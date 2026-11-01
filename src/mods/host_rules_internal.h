@@ -25,6 +25,10 @@ struct View {
 	std::vector<std::string> differ;   // host: players whose MMH5.5 files differ ("Name: settings"...)
 	bool this_differs = false;         // client: the host said this PC's files differ from its own
 	bool in_game_rules = false;        // in game: the host's rules are used (else the files')
+	// host: every PC can take the start rules (game mode, ToE bonuses), else why not;
+	// client: the host said they can (false: MMH5.5's way for them)
+	bool start_ok = true;
+	std::string start_why;
 };
 // The view for this role (the panel decides it from the screen on top and LobbyRole()).
 View GetView(View::Role role);
@@ -43,6 +47,22 @@ bool InstallPanel();
 // Is the waiting room on top, and this PC's role there (the logic seen in the
 // last second)? kNoGame when not in a waiting room.
 View::Role LobbyRole();
+
+// --- the lobby's bonus tooltips (host_rules_bonus.cpp) ---
+// What the waiting room's bonus tooltips should say. Not ours: the game's own
+// (MMH5.5's texts: its modes). Ours: ToE's bonuses (toe), or that the choice
+// gives nothing (MMH5.5's start artifact for everyone), and the game mode.
+struct BonusTips {
+	bool ours = false;
+	bool toe = false;
+	int mode = 0;  // ModeUsed(): 1 Default, 2 Savage, 3 Nightmare, 4 Random
+};
+// For these rule values (when every PC takes them).
+BonusTips TipsFor(const Values &values);
+// From the lobby logic's update (host or client, the main thread): each row's
+// four bonus tooltips (its own copies of the texts) set to `tips`, and the shown
+// one refreshed; logs each row's bonus when it changes.
+void SyncBonusTips(void *logic, const BonusTips &tips);
 
 }  // namespace rules
 }  // namespace mods

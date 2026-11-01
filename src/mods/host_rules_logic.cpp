@@ -23,6 +23,8 @@ const RuleDef kRules[kRuleCount] = {
 	{"competitive_towns", "H55_CompetitiveARMGTowns", kBool, 0, 1, kRandomMaps},
 	{"mana_observatories", "H55_ManaObservatories", kBool, 0, 1, kRandomMaps},
 	{"moon_disc", "H55_MoonDiscOnARMGMaps", kBool, 0, 1, kRandomMaps},
+	{"game_mode", nullptr, kChoice, 0, 4, kStart},
+	{"toe_bonuses", nullptr, kBool, 0, 1, kStart},
 };
 
 const char *const kMultipliers[kMultiplierCount] = {"0.5", "0.75", "1", "1.25", "1.5", "2", "3"};
@@ -150,7 +152,7 @@ void Scan(const std::string &lua, std::vector<Spot> *spots, std::vector<bool> *o
 				++p;
 			int rule = -1;
 			for (int r = 0; r < kRuleCount; ++r)
-				if (name == kRules[r].var)
+				if (kRules[r].var && name == kRules[r].var)
 					rule = r;
 			const size_t value_at = p;
 			while (p < eol && (Digit(lua[p]) || lua[p] == '.'))
@@ -228,7 +230,7 @@ std::string Substitute(const std::string &lua, const Values &values, std::vector
 	const char *eol = lua.find("\r\n") != std::string::npos ? "\r\n" : "\n";
 	bool added = false;
 	for (int r = 0; r < kRuleCount; ++r) {
-		if (static_cast<size_t>(r) >= values.size() || values[r].empty() || (seen[r] && !other[r]))
+		if (!kRules[r].var || static_cast<size_t>(r) >= values.size() || values[r].empty() || (seen[r] && !other[r]))
 			continue;
 		if (!added && !out.empty() && out[out.size() - 1] != '\n')
 			out += eol;
@@ -241,7 +243,7 @@ std::string Substitute(const std::string &lua, const Values &values, std::vector
 	}
 	if (changes)
 		for (int r = 0; r < kRuleCount; ++r)
-			if (static_cast<size_t>(r) < values.size() && !values[r].empty() && values[r] != before[r])
+			if (kRules[r].var && static_cast<size_t>(r) < values.size() && !values[r].empty() && values[r] != before[r])
 				changes->push_back(std::string(kRules[r].key) + " " + (before[r].empty() ? "?" : before[r]) + "->" + values[r]);
 	return out;
 }
@@ -272,16 +274,16 @@ uint32_t HashWithoutRuleValues(const std::string &lua)
 
 std::string Encode(const Values &values)
 {
-	std::string text = "OHR1";
+	std::string text = "OHR2";
 	for (int r = 0; r < kRuleCount; ++r)
 		if (static_cast<size_t>(r) < values.size() && ValidValue(kRules[r], values[r]))
 			text += std::string(";") + kRules[r].key + "=" + values[r];
-	return text.size() <= static_cast<size_t>(kTextMax) ? text : std::string("OHR1");
+	return text.size() <= static_cast<size_t>(kTextMax) ? text : std::string("OHR2");
 }
 
 bool Decode(const std::string &text, Values *values)
 {
-	if (text.compare(0, 4, "OHR1") != 0 || text.size() > static_cast<size_t>(kTextMax))
+	if (text.compare(0, 4, "OHR2") != 0 || text.size() > static_cast<size_t>(kTextMax))
 		return false;
 	Values v = NoValues();
 	size_t p = 4;
@@ -306,7 +308,7 @@ bool Decode(const std::string &text, Values *values)
 
 std::string LobbyText(int flags, const Values &values)
 {
-	std::string text = "L1|" + std::to_string(flags & 0xff) + "|";
+	std::string text = "L2|" + std::to_string(flags & 0xff) + "|";
 	for (int r = 0; r < kRuleCount; ++r) {
 		if (r)
 			text += ",";
@@ -318,7 +320,7 @@ std::string LobbyText(int flags, const Values &values)
 
 bool ReadLobbyText(const std::string &text, int *flags, Values *values)
 {
-	if (text.compare(0, 3, "L1|") != 0)
+	if (text.compare(0, 3, "L2|") != 0)
 		return false;
 	const size_t bar = text.find('|', 3);
 	if (bar == std::string::npos || bar == 3 || bar > 6)
@@ -352,6 +354,173 @@ bool HasMapScript(const std::string &map_xdb)
 	const size_t end = map_xdb.find('>', at);
 	const size_t href = map_xdb.find("href=\"", at);
 	return end != std::string::npos && href != std::string::npos && href < end && map_xdb.compare(href + 6, 1, "\"") != 0;
+}
+
+// --- MMH5.5's start script -------------------------------------------------------------------------
+namespace {
+
+const char kStartMarker[] = "H55_DEBUG = {102,\"StartingBonus\",1,\"NoHero\"};";
+const char kEndMarker[] = "H55_DEBUG = {103,\"StartingArmies\",1,\"NoHero\"};";
+// The edits' places (each must be in the part exactly once).
+const char kAmountAi[] = "local amountai = table.containsamount(H55_PlayerStatus,1);";
+const char kHumansLoop[] = "if H55_MapType ~= \"Campaign\" then";
+const char kModeDecision[] = "if H55_MapType == \"Scenario\" then";
+// What the edits rely on: the three flags are locals of the part, declared
+// before the computer players' count; the humans' loop (between edits 2 and 3)
+// takes the bonus back and gives MMH5.5's artifact; the mode's decision (after
+// edit 3) reads the three flags.
+const char *const kFlags[] = {"local somebodygold = 0;", "local somebodyres = 0;", "local somebodyartifact = 0;"};
+const char *const kInLoop[] = {"for i=1,8 do", "(H55_IsThisAIPlayer(i) ~= 1)", "SetPlayerResource(i,6,", "RemoveArtefact(heroes[0]",
+                               "H55_ArtifactStartBonus(heroes[0]);"};
+const char *const kInDecision[] = {"H55_GameMode ~= 0 and somebodyartifact == 1", "H55_GameMode ~= 0 and somebodygold == 1",
+                                   "H55_GameMode ~= 0 and somebodyres == 1"};
+
+// Where `what` is in [from, to) when it is there exactly once; npos otherwise.
+size_t FindOnce(const std::string &s, const char *what, size_t from, size_t to)
+{
+	const size_t n = strlen(what);
+	const size_t at = s.find(what, from);
+	if (at == std::string::npos || at + n > to)
+		return std::string::npos;
+	const size_t again = s.find(what, at + 1);
+	return again != std::string::npos && again + n <= to ? std::string::npos : at;
+}
+
+// Is `what` in [from, to)?
+bool Within(const std::string &s, const char *what, size_t from, size_t to)
+{
+	const size_t at = s.find(what, from);
+	return at != std::string::npos && at + strlen(what) <= to;
+}
+
+size_t LineStart(const std::string &s, size_t at)
+{
+	while (at > 0 && s[at - 1] != '\n')
+		--at;
+	return at;
+}
+
+// The line's own end, "\r\n" or "\n" (MMH5.5's file mixes both).
+std::string LineEnd(const std::string &s, size_t at)
+{
+	const size_t nl = s.find('\n', at);
+	return nl != std::string::npos && nl > 0 && s[nl - 1] == '\r' ? "\r\n" : "\n";
+}
+
+std::string Indent(const std::string &s, size_t line)
+{
+	size_t e = line;
+	while (e < s.size() && (s[e] == ' ' || s[e] == '\t'))
+		++e;
+	return s.substr(line, e - line);
+}
+
+}  // namespace
+
+bool FindStartBlock(const std::string &lua, size_t *begin, size_t *end)
+{
+	const size_t b = FindOnce(lua, kStartMarker, 0, lua.size());
+	const size_t e = FindOnce(lua, kEndMarker, 0, lua.size());
+	if (b == std::string::npos || e == std::string::npos || e <= b)
+		return false;
+	*begin = b;
+	*end = e;
+	return true;
+}
+
+uint32_t StartBlockHash(const std::string &lua)
+{
+	size_t b, e;
+	if (!FindStartBlock(lua, &b, &e))
+		return 0;
+	const uint32_t h = Fnv1a(lua.data() + b, e - b);
+	return h ? h : 1;
+}
+
+int ModeUsed(int game_mode, bool toe_bonuses)
+{
+	if (game_mode < 0 || game_mode > 4)
+		return 0;
+	return game_mode == 0 && toe_bonuses ? 1 : game_mode;
+}
+
+bool PatchStartScript(const std::string &lua, int game_mode, bool toe_bonuses, bool trace, std::string *out, std::string *why)
+{
+	const int mode = ModeUsed(game_mode, toe_bonuses);
+	if (mode == 0 && !toe_bonuses && !trace) {
+		*out = lua;
+		return true;
+	}
+	size_t b, e;
+	if (!FindStartBlock(lua, &b, &e)) {
+		*why = "its StartingBonus part (from H55_DEBUG = {102,\"StartingBonus\" to {103,\"StartingArmies\") is not there once";
+		return false;
+	}
+	const size_t amount = FindOnce(lua, kAmountAi, b, e);
+	const size_t loop = FindOnce(lua, kHumansLoop, b, e);
+	const size_t decision = FindOnce(lua, kModeDecision, b, e);
+	if (amount == std::string::npos || loop == std::string::npos || decision == std::string::npos || !(amount < loop && loop < decision)) {
+		*why = std::string("the lines \"") + kAmountAi + "\", \"" + kHumansLoop + "\" and \"" + kModeDecision +
+		       "\" are not each there once, in this order";
+		return false;
+	}
+	for (const char *flag : kFlags)
+		if (FindOnce(lua, flag, b, amount) == std::string::npos) {
+			*why = std::string("\"") + flag + "\" is not there once before the computer players' count";
+			return false;
+		}
+	for (const char *need : kInLoop)
+		if (!Within(lua, need, loop, decision)) {
+			*why = std::string("the humans' loop has no \"") + need + "\"";
+			return false;
+		}
+	for (const char *need : kInDecision)
+		if (FindOnce(lua, need, decision, e) == std::string::npos) {
+			*why = std::string("the mode's decision has no \"") + need + "\" (once)";
+			return false;
+		}
+	if (lua.find('\n', amount) == std::string::npos || lua.find('\n', amount) > loop) {
+		*why = "no line end after the computer players' count";
+		return false;
+	}
+	// The edits, from the last place to the first: the earlier places stay where they are.
+	std::string s = lua;
+	if (trace) {
+		const size_t line = LineStart(s, e);
+		const std::string text =
+			Indent(s, line) +
+			"for i=1,8 do if GetPlayerState(i) == 1 then local h = GetPlayerHeroes(i); local a = \"\"; "
+			"if h ~= nil and h[0] ~= nil then if HasArtefact(h[0],ARTIFACT_WAND_OF_X) == 1 then a = a..\" wand\" end; "
+			"if HasArtefact(h[0],ARTIFACT_SCROLL_OF_SPELL_X) == 1 then a = a..\" scroll\" end; "
+			"for j,m in H55_MinorArtifacts do if HasArtefact(h[0],m) == 1 then a = a..\" \"..m end end end; "
+			"print(\"open-homm5: start of player \"..i..\" (computer \"..H55_IsThisAIPlayer(i)..\"): gold \"..GetPlayerResource(i,6)"
+			"..\" wood \"..GetPlayerResource(i,0)..\" ore \"..GetPlayerResource(i,1)..\" mercury \"..GetPlayerResource(i,2)"
+			"..\" crystal \"..GetPlayerResource(i,3)..\" sulfur \"..GetPlayerResource(i,4)..\" gems \"..GetPlayerResource(i,5)"
+			"..\"; minor artifacts:\"..a..\"; game mode \"..H55_GameMode) end end; -- open-homm5: [rules] trace=1" +
+			LineEnd(s, e);
+		s.insert(line, text);
+	}
+	if (mode != 0 || toe_bonuses) {
+		const size_t line = LineStart(s, decision);
+		const std::string decide =
+			Indent(s, line) +
+			"if OH55_Mode ~= 0 then if OH55_Mode == 4 then OH55_Mode = random(3)+1 end; "
+			"somebodyartifact = 0; somebodygold = 0; somebodyres = 0; "
+			"if OH55_Mode == 1 then somebodyartifact = 1 elseif OH55_Mode == 2 then somebodygold = 1 else somebodyres = 1 end; "
+			"end; -- open-homm5: the game mode is the host's rule, not the bonus arrows" +
+			LineEnd(s, decision);
+		s.insert(line, decide);
+		s.replace(loop, strlen(kHumansLoop), "if H55_MapType ~= \"Campaign\" and OH55_KeepToEBonus ~= 1 then");
+		const std::string values =
+			Indent(s, LineStart(s, amount)) + "local OH55_KeepToEBonus, OH55_Mode = " + (toe_bonuses ? "1" : "0") + ", " +
+			std::to_string(mode) +
+			"; -- open-homm5: the host's rules (1 = each human keeps the ToE start bonus; mode 1 Default, 2 Savage, "
+			"3 Nightmare, 4 Random, 0 = the bonus arrows)" +
+			LineEnd(s, amount);
+		s.insert(s.find('\n', amount) + 1, values);
+	}
+	*out = s;
+	return true;
 }
 
 bool IsLobbyRow(uint32_t row)
@@ -428,7 +597,7 @@ void HashRequest(char mark, uint32_t hash, uint32_t *type, uint8_t *byte)
 bool ReadHashRequest(uint32_t type, uint8_t byte, char *mark, uint32_t *hash)
 {
 	const char m = static_cast<char>(type >> 24);
-	if (m != kMarkSettingsRest && m != kMarkSettingsWhole && m != kMarkStats)
+	if (m != kMarkSettingsRest && m != kMarkSettingsWhole && m != kMarkStats && m != kMarkStartScript)
 		return false;
 	*mark = m;
 	*hash = static_cast<uint32_t>(byte) << 24 | (type & 0x00ffffffu);
