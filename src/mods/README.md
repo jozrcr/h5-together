@@ -816,6 +816,13 @@ Plan, research and robot checks: [docs/plans/host-rules.md](../../docs/plans/hos
 - **Good to know:** MMH5.5's scripts only run on maps with a map script. Hand-made maps and random maps saved with a script (MMH5.5's Mapmixer, the editor: the group's usual maps) have one. **A random map straight from the game's generator, in a multiplayer game, has none: there MMH5.5's scripts do not run at all**, so these switches change nothing (the settings pak does not either).
 - Single player uses your MMH5.5 file, as before.
 
+**Game mode and ToE start bonuses** (the panel's first group; `host_rules_bonus.cpp` for the lobby's tooltips). In MMH5.5 the lobby's bonus arrows choose the game mode (artifact = Default, gold = Savage, resources = Nightmare, random = one of them), and MMH5.5's start script then takes every human's bonus back and gives each first hero a random minor artifact instead. Two host rules change that:
+- **Game mode:** "Bonus arrows (MMH5.5)" (the default: as today), or Default, Savage, Nightmare, Random for everyone. Savage and Nightmare still team the computer players against the humans, as MMH5.5 does (MMH5.5's own code runs; only its input changes). Scenarios, campaigns and games without computer players keep MMH5.5's choice (Default).
+- **ToE start bonuses:** on = each player picks a start bonus with the arrows, as in Tribes of the East (gold, resources, a minor artifact, or random), and keeps it; MMH5.5's start artifact is not given (it is the same kind of bonus, so a player would get two). With this on and the mode on "Bonus arrows", the mode is Default.
+- **How:** when the map's scripts read `scripts/H55-AdvMap.lua`, every PC serves it with three small edits in its "StartingBonus" part. Each edit is checked against MMH5.5's text; if MMH5.5 changes that text in an update, the file is served as it is (MMH5.5's way) and the log says why. RC19d and RC19k have the same part. The start rules are used only when every PC has the same part (its hash travels in the hello); otherwise the panel says why and MMH5.5's way stays.
+- **The tooltips:** with these rules on, the bonus icons' tooltips in the waiting room describe ToE's bonuses and the game mode (English or French, as the panel). Not changed: the icons themselves (MMH5.5's mode pictures).
+- The log: `rules: the scripts read scripts/H55-AdvMap.lua: served with game mode Default, each human keeps the ToE start bonus; ... hash ...` (the same hash on every PC).
+
 **Robot checks** (2026-11-01, LAN, two copies; all world checksums equal):
 - A1M4 (RC19k) with `governance=0 ai_cheat=0 mixed_stacks=0`: both PCs served the same file (hash `a07c5c34`), MMH5.5 no longer mixed the neutral stacks (`H55 Stacks Qty: 36`, no `H55 Mixing`). The client saw the host's rules in the waiting room and in game.
 - The owner's `MAP_JoacJoz` (a random map with a map script): the same, plus `competitive_towns=0`.
@@ -836,5 +843,8 @@ governance=   ; the host's choices, written by the panel (empty = MMH5.5's file)
               ; town_conversion, extra_conversions, town_gate, mine_control, dimension_doors,
               ; ai_cheat, mixed_stacks, neutral_stack_size, bank_difficulty, negative_artifacts,
               ; rpg_potions, competitive_towns, mana_observatories, moon_disc
-trace=0       ; testing: log every script file the game opens
+game_mode=    ; 0 or empty = the bonus arrows (MMH5.5), 1 Default, 2 Savage, 3 Nightmare, 4 Random
+toe_bonuses=  ; 1 = each player keeps the ToE start bonus picked with the arrows (0 or empty = MMH5.5's way)
+trace=0       ; testing: log every script file the game opens, and print each player's start
+              ; resources and minor artifacts to the game's console
 ```

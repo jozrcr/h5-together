@@ -133,7 +133,7 @@ const Words kEnglish = {
 	 "Random map towns start with a level 1 mage guild.",
 	 "Redwood observatories also restore mana (random maps).",
 	 "The moon disc artifact quest on random maps.",
-	 "Default, Savage or Nightmare for everyone (MMH5.5: the bonus arrows choose it).",
+	 "Default, Savage or Nightmare for everyone (MMH5.5: the bonus arrows).",
 	 "Each player keeps the start bonus picked with the arrows: gold, resources, artifact."},
 	{"Off", "40%", "60%", "80%", "100% (MMH5.5)", "120%", "140%"},
 	"On", "Off",
@@ -189,7 +189,7 @@ const Words kFrench = {
 	 "Sur les cartes al" E_ACUTE "atoires, chaque ville a une guilde des mages niveau 1.",
 	 "Les observatoires rendent aussi le mana (cartes al" E_ACUTE "atoires).",
 	 "La qu" E_CIRC "te de l'artefact du disque lunaire sur les cartes al" E_ACUTE "atoires.",
-	 "Par d" E_ACUTE "faut, Sauvage ou Cauchemar pour tous (MMH5.5" NBSP ": choisi par les fl" E_GRAVE "ches de bonus).",
+	 "Par d" E_ACUTE "faut, Sauvage ou Cauchemar pour tous (MMH5.5" NBSP ": les fl" E_GRAVE "ches de bonus).",
 	 "Chacun garde le bonus de d" E_ACUTE "part choisi avec les fl" E_GRAVE "ches" NBSP ": or, ressources, artefact."},
 	{"Aucun", "40" NBSP "%", "60" NBSP "%", "80" NBSP "%", "100" NBSP "% (MMH5.5)", "120" NBSP "%", "140" NBSP "%"},
 	"Oui", "Non",
@@ -508,7 +508,7 @@ void RuleRow(ImDrawList *draw, ImVec2 origin, float k, float width, float y, int
 	std::string help = w.help[r];
 	if (r == rules::kGameModeRule && (value.empty() || value == rules::kStartRuleOff) && g.edit[rules::kToeBonusRule] == "1")
 		help = w.mode_with_toe;
-	if (changed) {
+	if (changed && !rules::IsStartRule(r)) {  // (the start rules are not in the file: gold says "not MMH5.5's way")
 		char note[64];
 		_snprintf_s(note, sizeof(note), _TRUNCATE, w.file_value, Shown(rule, file, w).c_str());
 		help += std::string(" (") + note + ")";

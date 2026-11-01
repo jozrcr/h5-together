@@ -86,7 +86,7 @@ const Words kEnglish = {
 	{L"<color=yellow>Start bonus: random<color_default><br>Gold, resources or a minor artifact, as in Tribes of the East.",
 	 L"<color=yellow>Start bonus: minor artifact<color_default><br>Your first hero starts with a random minor artifact.",
 	 L"<color=yellow>Start bonus: gold<color_default><br>500 to 1000 more gold at the start.",
-	 L"<color=yellow>Start bonus: resources<color_default><br>3 to 6 more of random resources at the start."},
+	 L"<color=yellow>Start bonus: resources<color_default><br>3 to 6 more of one random resource at the start."},
 	L"<color=yellow>No start bonus to choose<color_default><br>MMH5.5 gives every human player's first hero a random minor "
 	L"artifact.",
 	L"<br><br>Game mode: %ls (the host's game rules).",
@@ -100,8 +100,8 @@ const Words kFrench = {
 	 L"<color=yellow>Bonus de départ : artefact mineur<color_default><br>Votre premier héros commence avec un artefact "
 	 L"mineur aléatoire.",
 	 L"<color=yellow>Bonus de départ : or<color_default><br>500 à 1000 pièces d'or de plus au départ.",
-	 L"<color=yellow>Bonus de départ : ressources<color_default><br>3 à 6 ressources aléatoires de plus au "
-	 L"départ."},
+	 L"<color=yellow>Bonus de départ : ressources<color_default><br>3 à 6 unités d'une ressource "
+	 L"aléatoire de plus au départ."},
 	L"<color=yellow>Pas de bonus de départ à choisir<color_default><br>MMH5.5 donne au premier héros de chaque "
 	L"joueur humain un artefact mineur aléatoire.",
 	L"<br><br>Mode de jeu : %ls (règles de la partie choisies par l'hôte).",

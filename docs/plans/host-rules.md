@@ -1,8 +1,8 @@
 # Plan and status: game rules chosen by the host
 
-Status: **step 1 built and robot-checked** (2026-11-01): MMH5.5's own switches, chosen by the host in a panel, used by every PC. Code: `src/mods/host_rules.cpp` (the game's side), `host_rules_logic.cpp` (the pure work, unit-tested by `src/hook/test/host_rules_test.cpp`), `host_rules_panel.cpp` (the panel). Settings: `open-homm5.ini` `[rules]`.
+Status: **step 1 built and robot-checked** (2026-11-01): MMH5.5's own switches, chosen by the host in a panel, used by every PC. **Step 2 built and robot-checked** (2026-11-01, night): the game mode and ToE's start bonuses (section "Step 2" below). Code: `src/mods/host_rules.cpp` (the game's side), `host_rules_logic.cpp` (the pure work, unit-tested by `src/hook/test/host_rules_test.cpp`), `host_rules_panel.cpp` (the panel), `host_rules_bonus.cpp` (the lobby's bonus tooltips). Settings: `open-homm5.ini` `[rules]`.
 
-The owner (2026-11-01): "Rules chosen by the host each game, with no file swapping: YES, this would be awesome as a new settings menu when setting up a game." He likes most of MMH5.5, so step 1 is MMH5.5's own switches. The same menu gets later: the class skill lock and the ToE start bonuses ([lobby-audio-classes.md](lobby-audio-classes.md), items 3 and 4).
+The owner (2026-11-01): "Rules chosen by the host each game, with no file swapping: YES, this would be awesome as a new settings menu when setting up a game." He likes most of MMH5.5, so step 1 is MMH5.5's own switches. Step 2 is the ToE start bonuses ([lobby-audio-classes.md](lobby-audio-classes.md), item 3; the owner chose option A: each player picks a bonus with the lobby's arrows, and the mode gets its own chooser). Later in the same menu: the class skill lock (item 4).
 
 Background: [mmh55-vs-vanilla.md](mmh55-vs-vanilla.md), B.5 (every setting of `H55-Settings.lua`) and C.1 (ways a rule can reach every PC).
 
@@ -41,6 +41,47 @@ From `H55-Settings.lua` ([mmh55-vs-vanilla.md](mmh55-vs-vanilla.md), B.5). `[rul
 
 Left out on purpose: `H55_DimensionDoorsOnThisMap`, `H55_MoonDiscQuest`, `H55_ForceMixedStacks` (MMH5.5 says they are for map makers), the town pre-build levels, the Duel template's numbers, the governors' experience. They stay as in each PC's file. Adding one later is one line in `kRules` (`host_rules_logic.cpp`), its words in the panel, and a new protocol version (below).
 
+## Step 2: game mode and start bonuses (built 2026-11-01)
+
+**What MMH5.5 does** ([lobby-audio-classes.md](lobby-audio-classes.md), item 2). Each lobby row has bonus arrows (ToE's start bonus: random, minor artifact, gold, resources). The game hands the bonus out when the map starts. Then MMH5.5's start script, `scripts/H55-AdvMap.lua` (`H55_PrepareAdvMap`, the part from `H55_DEBUG = {102,"StartingBonus"` to `{103,"StartingArmies"`, dofile'd by `H55-Core.lua` on every PC), looks at each human's gold, resources and first hero's artifacts, recognises the bonus, **takes it back**, gives each human's first hero a random minor artifact of its own (`H55_ArtifactStartBonus`; its creature bonus is commented out), and makes one **game mode** of the humans' picks: any artifact = Default, else any gold = Savage, else any resources = Nightmare. Savage and Nightmare stop the AI heroes from fleeing (Nightmare: also unlootable) and team the computer players against the humans (`H55_TeamHumansvsAI`, or `H55_TeamAI` with `H55_NoAutoTeamHumans = 1`). Scenarios, campaigns and games without computer players get Default; "casual" is decided elsewhere (`H55_UpdateGameMode`) and is left alone.
+
+**The two rules** (group "Game mode and start bonuses", first in the panel; `[rules]` keys; not in `H55-Settings.lua`, so "0" is each PC's default):
+
+| `[rules]` key | Values | Default |
+|---|---|---|
+| `game_mode` | 0 = the bonus arrows (MMH5.5's way), 1 Default, 2 Savage, 3 Nightmare, 4 Random (one of the three, drawn in the script with the game's shared random numbers, `random(3)+1`) | 0 |
+| `toe_bonuses` | 1 = each human keeps the ToE bonus picked with the arrows, and MMH5.5's start artifact is not given | 0 |
+
+With `toe_bonuses=1` and `game_mode=0`, the mode is Default (the arrows now choose bonuses). **Why MMH5.5's start artifact is not given with the ToE bonuses:** it is exactly ToE's "minor artifact" bonus given to everyone; on top of a ToE bonus, an artifact picker would get two. With `toe_bonuses=0` and a mode, MMH5.5 still takes the bonus back and gives its artifact (only the mode is the host's).
+
+**The served script** (`PatchStartScript`, every PC, when a start rule is not MMH5.5's way). Three edits inside the "StartingBonus" part, each place found **exactly once** (and in this order), else the file is served as it is and the log says why (`REFUSED`):
+1. after `local amountai = table.containsamount(H55_PlayerStatus,1);`: a line `local OH55_KeepToEBonus, OH55_Mode = <toe>, <mode>; -- open-homm5: ...`;
+2. the humans' loop `if H55_MapType ~= "Campaign" then` gets `and OH55_KeepToEBonus ~= 1` (the whole take-back and MMH5.5's artifact are skipped);
+3. before `if H55_MapType == "Scenario" then` (the mode's decision): one line that sets MMH5.5's three "somebody chose" flags from `OH55_Mode`. MMH5.5's own decision code then runs unchanged: its prints, the AI heroes that never flee, the teams.
+
+The checks also require the three flags to be locals of the part before the AI count, the loop to contain the take-back (`SetPlayerResource(i,6,`, `RemoveArtefact(heroes[0]`, `H55_ArtifactStartBonus(heroes[0]);`), and the decision to read the three flags. Each new line takes its neighbour's indent and line end (the file mixes CRLF and LF). Unit-tested on a text of ours in the file's layout (`TestStartScript`: the edits, nothing else changes, refusals); checked on the real RC19d and RC19k files in the scratchpad (never committed): both patch, and their "StartingBonus" parts are **identical** (hash `da18d7b6`), so an RC19d and an RC19k PC can play together on these rules. With `[rules] trace=1`, one more line before the next part prints each player's start resources and minor artifacts to the console (testing only).
+
+**Every PC the same:**
+- the rules travel in the start message with the others (protocol 2: `OHR2`, `L2`; a PC with protocol 1 counts as "without the add-on");
+- each client's hello also sends the hash of its "StartingBonus" part (mark `'A'`). The host uses the start rules only when its own part takes our edits and every human client sent the same hash; otherwise it sends them as "0" (MMH5.5's way, the arrows choose the mode), logs `rules: START: the game mode and ToE start bonuses stay MMH5.5's way ...`, and both panels say why (the lobby text's flag `kNoStart`);
+- a PC without the add-on: no rules at all, MMH5.5's way everywhere (step 1's rule).
+
+**The lobby's tooltips** (`host_rules_bonus.cpp`). The game reads each text file once per session, and each lobby row copies the four bonus tooltips when it is made (`0x00714f00`), before a joining client knows the host's rules, so serving other text files cannot follow the rules. Instead, every 0.5 s, the lobby logic's update rewrites each row's own copies: the row (`NUI::CMPWaitItem`, vftable `0x00e39ce8`) keeps at `+0x108` a vector of five `hash_map<int, wstring>` (0x18 bytes each); the fourth (`+0x48`) holds the bonus tooltips by bonus number; `0x0040e960` (`wstring::assign(first, last)`) puts our text in, and the icon (`+0x9c`) gets the one of the row's bonus (`+0x84`) through its vtable slot `0x68`, exactly as the row's refresh `0x00713fe0` does. Our texts (English or French, the panel's language): ToE's bonus (e.g. "Start bonus: gold. 500 to 1000 more gold at the start.") and "Game mode: Savage (the host's game rules)"; with only a mode, "No start bonus to choose: MMH5.5 gives every human player's first hero a random minor artifact." MMH5.5's texts come back when the rules go back to MMH5.5's way (or a player without the add-on joins). **Gaps:** the icons stay MMH5.5's mode pictures (a fist and a burning town for gold...): the game loads them once too, and swapping them would need the icon's texture list (not studied; MMH5.5's pak still has three of ToE's icons as `Gold_ret`, `RandomArtifact_ret`, `Random_ret`); the tooltips were set without an error in every run, but the robot cannot hover, so nobody has seen them on screen yet.
+
+**Found on the way:** the lobby's arrow kinds are a row's pending request type `+0xc4`: 1 state, 2 team, 3 faction, **4 hero** (`hero_change_*`, `0x007138e0`/`0x00713900`), **5 start bonus** (`bonus_change_*`, `0x00713920`/`0x00713940`). The host's handler asks the game setup (`NWorld::CPlayersStartInfo`, vtable `0x00e92744`) first: `+0x3c`/`+0x40` for a hero, `+0x44`/`+0x48` for a bonus. The robot's `arrow` step has `<row> bonus left|right` and `<row> hero left|right`. ToE's resources bonus is 3 to 6 of one random resource (seen: +4 sulfur, +6 mercury, +5 gems, +4 mercury); gold is +500 to +1000 (seen: +900, +800).
+
+**Robot checks** (2026-11-01, LAN on A1M4, `[rules] trace=1` on both copies; the console lines are each copy's):
+
+| Run | Rules | Lobby | Result |
+|---|---|---|---|
+| `20261101-225141-lan` (RC19k) | `toe_bonuses=1 game_mode=1` | host: gold (2× right), client: resources (3× right) | Both PCs served the same script (hash `cfaff75f`). `H55 Players chose Default mode`. Host: gold 20900 (difficulty base 20000), client: gems 15 (base 10): **both kept their bonus**, no MMH5.5 artifact. The panels: the host's editable, the client's read only with the host's values (screenshots). **332 world checksums, all equal.** |
+| `20261101-225339-lan` (RC19k) | MMH5.5's way (no start rules) | the same picks | Script served with only the trace line. MMH5.5 as before: `H55 Players chose more difficult mode` (gold → Savage), `All AI Players have allied against the human players`, gold 20000 and gems 10 (taken back), MMH5.5's artifacts 113 and 61. The tooltips stayed the game's own. **332 checksums, all equal.** |
+| `20261101-225529-lan` (RC19k, client `texts=fr`) | `toe_bonuses=1 game_mode=2` | host: minor artifact, client: random | Same hash on both (`08191c58`). Savage: the AI heroes fight to death and the AIs ally against the humans. Host kept its ToE artifact (175), the client's random gave an artifact (14); **one artifact each** (no MMH5.5 extra). **324 checksums, all equal.** |
+| `20261101-225727-lan` (**RC19d**, `C:\Games\H5_test`) | `toe_bonuses=1 game_mode=3` | host: resources (1× left: random wraps to resources), client: gold | Same hash on both (`ce53e759`). `H55 Player chose most difficult mode, AI heroes are unlootable and fight to death`, AIs allied. Host +4 mercury, client gold 20800. **327 checksums, all equal.** |
+| `20261101-224738-lan` (RC19k, first try) | `toe_bonuses=1 game_mode=1` | the robot pressed the **hero** arrows (type 4) by mistake: both bonuses stayed random | Both humans got a random resources bonus and kept it; Default. 326 checksums, all equal. |
+
+Not robot-checked: a client without the add-on with these rules chosen (the step 1 path, already checked), a client whose start script differs (the hash check: RC19d and RC19k have the same part, so no test copy differs), Random mode, a scenario or a campaign map.
+
 ## How the choice reaches every PC (research, 2026-11-01)
 
 | Channel | Direction, when | Verdict |
@@ -59,7 +100,7 @@ Left out on purpose: `H55_DimensionDoorsOnThisMap`, `H55_MoonDiscQuest`, `H55_Fo
 
 **A PC without the mod**, or with `[rules] enabled=0`, or with another protocol version, says no hello (or another version), so the host sends no chunk, and every PC uses its own file, as without the mod. The host's log has `rules: START: Robot-client without open-homm5's rules: every PC uses its own H55-Settings.lua`, its panel the same warning, and our lobby button a red "!".
 
-**Versions.** The carried text starts with `OHR1` (the lobby's with `L1`); a PC refuses a text with an unknown key or a bad value (`Decode`), and the hello carries `kProtocol` (1). A new rule = a new protocol version, so an older PC is treated as "without the mod" and nobody plays on rules it cannot apply.
+**Versions.** The carried text starts with `OHR2` (the lobby's with `L2`; step 1 used `OHR1`, `L1`); a PC refuses a text with an unknown key or a bad value (`Decode`), and the hello carries `kProtocol` (2 since step 2). A new rule = a new protocol version, so an older PC is treated as "without the mod" and nobody plays on rules it cannot apply.
 
 ## How each PC applies them
 
@@ -120,11 +161,12 @@ Screenshots: the session's `scratchpad\rules-shots\`.
 
 ## Later
 
-1. **The class skill lock** ([lobby-audio-classes.md](lobby-audio-classes.md) item 4) and **ToE start bonuses** (item 3) in the same panel: a new group, new keys in the carried text (protocol 2), served data files (`HeroClass.xdb`, the hero files, `H55-AdvMap.lua`) the same way.
+1. **The class skill lock** ([lobby-audio-classes.md](lobby-audio-classes.md) item 4) in the same panel: a new group, new keys in the carried text (protocol 3), served data files (`HeroClass.xdb`, the hero files) the same way. (The ToE start bonuses, item 3, are step 2.)
 2. **The button's place** from the owner's sketch (and one on the setup screen).
 3. **The check in the co-op hello** too, for games joined without our lobby (a second ignored checksum message with the served file's hash).
 4. **MMH5.5's scripts on generated random maps in multiplayer** (an owner's choice: it changes the game; MMH5.5's way is the Mapmixer). Where to start: the two places that run `scripts/advmap-startup.lua`, `0x00603b20` (called from `0x006089a0`) and `0x00992d00` (called from `0x009941a0`; it returns early when two bytes of the world's settings, its slot `0x14`, are both 0). Not studied further.
 5. Single player and hotseat could use the host's choices too (today they use the file).
+6. **The bonus icons** with the ToE bonuses on: ToE's own pictures instead of MMH5.5's mode pictures (step 2, "Gaps"). And the owner's look at the new tooltips by hand (hover the bonus icon in the waiting room).
 
 ## Addresses (vanilla 3.1, also `MMH55_Utility`)
 
