@@ -71,12 +71,16 @@ void TestTable()
 	Check(unique, "every rule has its own key and variable");
 	bool start = Index("game_mode") == kGameModeRule && Index("toe_bonuses") == kToeBonusRule;
 	for (int r = 0; r < kRuleCount; ++r)
-		start = start && (IsStartRule(r) == (kRules[r].var == nullptr)) && (IsStartRule(r) == (kRules[r].group == kStart)) &&
-		        (!IsStartRule(r) || ValidValue(kRules[r], kStartRuleOff));
-	Check(start, "the start rules: the last two, no settings variable, their own group, \"0\" = MMH5.5's way");
+		start = start && (IsStartRule(r) || r == kMapScripts) == (kRules[r].var == nullptr) &&
+		        (IsStartRule(r) == (kRules[r].group == kStart)) && (!IsStartRule(r) || ValidValue(kRules[r], kStartRuleOff));
+	Check(start, "the start rules: no settings variable, their own group, \"0\" = MMH5.5's way");
 	Check(ValidValue(kRules[kGameModeRule], "4") && !ValidValue(kRules[kGameModeRule], "5") &&
 	          ValidValue(kRules[kToeBonusRule], "1") && !ValidValue(kRules[kToeBonusRule], "2"),
 	      "game mode 0 to 4, ToE bonuses 0 or 1");
+	Check(kMapScripts == Index("map_scripts") && kMapScripts == kRuleCount - 1 && !kRules[kMapScripts].var &&
+	          kRules[kMapScripts].kind == kBool && kRules[kMapScripts].group == kRandomMaps && !IsStartRule(kMapScripts),
+	      "map_scripts: the table's last, no settings variable (the add-on applies it), on/off, with the random maps");
+	Check(kProtocol == 3, "protocol 3 (map_scripts after the start rules): a PC with version 1 or 2 gets no rules");
 	bool plain = true;
 	for (int r = 0; r < kRuleCount; ++r)
 		for (const char *c = kRules[r].key; *c; ++c)
@@ -120,6 +124,8 @@ void TestParse()
 	Check(none[Index("ai_cheat")].empty(), "an expression is not a value we can read");
 	const Values last = ParseSettings("H55_AICheatMode = 1;\nH55_AICheatMode = 3;\n");
 	Check(last[Index("ai_cheat")] == "3", "the last assignment wins, as in Lua");
+	Check(v[kMapScripts].empty() && ParseSettings("map_scripts = 1;\n")[kMapScripts].empty(),
+	      "map_scripts is never read from the file");
 }
 
 // Every byte outside the changed numbers is the same.
@@ -198,6 +204,17 @@ void TestSubstitute()
 	Check(ParseSettings(expr)[Index("ai_cheat")].empty() && expr.size() > tail.size() &&
 	          expr.compare(expr.size() - tail.size(), tail.size(), tail) == 0 && expr.find("H55_AICheatMode = 2;\n") == 0,
 	      "a variable also set by an expression gets our line at the end");
+	// map_scripts: not a variable of the file, so the file never changes for it
+	Values scripts = NoValues();
+	scripts[kMapScripts] = "1";
+	changes.clear();
+	Check(Substitute(file, scripts, &changes) == file && changes.empty(), "map_scripts alone: the file is served as it is");
+	scripts[Index("governance")] = "0";
+	changes.clear();
+	const std::string with = Substitute(file, scripts, &changes);
+	Check(ParseSettings(with)[Index("governance")] == "0" && with.size() == file.size() && changes.size() == 1 &&
+	          with.find("map_scripts") == std::string::npos,
+	      "map_scripts with another rule: only the other rule's number changes, no line for map_scripts");
 }
 
 void TestHash()
@@ -218,12 +235,12 @@ void TestHash()
 void TestText()
 {
 	Values v = NoValues();
-	Check(Encode(v) == "OHR2", "no values: \"OHR2\"");
+	Check(Encode(v) == "OHR3", "no values: \"OHR3\"");
 	v[Index("governance")] = "0";
 	v[Index("ai_cheat")] = "0";
 	v[Index("neutral_stack_size")] = "1.25";
 	const std::string text = Encode(v);
-	Check(text == "OHR2;governance=0;ai_cheat=0;neutral_stack_size=1.25", "values in the table's order");
+	Check(text == "OHR3;governance=0;ai_cheat=0;neutral_stack_size=1.25", "values in the table's order");
 	Values back;
 	Check(Decode(text, &back) && back == v, "decoded back to the same values");
 	Values with_start = v;
@@ -231,15 +248,15 @@ void TestText()
 	with_start[kToeBonusRule] = "1";
 	Check(Encode(with_start) == text + ";game_mode=3;toe_bonuses=1" && Decode(Encode(with_start), &back) && back == with_start,
 	      "the start rules travel too");
-	Check(!Decode("OHR1;governance=0", &back), "another version (1: no start rules) is refused");
-	Check(!Decode("OHR2;governance=2", &back) && !Decode("OHR2;game_mode=5", &back), "a bad value is refused");
-	Check(!Decode("OHR2;governance=0;governance=1", &back), "a key twice is refused");
-	Check(!Decode("OHR2;new_rule=1", &back), "an unknown key is refused (a newer host: nothing is used)");
-	Check(!Decode("OHR2;governance", &back) && !Decode("OHR2governance=0", &back) && !Decode("OHR2;", &back),
+	Check(!Decode("OHR1;governance=0", &back) && !Decode("OHR2;governance=0", &back), "another version (1, 2) is refused");
+	Check(!Decode("OHR3;governance=2", &back) && !Decode("OHR3;game_mode=5", &back), "a bad value is refused");
+	Check(!Decode("OHR3;governance=0;governance=1", &back), "a key twice is refused");
+	Check(!Decode("OHR3;new_rule=1", &back), "an unknown key is refused (a newer host: nothing is used)");
+	Check(!Decode("OHR3;governance", &back) && !Decode("OHR3governance=0", &back) && !Decode("OHR3;", &back),
 	      "broken texts are refused");
 	Values bad = NoValues();
 	bad[Index("governance")] = "7";
-	Check(Encode(bad) == "OHR2", "invalid values are never sent");
+	Check(Encode(bad) == "OHR3", "invalid values are never sent");
 	// the longest text: every rule with an 8-character value
 	Values longest = NoValues();
 	for (int r = 0; r < kRuleCount; ++r)
@@ -249,19 +266,35 @@ void TestText()
 	      "every rule at its longest fits (start message chunk: 512 bytes with its zero)");
 	Check(all.size() < 512 - 1, "the chunk keeps a final zero");
 
+	Values scripts = v;
+	scripts[kMapScripts] = "1";
+	const std::string with_scripts = Encode(scripts);
+	Check(with_scripts == text + ";map_scripts=1" && Decode(with_scripts, &back) && back == scripts,
+	      "map_scripts travels in the start message like the others");
+	Values all_three = with_start;
+	all_three[kMapScripts] = "0";
+	Check(Encode(all_three) == text + ";game_mode=3;toe_bonuses=1;map_scripts=0" && Decode(Encode(all_three), &back) &&
+	          back == all_three,
+	      "the start rules and map_scripts travel together");
+	Check(!Decode("OHR3;map_scripts=2", &back), "map_scripts takes 0 or 1 only");
+	Check(!Decode("OHR2;governance=0;game_mode=3", &back), "a version 2 text (no map_scripts) is refused");
+
 	const std::string lobby = LobbyText(kWillApply | kDiffers, v);
 	int flags = 0;
-	Check(lobby == "L2|3|0,,,,,,0,,1.25,,,,,,,," && ReadLobbyText(lobby, &flags, &back) && flags == 3 && back == v,
-	      "the lobby text: L2|flags|every value in the table's order");
-	Check(LobbyText(kWillApply | kNoStart, with_start) == "L2|9|0,,,,,,0,,1.25,,,,,,,3,1" &&
+	Check(lobby == "L3|3|0,,,,,,0,,1.25,,,,,,,,," && ReadLobbyText(lobby, &flags, &back) && flags == 3 && back == v,
+	      "the lobby text: L3|flags|every value in the table's order");
+	Check(LobbyText(kWillApply | kNoStart, with_start) == "L3|9|0,,,,,,0,,1.25,,,,,,,3,1," &&
 	          ReadLobbyText(LobbyText(kWillApply | kNoStart, with_start), &flags, &back) && flags == 9 && back == with_start,
 	      "the start rules and their flag in the lobby text");
-	Check(!ReadLobbyText(text, &flags, &back) && !ReadLobbyText("L2|x|0,,,,,,0,,1.25,,,,,,,,", &flags, &back) &&
-	          !ReadLobbyText("L2||0,,,,,,0,,1.25,,,,,,,,", &flags, &back) && !ReadLobbyText("L1|3|0,,,,,,0,,1.25,,,,,,", &flags, &back),
+	Check(LobbyText(kNoScript, scripts) == "L3|4|0,,,,,,0,,1.25,,,,,,,,,1" && ReadLobbyText(LobbyText(kNoScript, scripts), &flags, &back) &&
+	          flags == 4 && back == scripts,
+	      "map_scripts in the lobby text (the last value)");
+	Check(!ReadLobbyText(text, &flags, &back) && !ReadLobbyText("L3|x|0,,,,,,0,,1.25,,,,,,,,,", &flags, &back) &&
+	          !ReadLobbyText("L3||0,,,,,,0,,1.25,,,,,,,,,", &flags, &back) && !ReadLobbyText("L2|3|0,,,,,,0,,1.25,,,,,,,,", &flags, &back),
 	      "a lobby text without flags, or of another version, is refused");
-	Check(!ReadLobbyText("L2|1|0,,,,,,0,,1.25,,,,,,,", &flags, &back) && !ReadLobbyText("L2|1|0,,,,,,0,,1.25,,,,,,,,,", &flags, &back) &&
-	          !ReadLobbyText("L2|1|7,,,,,,0,,1.25,,,,,,,,", &flags, &back),
-	      "too few or too many values, or a bad one, is refused");
+	Check(!ReadLobbyText("L3|1|0,,,,,,0,,1.25,,,,,,,,", &flags, &back) && !ReadLobbyText("L3|1|0,,,,,,0,,1.25,,,,,,,,,,", &flags, &back) &&
+	          !ReadLobbyText("L3|1|7,,,,,,0,,1.25,,,,,,,,,", &flags, &back),
+	      "too few or too many values (a version 2 text has 17), or a bad one, is refused");
 	Check(LobbyText(kWillApply, longest).size() < 100, "the lobby text stays short (it travels 4 bytes at a time)");
 }
 
@@ -321,6 +354,20 @@ void TestMapScript()
 	Check(!HasMapScript("<AdvMapDesc>\n\t<MapScript/>\n\t<Script href=\"x\"/>\n</AdvMapDesc>"),
 	      "<MapScript/> (a generated random map) is none, whatever follows");
 	Check(!HasMapScript("<MapScript href=\"\"/>") && !HasMapScript("<AdvMapDesc/>"), "an empty link or no field is none");
+
+	// what this PC's MMH5.5 does by itself: the "no map script" jump's bytes
+	const unsigned char original[6] = {0x0f, 0x84, 0x4e, 0x01, 0x00, 0x00};
+	const unsigned char nops[6] = {0x90, 0x90, 0x90, 0x90, 0x90, 0x90};
+	const unsigned char elsewhere[6] = {0xe9, 0x10, 0x20, 0x30, 0x40, 0x90};
+	Check(OwnMapScripts(original) == 0, "the original jump (the original game, RC19d): no scripts without a map script");
+	Check(OwnMapScripts(nops) == 1 && OwnMapScripts(elsewhere) == 1, "a changed jump (RC19k's 55u.dll): the scripts run");
+
+	// what the add-on does when the world starts its scripts
+	Check(MapScriptActionFor(true, "") == kAsIs && MapScriptActionFor(true, "0") == kAsIs && MapScriptActionFor(true, "1") == kAsIs,
+	      "a map with its own script: always the game's own way");
+	Check(MapScriptActionFor(false, "") == kAsIs, "no host's rules: the game's own way (MMH5.5 decides)");
+	Check(MapScriptActionFor(false, "1") == kEmptyScript, "no map script, map_scripts=1: an empty script, the scripts run");
+	Check(MapScriptActionFor(false, "0") == kNoScripts, "no map script, map_scripts=0: no scripts, as in the original game");
 }
 
 // A start script in the layout of MMH5.5's H55-AdvMap.lua "StartingBonus" part

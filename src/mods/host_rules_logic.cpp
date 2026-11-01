@@ -23,8 +23,9 @@ const RuleDef kRules[kRuleCount] = {
 	{"competitive_towns", "H55_CompetitiveARMGTowns", kBool, 0, 1, kRandomMaps},
 	{"mana_observatories", "H55_ManaObservatories", kBool, 0, 1, kRandomMaps},
 	{"moon_disc", "H55_MoonDiscOnARMGMaps", kBool, 0, 1, kRandomMaps},
-	{"game_mode", nullptr, kChoice, 0, 4, kStart},
-	{"toe_bonuses", nullptr, kBool, 0, 1, kStart},
+	{"game_mode", nullptr, kChoice, 0, 4, kStart},       // kGameModeRule
+	{"toe_bonuses", nullptr, kBool, 0, 1, kStart},       // kToeBonusRule
+	{"map_scripts", nullptr, kBool, 0, 1, kRandomMaps},  // kMapScripts: not in the file
 };
 
 const char *const kMultipliers[kMultiplierCount] = {"0.5", "0.75", "1", "1.25", "1.5", "2", "3"};
@@ -274,16 +275,16 @@ uint32_t HashWithoutRuleValues(const std::string &lua)
 
 std::string Encode(const Values &values)
 {
-	std::string text = "OHR2";
+	std::string text = "OHR3";
 	for (int r = 0; r < kRuleCount; ++r)
 		if (static_cast<size_t>(r) < values.size() && ValidValue(kRules[r], values[r]))
 			text += std::string(";") + kRules[r].key + "=" + values[r];
-	return text.size() <= static_cast<size_t>(kTextMax) ? text : std::string("OHR2");
+	return text.size() <= static_cast<size_t>(kTextMax) ? text : std::string("OHR3");
 }
 
 bool Decode(const std::string &text, Values *values)
 {
-	if (text.compare(0, 4, "OHR2") != 0 || text.size() > static_cast<size_t>(kTextMax))
+	if (text.compare(0, 4, "OHR3") != 0 || text.size() > static_cast<size_t>(kTextMax))
 		return false;
 	Values v = NoValues();
 	size_t p = 4;
@@ -308,7 +309,7 @@ bool Decode(const std::string &text, Values *values)
 
 std::string LobbyText(int flags, const Values &values)
 {
-	std::string text = "L2|" + std::to_string(flags & 0xff) + "|";
+	std::string text = "L3|" + std::to_string(flags & 0xff) + "|";
 	for (int r = 0; r < kRuleCount; ++r) {
 		if (r)
 			text += ",";
@@ -320,7 +321,7 @@ std::string LobbyText(int flags, const Values &values)
 
 bool ReadLobbyText(const std::string &text, int *flags, Values *values)
 {
-	if (text.compare(0, 3, "L2|") != 0)
+	if (text.compare(0, 3, "L3|") != 0)
 		return false;
 	const size_t bar = text.find('|', 3);
 	if (bar == std::string::npos || bar == 3 || bar > 6)
@@ -354,6 +355,20 @@ bool HasMapScript(const std::string &map_xdb)
 	const size_t end = map_xdb.find('>', at);
 	const size_t href = map_xdb.find("href=\"", at);
 	return end != std::string::npos && href != std::string::npos && href < end && map_xdb.compare(href + 6, 1, "\"") != 0;
+}
+
+const unsigned char kNoScriptJump[6] = {0x0f, 0x84, 0x4e, 0x01, 0x00, 0x00};  // jz 0x00992e7e
+
+int OwnMapScripts(const unsigned char code[6])
+{
+	return memcmp(code, kNoScriptJump, sizeof(kNoScriptJump)) == 0 ? 0 : 1;
+}
+
+MapScriptAction MapScriptActionFor(bool map_has_script, const std::string &value)
+{
+	if (map_has_script || value.empty())
+		return kAsIs;
+	return value == "1" ? kEmptyScript : kNoScripts;
 }
 
 // --- MMH5.5's start script -------------------------------------------------------------------------

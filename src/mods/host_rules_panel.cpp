@@ -97,8 +97,9 @@ struct Words {
 	const char *ai[7];
 	const char *on, *off;
 	const char *file_value;  // %s
+	const char *own_value;   // %s: a rule not in the file (map_scripts): what MMH5.5 does by itself
 	const char *apply, *missing, *differ, *setup, *client_wait, *client_apply, *client_no, *client_differ;
-	const char *game_host, *game_file, *no_file, *no_script;
+	const char *game_host, *game_file, *no_file, *no_script, *script_added;
 	const char *ok, *file, *cancel, *close;
 	const char *button;
 	const char *modes[5];  // the game mode rule's values
@@ -117,7 +118,7 @@ const Words kEnglish = {
 	{"Governors", "Town and dwelling conversion", "Extra conversions", "Town gate", "Mine guards",
 	 "Dimension doors visit towns", "Computer bonus", "Mixed neutral armies", "Neutral army size", "Battle site guards",
 	 "Prank artifacts", "Potions for sale", "Mage guild in every town", "Mana at observatories", "Moon disc quest",
-	 "Game mode", "ToE start bonuses"},
+	 "Game mode", "ToE start bonuses", "MMH5.5 scripts on random maps"},
 	{"A hero can govern a town and give it bonuses.",
 	 "Captured towns and dwellings can change to your faction.",
 	 "How many more towns and dwellings may convert (1 = MMH5.5's balance).",
@@ -134,10 +135,12 @@ const Words kEnglish = {
 	 "Redwood observatories also restore mana (random maps).",
 	 "The moon disc artifact quest on random maps.",
 	 "Default, Savage or Nightmare for everyone (MMH5.5: the bonus arrows).",
-	 "Each player keeps the start bonus picked with the arrows: gold, resources, artifact."},
+	 "Each player keeps the start bonus picked with the arrows: gold, resources, artifact.",
+	 "In multiplayer, MMH5.5's scripts also run on maps without a script (from the generator)."},
 	{"Off", "40%", "60%", "80%", "100% (MMH5.5)", "120%", "140%"},
 	"On", "Off",
 	"your file: %s",
+	"MMH5.5 alone: %s",
 	"Every player has open-homm5: these rules will be used.",
 	"Without open-homm5: %s. Then every PC uses its own MMH5.5 file.",
 	"MMH5.5 files differ: %s. The game may not stay in step.",
@@ -149,8 +152,9 @@ const Words kEnglish = {
 	"This game uses the host's rules.",
 	"This game uses this PC's MMH5.5 file.",
 	"MMH5.5's settings file (scripts/H55-Settings.lua) was not found: nothing to choose.",
-	"This map has no map script: in multiplayer MMH5.5's scripts do not run on it (a random map straight from the "
-	"generator), so these rules change nothing there.",
+	"This map has no map script (a random map straight from the generator): with \"MMH5.5 scripts on random maps\" off, "
+	"MMH5.5's scripts do not run on it in multiplayer, so these rules change nothing there.",
+	"This map has no map script: MMH5.5's scripts will run on it all the same (\"MMH5.5 scripts on random maps\").",
 	"OK", "MMH5.5's file", "Cancel", "Close",
 	"Rules...",
 	{"Bonus arrows (MMH5.5)", "Default", "Savage", "Nightmare", "Random"},
@@ -173,7 +177,7 @@ const Words kFrench = {
 	 "Portes dimensionnelles", "Bonus de l'ordinateur", "Arm" E_ACUTE "es neutres m" E_ACUTE "lang" E_ACUTE "es",
 	 "Taille des arm" E_ACUTE "es neutres", "Gardes des sites de combat", "Artefacts farceurs", "Potions en vente",
 	 "Guilde des mages dans chaque ville", "Mana aux observatoires", "Qu" E_CIRC "te du disque lunaire", "Mode de jeu",
-	 "Bonus de d" E_ACUTE "part de ToE"},
+	 "Bonus de d" E_ACUTE "part de ToE", "Scripts MMH5.5 sur les cartes al" E_ACUTE "atoires"},
 	{"Un h" E_ACUTE "ros peut gouverner une ville et lui donner des bonus.",
 	 "Les villes et habitations prises peuvent passer " A_GRAVE " votre faction.",
 	 "Combien de conversions en plus (1 = l'" E_ACUTE "quilibre de MMH5.5).",
@@ -190,10 +194,12 @@ const Words kFrench = {
 	 "Les observatoires rendent aussi le mana (cartes al" E_ACUTE "atoires).",
 	 "La qu" E_CIRC "te de l'artefact du disque lunaire sur les cartes al" E_ACUTE "atoires.",
 	 "Par d" E_ACUTE "faut, Sauvage ou Cauchemar pour tous (MMH5.5" NBSP ": les fl" E_GRAVE "ches de bonus).",
-	 "Chacun garde le bonus de d" E_ACUTE "part choisi avec les fl" E_GRAVE "ches" NBSP ": or, ressources, artefact."},
+	 "Chacun garde le bonus de d" E_ACUTE "part choisi avec les fl" E_GRAVE "ches" NBSP ": or, ressources, artefact.",
+	 "En multijoueur, les scripts MMH5.5 tournent aussi sur les cartes sans script (du g" E_ACUTE "n" E_ACUTE "rateur)."},
 	{"Aucun", "40" NBSP "%", "60" NBSP "%", "80" NBSP "%", "100" NBSP "% (MMH5.5)", "120" NBSP "%", "140" NBSP "%"},
 	"Oui", "Non",
 	"votre fichier" NBSP ": %s",
+	"MMH5.5 seul" NBSP ": %s",
 	"Tous les joueurs ont open-homm5" NBSP ": ces r" E_GRAVE "gles seront utilis" E_ACUTE "es.",
 	"Sans open-homm5" NBSP ": %s. Chaque PC utilise alors son propre fichier MMH5.5.",
 	"Fichiers MMH5.5 diff" E_ACUTE "rents" NBSP ": %s. La partie risque de se d" E_ACUTE "synchroniser.",
@@ -207,8 +213,11 @@ const Words kFrench = {
 	"Cette partie utilise les r" E_GRAVE "gles de l'h" O_CIRC "te.",
 	"Cette partie utilise le fichier MMH5.5 de ce PC.",
 	"Le fichier de r" E_ACUTE "glages de MMH5.5 (scripts/H55-Settings.lua) est introuvable" NBSP ": rien " A_GRAVE " choisir.",
-	"Cette carte n'a pas de script" NBSP ": en multijoueur, les scripts de MMH5.5 n'y tournent pas (carte al" E_ACUTE "atoire "
-	"sortie du g" E_ACUTE "n" E_ACUTE "rateur), ces r" E_GRAVE "gles n'y changent donc rien.",
+	"Cette carte n'a pas de script (carte al" E_ACUTE "atoire sortie du g" E_ACUTE "n" E_ACUTE "rateur)" NBSP ": sans "
+	"\"Scripts MMH5.5 sur les cartes al" E_ACUTE "atoires\", les scripts de MMH5.5 n'y tournent pas en multijoueur, ces "
+	"r" E_GRAVE "gles n'y changent donc rien.",
+	"Cette carte n'a pas de script" NBSP ": les scripts de MMH5.5 y tourneront quand m" E_CIRC "me (\"Scripts MMH5.5 sur "
+	"les cartes al" E_ACUTE "atoires\").",
 	"OK", "Fichier MMH5.5", "Annuler", "Fermer",
 	"R" E_GRAVE "gles...",
 	{"Fl" E_GRAVE "ches (MMH5.5)", "Par d" E_ACUTE "faut", "Sauvage", "Cauchemar", "Al" E_ACUTE "atoire"},
@@ -415,7 +424,7 @@ bool Wanted()
 	if (g_button_shown) {
 		ButtonInput(top);
 		const View v = rules::GetView(role);
-		g_button_warn = v.map_script == 0 ||
+		g_button_warn = (v.map_script == 0 && v.shown[rules::kMapScripts] != "1") ||
 		                (role == View::kHost ? (!v.missing.empty() || !v.differ.empty()) : (v.this_differs || (v.shown_known && !v.will_apply)));
 		static bool told = false;
 		if (!told) {
@@ -470,6 +479,14 @@ float Wrapped(ImDrawList *draw, ImFont *font, float px, float x, float y, float 
 	return y;
 }
 
+// The lobby's map has no map script: will MMH5.5's scripts run on it? With the
+// host's rules (`rules_used`), map_scripts as shown; else this PC's MMH5.5 by itself.
+float ScriptLine(ImDrawList *draw, ImFont *font, float px, float x, float y, float width, const Words &w, bool rules_used)
+{
+	const bool on = (rules_used ? g.edit[rules::kMapScripts] : g.view.file[rules::kMapScripts]) == "1";
+	return Wrapped(draw, font, px, x, y, width, on ? ui::kDim : ui::kWarn, on ? w.script_added : w.no_script);
+}
+
 // A value as words: "On", "Off", "100% (MMH5.5)", "x1.25", "5".
 std::string Shown(const rules::RuleDef &rule, const std::string &value, const Words &w)
 {
@@ -510,7 +527,7 @@ void RuleRow(ImDrawList *draw, ImVec2 origin, float k, float width, float y, int
 		help = w.mode_with_toe;
 	if (changed && !rules::IsStartRule(r)) {  // (the start rules are not in the file: gold says "not MMH5.5's way")
 		char note[64];
-		_snprintf_s(note, sizeof(note), _TRUNCATE, w.file_value, Shown(rule, file, w).c_str());
+		_snprintf_s(note, sizeof(note), _TRUNCATE, rule.var ? w.file_value : w.own_value, Shown(rule, file, w).c_str());
 		help += std::string(" (") + note + ")";
 	}
 	ui::ShadowText(draw, small, small_px, at(4, y + 16), changed ? ui::kWarn : ui::kDim,
@@ -629,8 +646,11 @@ void DrawPanel(const overlay::Frame &frame)
 			list->AddLine(ImVec2(origin.x, origin.y + (y + 17) * l.k), ImVec2(origin.x + width * l.k, origin.y + (y + 17) * l.k),
 			              IM_COL32(230, 189, 92, 90), 1.0f);
 			y += 22.0f;
-			for (int r = 0; r < kRuleCount; ++r) {
-				if (kRules[r].group != group)
+			// table order, but map_scripts (the table's last) first of its group: it decides
+			// whether MMH5.5's scripts, and so the group's other rules, run on a generated map
+			for (int i = -1; i < kRuleCount; ++i) {
+				const int r = i < 0 ? rules::kMapScripts : i;
+				if (kRules[r].group != group || (i >= 0 && r == rules::kMapScripts))
 					continue;
 				RuleRow(list, origin, l.k, width, y, r, w);
 				y += 34.0f;
@@ -667,7 +687,7 @@ void DrawPanel(const overlay::Frame &frame)
 			sy = Wrapped(draw, small, small_px, sx, sy, sw, ui::kError, line);
 		}
 		if (g.view.map_script == 0)
-			sy = Wrapped(draw, small, small_px, sx, sy, sw, ui::kWarn, w.no_script);
+			sy = ScriptLine(draw, small, small_px, sx, sy, sw, w, g.view.missing.empty());
 		if (StartChanged(g.edit) && !g.view.start_ok && g.view.missing.empty()) {
 			_snprintf_s(line, sizeof(line), _TRUNCATE, w.start_no, g.view.start_why.c_str());
 			sy = Wrapped(draw, small, small_px, sx, sy, sw, ui::kWarn, line);
@@ -691,7 +711,7 @@ void DrawPanel(const overlay::Frame &frame)
 		if (g.view.this_differs)
 			sy = Wrapped(draw, small, small_px, sx, sy, sw, ui::kError, w.client_differ);
 		if (g.view.map_script == 0)
-			sy = Wrapped(draw, small, small_px, sx, sy, sw, ui::kWarn, w.no_script);
+			sy = ScriptLine(draw, small, small_px, sx, sy, sw, w, g.view.shown_known && g.view.will_apply);
 	}
 	else if (g.role == View::kInGame)
 		sy = Wrapped(draw, small, small_px, sx, sy, sw, ui::kDim, g.view.in_game_rules ? w.game_host : w.game_file);
