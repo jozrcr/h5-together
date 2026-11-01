@@ -19,6 +19,7 @@
 #include "../mods/original_music.h"
 #include "../mods/player_list.h"
 #include "../mods/rmg_builder.h"
+#include "../mods/rmg_factions.h"
 #include "../mods/rmg_teams.h"
 #include "../mods/rmg_templates.h"
 
@@ -75,6 +76,7 @@ void InstallAll()
 	mods::ApplyRmgTeamsFromSettings();
 	mods::ApplyRmgTemplatesFromSettings();
 	mods::ApplyLanguagesFromSettings();
+	mods::ApplyRmgFactionsFromSettings();
 	mods::ApplyOriginalMusicFromSettings();
 	mods::ApplyPlayerListFromSettings();  // overlay clients: drawn in this order
 	mods::ApplyRmgBuilderFromSettings();
