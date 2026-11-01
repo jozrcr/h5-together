@@ -207,6 +207,8 @@ void DoApply()
 	                                       "saved for the next games (this game's looks are off)", "not applied"};
 	hooklog::Write("hero skins: Apply: %s: %s", note.c_str(), kResults[result]);
 	Close("Apply");
+	if (result == skins::kAppliedNow)  // multiplayer: when the look counts, at its segment (hero_skins.cpp)
+		skins::RefreshHeroScreen("Apply");
 }
 
 // The robot's "panel|skins ..." (it cannot click).
@@ -249,11 +251,21 @@ void RobotCommand(const char *text)
 // reference height its top-left corner is (60, 45), and everything scales with
 // the screen height. In its "Armée & Stats" header the skill wheel's round
 // button (MMH55-Skillwheel.pak, Single/Army: Button_HS at 372,48, 32x32) is at
-// (432, 93); MMH5.5 draws a small square one just left of it (403..427, 93..117
-// in the owner's screenshot, 2026-11-01). Ours goes left of that one, the same
-// size. Drawn with ImGui (the screen's own files and command handler are not
-// researched yet); it reads the mouse itself, like the builder's fallback button.
-const float kHsButtonX = 375.0f, kHsButtonY = 93.0f, kHsButtonSize = 24.0f;
+// (432, 93). Measured in the owner's screenshots (units of the 768 reference):
+//   - 1348x750 (k 0.977): MMH5.5's square button 395..417 px = 404..427, round
+//     one 427..449 px = 437..460, both centred on y 102.5 px = 105;
+//   - 977x725 (k 0.944): no square button; the round one 408..432 px = 432..458,
+//     y 89..112 px, centred on y 100.5 px = 106.5.
+// So the header's buttons are centred on y ~106 (the round button's picture
+// sits a little above the middle of its 32x32 window), and the square button,
+// when MMH5.5 shows it, takes 404..427, about 9 units left of the round one.
+// It is not in the hero screen's UI files (MMH5.5 must add it in code), so its
+// presence cannot be read from the data: ours takes its slot, 24x24 at
+// (403, 94), centred on y 106. [skins] hero_screen_button_x / _y move it.
+// Drawn with ImGui (the screen's own command handler is not researched); it
+// reads the mouse itself, like the builder's fallback button.
+float kHsButtonX = 403.0f, kHsButtonY = 94.0f;
+const float kHsButtonSize = 24.0f;
 bool g_button = true;            // [skins] hero_screen_button
 bool g_test_button = false;      // testing ([skins] test_button_on_map=1): also on the adventure map (the robot cannot open the hero screen)
 bool g_on_hero_screen = false;
@@ -527,6 +539,8 @@ void ReadSettings()
 	g_early = GetPrivateProfileIntW(L"skins", L"skins", 1, path) != 0;
 	g_button = GetPrivateProfileIntW(L"skins", L"hero_screen_button", 1, path) != 0;
 	g_test_button = GetPrivateProfileIntW(L"skins", L"test_button_on_map", 0, path) != 0;
+	kHsButtonX = static_cast<float>(GetPrivateProfileIntW(L"skins", L"hero_screen_button_x", 403, path));
+	kHsButtonY = static_cast<float>(GetPrivateProfileIntW(L"skins", L"hero_screen_button_y", 94, path));
 }
 
 }  // namespace

@@ -69,7 +69,11 @@ if ($Test) {
 # vcvarsall prints a harmless vswhere warning on stderr (silenced above);
 # PowerShell 5.1 would turn any native stderr line into an error.
 $ErrorActionPreference = "Continue"
-cmd /c "$cmd 2>&1"
+# One command per line of a batch file: with every test, the && chain grew past
+# cmd's 8191 characters per command line.
+$bat = Join-Path $out "build.cmd"
+Set-Content -Encoding ascii $bat ((($cmd -split ' && ') | ForEach-Object { "$_`r`nif errorlevel 1 exit /b 1" }) -join "`r`n")
+cmd /c "`"$bat`" 2>&1"
 if ($LASTEXITCODE -ne 0) { throw "build failed" }
 $ErrorActionPreference = "Stop"
 Write-Host "built $out\dinput8.dll"

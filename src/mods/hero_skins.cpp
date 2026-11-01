@@ -85,6 +85,7 @@
 #include "hero_skins_logic.h"
 
 #include "../hook/log.h"
+#include "../hook/overlay.h"
 #include "../hook/patch.h"
 
 namespace mods {
@@ -131,6 +132,8 @@ const DWORD kSharedNameFile = 0x16c;       // the text file of its name (narrow 
 const DWORD kTextureVftable = 0x00e90318;  // NDb::STexture
 const DWORD kTextureFile = 0x40;           // DestName: the .dds in the game's data
 const DWORD kPlayerSelected = 0x1d0;       // IPlayer: its selected hero (slot 0x0c, 0x004fcc40)
+const DWORD kHeroScreenVftable = 0x00e3584c;  // NUI::CHeroScreen2 (also MMH5.5's HeroScreen3 layout)
+const DWORD kHeroScreenDirty = 0x7d8;      // its "needs refresh" byte: 0x006ca4e0 rebuilds texts and the 3D figure
 const DWORD kReleaseResource = 0x008c6150; // __fastcall(object): frees it when both counts are 0
 const DWORD kUpdateCall = 0x0060895e;      // in 0x00608930: call 0x006082f0 (the adventure controller's frame)
 const DWORD kUpdate = 0x006082f0;          // __thiscall, 5 stack arguments
@@ -197,6 +200,9 @@ const Code kCode[] = {
 	{0x00e1a0a8, {0x40, 0xcc, 0x4f, 0x00}, 4},                           // ... its vtable cell
 	{0x00a0c4a2, {0x8d, 0x87, 0x2c, 0x01, 0x00, 0x00, 0x50, 0x50, 0x6a, 0x00, 0x68, 0x88, 0xd9, 0xe6, 0x00}, 15},  // FaceTexture
 	{0x00c7a69c, {0x8d, 0x47, 0x40}, 3},                                 // STexture: DestName at +0x40
+	{0x006ca4e6, {0x80, 0xbe, 0xd8, 0x07, 0x00, 0x00, 0x00}, 7},         // hero screen refresh: cmp byte [esi+0x7d8],0
+	{0x006cbb49, {0xc6, 0x86, 0xd8, 0x07, 0x00, 0x00, 0x01}, 7},         // ... and the game setting it: mov byte [esi+0x7d8],1
+	{0x006ca5a9, {0x8b, 0x86, 0xb0, 0x01, 0x00, 0x00, 0x50, 0x8b, 0xce, 0xe8}, 10},  // ... which builds the 3D view (0x006c72e0)
 	{kReleaseResource, {0x51, 0x83, 0x79, 0x08, 0x00, 0x75, 0x6b, 0xf7, 0x41, 0x04}, 10},
 	// the adventure controller's frame (as notify.cpp checks it)
 	{0x00608930, {0x56, 0x8b, 0xf1, 0x8b, 0x46, 0x3c}, 6},
@@ -911,6 +917,8 @@ void __fastcall SegmentHook(void *transceiver8, void *edx, DWORD time)
 	// After the game set the segment's time, before its commands: the same point on every PC.
 	for (BYTE *object : rebuild)
 		g_figure_cell_next(object, nullptr);
+	if (!rebuild.empty())  // this PC's hero screen, if open, shows the new figure (only on this PC: no world data)
+		skins::RefreshHeroScreen("a look changed at this segment");
 }
 
 // ---- the panel's questions (hero_skins_internal.h) ----
@@ -980,6 +988,20 @@ std::string InternalName(int hero)
 {
 	Lock lock;
 	return hero >= 0 && hero < static_cast<int>(g_catalog.size()) ? g_catalog[hero].name : std::string();
+}
+
+void RefreshHeroScreen(const char *why)
+{
+	if (g_disabled)
+		return;
+	char top[96];
+	if (!overlay::TopScreen(top, sizeof(top)) || strcmp(top, ".?AVCHeroScreen2@NUI@@") != 0)
+		return;
+	BYTE *screen = static_cast<BYTE *>(overlay::TopScreenObject());
+	if (!screen || Read(screen, 0) != kHeroScreenVftable)
+		return;
+	screen[kHeroScreenDirty] = 1;
+	hooklog::Write("hero skins: the hero screen is refreshed (%s): its 3D figure is built again", why);
 }
 
 bool SelectedLookPortrait(std::string *dds)
