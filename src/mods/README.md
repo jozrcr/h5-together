@@ -815,7 +815,14 @@ Plan, research and robot checks: [docs/plans/host-rules.md](../../docs/plans/hos
 - **Good to know:** MMH5.5's scripts only run on maps with a map script. Hand-made maps and random maps saved with a script (MMH5.5's Mapmixer, the editor: the group's usual maps) have one. **A random map straight from the game's generator, in a multiplayer game, has none: there MMH5.5's scripts do not run at all**, so these switches change nothing (the settings pak does not either).
 - Single player uses your MMH5.5 file, as before.
 
-**Robot checks** (2026-11-01, LAN, two copies): on A1M4 (RC19k) with `governance=0 ai_cheat=0 mixed_stacks=0`, both PCs served the same file (hash `a07c5c34`), MMH5.5 no longer mixed the neutral stacks (`H55 Stacks Qty: 36`, no `H55 Mixing`), and the world checksums stayed equal (417 and 707). The client saw the host's rules in the waiting room and in game. More in the plan.
+**Robot checks** (2026-11-01, LAN, two copies; all world checksums equal):
+- A1M4 (RC19k) with `governance=0 ai_cheat=0 mixed_stacks=0`: both PCs served the same file (hash `a07c5c34`), MMH5.5 no longer mixed the neutral stacks (`H55 Stacks Qty: 36`, no `H55 Mixing`). The client saw the host's rules in the waiting room and in game.
+- The owner's `MAP_JoacJoz` (a random map with a map script): the same, plus `competitive_towns=0`.
+- A client without the rules (`enabled=0`): no rules sent, both PCs used their file (and mixed the stacks, as the file says).
+- A random map straight from the generator: MMH5.5's scripts did not run on either PC (no map script); the host's panel says so.
+- **Saves:** loading a save opens no script file; the scripts go on with the values the game started with (single player, robot).
+
+More in the plan.
 
 **Settings** (`open-homm5.ini`):
 

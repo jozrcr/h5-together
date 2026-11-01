@@ -14,6 +14,7 @@ Background: [mmh55-vs-vanilla.md](mmh55-vs-vanilla.md), B.5 (every setting of `H
 - **Every PC uses the same values:** they travel inside the game's own start message, so it works on **any map**, random or hand-made.
 - **A PC without the add-on (or with it off) cannot start on other rules:** the host then sends no rules, and every PC uses its own MMH5.5 file, exactly as without the add-on. The host's log and panel say so ("Without open-homm5: Robot-client").
 - **The rules check:** every PC's add-on tells the host a fingerprint of its MMH5.5 files (`H55-Settings.lua` and the stats paks). The host's log and panel name a player whose files differ, and that player's panel says so too.
+- **Saves keep the rules the game started with:** the scripts read the file once, at the map's start, and a save keeps their values (robot-checked in single player).
 - **MMH5.5's scripts do not run on a random map straight from the game's generator in a multiplayer game** (found by the robot, below). There, these switches change nothing, with or without the add-on. They work on hand-made maps, on random maps saved with a map script (MMH5.5's Mapmixer or the editor: all of the owner's saved maps but the `MMH55_RMG_Map_...` ones), and in single player.
 
 ## The rules (step 1)
@@ -84,12 +85,13 @@ Not done: the same check in the co-op hello once the game runs (the co-op guard'
 
 ## Saves
 
-(see the robot checks below)
+**A loaded game keeps the rules it was started with.** MMH5.5's scripts read `H55-Settings.lua` once, when a map starts; a save keeps the scripts' variables and threads. Robot check (RC19k, single player, `[rules] trace=1`, which logs every script file the game opens): a new game on A1M4 opened `advmap-startup.lua`, `H55-Core.lua`, `H55-Settings.lua` and the rest (run `20261101-203522`); loading its day-2 autosave (`Sauvegarde auto 3`, run `20261101-203603`) opened **no script file at all**, printed no `H55 Lua Library and Tables initialized`, and MMH5.5's scripts went on (`H55 Daily Event 2 Finished`, `H55 Player Configuration: ...` on each new day). So whatever the host's panel says when a save is loaded, the game goes on with the values it started with, on every PC (each PC loads its own copy of the save, made from the same world). A multiplayer load was not robot-tested (the robot cannot open the multiplayer load screen yet); it uses the same script engine.
 
 ## The panel
 
 A modal overlay panel in the template builder's and the hero looks' style (`rmg_builder_widgets.cpp`: the game's check boxes, drop-down lists, arrows and buttons), 649×508 in the game's 1024×768 layout, centred and scaled with the height.
 - **Host** (setup screen, waiting room): check boxes, the arrows (`extra_conversions`), drop-down lists (AI bonus, multipliers). Gold = changed from the file, with "(your file: On)" after the explanation. Under the list: "Every player has open-homm5: these rules will be used", or who lacks it, or whose files differ. Buttons OK, MMH5.5's file, Cancel.
+- **The lobby's map without a map script** (a random map straight from the generator): the host reads the map's `map.xdb` once (`HasMapScript`), logs it, and both panels say the rules change nothing on it; the button gets its red mark.
 - **Client** (waiting room): the same rows, read only, as the host sent them; "They will be used: every player has open-homm5" or why not.
 - **In game** (adventure map): this game's rules, read only.
 - **Words:** French or English (`[ui] language`, `overlay::PanelLanguage`).
@@ -104,6 +106,9 @@ A modal overlay panel in the template builder's and the hero looks' style (`rmg_
 | `20261101-192743-lan` (RC19k, A1M4) | the same, with the lock-buttons pieces | The client logged `the host's rules (lobby): governance=0 ... ai_cheat=0 mixed_stacks=0 ...` 0.4 s after the host sent them, and its panel showed them; in game its F2 panel said "This game uses the host's rules". Served on both PCs, the same hash; no mixing. **707 world checksums, all equal.** |
 | `20261101-193017-lan` (RC19d, the random map `MMH55_RMG_Map_002`, no map script) | `governance=0 competitive_towns=0 mixed_stacks=0 ai_cheat=2` | Lobby and start message as above, both PCs had the rules for the game, but **neither PC read `H55-Settings.lua`, and the console has no `H55` line at all: MMH5.5's scripts did not run.** 365 world checksums, all equal. |
 | `20261101-193713` (RC19d, single player, the same random map) | the file's rules | The scripts ran (`H55 Towns prepared for Competitive ARMG Map!`), `rules: the scripts read scripts/H55-Settings.lua: this game uses the file's rules`. So the same map runs MMH5.5's scripts in single player, not in multiplayer. |
+| `20261101-202901-lan` (RC19k, A1M4) | **a client without the rules** (`[rules] enabled=0`); the host chose `mixed_stacks=0` **in the panel on the setup screen** (robot `panel|rules set mixed_stacks 0`, `panel|rules ok`) | The host's choice was saved (`rules: the host's choices: mixed_stacks=0 (saved in open-homm5.ini [rules])`); in the waiting room its panel said "Without open-homm5: Robot-client" and the button had its red mark; at the start `rules: START: Robot-client without open-homm5's rules: every PC uses its own H55-Settings.lua`, no chunk; both PCs used their file: **`H55 Mixing 36 neutral stacks!` on both** (the file's value). 518 world checksums, all equal. |
+| `20261101-203209-lan` (RC19k, the owner's `MAP_JoacJoz`: a random map saved with a map script, 4 players) | `governance=0 mixed_stacks=0 competitive_towns=0 ai_cheat=0` | The host logged `the lobby's map /Maps/RMG/81CD0EF2-.../map.xdb has a map script`; both PCs served the same file (hash `15eef79d`, `governance 1->0, ai_cheat 4->0, mixed_stacks 1->0, competitive_towns 1->0`); the scripts ran on both (`H55 Stacks Qty: 163` twice) and **did not mix** the stacks. 262 world checksums, all equal. |
+| `20261101-204054-lan` (RC19k, A1M4, after merging main 0.2.5 with the hero looks) | `governance=0 mixed_stacks=0 ai_cheat=2` | Both mods on together: the same served hash on both PCs (`1827cd4e`), `hero skins: looks on for this game`, no mixing. **517 world checksums, all equal.** |
 
 Screenshots: the session's `scratchpad\rules-shots\`.
 
