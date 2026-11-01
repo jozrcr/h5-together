@@ -115,7 +115,7 @@ const Words kEnglish = {
 	 "Prank artifacts", "Potions for sale", "Mage guild in every town", "Mana at observatories", "Moon disc quest"},
 	{"A hero can govern a town and give it bonuses.",
 	 "Captured towns and dwellings can change to your faction.",
-	 "How many more towns and dwellings may be converted (1 = MMH5.5's balance).",
+	 "How many more towns and dwellings may convert (1 = MMH5.5's balance).",
 	 "Heroes can travel between their own towns.",
 	 "Mines can be guarded by armies that keep themselves.",
 	 "On random maps, a dimension door can visit a town from afar.",
@@ -160,17 +160,17 @@ const Words kFrench = {
 	 "Guilde des mages dans chaque ville", "Mana aux observatoires", "Qu" E_CIRC "te du disque lunaire"},
 	{"Un h" E_ACUTE "ros peut gouverner une ville et lui donner des bonus.",
 	 "Les villes et habitations prises peuvent passer " A_GRAVE " votre faction.",
-	 "Combien de villes et habitations en plus peuvent " E_CIRC "tre converties (1 = l'" E_ACUTE "quilibre de MMH5.5).",
+	 "Combien de conversions en plus (1 = l'" E_ACUTE "quilibre de MMH5.5).",
 	 "Les h" E_ACUTE "ros peuvent voyager entre leurs villes.",
-	 "Les mines peuvent " E_CIRC "tre gard" E_ACUTE "es par des arm" E_ACUTE "es qui s'entretiennent seules.",
+	 "Des arm" E_ACUTE "es qui s'entretiennent seules peuvent garder les mines.",
 	 "Sur les cartes al" E_ACUTE "atoires, une porte peut visiter une ville " A_GRAVE " distance.",
 	 "Or et cr" E_ACUTE "atures en plus chaque semaine pour les joueurs ordinateur.",
 	 "Les arm" E_ACUTE "es neutres m" E_CIRC "lent plusieurs sortes de cr" E_ACUTE "atures (cartes multijoueur).",
-	 "Multiplicateur des arm" E_ACUTE "es neutres (le d" E_ACUTE "but peut ramer un moment).",
-	 "Multiplicateur des gardes des banques et sites de combat.",
+	 "Multiplie les arm" E_ACUTE "es neutres (le d" E_ACUTE "but peut ramer un moment).",
+	 "Multiplie les gardes des banques et des sites de combat.",
 	 "Des artefacts n" E_ACUTE "fastes cach" E_ACUTE "s (de Heroes II) peuvent " E_CIRC "tre trouv" E_ACUTE "s.",
-	 "Les comptoirs vendent des potions sur les cartes multijoueur et al" E_ACUTE "atoires.",
-	 "Les villes des cartes al" E_ACUTE "atoires commencent avec une guilde des mages niveau 1.",
+	 "Les comptoirs vendent des potions (cartes multijoueur et al" E_ACUTE "atoires).",
+	 "Sur les cartes al" E_ACUTE "atoires, chaque ville a une guilde des mages niveau 1.",
 	 "Les observatoires rendent aussi le mana (cartes al" E_ACUTE "atoires).",
 	 "La qu" E_CIRC "te de l'artefact du disque lunaire sur les cartes al" E_ACUTE "atoires."},
 	{"Aucun", "40" NBSP "%", "60" NBSP "%", "80" NBSP "%", "100" NBSP "% (MMH5.5)", "120" NBSP "%", "140" NBSP "%"},
@@ -463,9 +463,11 @@ void RuleRow(ImDrawList *draw, ImVec2 origin, float k, float width, float y, int
 	std::string &value = g.edit[r];
 	const std::string &file = g.view.file[r];
 	const bool changed = g.view.file_known && !value.empty() && value != file;
-	const float control_w = 150.0f;
+	const float control_w = 150.0f;  // a list
+	// the texts' room: what the control (or the value, read only) leaves
+	const float used = !edit ? 90.0f : rule.kind == rules::kBool ? 26.0f : rule.kind == rules::kInt ? 80.0f : control_w;
 	ui::ShadowText(draw, body, body_px, at(4, y), changed ? ui::kGold : ui::kParchment,
-	               ui::Fit(body, body_px, w.names[r], (width - control_w - 12) * k).c_str());
+	               ui::Fit(body, body_px, w.names[r], (width - used - 12) * k).c_str());
 	std::string help = w.help[r];
 	if (changed) {
 		char note[64];
@@ -473,7 +475,7 @@ void RuleRow(ImDrawList *draw, ImVec2 origin, float k, float width, float y, int
 		help += std::string(" (") + note + ")";
 	}
 	ui::ShadowText(draw, small, small_px, at(4, y + 16), changed ? ui::kWarn : ui::kDim,
-	               ui::Fit(small, small_px, help.c_str(), (width - control_w - 12) * k).c_str());
+	               ui::Fit(small, small_px, help.c_str(), (width - used - 12) * k).c_str());
 	char id[32];
 	_snprintf_s(id, sizeof(id), _TRUNCATE, "##rule%d", r);
 	if (!edit) {

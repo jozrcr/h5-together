@@ -186,6 +186,7 @@ std::vector<std::string> g_missing, g_differ;
 bool g_lobby_known = false;  // client: what the host sent in the lobby
 Values g_lobby_values = rules::NoValues();
 int g_lobby_flags = 0;
+rules::LobbyAssembler g_assembler;  // the host's lobby text, piece by piece
 
 std::string g_start_text;  // host: the chunk of its start message ("" = none)
 bool g_armed = false;      // this PC's next multiplayer game gets these rules
@@ -521,9 +522,12 @@ void __fastcall ClientUpdateHook(void *logic, void *edx)
 		Lock lock;
 		g_client_seen = GetTickCount();
 		g_host_seen = 0;
-		if (g_in_game) {  // back in a lobby: the last game's view is over
+		static const void *last_logic = nullptr;
+		if (g_in_game || logic != last_logic) {  // another lobby: what the last host sent is over
+			last_logic = logic;
 			g_in_game = false;
 			g_lobby_known = false;
+			g_assembler = rules::LobbyAssembler();
 		}
 	}
 	static int step = 0;
@@ -566,7 +570,6 @@ void __fastcall ClientUpdateHook(void *logic, void *edx)
 }
 
 // --- 2. the lobby display: clients -------------------------------------------------------------
-rules::LobbyAssembler g_assembler;  // the host's lobby text, piece by piece
 
 int __fastcall ClientMessageHook(void *logic, void *edx, int sender, BYTE *message)
 {

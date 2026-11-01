@@ -144,6 +144,20 @@ python tools\robot\run_ai_test.py --no-map --seconds 170 --turns 1 --quick-comba
 - Checked 2026-10-25 at 1024×768 and 1920×1080 on the French test copy: every line above, our template chosen 14th of the 19 that fit, the map built from it, saved and started, and the computer players took their turns.
 - Not possible with the robot: clicks on the panel (the drop-down lists, the arrows, the boxes, the scroll bar), Esc, and checking that the game behind gets no input (the robot's window is in the background). That is checked by hand, with the test panel's help (`[ui] overlay_test_panel=1`, `src/mods/README.md`).
 
+## Checking the host's game rules (a modal panel; `src/mods/host_rules*.cpp`)
+
+```
+python tools\robot\run_lan_test.py --game C:\Games\H5_test_k --seconds 220 --turns 4 --start-at 48 --host-rules governance=0 --host-rules ai_cheat=0 --host-rules mixed_stacks=0 --host-step "39|key|F2" --host-step "40|shot|host-rules-panel" --host-step "42|panel|rules cancel" --client-step "40|key|F2" --client-step "41|shot|client-rules-panel" --client-step "43|panel|rules close"
+python tools\robot\run_lan_test.py --client-rules enabled=0 --host-rules mixed_stacks=0          # a client without the rules: the files' rules for everyone
+python tools\robot\lan_report.py --last 1
+```
+
+- `--host-rules KEY=VALUE` / `--client-rules` / `--rules-setting` (both): `[rules]` settings. The host's choices are keys such as `governance=0`; `enabled=0` makes a copy behave as a PC without the rules; `trace=1` logs every script file the game opens. `run_ai_test.py` has `--rules-setting`.
+- `key|F2` opens the panel (setup screen, waiting room, adventure map); `panel|rules <command>` gives it what a click would: `open`, `set <key> <value>`, `file` (MMH5.5's values), `ok`, `cancel` / `close`, `scroll <units>|end`. Commands that start with `rules ` go to this panel only (`robot::TakePanelCommand` with a prefix).
+- In the logs look for `rules: hello`, `rules: the host's rules (lobby)`, `rules: START`, `rules: the host's start message` and `rules: the scripts read scripts/H55-Settings.lua: served ... hash`: the hash must be the same on both copies.
+- What MMH5.5's scripts did is in the shared `console.txt` (both copies write to it): e.g. `H55 Mixing 36 neutral stacks!` once per copy with mixed stacks on, none with them off; `H55 Towns prepared for Competitive ARMG Map!` on random maps that run the scripts.
+- A random map straight from the generator runs no MMH5.5 script in a LAN game (no map script): use a saved map with one, such as the owner's `MAP_JoacJoz` (`--map 81CD0EF2-7D11-41D7-AE71-0A74BF0872A0/`, 4 players: `--host-step "38|arrow|3 right"`).
+
 ## Robot script
 
 Besides starting a map, the DLL runs a script of timed steps (`--step`, or `--host-step` / `--client-step`), `"<seconds>|<kind>|<text>"`, seconds counted from the first main-loop call:
