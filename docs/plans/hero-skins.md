@@ -4,11 +4,23 @@ Status: **research only** (2026-11-01). Static reading of the vanilla 3.1 exe (G
 
 The owner asked: "A way in game to select our hero's skin would be awesome."
 
+**The owner's answers (2026-11-01):**
+1. **No portrait change.** Only the 3D figures change: map, battle, hero screen.
+2. **Shared with friends.** Choices go to the other PCs; a PC without the add-on sees the normal looks.
+3. **Same faction only**, from the ~40 real looks. No experimental models (on foot, cutscene, joke models).
+4. **One choice per hero, for every game**, in `open-homm5-skins.ini`.
+
+Defaults for the questions not asked: computer players' heroes keep their looks (only a human owner's choice counts); the group plays with MMH5.5, but vanilla stays working when it costs nothing; the button's place waits for the owner's sketch, so the panel comes first with a key, the button later.
+
+**Built (2026-11-01): steps 1 and 3,** `src/mods/hero_skins.cpp` (game side) and `hero_skins_logic.cpp` (the rules, unit-tested by `src/hook/test/hero_skins_test.cpp`). On by default; it changes nothing until a look is chosen. Choices are read from `open-homm5-skins.ini` (`[skins]`, `Godric=Freyda`); the switches are in `open-homm5.ini` `[skins]` (`skins`, `show_others`, `trace`, `test_ai_heroes`). Details and log lines: [src/mods/README.md](../../src/mods/README.md), "Hero looks". What step 0 and the robot found: [Robot results](#robot-results-2026-11-01). Still to do: step 2, the panel (with a temporary key until the owner's sketch).
+
+**One change from the plan, found by the robot: in a multiplayer game, the looks are all or nothing.** Rebuilding a hero's map figure makes new game objects, and those get numbers from the game world's counter. A PC that rebuilds a figure while another PC does not makes the two worlds' object numbers part, and later commands could then point at different objects: a real desync risk, not only a checksum difference. So in multiplayer every PC rebuilds the same figures at the same moment of the game (the start of segment 20, a few seconds in), and only when **every** PC sent its looks with the same game data. If one PC has no open-homm5, an old one, other game data or `show_others=0`, nobody's looks show in that game (the log says which PC). Single player and hot seat are not affected. This replaces the plan's "a PC without the add-on simply sees the normal look" (owner's answer 2): with a friend who lacks the add-on, everyone sees the normal looks.
+
 ## In short
 
 - **Yes, it is possible, and it can change while you play.** A hero's look is three things: its **figure on the adventure map**, its **figure in battle** (the same figure is shown in 3D on the hero screen), and its **portrait**. All three are named in the hero's data file. The game keeps every hero's data in memory from start-up, so our DLL can give hero A the figures of hero B at any moment, then ask the game to rebuild hero A's map figure. Battles and the hero screen pick up the new figure the next time they open.
 - **What you can pick, for free:** the looks of the other heroes. MMH5.5 has 203 hero files but about **40 different looks** (most heroes of a class share one figure, the campaign heroes have their own). Any look of any faction can go on any hero. Almost all of them ride something (horse, unicorn, elephant, dragon, bear, wolf...). "On foot" figures exist too (cutscene models, MMH5.5's Alaric), and two joke models (a tank and a UFO), but they lack some battle animations: an "experimental" extra at best.
-- **Multiplayer:** a look is not part of the game world, so it cannot desync. Each PC tells the others the looks its player chose, with a small message that a PC without our DLL ignores (the same trick as the co-op timing hello). Friends with the DLL see your choices; a PC without it sees the normal looks.
+- **Multiplayer:** each PC tells the others the looks its player chose, with a small message that a PC without our DLL ignores (the same trick as the co-op timing hello). *As built:* rebuilding a figure turned out to touch the game world (new game objects), so every PC rebuilds the same figures at the same moment, and only if every PC has the DLL; otherwise everyone sees the normal looks (see "Built" above).
 - **Where you pick:** a "Look..." button on the **hero screen** opens a panel in the builder's style: the looks as portraits, grouped by faction, with the names of the heroes who wear them. A 3D preview inside the panel is too hard, but the hero screen itself shows the battle figure in 3D, so after "Apply" the player sees it there.
 - **Remembered** per hero in `open-homm5-skins.ini` (`Godric=Freyda`). Nothing changes until someone picks a look.
 - **Effort:** about **5 sessions** (4 to 6), in testable steps.
@@ -152,15 +164,16 @@ The owner probably wants friends to see the chosen looks. That needs one small m
 
 **The channel: the co-op guard's in-game message** (`src/mods/coop_guard.cpp`). Our DLL already sends a world-checksum message (`NWorld::CCrcTestCmd`, vtable `0x00e43db0`) with check number −1 after the first segment. The game ignores check numbers below 1 (`0x007c9410`), so a PC without our DLL does nothing with it. Its 32-bit "checksum" carries our data, with a mark in the top byte (`G` for the co-op hello). Skins would use another mark (`K`):
 
+As built (`hero_skins_logic.h`): a header first, then one message per choice. "player" is the sender's player number, whose heroes the choices are for; it saves mapping the network's PC numbers to players.
+
 ```
-bits 31..24  'K'          the mark
-bits 23..21  version
-bit  20      the portrait comes along
-bits 19..10  hero        position in the game's list of all heroes (HEROES_ANY)
-bits  9..0   look        position of the look's hero in the same list (0x3ff = back to the original)
+header  bits 31..24 'k'   bits 23..20 version   bits 19..16 player   bits 15..0 fingerprint of the hero list
+choice  bits 31..24 'K'   bits 23..20 player    bits 19..10 hero     bits  9..0 look (0x3ff = back to its own)
 ```
 
-- **When:** after the first segment of a game (as the co-op hello), each PC sends one message for each look it has chosen; and again when its player changes a look during the game. A first message carries a fingerprint of the hero list (a hash of all the names), so PCs with different game data (another MMH5.5 version) ignore each other's skins and show the normal looks.
+Hero and look are positions in the game's list of all heroes (`HEROES_ANY`).
+
+- **When:** after its second segment of a game (the co-op hello goes after the first), each PC sends one message for each look it has chosen; and again when its player changes a look during the game. A first message carries a fingerprint of the hero list (a hash of all the names), so PCs with different game data (another MMH5.5 version) ignore each other's skins and show the normal looks.
 - **Who decides a hero's look:** the player who owns the hero. Every PC keeps the choices of each PC, and applies them to the heroes of that PC's player. A hero hired by someone else gets the new owner's choice (our DLL rebuilds the figure when the owner changes). Computer players' heroes keep their looks, unless the owner wants a local option for them (question 6).
 - **The receiving hook is shared:** the co-op guard's handler (call site `0x007ca8d1`) takes every check −1 message today; it would pass `K` messages to the skins code. The sending should happen in the same place the hello is sent from (the transceiver's own step, `0x007ca990`), from a queue.
 - **A PC without our DLL** ignores the messages and shows the normal looks. **A PC with the DLL but skins turned off** shows the normal looks too (question 3).
@@ -208,14 +221,12 @@ Words in the game's language (French or English, `[ui] language`), the builder's
 
 ### How choices are remembered
 
-A small file per PC, `bin\open-homm5-skins.ini`, keyed by the hero's internal name (the `InternalName` of its file, the same in every map):
+A small file per PC, `bin\open-homm5-skins.ini`, keyed by the hero's internal name (the `InternalName` of its file, the same in every map). As built (no portrait, per the owner's answer 1; the switches went to `open-homm5.ini` `[skins]`: `skins=1`, `show_others=1`, `trace=0`):
 
 ```ini
 [skins]
-Godric=Freyda          ; Godric looks like Freyda (map and battle figures)
-Godric.portrait=1      ; and has her portrait
+Godric=Freyda          ; Godric looks like Freyda (map, battle and hero screen figures)
 Hero1=Kujin            ; Stronghold's first hero rides Kujin's beast
-show_others=1          ; 0 = show only my own choices, never my friends'
 ```
 
 A choice follows the hero into every game (question 2).
@@ -256,3 +267,33 @@ A choice follows the hero into every game (question 2).
 6. **Computer players' heroes:** keep their looks (proposed), or allow choices for them too (seen only on your PC)?
 7. **The button on the hero screen:** where should it go? A quick sketch over a screenshot of your (French) hero screen would help.
 8. Does the group ever play **without MMH5.5**? Vanilla works with the same code, but would need its own tests.
+
+## Robot results (2026-11-01)
+
+Test copy `C:\Games\H5_test` (MMH5.5 RC19d), map A1M4, each run under the robot lock, the test copy's `dinput8.dll` put back after each run. Choices files made by `tools/robot/make_skins_file.py`: every hero of a faction wears one look (file A: Freyda, Zehir, Raelag, Wulfstan, Agrael, Giovanni, Heam, Quroq; file B: Duncan, Cyrus, Thralsai, King Tolghar, Biara, Arantir, Diraya, Kujin).
+
+**Step 0 (what the static reading said):**
+- The game's list of all heroes (`HEROES_ANY`) holds **179** heroes (fingerprint `0518`), not all 203 hero files: MMH5.5's campaign copies are not in it. 163 of file A's 194 lines resolve; "Orlando" exists twice (Haven and Inferno), and the list's one wins.
+- **Who calls the two figure slots** (`trace=1`, over a whole run with AI turns and a battle): slot `0x24c` only from the map figure builder (`0x008df758`, `0x008df773`), slot `0x248` only from the battle hero's figure (`0x00bc2303`, `0x00bc2324`, `0x00bc2367`). No rules code.
+- **Calling the figure builder again replaces the map figure** (screenshots: the human player's hero takes the look; its portrait stays its own, as wanted).
+- **But a rebuild is not invisible to the world:** it makes two new game objects (new object numbers from the world's counter) and marks four others as changed (`0x0050c020`). A LAN run where each PC rebuilt its own player's hero at its own moment had different world checksums from check 1 on (598 of 599). Hence the multiplayer design above.
+
+**Steps 1 and 3:**
+
+| Run | What happened | World checksums |
+|---|---|---|
+| Single player, file A, `trace=1` | The human's hero rebuilt with its look 0.7 s after the map showed; computer players' heroes kept theirs | (one PC) |
+| Single player, file A, long run | The AI attacked the human's hero: the battle used the look's battle figure (slot `0x248`), auto-combat ran to the results screen, no error | (one PC) |
+| LAN, host file A, client file B | Both PCs: "looks on for this game (all 2 PCs sent theirs)"; at segment 20 both rebuilt Nelech (host's hero, Agrael's look) and Tamika (client's hero, Arantir's look); the client's screenshot shows Tamika riding Arantir's horse with her own portrait; 43 AI steps | 793, all equal |
+| LAN, host file A, client `skins=0` | Host: "no looks in this game: PC 1 sent none in time"; no rebuilds | 517, all equal |
+
+Earlier LAN runs of the first version (rebuilds from frames, before the synchronized design) are the ones that showed the checksum split; they are kept in `build/robot/20261101-164742-lan` and `-165433-lan` of this worktree.
+
+**Robot checks still to do** (each one run; commands as above with `--skins-file` / `--host-skins-file`):
+1. **The hero screen:** open it (the robot has no step for it yet) and check the 3D figure takes the look.
+2. **A hero hired during a multiplayer game** after segment 20: both PCs build it with the look (checksums).
+3. **A hero in a boat and in a town** when the looks come on (single player rebuilds from frames; multiplayer at segment 20).
+4. **A battle in a multiplayer game** between a human with a look and the AI (checksums during the battle).
+5. **Hot seat** (two humans on one PC): both humans' heroes take the file's looks.
+6. **RC19k** (`--game C:\Games\H5_test_k`) and **Linux**.
+7. **The game's own owner change** (a hero taken over by another player) in single player: rebuilt with the new owner's choice.

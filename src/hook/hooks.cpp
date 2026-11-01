@@ -11,6 +11,7 @@
 #include "../mods/camera.h"
 #include "../mods/coop_guard.h"
 #include "../mods/fast_paths.h"
+#include "../mods/hero_skins.h"
 #include "../mods/lan_discovery.h"
 #include "../mods/languages.h"
 #include "../mods/lockstep.h"
@@ -82,6 +83,7 @@ void InstallAll()
 	mods::ApplyRmgBuilderFromSettings();
 	overlay::ApplyTestPanelFromSettings();
 	mods::ApplyCameraFromSettings();
+	mods::ApplyHeroSkinsFromSettings();  // after notify and the co-op guard: it stacks on their hooks
 }
 
 }  // namespace hooks

@@ -144,6 +144,20 @@ python tools\robot\run_ai_test.py --no-map --seconds 170 --turns 1 --quick-comba
 - Checked 2026-10-25 at 1024×768 and 1920×1080 on the French test copy: every line above, our template chosen 14th of the 19 that fit, the map built from it, saved and started, and the computer players took their turns.
 - Not possible with the robot: clicks on the panel (the drop-down lists, the arrows, the boxes, the scroll bar), Esc, and checking that the game behind gets no input (the robot's window is in the background). That is checked by hand, with the test panel's help (`[ui] overlay_test_panel=1`, `src/mods/README.md`).
 
+## Checking the hero looks (`src/mods/hero_skins.cpp`)
+
+```
+python tools\robot\make_skins_file.py build\skins-a.ini
+python tools\robot\make_skins_file.py build\skins-b.ini --look TOWN_HEAVEN=Duncan --look TOWN_NECROMANCY=Arantir
+python tools\robot\run_ai_test.py --turns 24 --seconds 420 --shot-every 20 --step "3|console|mission_camera_def_pos 50 -40 16 12" --skins-file build\skins-a.ini --skins-setting trace=1
+python tools\robot\run_lan_test.py --seconds 270 --turns 5 --host-skins-file build\skins-a.ini --client-skins-file build\skins-b.ini --skins-setting trace=1
+python tools\robot\run_lan_test.py --seconds 200 --turns 3 --host-skins-file build\skins-a.ini --client-skins skins=0
+```
+
+- `make_skins_file.py` gives every hero of a faction one look, so whatever heroes A1M4 deals out, the robot's players show it. The camera position step brings the camera close to the hero.
+- What to look for: `hero skins: ...: the map figure is rebuilt with ...'s look` (single player), `looks on for this game` and the same rebuilds at the same moment on both copies (LAN), `no looks in this game: PC 1 sent none in time` (LAN, client off), and `lan_report.py`: checksums all equal. `trace=1` also lists who calls the hero's figure slots.
+- Not possible yet: opening the hero screen.
+
 ## Robot script
 
 Besides starting a map, the DLL runs a script of timed steps (`--step`, or `--host-step` / `--client-step`), `"<seconds>|<kind>|<text>"`, seconds counted from the first main-loop call:

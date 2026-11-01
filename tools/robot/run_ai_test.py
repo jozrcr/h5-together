@@ -130,7 +130,21 @@ def write_mod_settings(game, args, instance):
     debug = getattr(args, "debug_setting", None) or []  # e.g. hang_test_at=60, hang_seconds=10
     if debug:
         lines += ["[debug]"] + debug
+    # [skins] = the hero looks (src/mods/hero_skins.cpp); the choices themselves
+    # come from a file of open-homm5-skins.ini's format (--skins-file)
+    skins = getattr(args, "skins_setting", None) or []  # e.g. trace=1, show_others=0
+    if skins:
+        lines += ["[skins]"] + skins
     mod_settings_file(game, instance).write_text("\n".join(lines) + "\n", encoding="ascii")
+    choices = skins_file(game, instance)
+    choices.unlink(missing_ok=True)
+    if getattr(args, "skins_file", None):
+        shutil.copy2(args.skins_file, choices)
+
+
+def skins_file(game, instance):
+    """The hero looks' choices (open-homm5-skins.ini), per copy like the log."""
+    return game / "bin" / ("open-homm5-skins%s.ini" % ("-" + instance if instance else ""))
 
 
 def prepare(game, args, out, instance="", net_port=None):
@@ -356,6 +370,7 @@ def collect(game, out, instance, exit_code, elapsed):
     # enter robot mode (it only logs AI steps).
     ini.unlink(missing_ok=True)
     mod_settings_file(game, instance).unlink(missing_ok=True)
+    skins_file(game, instance).unlink(missing_ok=True)
     profile = game / "bin" / ("open-homm5-profile%s.txt" % ("-" + instance if instance else ""))
     if profile.exists():  # AI profiler samples (profile_ai), see tools/robot/profile_report.py
         shutil.move(str(profile), str(out / "ai-profile.txt"))
@@ -427,6 +442,10 @@ def main():
                    help="[lang] setting, e.g. texts=fr or log_texts=300 (repeatable; src/mods/languages.cpp)")
     p.add_argument("--camera-setting", action="append", default=[], metavar="KEY=VALUE",
                    help="[camera] setting, e.g. zoom_out=150 or combat_zoom_out=150 (repeatable; src/mods/camera.cpp)")
+    p.add_argument("--skins-setting", action="append", default=[], metavar="KEY=VALUE",
+                   help="[skins] setting, e.g. trace=1 (repeatable; src/mods/hero_skins.cpp)")
+    p.add_argument("--skins-file", metavar="PATH",
+                   help="hero looks to choose: a file in open-homm5-skins.ini's format, copied into bin for the run")
     p.add_argument("--debug-setting", action="append", default=[], metavar="KEY=VALUE",
                    help="[debug] setting, e.g. hang_test_at=60 or hang_seconds=10 (repeatable; src/hook/watchdog.cpp)")
     p.add_argument("--resolution", default="1024x768", metavar="WxH",
