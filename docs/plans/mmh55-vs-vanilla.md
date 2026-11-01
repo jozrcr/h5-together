@@ -353,6 +353,8 @@ MMH5.5's warning in the file: all multiplayer players must use the exact same fi
 | **3. Rules served by the DLL, per session** | `[rules]` in `open-homm5.ini`: our file hook serves `H55-Settings.lua` (and later other files) with those values; same ini on every PC, checked by way 2 | from the next game start | yes with way 2 |
 | **4. Rules from the host, per game** | the host's choice travels in the random map's name (`Maps/RMG/<guid>-OH1-...`, the faction-terrain channel); every PC's DLL serves the matching files; a PC without the DLL cannot even find that map | each random map game | yes, by construction; hand-made maps need another carrier (not studied) |
 
+**Built (2026-11-01): way 4 for any map, with way 2.** The host's choice travels in one more chunk of the start message (`NMP::CMPStart`), which a PC without the mod skips; it is sent only when every human said our lobby hello, so nobody starts on other rules. Hand-made maps work too. The lobby hello also carries the hashes of way 2. See [host-rules.md](host-rules.md). Found there: on a random map straight from the generator, in multiplayer, MMH5.5's scripts do not run at all (no map script), so `H55-Settings.lua` changes nothing on those maps.
+
 Two things to check before ways 3 and 4: whether a **saved game** re-reads `H55-Settings.lua` on load (MMH5.5's scripts keep their variables in the save, probably), and that the file is read at map start on every PC (our file hook sees it; the order was not logged yet).
 
 ### C.2 The options, one by one
