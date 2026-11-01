@@ -45,12 +45,6 @@ Applied ApplyLook(int hero, int look, std::string *note);
 // for the hero screen's button; false when there is no selected hero.
 bool SelectedLookPortrait(std::string *dds);
 
-// Asks the hero screen, if it is the screen on top at the next adventure frame,
-// to refresh as when it shows another hero ("shown" +0x15a = 0, "needs refresh"
-// +0x7d8 = 1; its update 0x006caee0 -> 0x006ca4e0), so its 3D figure is built
-// again with the hero's look. Logs the model it then shows.
-void RefreshHeroScreen(const char *why);
-
 // The catalog's InternalName of a position, and the text file of its name ("" if none).
 std::string InternalName(int hero);
 std::string NameFile(int hero);
