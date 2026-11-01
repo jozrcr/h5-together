@@ -1,6 +1,6 @@
 # Package: the easy install
 
-Builds `open-homm5-<version>.zip`, the file a friend downloads to install the hook DLL (see [docs/install.md](../../docs/install.md), "Easy install"). It stays local: this tool does not upload or publish anything.
+Builds `open-homm5-<version>.zip`, the file a friend downloads to install the hook DLL (see [docs/install.md](../../docs/install.md)). It stays local: this tool does not upload or publish anything.
 
 ## Build it
 

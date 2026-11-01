@@ -55,7 +55,7 @@ Download the latest `open-homm5-<version>.zip` from the [releases page](https://
 - **Windows:** double-click `install.bat`.
 - **Linux (Steam / Proton):** run `bash install.sh`, then paste the line it prints into the game's Steam launch options. Full walkthrough with ZeroTier: [docs/linux.md](docs/linux.md).
 
-Start the game: a file `open-homm5.log` appears in the game's `bin` folder, which means the add-on is running. **Everyone in the same co-op game should install the same version.** To remove it, run `uninstall.bat` (Windows) or `bash uninstall.sh` (Linux); only our own files are removed.
+Start the game: a file `open-homm5.log` appears in the game's `bin` folder, which means the add-on is running. **Everyone in the same co-op game should install the same version.** To remove it, run `uninstall.bat` (Windows) or `bash uninstall.sh` (Linux); only our own files are removed. More detail (what gets installed, updating): [docs/install.md](docs/install.md).
 
 ## Settings
 
