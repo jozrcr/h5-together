@@ -5,7 +5,7 @@ namespace mods {
 
 // With the settings of open-homm5.ini [audio]: volume_curve=game (the default:
 // the game's own sliders, and then nothing is installed) or wide; log_volume=N
-// (testing: log the first N channel volumes). Only after DetectGameBuild() said
+// (testing: log the first N changes of an audible channel volume). Only after DetectGameBuild() said
 // the build is hookable.
 void ApplyAudioVolumeFromSettings();
 

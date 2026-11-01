@@ -659,16 +659,20 @@ The robot passes them with `--camera-setting KEY=VALUE` (`run_lan_test.py`: also
 
 **Only your speakers change:** sound is not part of the game world. Each player can choose, also in co-op games. The log says `audio: volume_curve=wide: ...`.
 
-**To check with the robot** (not done yet):
-- `--audio-setting volume_curve=wide --audio-setting log_volume=40 --setvar "sound_sfxvolume = 0.1"`: the log lines must read `slider 25/255, game volume 25/255 -> 2/255` for a sound at full own volume;
-- the owner's ears: the lowest step quiet but audible, music and sounds balanced as before.
+**Checked with the robot** (2026-11-01; `--audio-setting volume_curve=wide --audio-setting log_volume=200 --setvar "sound_sfxvolume = 0.1" --setvar "sound_musicvolume = 0.1"`):
+- the log has `audio: volume_curve=wide: ...`;
+- the main menu's music fades in from `game volume 1/255 -> 1/255` to `game volume 25/255 -> 2/255` and stays there;
+- on the map, a sound effect has `audio: sound: slider 25/255, game volume 25/255 -> 2/255`. So at the lowest step FMOD gets 2 instead of 25 (about −42 dB instead of −20 dB);
+- the game ran normally, with a battle.
+
+Still to check: the owner's ears (the lowest step quiet but audible, music and sounds balanced as before). In a LAN game where only the host used it, the world checksums stayed equal (700, below).
 
 **Settings** (`open-homm5.ini`):
 
 ```ini
 [audio]
 volume_curve=game   ; game (the game's sliders), wide (each step about the same number of decibels)
-log_volume=0        ; testing: log the first N channel volumes (slider, game's volume, ours)
+log_volume=0        ; testing: log the first N changes of an audible channel volume (slider, game's volume, ours)
 ```
 
 ## Black past the map's edge (`edge_sky.cpp`, off by default)
@@ -682,12 +686,16 @@ log_volume=0        ; testing: log the first N channel volumes (slider, game's v
 
 **Only your screen changes:** lights are drawn, not simulated. Each player can choose. The log says `edge sky: ... served without its sky dome (edge_sky=none)` when a map uses that light.
 
-**To check with the robot** (not done yet):
-- the robot's map A1M4 uses another light, so add `--camera-setting edge_sky_test_light=Lights/_(AmbientLight)/AdvMap/Addon/AC1M4.xdb` with `edge_sky=none` and `zoom_out=300` and the far start (camera.md);
-- the sky above the far edge must turn black, and the light's log line must appear;
-- a battle keeps its sky;
-- a LAN game with only the host using it keeps equal world checksums;
-- then a random map that drew the dusk light (the map's `map.xdb` names it under `GroundAmbientLights`).
+**Checked with the robot** (2026-11-01, `zoom_out=300` and the far start position of camera.md):
+
+| Map | `edge_sky=game` | `edge_sky=none` |
+|---|---|---|
+| a random map of the owner's that drew the dusk light (`MAP_JoacJoz`, started with `--map /Maps/RMG/81CD0EF2-7D11-41D7-AE71-0A74BF0872A0/map.xdb`) | past the top-left edge: the flat violet and lavender of the owner's screenshot | black; the log has `edge sky: lights/_(ambientlight)/arena/dusk_light_boatarena01(victest).xdb served without its sky dome` |
+| A1M4 (another light: tested with `edge_sky_test_light=Lights/_(AmbientLight)/AdvMap/Addon/AC1M4.xdb`) | a pale sky glow above the far edge | black |
+
+- **Battles:** a battle in the same game drew its battlefield as usual. The log showed no other light served, so only the named light files change.
+- **LAN game**, only the host with `edge_sky=none`, the test light, `volume_curve=wide` and French texts: 700 world checksums, all equal on both copies.
+- Give a Git Bash command line `MSYS_NO_PATHCONV=1`, or use PowerShell: Git Bash rewrites `--map /Maps/...` into a Windows path, and the game then says `Couldn't find map`.
 
 **Settings** (`open-homm5.ini`):
 

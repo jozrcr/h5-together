@@ -33,7 +33,7 @@
 //   volume_curve=game   game: the game's straight sliders (nothing installed)
 //                       wide: each slider step about the same number of
 //                       decibels; the lowest step is 10 times quieter
-//   log_volume=0        testing: log the first N channel volumes set (the
+//   log_volume=0        testing: log the first N audible channel volumes set (the
 //                       slider's value, the game's volume and ours)
 #include "audio_volume.h"
 
@@ -68,24 +68,33 @@ int Slider(DWORD global)
 	return object ? *reinterpret_cast<const int *>(object + kSliderOffset) : 255;
 }
 
-float Apply(const char *what, DWORD global, float volume)
+// The last volume logged for sounds [0] and music [1] (FMOD's 0..255): only a
+// change is logged, so a music fade-in or many sounds at the same volume take
+// one line each, not dozens.
+volatile LONG g_last_logged[2] = {-1, -1};
+
+float Apply(int kind, DWORD global, float volume)
 {
 	const int slider = Slider(global);
 	const float out = audiovol::Wide(volume, slider);
-	if (g_log_volume > 0 && InterlockedIncrement(&g_logged) <= g_log_volume)
-		hooklog::Write("audio: %s: slider %d/255, game volume %d/255 -> %d/255", what, slider,
-		               static_cast<int>(volume * 255.0f), static_cast<int>(out * 255.0f));
+	if (g_log_volume > 0) {
+		const LONG game = static_cast<LONG>(volume * 255.0f);
+		if (game >= 1 && InterlockedExchange(&g_last_logged[kind], game) != game &&
+		    InterlockedIncrement(&g_logged) <= g_log_volume)
+			hooklog::Write("audio: %s: slider %d/255, game volume %ld/255 -> %d/255", kind ? "music" : "sound", slider,
+			               game, static_cast<int>(out * 255.0f));
+	}
 	return out;
 }
 
 void __fastcall SoundVolumeHook(void *channel, void *edx, float volume)
 {
-	g_sound_next(channel, edx, Apply("sound", kSoundManager, volume));
+	g_sound_next(channel, edx, Apply(0, kSoundManager, volume));
 }
 
 void __fastcall MusicVolumeHook(void *channel, void *edx, float volume)
 {
-	g_music_next(channel, edx, Apply("music", kMusicSystem, volume));
+	g_music_next(channel, edx, Apply(1, kMusicSystem, volume));
 }
 
 }  // namespace

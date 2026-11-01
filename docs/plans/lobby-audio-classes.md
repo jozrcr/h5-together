@@ -13,14 +13,14 @@ The owner asked for five things:
 
 | Item | Answer | Status |
 |---|---|---|
-| 1. Volume | "Wider range": `[audio] volume_curve=wide`, off by default; no scale settings. | **Built:** `src/mods/audio_volume.cpp`. Not yet checked in a game. |
-| 2. Lobby labels | (the fix is ours, no choice needed) | **Done:** 4 tooltips in the private packs; outdated-text check in `tools/lang/inventory.py`. |
+| 1. Volume | "Wider range": `[audio] volume_curve=wide`, off by default; no scale settings. | **Built and robot-checked:** `src/mods/audio_volume.cpp`. The owner's ears still to check. |
+| 2. Lobby labels | (the fix is ours, no choice needed) | **Done and robot-checked:** 4 tooltips in the private packs; outdated-text check in `tools/lang/inventory.py`. |
 | 3. ToE bonuses | "Each player picks": option A (a mode chooser in the lobby, the bonus arrows back to ToE). | Later. |
 | 4. Hero skills | "Per game in the lobby" (option 2). | Later. |
-| 5. Map edges | "Black": `[camera] edge_sky=none`, off by default. | **Built:** `src/mods/edge_sky.cpp`. Not yet checked in a game. |
+| 5. Map edges | "Black": `[camera] edge_sky=none`, off by default. | **Built and robot-checked:** `src/mods/edge_sky.cpp`. |
 | The French pack in `data\` | The coordinator asks the owner. | Open. |
 
-**What was built (2026-11-01, no game or robot run: the owner was playing):**
+**What was built (2026-11-01):**
 
 - **Volume** (`audio_volume.cpp`, setting `[audio] volume_curve=game|wide`, testing `log_volume=N`).
   - The two calls of `0x00b26e80` (`0x00d0439b` sounds, `0x00d047ac` music) are redirected, after checking each still calls `0x00b26e80`.
@@ -39,22 +39,19 @@ The owner asked for five things:
   They were made in this worktree's `build/lang/` (the main checkout's `build/` was read only), so they still have to be copied over the main checkout's files.
 - **Outdated-text check:** `inventory.py --fr-pack` now also writes `outdated.txt`, the translated files whose markup differs from the English text's. RC19i's pack on RC19k: 108 candidates, among them the gold and resources tooltips. `inventory.py --self-test` checks the comparison.
 
-**What the robot should check later** (with the robot lock):
-1. **Volume:**
-   - run `run_ai_test.py --audio-setting volume_curve=wide --audio-setting log_volume=40 --setvar "sound_sfxvolume = 0.1" --setvar "sound_musicvolume = 0.1"`;
-   - the log has `audio: volume_curve=wide: ...` and lines like `audio: sound: slider 25/255, game volume 25/255 -> 2/255`;
-   - the game runs normally (a battle, a dialog);
-   - then the owner's ears.
-2. **Edge sky:**
-   - A1M4 uses another light, so add `--camera-setting edge_sky=none --camera-setting "edge_sky_test_light=Lights/_(AmbientLight)/AdvMap/Addon/AC1M4.xdb" --camera-setting zoom_out=300` and the far start position ([../subsystems/camera.md](../subsystems/camera.md), robot checks);
-   - the log has `edge sky: lights/_(ambientlight)/advmap/addon/ac1m4.xdb served without its sky dome`;
-   - the screenshot shows black above the map's far edge, where the game's run shows its sky;
-   - a battle keeps its sky.
-3. **A random map that drew the dusk light** (its `map.xdb` names it under `GroundAmbientLights`), without the test light: black past the edge.
-4. **LAN:** only the host with `volume_curve=wide` and `edge_sky=none`: world checksums all equal.
-5. **French texts:**
-   - with the new RC19d packs in the test copy's `bin\open-homm5\lang\fr\` and `texts=fr`, hover the lobby's bonus icons;
-   - all 4 tooltips must be in French and describe Default, Savage and Nightmare.
+**Robot checks (2026-11-01, robot lock held; runs in this worktree's `build/robot/`):**
+
+| Check | Run | Result |
+|---|---|---|
+| 1. Volume | `20261101-164014` (lowest step: `sound_sfxvolume = 0.1`, `sound_musicvolume = 0.1`) | The main menu music fades in from `game volume 1/255 -> 1/255` to `game volume 25/255 -> 2/255`. On the map, `audio: sound: slider 25/255, game volume 25/255 -> 2/255`. **Works**; the owner's ears still to check. |
+| 2. Edge sky on A1M4 (test light `AC1M4.xdb`, far camera) | `20261101-162622` (none), `20261101-163308` (game) | With `game`, a pale sky glow above the far edge; with `none`, black there. The log has `edge sky: lights/_(ambientlight)/advmap/addon/ac1m4.xdb served without its sky dome`. A battle (an AI attack, underground battlefield) ran normally, and no other light was served. **Works.** |
+| 3. Edge sky on a random map with the dusk light (the owner's `MAP_JoacJoz`) | `20261101-164014` (none, RC19d copy), `20261101-164319` (game, RC19k copy) | Same start view. With `game`, the flat violet and lavender of the owner's screenshot past the top-left edge; with `none`, black. The log has `edge sky: lights/_(ambientlight)/arena/dusk_light_boatarena01(victest).xdb served without its sky dome`. **Works.** |
+| 4. LAN, host only with both settings (and `texts=fr`) | `20261101-164454-lan` | `lan_report.py`: 700 world checksums, all equal on both copies (no desync). The client logged the game's sky and sliders. |
+| 5. French lobby tooltips (new RC19d packs in the test copy, removed afterwards) | `20261101-164454-lan`, host | The lobby reads the 4 tooltips when it builds its rows. All 4 came from `open-homm5-fr-rc19d.pak`, in French: Mode Par défaut, Mode Sauvage, Mode Cauchemar and the help text. **Works.** |
+
+One fix came out of these runs. `log_volume` now logs only **changes** of an audible volume: a music fade-in had used up all the lines.
+
+Screenshots of the edge (for the owner) are in the session's `scratchpad\edge-shots\`.
 
 ## Summary
 
