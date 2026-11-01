@@ -512,6 +512,7 @@ trace_factions=0   ; research: lobby setups, the start, map builds, map files, f
 
 **Each rebuild leaves a map package in the game's `Maps` folder** (`Maps\<name>.N.h5m`), like each join of a random map in the game itself. **It is hidden from the game's map lists** (on every PC with the DLL, whatever its settings): only the map it was rebuilt from shows. The lists (multiplayer, single player, random map screen) get their maps from `0x007c2ce0`, every `map-tag` resource under a folder from the game's resource index; the mod takes out those under `Maps/RMG/<guid>-OH1-<8 hex digits>/`. Log: `rmg factions: map list of ...: 1 rebuilt map(s) (-OH1-) hidden, 23 shown`.
 - **The packages are not deleted:** a save of such a game names its map's path, and reading a save's setup needs the map's description (`0x00ca0c70` → the setup constructor). The start and the saves find the package by that exact path, which the lists do not touch.
+- **Robot check** (LAN, 2026-11-01, `MMH55_Utility_64.exe`, map `MMH55_RMG_Map_002`, the client picked Haven where its zone was made for Dungeon): the host's map list log said `map list of Maps/RMG: 2 rebuilt map(s) (-OH1-) hidden, 55 shown`, and none of the 95 maps of the multiplayer list was an `-OH1-` one; both PCs rebuilt the map (`-OH1-838A0000`) and started on it; **496 world checksums, all equal.**
 - So do not delete them by hand while you keep saves of those games. (A save's setup is read by the same code as the start message, `0x005a1430` → `0x00ca0c70`, where the mod rebuilds a missing rebuilt map; not tested with a save.)
 
 ## Original music (`original_music*.cpp`, off by default)
@@ -678,6 +679,16 @@ wheel: Wine reports the mouse wheel as steps (2 of 3 checks): from now on the ga
 
 **The trace** (`[debug] trace_wheel=1`): every wheel event (raw and what the game gets, and whether the game drops it as a press), the game's own `GetDeviceState` reads, each Acquire, each check, the game's checks for presses at the first event (window active, cursor inside), and the window's `WM_MOUSEWHEEL` messages (a `WH_GETMESSAGE` hook on the game's thread, watch only).
 
-**Tests:** `test/wheel_test.cpp` models the game's reading, Windows' and Wine's mice: without the fix, 5 notches up zoom in once and 10 down do nothing; with it, every notch counts, also when the game drops presses; positions are never converted. **Not checked yet:** a real Linux PC (the robot runs on Windows).
+**Tests:** `test/wheel_test.cpp` models the game's reading, Windows' and Wine's mice: without the fix, 5 notches up zoom in once and 10 down do nothing; with it, every notch counts, also when the game drops presses; positions are never converted.
+
+**Robot checks** (2026-11-01, A1M4, `MMH55_Utility_64.exe`, `builder=1`; the robot's `wheel` step gives the game's mouse notches as Windows or as Wine would, its `dik` step presses Page Down / Page Up). The robot's game window is in the background, so the game's press filter is on (`trace_wheel`: "window active 1 1, cursor in its window 0"), as it seems to be for the Linux player:
+
+| Run | Wheel down 6 notches | Wheel up 6 notches |
+|---|---|---|
+| `wheel_fix=0`, Wine-like steps | **no zoom** (every -120 dropped as a press) | zooms in **one** notch, then nothing |
+| `wheel_fix=0`, Windows-like positions | zooms out to the farthest | |
+| `wheel_fix=1`, Wine-like steps | zooms out to the farthest | zooms in to the nearest |
+
+Page Down (1.5 s) zoomed out to the farthest and Page Up back in, with `builder=1` (the modal panels' input hooks installed and idle). **Not checked yet:** a real Linux PC (that `auto` switches on there by itself).
 
 **Keyboard:** Page Down zooms out and Page Up zooms in (`bind +camera_zoom 'PG_DOWN'`, `bind -camera_zoom 'PG_UP'` in the profile's `input_a2.cfg`), on every system.

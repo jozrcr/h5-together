@@ -92,6 +92,8 @@ So the game expects **positions** for the wheel: with an absolute axis, Windows 
 
 **The fix** (`wheel.cpp`, `[camera] wheel_fix=auto`, under Wine only): the game gets positions, the running sum of the steps, in the events and in the state's `lZ`. It switches on after two checks show steps (the device's `lZ` is the sum of the events, not the last one). `[debug] trace_wheel=1` logs the raw events, the game's view and the window's `WM_MOUSEWHEEL` messages.
 
+**Robot check** (2026-11-01, A1M4): with Wine-like steps and no fix, 6 notches down did nothing and 6 up zoomed in one notch (the robot's window is in the background, so the press filter is on); Windows-like positions zoomed out; with `wheel_fix=1` the steps zoomed out to the farthest and back in to the nearest. Details in [src/mods/README.md](../../src/mods/README.md).
+
 **The keys work everywhere:** `PG_DOWN` / `PG_UP` are keyboard buttons (`0x80` down, `0` up) read through the same loop; only the window-inactive part of the press filter applies to them.
 
 ## Battles
