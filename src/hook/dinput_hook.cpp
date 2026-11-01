@@ -26,7 +26,7 @@ struct User {
 	Filters filters;
 	int order;
 };
-const int kMaxUsers = 4;
+const int kMaxUsers = 6;
 User g_users[kMaxUsers];
 int g_user_count = 0;
 

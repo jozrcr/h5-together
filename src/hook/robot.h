@@ -37,8 +37,13 @@ void OnAiTurnStart(void *ai);
 // Robot keyboard (robot_input.cpp). From the DirectInput8Create proxy: hook the
 // DirectInput object so the keyboard device can be fed robot key presses.
 void OnDirectInputCreated(void *direct_input);
-// Press and release one key (a DIK_ code, e.g. 0x1C = Enter). False if busy.
-bool PressKey(int dik_code);
+// Press and release one key (a DIK_ code, e.g. 0x1C = Enter), held hold_ms
+// (0 = 150 ms). False if busy.
+bool PressKey(int dik_code, DWORD hold_ms = 0);
+// Robot mouse wheel (step "wheel|<notches> [steps]"): give the game's mouse
+// that many notches (+ up, - down), one per buffered read, as positions (the
+// running sum, as Windows gives them) or as steps (+-120, as Wine gives them).
+void TurnWheel(int notches, bool steps);
 // One of our overlay's own keys (step "key|F11"): true once for the next
 // overlay::KeyPressed(vk) after the step ran (the robot's window is in the
 // background, so the overlay's GetAsyncKeyState never sees a key).

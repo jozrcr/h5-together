@@ -32,7 +32,8 @@ struct Step {
 	DWORD at_ms;
 	char kind;  // 'c' console, 'm' menu, 'u' ui, 'g' game message, 'p' pick map, 'l' pick save,
 	            // 'o' setup option, 'r' setup slider, 'j' pick game, 'k' peek, 'w' waiting-room slots, 'a' slot arrow,
-	            // 'v' memory, 's' screenshot, 'y' a key of our overlay, 'b' a command for our panel
+	            // 'v' memory, 's' screenshot, 'y' a key of our overlay, 'b' a command for our panel,
+	            // 'd' a game key (DirectInput), 'z' the mouse wheel
 	char text[512];
 };
 const int kMaxSteps = 32;
@@ -365,6 +366,19 @@ BOOL WINAPI RobotPeekMessageA(LPMSG msg, HWND hwnd, UINT min, UINT max, UINT rem
 				else {
 					hooklog::Write("robot: key \"%s\" is not F1..F12", s.text);
 				}
+			}
+			else if (s.kind == 'd') {  // "<hex DIK code> [hold ms]": a game key through the robot's DirectInput keyboard
+				char *rest = nullptr;
+				const long code = strtol(s.text, &rest, 16);
+				const long hold = rest ? strtol(rest, nullptr, 10) : 0;
+				const bool ok = code > 0 && code < 256 && PressKey(static_cast<int>(code), hold > 0 ? static_cast<DWORD>(hold) : 0);
+				hooklog::Write("robot: game key %02lx held %ld ms: %s", code, hold > 0 ? hold : 150, ok ? "pressed" : "NOT pressed (busy or bad code)");
+			}
+			else if (s.kind == 'z') {  // "<notches> [steps]": the mouse wheel (+ up, - down), as Windows or as Wine gives it
+				const int notches = atoi(s.text);
+				TurnWheel(notches, strstr(s.text, "steps") != nullptr);
+				hooklog::Write("robot: mouse wheel %+d notch(es) queued, as %s", notches,
+				               strstr(s.text, "steps") ? "steps (+-120 each, as Wine gives them)" : "positions (as Windows gives them)");
 			}
 			else if (s.kind == 'b') {  // "<command>" for our open panel (e.g. the builder's "preset 4", "use")
 				lstrcpynA(g_panel_command, s.text, sizeof(g_panel_command));
@@ -702,6 +716,8 @@ bool ReadConfig(const wchar_t *path)
 				         : strcmp(kind, "arrow") == 0 ? 'a'
 				         : strcmp(kind, "mem") == 0 ? 'v'
 				         : strcmp(kind, "key") == 0 ? 'y'
+				         : strcmp(kind, "dik") == 0 ? 'd'
+				         : strcmp(kind, "wheel") == 0 ? 'z'
 				         : strcmp(kind, "rmg") == 0 ? 'n'
 				         : strcmp(kind, "panel") == 0 ? 'b'
 				                                     : 'c';
@@ -848,6 +864,8 @@ void Init()
 		               : g_steps[i].kind == 'a' ? "arrow"
 		               : g_steps[i].kind == 'v' ? "mem"
 		               : g_steps[i].kind == 'y' ? "key"
+		               : g_steps[i].kind == 'd' ? "dik"
+		               : g_steps[i].kind == 'z' ? "wheel"
 		               : g_steps[i].kind == 'n' ? "rmg"
 		               : g_steps[i].kind == 'b' ? "panel"
 		               : g_steps[i].kind == 's' ? "shot"
