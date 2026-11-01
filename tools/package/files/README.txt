@@ -17,6 +17,7 @@ Camera: to let the camera zoom out farther than the game allows, open open-homm5
 Random map templates: the install also adds ready templates (names start with OH-) to the game's random map list. Every player of a multiplayer game needs the same ones, so everyone should install the same version.
 
 Settings (you can skip this): open-homm5.ini in the bin folder. Every line is commented out and shows the default.
-Uninstall: double-click uninstall.bat (Windows) or run: bash uninstall.sh (Linux). Only our own files are removed (dinput8.dll, the log, our templates, and your settings file if you say yes). Templates you added yourself stay.
+Updating: install the new version the same way. Your settings are kept, and the new ones are added to open-homm5.ini (commented out, with what they do). Your old file is saved as open-homm5.ini.bak.
+Uninstall: double-click uninstall.bat (Windows) or run: bash uninstall.sh (Linux). Only our own files are removed (dinput8.dll, the log, our templates, and your settings file and its .bak copies if you say yes). Templates you added yourself stay.
 
 Project page, guides and bug reports: https://github.com/jozrcr/open-homm5

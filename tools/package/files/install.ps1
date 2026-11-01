@@ -8,6 +8,9 @@
 #   -SteamDir <folder>  look in this Steam folder instead of the one in the registry
 #   -NoPause            do not wait for Enter at the end
 #
+# An existing open-homm5.ini is refreshed: it becomes this package's file with the
+# player's values in it (the old one is kept as open-homm5.ini.bak; see Merge-Settings).
+#
 # Exit codes: 0 done, 3 refused (a dinput8.dll that is not ours is there),
 # 4 game not found, 5 copy failed, 6 unexpected error, 7 package incomplete.
 param(
@@ -178,6 +181,200 @@ function Get-PublicZeroTier {
     return $names
 }
 
+# ---- the settings file: refresh it from this package's open-homm5.ini ----
+# install.sh does exactly the same (merge_ini); test_scripts.py checks that both give
+# the same bytes. The rules:
+# - the result is this package's open-homm5.ini (every setting, commented out), with
+#   its line endings;
+# - each "key=value" line of the player's file fills the line ";key=..." of the same
+#   [section] of the new file: it becomes "key=value". Names ignore upper/lower case
+#   (as the game's ini reader does); spaces around the key and the value go;
+# - the player's other lines with content (a setting this version does not list, a
+#   second copy of one) go, as they were, at the end of their section under
+#   "; kept from your previous file:". A section the new file lacks goes at the end;
+# - the player's own comments and blank lines are not carried over (the backup,
+#   open-homm5.ini.bak, has them).
+# Files are read and written one byte = one character (Latin-1), so nothing is
+# re-encoded: an ASCII file stays ASCII.
+$Latin1 = [System.Text.Encoding]::GetEncoding(28591)
+$IniBlank = [char[]]@([char]32, [char]9)
+$KeptHeading = "; kept from your previous file:"
+
+# Lower case for A to Z only (as awk does in install.sh).
+function Get-AsciiLower([string]$Text) {
+    $a = $Text.ToCharArray()
+    for ($i = 0; $i -lt $a.Length; $i++) {
+        $c = [int]$a[$i]
+        if ($c -ge 65 -and $c -le 90) { $a[$i] = [char]($c + 32) }
+    }
+    return (-join $a)
+}
+
+function New-OrdinalTable { return (New-Object System.Collections.Hashtable ([StringComparer]::Ordinal)) }
+
+# The lines of a file without their line ends: a UTF-8 byte-order mark at the start
+# goes, and one CR before each LF. Crlf: some line ended with CR LF.
+function Read-IniLines([byte[]]$Bytes) {
+    $start = 0
+    if ($Bytes.Length -ge 3 -and $Bytes[0] -eq 0xEF -and $Bytes[1] -eq 0xBB -and $Bytes[2] -eq 0xBF) { $start = 3 }
+    $text = $Latin1.GetString($Bytes, $start, $Bytes.Length - $start)
+    $lines = New-Object System.Collections.Generic.List[string]
+    $crlf = $false
+    if ($text.Length -gt 0) {
+        $parts = $text.Split([char]10)
+        $n = $parts.Length
+        if ($text[$text.Length - 1] -eq [char]10) { $n-- }
+        for ($i = 0; $i -lt $n; $i++) {
+            $l = $parts[$i]
+            if ($l.EndsWith([string][char]13)) { $l = $l.Substring(0, $l.Length - 1); $crlf = $true }
+            $lines.Add($l)
+        }
+    }
+    return @{ Lines = $lines; Crlf = $crlf }
+}
+
+# What one line is. Kind: blank, section (Name), comment (Key if it reads ";key=..."),
+# setting (Key, Value) or other. Text: the line without spaces at its ends.
+function Get-IniLine([string]$Line) {
+    $t = $Line.Trim($IniBlank)
+    $r = @{ Kind = "other"; Text = $t; Name = ""; Key = ""; Value = "" }
+    if ($t.Length -eq 0) { $r.Kind = "blank"; return $r }
+    $c = $t[0]
+    $p = $t.IndexOf([char]']')
+    if ($c -eq [char]'[' -and $p -gt 0) {
+        $r.Kind = "section"
+        $r.Name = $t.Substring(1, $p - 1).Trim($IniBlank)
+        return $r
+    }
+    if ($c -eq [char]';' -or $c -eq [char]'#') {
+        $r.Kind = "comment"
+        if ($t -cmatch '^;([A-Za-z0-9_]+)=') { $r.Key = $Matches[1] }
+        return $r
+    }
+    $p = $t.IndexOf([char]'=')
+    if ($p -gt 0) {
+        $r.Kind = "setting"
+        $r.Key = $t.Substring(0, $p).Trim($IniBlank)
+        $r.Value = $t.Substring($p + 1).Trim($IniBlank)
+    }
+    return $r
+}
+
+function Add-KeptLines($Out, [string]$Heading, $Lines, [string]$Eol) {
+    if ($null -eq $Lines -or $Lines.Count -eq 0) { return }
+    [void]$Out.Append($Eol)
+    if ($Heading) { [void]$Out.Append($Heading).Append($Eol) }
+    [void]$Out.Append($KeptHeading).Append($Eol)
+    foreach ($l in $Lines) { [void]$Out.Append($l).Append($Eol) }
+}
+
+# The refreshed settings file (Bytes) from the player's file and this package's.
+# Settings: the player's "key=value" lines; New: settings of the package's file that
+# the player's file does not mention; Unknown: player's settings the package's file
+# does not list. $null if the player's file is not plain text (it holds zero bytes,
+# for example saved as "Unicode" by Notepad): then it is left as it is.
+function Merge-Settings([byte[]]$PlayerBytes, [byte[]]$PackageBytes) {
+    # (PowerShell names ignore upper/lower case: $old here is not $Old)
+    if ([Array]::IndexOf($PlayerBytes, [byte]0) -ge 0) { return $null }
+    $tpl = Read-IniLines $PackageBytes
+    $old = Read-IniLines $PlayerBytes
+    $eol = "`n"
+    if ($tpl.Crlf) { $eol = "`r`n" }
+
+    # The package's file: each line's section, the settings, each section's last line.
+    $lineSec = New-Object System.Collections.Generic.List[string]
+    $slotKey = @{}
+    $slots = New-OrdinalTable
+    $known = New-OrdinalTable
+    $lastLine = New-OrdinalTable
+    $sec = ""
+    $known[""] = $true
+    for ($i = 0; $i -lt $tpl.Lines.Count; $i++) {
+        $p = Get-IniLine $tpl.Lines[$i]
+        if ($p.Kind -eq "section") { $sec = Get-AsciiLower $p.Name; $known[$sec] = $true }
+        $lineSec.Add($sec)
+        if ($p.Kind -ne "blank") { $lastLine[$sec] = $i }
+        if (($p.Kind -eq "comment" -and $p.Key -ne "") -or ($p.Kind -eq "setting" -and $p.Key -cmatch '^[A-Za-z0-9_]+$')) {
+            $k = $sec + "`n" + (Get-AsciiLower $p.Key)
+            if (-not $slots.ContainsKey($k)) { $slots[$k] = $true; $slotKey[$i] = $p.Key }
+        }
+    }
+
+    # The player's file: the values, and the lines to keep as they are.
+    $fill = New-OrdinalTable
+    $seen = New-OrdinalTable
+    $kept = New-OrdinalTable
+    $heading = New-OrdinalTable
+    $order = New-Object System.Collections.Generic.List[string]
+    $settings = 0
+    $unknown = 0
+    $sec = ""
+    foreach ($line in $old.Lines) {
+        $p = Get-IniLine $line
+        if ($p.Kind -eq "blank") { continue }
+        if ($p.Kind -eq "section") {
+            $sec = Get-AsciiLower $p.Name
+            if (-not $heading.ContainsKey($sec)) { $heading[$sec] = $p.Text; $order.Add($sec) }
+            continue
+        }
+        if ($p.Kind -eq "comment") {
+            if ($p.Key -ne "") { $seen[$sec + "`n" + (Get-AsciiLower $p.Key)] = $true }
+            continue
+        }
+        if ($p.Kind -eq "setting") {
+            $settings++
+            $k = $sec + "`n" + (Get-AsciiLower $p.Key)
+            $seen[$k] = $true
+            if ($slots.ContainsKey($k)) {
+                if (-not $fill.ContainsKey($k)) { $fill[$k] = $p.Value; continue }
+            } else {
+                $unknown++
+            }
+        }
+        if (-not $kept.ContainsKey($sec)) { $kept[$sec] = New-Object System.Collections.Generic.List[string] }
+        $kept[$sec].Add($p.Text)
+    }
+    $new = 0
+    foreach ($k in $slots.Keys) { if (-not $seen.ContainsKey($k)) { $new++ } }
+
+    # The new file.
+    $out = New-Object System.Text.StringBuilder
+    if (-not $lastLine.ContainsKey("")) { Add-KeptLines $out $null $kept[""] $eol }
+    for ($i = 0; $i -lt $tpl.Lines.Count; $i++) {
+        $line = $tpl.Lines[$i]
+        $s = $lineSec[$i]
+        if ($slotKey.ContainsKey($i)) {
+            $k = $s + "`n" + (Get-AsciiLower $slotKey[$i])
+            if ($fill.ContainsKey($k)) { $line = $slotKey[$i] + "=" + $fill[$k] }
+        }
+        [void]$out.Append($line).Append($eol)
+        if ($lastLine.ContainsKey($s) -and $lastLine[$s] -eq $i) { Add-KeptLines $out $null $kept[$s] $eol }
+    }
+    foreach ($s in $order) {
+        if (-not $known.ContainsKey($s)) { Add-KeptLines $out $heading[$s] $kept[$s] $eol }
+    }
+    return @{ Bytes = $Latin1.GetBytes($out.ToString()); Settings = $settings; New = $new; Unknown = $unknown }
+}
+
+# Keeps the last three copies of the settings file: .bak (the newest), .bak2, .bak3.
+function Save-IniBackup([string]$Path) {
+    $b1 = $Path + ".bak"
+    $b2 = $Path + ".bak2"
+    $b3 = $Path + ".bak3"
+    if (Test-Path -LiteralPath $b2) {
+        if (Test-Path -LiteralPath $b3) { Remove-Item -LiteralPath $b3 -Force }
+        Move-Item -LiteralPath $b2 -Destination $b3
+    }
+    if (Test-Path -LiteralPath $b1) { Move-Item -LiteralPath $b1 -Destination $b2 }
+    Copy-Item -LiteralPath $Path -Destination $b1
+}
+
+# "1 new setting", "2 new settings"
+function Get-Count([int]$N, [string]$One, [string]$Many) {
+    if ($N -eq 1) { return "1 $One" }
+    return "$N $Many"
+}
+
 try {
     Write-Host ""
     Write-Host "open-homm5 installer"
@@ -233,7 +430,7 @@ try {
         Copy-Item -LiteralPath $srcDll -Destination $dstDll -Force
         # A zip from the web marks its files as "downloaded"; take that mark off the copy.
         try { Unblock-File -LiteralPath $dstDll } catch { }
-        $iniWas = "kept"
+        $iniWas = "old"
         if (-not (Test-Path -LiteralPath $dstIni)) {
             Copy-Item -LiteralPath $srcIni -Destination $dstIni
             $iniWas = "new"
@@ -258,13 +455,53 @@ try {
         Wait-AndExit 5
     }
 
+    # The player's settings file: add this version's settings, keep the player's values.
+    $iniError = ""
+    if ($iniWas -eq "old") {
+        try {
+            $oldBytes = [System.IO.File]::ReadAllBytes($dstIni)
+            $merged = Merge-Settings $oldBytes ([System.IO.File]::ReadAllBytes($srcIni))
+            if ($null -eq $merged) {
+                $iniWas = "unreadable"
+            } elseif ([string]::Equals($Latin1.GetString($merged.Bytes), $Latin1.GetString($oldBytes))) {
+                $iniWas = "current"
+            } else {
+                Save-IniBackup $dstIni
+                [System.IO.File]::WriteAllBytes($dstIni, $merged.Bytes)
+                $iniWas = "refreshed"
+            }
+        } catch {
+            $iniWas = "failed"
+            $iniError = $_.Exception.Message
+        }
+    }
+
     Write-Host ""
     Write-Host "Done. What I did:" -ForegroundColor Green
     if ($dllWas -eq "new") { Write-Host "  - added dinput8.dll (the add-on)" }
     elseif ($dllWas -eq "same") { Write-Host "  - dinput8.dll was already installed and up to date" }
     else { Write-Host "  - replaced the older open-homm5 dinput8.dll with this version" }
     if ($iniWas -eq "new") { Write-Host "  - added open-homm5.ini (settings, all at their defaults)" }
-    else { Write-Host "  - kept your existing open-homm5.ini, with your settings" }
+    elseif ($iniWas -eq "refreshed") {
+        $newText = Get-Count $merged.New "new setting" "new settings"
+        Write-Host ("  - settings file refreshed: {0} of your settings kept, {1} available (see the comments)" -f $merged.Settings, $newText)
+        Write-Host "    (your previous file is saved as open-homm5.ini.bak)"
+        if ($merged.Unknown -gt 0) {
+            $unknownText = Get-Count $merged.Unknown "setting" "settings"
+            Write-Host ("    ({0} not listed in this version: kept at the end of their section, under ""kept from your previous file"")" -f $unknownText)
+        }
+    }
+    elseif ($iniWas -eq "current") {
+        if ($merged.Settings -gt 0) { Write-Host ("  - settings file already up to date: {0} of your settings kept" -f $merged.Settings) }
+        else { Write-Host "  - settings file already up to date (every setting at its default)" }
+    }
+    elseif ($iniWas -eq "unreadable") {
+        Write-Host "  - kept open-homm5.ini as it is: it is not a plain text file, so I could not add the new settings" -ForegroundColor Yellow
+    }
+    else {
+        Write-Host ("  - could not refresh open-homm5.ini: " + $iniError) -ForegroundColor Yellow
+        Write-Host "    If the game is running, close it and run the installer again." -ForegroundColor Yellow
+    }
     Write-Host ("  - installed {0} random map templates in open-homm5\templates (they are in the game's random map list)" -f $templateFiles.Count)
     if ($tplReplaced -gt 0) { Write-Host ("    ({0} of them replaced our files from an earlier install)" -f $tplReplaced) }
     if ($tplOthers -gt 0) { Write-Host ("    (left the {0} other file(s) in that folder alone)" -f $tplOthers) }
