@@ -66,9 +66,17 @@ void TestTable()
 	bool unique = true;
 	for (int a = 0; a < kRuleCount; ++a)
 		for (int b = a + 1; b < kRuleCount; ++b)
-			if (strcmp(kRules[a].key, kRules[b].key) == 0 || strcmp(kRules[a].var, kRules[b].var) == 0)
+			if (strcmp(kRules[a].key, kRules[b].key) == 0 ||
+			    (kRules[a].var && kRules[b].var && strcmp(kRules[a].var, kRules[b].var) == 0))
 				unique = false;
 	Check(unique, "every rule has its own key and variable");
+	int without_var = 0;
+	for (int r = 0; r < kRuleCount; ++r)
+		without_var += kRules[r].var ? 0 : 1;
+	Check(kMapScripts == Index("map_scripts") && !kRules[kMapScripts].var && kRules[kMapScripts].kind == kBool &&
+	          kRules[kMapScripts].group == kRandomMaps && without_var == 1,
+	      "map_scripts: the one rule without a variable (the add-on applies it), on/off, with the random maps");
+	Check(kProtocol == 2, "protocol 2 (map_scripts): a PC with version 1 gets no rules");
 	bool plain = true;
 	for (int r = 0; r < kRuleCount; ++r)
 		for (const char *c = kRules[r].key; *c; ++c)
@@ -112,6 +120,8 @@ void TestParse()
 	Check(none[Index("ai_cheat")].empty(), "an expression is not a value we can read");
 	const Values last = ParseSettings("H55_AICheatMode = 1;\nH55_AICheatMode = 3;\n");
 	Check(last[Index("ai_cheat")] == "3", "the last assignment wins, as in Lua");
+	Check(v[kMapScripts].empty() && ParseSettings("map_scripts = 1;\n")[kMapScripts].empty(),
+	      "map_scripts is never read from the file");
 }
 
 // Every byte outside the changed numbers is the same.
@@ -184,6 +194,17 @@ void TestSubstitute()
 	Check(ParseSettings(expr)[Index("ai_cheat")].empty() && expr.size() > tail.size() &&
 	          expr.compare(expr.size() - tail.size(), tail.size(), tail) == 0 && expr.find("H55_AICheatMode = 2;\n") == 0,
 	      "a variable also set by an expression gets our line at the end");
+	// map_scripts: not a variable of the file, so the file never changes for it
+	Values scripts = NoValues();
+	scripts[kMapScripts] = "1";
+	changes.clear();
+	Check(Substitute(file, scripts, &changes) == file && changes.empty(), "map_scripts alone: the file is served as it is");
+	scripts[Index("governance")] = "0";
+	changes.clear();
+	const std::string with = Substitute(file, scripts, &changes);
+	Check(ParseSettings(with)[Index("governance")] == "0" && with.size() == file.size() && changes.size() == 1 &&
+	          with.find("map_scripts") == std::string::npos,
+	      "map_scripts with another rule: only the other rule's number changes, no line for map_scripts");
 }
 
 void TestHash()
@@ -230,16 +251,27 @@ void TestText()
 	      "every rule at its longest fits (start message chunk: 512 bytes with its zero)");
 	Check(all.size() < 512 - 1, "the chunk keeps a final zero");
 
+	Values scripts = v;
+	scripts[kMapScripts] = "1";
+	const std::string with_scripts = Encode(scripts);
+	Check(with_scripts == "OHR1;governance=0;ai_cheat=0;neutral_stack_size=1.25;map_scripts=1" &&
+	          Decode(with_scripts, &back) && back == scripts,
+	      "map_scripts travels in the start message like the others");
+	Check(!Decode("OHR1;map_scripts=2", &back), "map_scripts takes 0 or 1 only");
+
 	const std::string lobby = LobbyText(kWillApply | kDiffers, v);
 	int flags = 0;
-	Check(lobby == "L1|3|0,,,,,,0,,1.25,,,,,," && ReadLobbyText(lobby, &flags, &back) && flags == 3 && back == v,
+	Check(lobby == "L1|3|0,,,,,,0,,1.25,,,,,,," && ReadLobbyText(lobby, &flags, &back) && flags == 3 && back == v,
 	      "the lobby text: L1|flags|every value in the table's order");
-	Check(!ReadLobbyText(text, &flags, &back) && !ReadLobbyText("L1|x|0,,,,,,0,,1.25,,,,,,", &flags, &back) &&
-	          !ReadLobbyText("L1||0,,,,,,0,,1.25,,,,,,", &flags, &back) && !ReadLobbyText("L2|3|0,,,,,,0,,1.25,,,,,,", &flags, &back),
+	Check(LobbyText(0, scripts) == "L1|0|0,,,,,,0,,1.25,,,,1,,," && ReadLobbyText(LobbyText(0, scripts), &flags, &back) &&
+	          back == scripts,
+	      "map_scripts in the lobby text (the 13th value)");
+	Check(!ReadLobbyText(text, &flags, &back) && !ReadLobbyText("L1|x|0,,,,,,0,,1.25,,,,,,,", &flags, &back) &&
+	          !ReadLobbyText("L1||0,,,,,,0,,1.25,,,,,,,", &flags, &back) && !ReadLobbyText("L2|3|0,,,,,,0,,1.25,,,,,,,", &flags, &back),
 	      "a lobby text without flags, or of another version, is refused");
-	Check(!ReadLobbyText("L1|1|0,,,,,,0,,1.25,,,,,", &flags, &back) && !ReadLobbyText("L1|1|0,,,,,,0,,1.25,,,,,,,", &flags, &back) &&
-	          !ReadLobbyText("L1|1|7,,,,,,0,,1.25,,,,,,", &flags, &back),
-	      "too few or too many values, or a bad one, is refused");
+	Check(!ReadLobbyText("L1|1|0,,,,,,0,,1.25,,,,,,", &flags, &back) && !ReadLobbyText("L1|1|0,,,,,,0,,1.25,,,,,,,,", &flags, &back) &&
+	          !ReadLobbyText("L1|1|7,,,,,,0,,1.25,,,,,,,", &flags, &back),
+	      "too few or too many values (a version 1 text has 15), or a bad one, is refused");
 	Check(LobbyText(kWillApply, longest).size() < 100, "the lobby text stays short (it travels 4 bytes at a time)");
 }
 
@@ -299,6 +331,20 @@ void TestMapScript()
 	Check(!HasMapScript("<AdvMapDesc>\n\t<MapScript/>\n\t<Script href=\"x\"/>\n</AdvMapDesc>"),
 	      "<MapScript/> (a generated random map) is none, whatever follows");
 	Check(!HasMapScript("<MapScript href=\"\"/>") && !HasMapScript("<AdvMapDesc/>"), "an empty link or no field is none");
+
+	// what this PC's MMH5.5 does by itself: the "no map script" jump's bytes
+	const unsigned char original[6] = {0x0f, 0x84, 0x4e, 0x01, 0x00, 0x00};
+	const unsigned char nops[6] = {0x90, 0x90, 0x90, 0x90, 0x90, 0x90};
+	const unsigned char elsewhere[6] = {0xe9, 0x10, 0x20, 0x30, 0x40, 0x90};
+	Check(OwnMapScripts(original) == 0, "the original jump (the original game, RC19d): no scripts without a map script");
+	Check(OwnMapScripts(nops) == 1 && OwnMapScripts(elsewhere) == 1, "a changed jump (RC19k's 55u.dll): the scripts run");
+
+	// what the add-on does when the world starts its scripts
+	Check(MapScriptActionFor(true, "") == kAsIs && MapScriptActionFor(true, "0") == kAsIs && MapScriptActionFor(true, "1") == kAsIs,
+	      "a map with its own script: always the game's own way");
+	Check(MapScriptActionFor(false, "") == kAsIs, "no host's rules: the game's own way (MMH5.5 decides)");
+	Check(MapScriptActionFor(false, "1") == kEmptyScript, "no map script, map_scripts=1: an empty script, the scripts run");
+	Check(MapScriptActionFor(false, "0") == kNoScripts, "no map script, map_scripts=0: no scripts, as in the original game");
 }
 
 void TestHello()

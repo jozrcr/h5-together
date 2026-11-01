@@ -213,7 +213,7 @@ Sources: `H55-Settings.lua`, `H55-Core.lua`; [Steam discussion of MMH5.5](https:
 
 #### Map scripts (H55 Lua)
 
-- `advmap-common.lua` loads `H55-Core.lua`, which loads the settings and `H55-AdvMap.lua`, on every adventure map. **RC19k turns map scripts on for random maps by default** (RC19f–k notes); the RC19k robot's console on a random map shows them running ("Towns prepared for Competitive ARMG Map", "All AI Players have allied against the human players").
+- `advmap-common.lua` loads `H55-Core.lua`, which loads the settings and `H55-AdvMap.lua`, on every adventure map. **RC19k turns map scripts on for random maps by default** (RC19f–k notes); the RC19k robot's console on a random map shows them running ("Towns prepared for Competitive ARMG Map", "All AI Players have allied against the human players"). With RC19d, in a multiplayer game, they run only on maps with a map script (single player runs them on every map). Details, and the host rule `map_scripts` that decides it for every PC: [host-rules.md](host-rules.md#mmh55s-scripts-on-random-maps-map_scripts-2026-11-01).
 - What they do, besides the systems above: mixed neutral stacks, bank and dwelling armies, weekly events, witch huts and memory mentors by class, obelisk and Shantiri quests with forced rewards, the moon disc quest, prisoners, potions, the duel template, start bonuses and modes, AI cheats.
 - They are part of the game world: they run on every PC in step, so every PC must read the same scripts and settings.
 

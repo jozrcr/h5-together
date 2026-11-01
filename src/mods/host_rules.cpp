@@ -35,8 +35,20 @@
 //      -> H55-Core.lua, on every PC), our wrap of the game's "open file"
 //      (NVFS::CWinVFS slot 7, stacked with the other mods) serves the file with
 //      those values: only the numbers change (host_rules_logic.cpp). Logged.
+//   6. One rule is not in that file: map_scripts, MMH5.5's scripts on maps
+//      without a map script (a random map straight from the generator). In a
+//      multiplayer game the world starts the map's scripts only for a map with
+//      one (NWorld::CWorld slot 128, 0x009941a0 -> 0x00992d00, given the map's
+//      NDb::SScript by the world's creation 0x00c9fa80). Our wrap of that slot,
+//      while a multiplayer game starts with the host's rules: map_scripts=1 and
+//      no script -> an empty script (as MMH5.5's Mapmixer adds: the game then
+//      runs scripts/advmap-startup.lua, which loads MMH5.5's H55-Core.lua, and
+//      no map file); map_scripts=0 and no script -> nothing, as in the original
+//      game (RC19k's 55u.dll would run them: its change of the jump at
+//      0x00992d2a). The default (the host's "file" value) is what this PC's
+//      MMH5.5 does by itself: that jump's bytes. Logged.
 // Saves: the scripts' variables are part of the save (docs/plans/host-rules.md,
-// "Saves"), so a loaded game keeps the rules it started with.
+// "Saves"), so a loaded game keeps the rules it started with (and its scripts).
 //
 // The panel (host_rules_panel.cpp): the host chooses in the waiting room; the
 // clients see the host's rules read-only; in a game, everyone sees this game's.
@@ -93,6 +105,26 @@ const DWORD kRunMpSlot = 0x00e3a498;          // NUI::CRunMPGame (vftable 0x00e3
 const DWORD kRunMp = 0x0071d660;              // __thiscall(this): every PC's world starts
 const DWORD kRunSingleSlot = 0x00e454dc;      // NUI::CStartSingleAdventureMap (vftable 0x00e454c0) slot 7
 const DWORD kRunSingle = 0x007e1030;
+const DWORD kWorldScriptsSlot = 0x00e6280c;   // NWorld::CWorld (vftable 0x00e6260c) slot 128
+const DWORD kWorldScripts = 0x009941a0;       // __thiscall(world, const NDb::SScript *map_script), ret 4
+const DWORD kScriptStart = 0x00992d00;        // what it calls: starts the world's scripts
+const DWORD kNoScriptJumpAt = 0x00992d2a;     // in it: "no map script: return" (jz, 6 bytes)
+// The bytes our empty script relies on (vanilla 3.1, also MMH55_Utility): the
+// slot's code (the world's script host +0x1d0, then 0x00992d00), the null test
+// before the jump, and the only reads of the script: its file name, a string at
+// +0x44..+0x48 (RC19k's 55u.dll changes that read, below, not what it reads).
+const BYTE kWorldScriptsCode[] = {0x8b, 0x89, 0xd0, 0x01, 0x00, 0x00, 0x85, 0xc9, 0x74, 0x05, 0xe9, 0x51, 0xeb, 0xff, 0xff};
+const DWORD kNullTestAt = 0x00992d26;
+const BYTE kNullTest[] = {0x39, 0x5c, 0x24, 0x34};  // cmp [esp+0x34], ebx (ebx = 0)
+const DWORD kNameReadAt = 0x00992db1;
+const BYTE kNameRead[] = {0x8b, 0x44, 0x24, 0x3c, 0x8b, 0x48, 0x48, 0x8b, 0x50, 0x44};  // mov eax,[esp+0x3c]; [eax+0x48]; [eax+0x44]
+// MMH5.5 RC19k's 55u.dll (with its 6 nops at the jump) replaces the first 7 of
+// those bytes with a jump to its own code, which skips the name when there is no
+// script and otherwise reads it as the game does: xor eax,eax; cmp ss:[esp+0x3c],eax;
+// jz +0f; mov eax,ss:[esp+0x3c]; mov ecx,ds:[eax+0x48]; then back to 8b 50 44.
+const BYTE kNameReadRc19kTail[] = {0x90, 0x90, 0x8b, 0x50, 0x44};
+const BYTE kNameReadRc19kCode[] = {0x33, 0xc0, 0x36, 0x39, 0x44, 0x24, 0x3c, 0x74, 0x0f,
+                                   0x36, 0x8b, 0x44, 0x24, 0x3c, 0x3e, 0x8b, 0x48, 0x48};
 
 const DWORD kRequestVftable = 0x00e39838;      // NUI::CMPWaitChangeRequest: +0xc row, +0x10 type, +0x14 byte
 const DWORD kLockCommandVftable = 0x00e397d0;  // NUI::CMPWaitLockButtonsUICommand: +0xc row, +0x10 mask
@@ -138,6 +170,19 @@ typedef void(__fastcall *ReleaseFn)(void *object, void *edx, int mask);
 typedef void(__fastcall *SendToFn)(void *net, void *edx, int pc, void *message);
 typedef char(__fastcall *IsReadingFn)(void *saver, void *edx);
 typedef void(__fastcall *DataChunkFn)(void *saver, void *edx, int id, void *data, int size, int number);
+typedef void(__fastcall *WorldScriptsFn)(void *world, void *edx, const void *map_script);
+
+// An empty map script (NDb::SScript as 0x00992d00 reads it: its file name only,
+// a string at +0x44..+0x48): the world then runs scripts/advmap-startup.lua
+// and createAdvmapAliases(), and no map file (its name is empty), as for a map
+// from MMH5.5's Mapmixer (whose map.lua holds only a comment).
+struct EmptyScript {
+	BYTE head[0x44];
+	const char *name_begin, *name_end, *name_cap;
+	BYTE tail[0x40];
+};
+const char g_empty_name[4] = {0, 0, 0, 0};
+EmptyScript g_empty_script;  // zero, its name set at install
 
 OpenFn g_open_next = nullptr;
 LogicFn g_host_update_next = nullptr;
@@ -148,6 +193,7 @@ LogicFn g_host_start_next = nullptr;
 SerializeFn g_serialize_next = nullptr;
 RunFn g_run_mp_next = nullptr;
 RunFn g_run_single_next = nullptr;
+WorldScriptsFn g_world_scripts_next = nullptr;  // null: map_scripts cannot be applied (the code is not as expected)
 
 bool g_enabled = true;
 bool g_trace = false;
@@ -199,6 +245,7 @@ bool g_serving = false;  // this game's rules (served when the scripts read the 
 Values g_serving_values = rules::NoValues();
 bool g_in_game = false;  // a game started since the last lobby
 LONG g_served = 0;
+volatile LONG g_mp_world = 0;  // a multiplayer game's world is being made (inside RunMpHook)
 
 // --- small helpers ---------------------------------------------------------------------------
 bool Readable(const void *p, size_t n)
@@ -249,6 +296,72 @@ std::string NormalizePath(const char *b, const char *e)
 	for (char &c : s)
 		c = c == '\\' ? '/' : (c >= 'A' && c <= 'Z') ? static_cast<char>(c - 'A' + 'a') : c;
 	return s;
+}
+
+bool CodeIs(DWORD at, const BYTE *bytes, size_t n)
+{
+	return Readable(reinterpret_cast<const void *>(at), n) && memcmp(reinterpret_cast<const void *>(at), bytes, n) == 0;
+}
+
+// How the world's script start reads the script's name: 1 = the game's own code,
+// 2 = through MMH5.5 RC19k's 55u.dll (the same reads when there is a script),
+// 0 = something else (then an empty script is not given).
+int NameReadForm()
+{
+	if (CodeIs(kNameReadAt, kNameRead, sizeof(kNameRead)))
+		return 1;
+	const BYTE *n = reinterpret_cast<const BYTE *>(kNameReadAt);
+	if (!Readable(n, 10) || n[0] != 0xe9 || !CodeIs(kNameReadAt + 5, kNameReadRc19kTail, sizeof(kNameReadRc19kTail)))
+		return 0;
+	const DWORD target = kNameReadAt + 5 + *reinterpret_cast<const DWORD *>(n + 1);
+	return CodeIs(target, kNameReadRc19kCode, sizeof(kNameReadRc19kCode)) ? 2 : 0;
+}
+
+// --- the rule map_scripts ----------------------------------------------------------------------
+// What this PC's MMH5.5 does by itself on a map without a map script, in a
+// multiplayer game: the "no map script" jump's bytes (55u.dll changes them when
+// the game starts, long before a lobby). 1 = its scripts run (RC19k), 0 = not
+// (RC19d, the original game), -1 = unreadable. Logged once, with where a changed
+// jump goes.
+int OwnMapScripts()
+{
+	const BYTE *code = reinterpret_cast<const BYTE *>(kNoScriptJumpAt);
+	if (!Readable(code, 6))
+		return -1;
+	unsigned char now[6];
+	memcpy(now, code, sizeof(now));
+	const int own = rules::OwnMapScripts(now);
+	static LONG logged = 0;
+	if (InterlockedExchange(&logged, 1) == 0) {
+		std::string where;
+		DWORD target = 0;
+		if (now[0] == 0x0f && (now[1] & 0xf0) == 0x80)
+			target = kNoScriptJumpAt + 6 + *reinterpret_cast<const DWORD *>(now + 2);
+		else if (now[0] == 0xe9 || now[0] == 0xe8)
+			target = kNoScriptJumpAt + 5 + *reinterpret_cast<const DWORD *>(now + 1);
+		if (own && target) {
+			char module[MAX_PATH] = "?";
+			HMODULE m = nullptr;
+			if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+			                       reinterpret_cast<LPCSTR>(target), &m))
+				GetModuleFileNameA(m, module, MAX_PATH);
+			const char *base = strrchr(module, '\\');
+			char text[160];
+			_snprintf_s(text, sizeof(text), _TRUNCATE, "; it goes to 0x%08x (%s):", target, base ? base + 1 : module);
+			where = text;
+			const BYTE *t = reinterpret_cast<const BYTE *>(target);
+			for (int i = 0; i < 32 && Readable(t + i, 1); ++i) {
+				_snprintf_s(text, sizeof(text), _TRUNCATE, " %02x", t[i]);
+				where += text;
+			}
+		}
+		hooklog::Write("rules: map scripts: the game's \"no map script\" jump (0x%08x) is %02x %02x %02x %02x %02x %02x: %s%s",
+		               kNoScriptJumpAt, now[0], now[1], now[2], now[3], now[4], now[5],
+		               own ? "changed (MMH5.5 RC19k: its scripts run on maps without a map script, in multiplayer too)"
+		                   : "the original (MMH5.5's scripts do not run on maps without a map script in multiplayer)",
+		               where.c_str());
+	}
+	return own;
 }
 
 // --- the files ---------------------------------------------------------------------------------
@@ -342,13 +455,17 @@ void LoadFiles()
 	std::string file;
 	if (!ReadInstalled(kSettingsPath, &file))
 		return;
-	const Values values = rules::ParseSettings(file);
+	Values values = rules::ParseSettings(file);
+	// map_scripts is not in the file: its "file" value is what this PC's MMH5.5 does by itself
+	const int own = OwnMapScripts();
+	if (own >= 0)
+		values[rules::kMapScripts] = own ? "1" : "0";
 	const uint32_t rest = rules::HashWithoutRuleValues(file);
 	const uint32_t whole = rules::Fnv1a(file.data(), file.size());
 	const uint32_t stats = StatsHash();
 	int missing = 0;
 	for (int r = 0; r < kRuleCount; ++r)
-		missing += values[r].empty() ? 1 : 0;
+		missing += kRules[r].var && values[r].empty() ? 1 : 0;
 	hooklog::Write("rules: this PC's scripts/H55-Settings.lua: %u bytes, hash %08x (without the rules' values %08x); %s%s",
 	               static_cast<unsigned>(file.size()), whole, rest, ValueList(values).c_str(),
 	               missing ? " (some rules are not in the file: MMH5.5's scripts use their own defaults)" : "");
@@ -684,8 +801,8 @@ void CheckMap(void *logic)
 	g_map_script = script;
 	if (!path.empty())
 		hooklog::Write(script == 1   ? "rules: the lobby's map %s has a map script: MMH5.5's scripts run on it"
-		               : script == 0 ? "rules: the lobby's map %s has NO map script: in a multiplayer game MMH5.5's scripts do not "
-		                               "run on it, so these rules change nothing there"
+		               : script == 0 ? "rules: the lobby's map %s has NO map script: in a multiplayer game MMH5.5's scripts run on "
+		                               "it only with map_scripts=1 (else these rules change nothing there)"
 		                             : "rules: the lobby's map %s could not be read",
 		               path.c_str());
 }
@@ -833,7 +950,58 @@ void __fastcall RunMpHook(void *self, void *edx)
 		hooklog::Write("rules: a multiplayer game starts: %s",
 		               g_serving ? ("the host's rules, " + ValueList(g_serving_values)).c_str() : "the file's rules");
 	}
+	InterlockedExchange(&g_mp_world, 1);  // the world is made inside (0x00820830 -> 0x00c9fa80)
 	g_run_mp_next(self, edx);
+	InterlockedExchange(&g_mp_world, 0);
+}
+
+// --- 6. the world starts its scripts (map_scripts) ----------------------------------------------
+void __fastcall WorldScriptsHook(void *world, void *edx, const void *map_script)
+{
+	const bool mp = g_mp_world != 0;
+	std::string value;
+	{
+		Lock lock;
+		if (mp && g_serving)
+			value = g_serving_values[rules::kMapScripts];
+	}
+	rules::MapScriptAction action = rules::MapScriptActionFor(map_script != nullptr, value);
+	const int own = OwnMapScripts();
+	static LONG logged = 0;
+	const bool log = InterlockedIncrement(&logged) <= 30;
+	if (action == rules::kEmptyScript && NameReadForm() == 0) {
+		// checked at start-up; changed since (an unknown MMH5.5 patch): the empty script is not safe
+		hooklog::Write("rules: the world starts its scripts: map_scripts=1, but the game's script start changed since "
+		               "start-up: FAILED, no scripts on this map (every PC with the same MMH5.5 does the same)");
+		action = rules::kNoScripts;
+	}
+	if (action == rules::kEmptyScript) {
+		if (log)
+			hooklog::Write("rules: the world starts its scripts: this map has no map script, and this game's rules say "
+			               "map_scripts=1: it gets an empty one, so MMH5.5's scripts run (as on a map from MMH5.5's Mapmixer)");
+		g_world_scripts_next(world, edx, &g_empty_script);
+		return;
+	}
+	if (action == rules::kNoScripts) {
+		if (log)
+			hooklog::Write("rules: the world starts its scripts: this map has no map script, and this game's rules say "
+			               "map_scripts=0: no scripts, as in the original game%s",
+			               own == 1 ? " (this PC's MMH5.5 would run them)" : "");
+		return;  // what the game itself does without a map script (0x00992d00 returns at its jump)
+	}
+	if (log) {
+		if (map_script)
+			hooklog::Write("rules: the world starts its scripts: the map has its own map script: the game's own way");
+		else if (!mp)
+			hooklog::Write("rules: the world starts its scripts: no map script, not a multiplayer game's start (single "
+			               "player, or a random map being rebuilt): the game's own way (single player runs MMH5.5's scripts "
+			               "from the adventure screen)");
+		else
+			hooklog::Write("rules: the world starts its scripts: no map script, no host's rules in this game: MMH5.5's own way "
+			               "(%s)",
+			               own == 1 ? "this PC's MMH5.5 runs its scripts" : "MMH5.5's scripts do not run");
+	}
+	g_world_scripts_next(world, edx, map_script);
 }
 
 void __fastcall RunSingleHook(void *self, void *edx)
@@ -991,15 +1159,38 @@ void ApplyHostRulesFromSettings()
 	g_serialize_next = reinterpret_cast<SerializeFn>(hookpatch::PatchPointer(kStartSerializeSlot, kStartSerialize, &StartSerializeHook));
 	g_run_mp_next = reinterpret_cast<RunFn>(hookpatch::PatchPointer(kRunMpSlot, kRunMp, &RunMpHook));
 	g_run_single_next = reinterpret_cast<RunFn>(hookpatch::PatchPointer(kRunSingleSlot, kRunSingle, &RunSingleHook));
+	// map_scripts: the world's script start, with the bytes our empty script relies on
+	// (kWorldScriptsCode ends with its jump to kScriptStart: e9 51 eb ff ff)
+	const int name_read = NameReadForm();
+	const bool script_code = CodeIs(kWorldScripts, kWorldScriptsCode, sizeof(kWorldScriptsCode)) &&
+	                         CodeIs(kNullTestAt, kNullTest, sizeof(kNullTest)) && name_read != 0;
+	if (script_code) {
+		g_empty_script.name_begin = g_empty_name;
+		g_empty_script.name_end = g_empty_name;
+		g_empty_script.name_cap = g_empty_name;
+		g_world_scripts_next = reinterpret_cast<WorldScriptsFn>(
+			hookpatch::PatchPointer(kWorldScriptsSlot, kWorldScripts, reinterpret_cast<const void *>(&WorldScriptsHook)));
+	}
+	if (!g_world_scripts_next)
+		hooklog::Write("rules: map_scripts: %s (slot 0x%08x holds 0x%08x; code %d%d%d)",
+		               script_code ? "the world's script slot could not be wrapped" : "the world's script start is not as expected",
+		               kWorldScriptsSlot, Read(reinterpret_cast<const void *>(kWorldScriptsSlot), 0),
+		               CodeIs(kWorldScripts, kWorldScriptsCode, sizeof(kWorldScriptsCode)), CodeIs(kNullTestAt, kNullTest, sizeof(kNullTest)),
+		               name_read);
+	else
+		hooklog::Write("rules: map_scripts: the world's script start is as expected (its name read: %s)",
+		               name_read == 1 ? "the game's own" : "through MMH5.5 RC19k's 55u.dll, the same for a script");
 	const bool all = g_open_next && g_host_update_next && g_host_request_next && g_client_update_next && g_client_message_next &&
-	                 g_host_start_next && g_serialize_next && g_run_mp_next && g_run_single_next;
+	                 g_host_start_next && g_serialize_next && g_run_mp_next && g_run_single_next && g_world_scripts_next;
 	if (!all) {
-		// Whatever went in stays harmless: with g_enabled off the hooks only pass through.
+		// Whatever went in stays harmless: with g_enabled off the hooks only pass through (the world's
+		// script hook acts only on this game's rules, which a PC without the hello never gets).
 		g_enabled = false;
-		hooklog::Write("rules: the game's code is not as expected (%d%d%d%d%d%d%d%d%d): off, every game uses this PC's "
+		hooklog::Write("rules: the game's code is not as expected (%d%d%d%d%d%d%d%d%d%d): off, every game uses this PC's "
 		               "H55-Settings.lua",
 		               !!g_open_next, !!g_host_update_next, !!g_host_request_next, !!g_client_update_next,
-		               !!g_client_message_next, !!g_host_start_next, !!g_serialize_next, !!g_run_mp_next, !!g_run_single_next);
+		               !!g_client_message_next, !!g_host_start_next, !!g_serialize_next, !!g_run_mp_next, !!g_run_single_next,
+		               !!g_world_scripts_next);
 		return;
 	}
 	const bool panel = rules::InstallPanel();

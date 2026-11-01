@@ -173,7 +173,12 @@ python tools\robot\lan_report.py --last 1
 - `key|F2` opens the panel (setup screen, waiting room, adventure map); `panel|rules <command>` gives it what a click would: `open`, `set <key> <value>`, `file` (MMH5.5's values), `ok`, `cancel` / `close`, `scroll <units>|end`. Commands that start with `rules ` go to this panel only (`robot::TakePanelCommand` with a prefix).
 - In the logs look for `rules: hello`, `rules: the host's rules (lobby)`, `rules: START`, `rules: the host's start message` and `rules: the scripts read scripts/H55-Settings.lua: served ... hash`: the hash must be the same on both copies.
 - What MMH5.5's scripts did is in the shared `console.txt` (both copies write to it): e.g. `H55 Mixing 36 neutral stacks!` once per copy with mixed stacks on, none with them off; `H55 Towns prepared for Competitive ARMG Map!` on random maps that run the scripts.
-- A random map straight from the generator runs no MMH5.5 script in a LAN game (no map script): use a saved map with one, such as the owner's `MAP_JoacJoz` (`--map 81CD0EF2-7D11-41D7-AE71-0A74BF0872A0/`, 4 players: `--host-step "38|arrow|3 right"`).
+- A random map straight from the generator has no map script: in a LAN game MMH5.5's scripts run on it only with `map_scripts=1` (the default with RC19k, not RC19d). Or use a saved map with one, such as the owner's `MAP_JoacJoz` (`--map 81CD0EF2-7D11-41D7-AE71-0A74BF0872A0/`, 4 players: `--host-step "38|arrow|3 right"`).
+- **`map_scripts` on a generated random map** (the copy's `MMH55_RMG_Map_002`, 4 players; for RC19k use a map made by RC19k, see "Checking random maps from recipe templates" with `--game C:\Games\H5_test_k`):
+  ```
+  python tools\robot\run_lan_test.py --map "EDD31DF8-A828-4414-A615-E8AC32ACA9C0/" --client-ready-at 56 --start-at 70 --host-step "38|arrow|3 right" --seconds 220 --turns 3 --host-rules map_scripts=1 --host-rules mixed_stacks=0 --rules-setting trace=1
+  ```
+  Look for `rules: the world starts its scripts: ... map_scripts=1: it gets an empty one` in both logs, `the game opens scripts/advmap-startup.lua` (trace), every `H55 ...` start-up line twice in `console.txt`, the same served hash, and equal checksums. `map_scripts=0`: `... no scripts, as in the original game`, no `H55` line. `--client-rules enabled=0`: `no host's rules in this game: MMH5.5's own way`.
 
 ## Robot script
 

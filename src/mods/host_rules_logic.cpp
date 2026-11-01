@@ -20,6 +20,7 @@ const RuleDef kRules[kRuleCount] = {
 	{"bank_difficulty", "H55_BanksDifficulty", kMultiplier, 0, 0, kComputer},
 	{"negative_artifacts", "H55_NegativeArtifacts", kBool, 0, 1, kItems},
 	{"rpg_potions", "H55_RPGPotions", kBool, 0, 1, kItems},
+	{"map_scripts", nullptr, kBool, 0, 1, kRandomMaps},  // kMapScripts: not in the file
 	{"competitive_towns", "H55_CompetitiveARMGTowns", kBool, 0, 1, kRandomMaps},
 	{"mana_observatories", "H55_ManaObservatories", kBool, 0, 1, kRandomMaps},
 	{"moon_disc", "H55_MoonDiscOnARMGMaps", kBool, 0, 1, kRandomMaps},
@@ -150,7 +151,7 @@ void Scan(const std::string &lua, std::vector<Spot> *spots, std::vector<bool> *o
 				++p;
 			int rule = -1;
 			for (int r = 0; r < kRuleCount; ++r)
-				if (name == kRules[r].var)
+				if (kRules[r].var && name == kRules[r].var)
 					rule = r;
 			const size_t value_at = p;
 			while (p < eol && (Digit(lua[p]) || lua[p] == '.'))
@@ -228,7 +229,7 @@ std::string Substitute(const std::string &lua, const Values &values, std::vector
 	const char *eol = lua.find("\r\n") != std::string::npos ? "\r\n" : "\n";
 	bool added = false;
 	for (int r = 0; r < kRuleCount; ++r) {
-		if (static_cast<size_t>(r) >= values.size() || values[r].empty() || (seen[r] && !other[r]))
+		if (!kRules[r].var || static_cast<size_t>(r) >= values.size() || values[r].empty() || (seen[r] && !other[r]))
 			continue;
 		if (!added && !out.empty() && out[out.size() - 1] != '\n')
 			out += eol;
@@ -241,7 +242,7 @@ std::string Substitute(const std::string &lua, const Values &values, std::vector
 	}
 	if (changes)
 		for (int r = 0; r < kRuleCount; ++r)
-			if (static_cast<size_t>(r) < values.size() && !values[r].empty() && values[r] != before[r])
+			if (kRules[r].var && static_cast<size_t>(r) < values.size() && !values[r].empty() && values[r] != before[r])
 				changes->push_back(std::string(kRules[r].key) + " " + (before[r].empty() ? "?" : before[r]) + "->" + values[r]);
 	return out;
 }
@@ -352,6 +353,20 @@ bool HasMapScript(const std::string &map_xdb)
 	const size_t end = map_xdb.find('>', at);
 	const size_t href = map_xdb.find("href=\"", at);
 	return end != std::string::npos && href != std::string::npos && href < end && map_xdb.compare(href + 6, 1, "\"") != 0;
+}
+
+const unsigned char kNoScriptJump[6] = {0x0f, 0x84, 0x4e, 0x01, 0x00, 0x00};  // jz 0x00992e7e
+
+int OwnMapScripts(const unsigned char code[6])
+{
+	return memcmp(code, kNoScriptJump, sizeof(kNoScriptJump)) == 0 ? 0 : 1;
+}
+
+MapScriptAction MapScriptActionFor(bool map_has_script, const std::string &value)
+{
+	if (map_has_script || value.empty())
+		return kAsIs;
+	return value == "1" ? kEmptyScript : kNoScripts;
 }
 
 bool IsLobbyRow(uint32_t row)
