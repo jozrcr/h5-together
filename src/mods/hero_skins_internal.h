@@ -45,6 +45,17 @@ Applied ApplyLook(int hero, int look, std::string *note);
 // for the hero screen's button; false when there is no selected hero.
 bool SelectedLookPortrait(std::string *dds);
 
+// After these heroes' looks changed (catalog positions): at the next adventure
+// frame, a hero screen on top showing one of them closes and opens again (its
+// "next hero" with the same hero), so its 3D figure shows the look. Logs the model.
+void RefreshHeroScreen(const std::vector<int> &heroes, const char *why);
+
+// Robot mode only (the panel's robot commands): "hero_screen" (the adventure
+// screen's "hero_attributes"), "town <n>" (its "input_select_town_<n+1>", then
+// "adv_show_town"), "town_hero_screen" (the town screen's "hero_attributes").
+// Done at the next adventure frame, by the game's own message handlers.
+void RobotScreenCommand(const char *text);
+
 // The catalog's InternalName of a position, and the text file of its name ("" if none).
 std::string InternalName(int hero);
 std::string NameFile(int hero);
