@@ -1,78 +1,40 @@
-# Trying the DLL in a real game
+# Installing open-homm5
 
-This is for the owner and friends. It installs our hook DLL, which carries two mods (see [src/mods/README.md](../src/mods/README.md)):
-
-- **LAN link tuning:** faster co-op AI turns (every player should run it).
-- **Fast AI pathfinding:** much less AI thinking late in a game on big maps, with exactly the same AI moves (it matters on the host, who runs the AI).
-
-Everything here is something **you** do; the DLL only adds files and never changes the game's own files.
-
-## Easy install (package)
-
-The simplest way is the package, a zip called `open-homm5-<version>.zip`. It holds the DLL, a settings file, an installer and an uninstaller for Windows, the same for Linux, and a short `README.txt`. It is built with `python tools/package/make_package.py` ([tools/package/README.md](../tools/package/README.md)); there is no download page yet, so ask the owner for the zip. If you use it, skip "What you need" and "Install" below.
-
-1. Close the game. Extract the whole zip (right-click it, **Extract All**).
-2. **Windows:** double-click `install.bat`. It finds the game through Steam, or asks you for the folder. It copies `dinput8.dll` and `open-homm5.ini` into the game's `bin` folder and tells you what it did. It never overwrites a `dinput8.dll` that is not ours, and never overwrites your `open-homm5.ini`. It also puts our ready random map templates (files called `OH-*.xdb`) in `bin\open-homm5\templates`, overwriting only its own and leaving any template you added; they show up in the generator's template list, and **every player of a multiplayer game needs the same ones**. It also warns you if a ZeroTier network is set to Public in Windows and tells you how to make it Private (it changes no Windows setting itself).
-   **Linux (Steam / Proton):** run `bash install.sh` in the extracted folder. It does the same, then prints the one launch option to paste into Steam. [linux.md](linux.md) has the full walkthrough.
-3. Start the game. A file `open-homm5.log` appears in the `bin` folder: the add-on is running.
-4. To remove it: `uninstall.bat` (Windows) or `bash uninstall.sh` (Linux). Only our own files are removed (our templates too, never one you added); it asks before deleting your `open-homm5.ini`.
-
-The manual steps below do the same by hand.
+How to install the add-on on a player's PC. What it does: [the main README](../README.md); every setting: [src/mods/README.md](../src/mods/README.md).
 
 ## What you need
 
-- The game with MMH5.5, as you play it over GameRanger (the co-op exe is `MMH55_Utility_64.exe`).
-- `dinput8.dll` from this repo: build it with `powershell -File src\hook\build.ps1` (it lands in `build\hook\`), or ask for a copy.
-- **Every player** of the co-op game should install it. Each PC only speeds up what it sends.
+- Heroes of Might and Magic V: Tribes of the East (Steam) with **MMH5.5 RC19d or RC19k already installed**. The add-on does not install MMH5.5.
+- The same add-on version as the friends you play with: **everyone in the same co-op game should install the same version.**
 
 ## Install
 
-1. Close the game.
-2. Copy `dinput8.dll` into the game's `bin` folder, the folder that holds `MMH55_Utility_64.exe`.
-   On Steam that's usually `C:\Program Files (x86)\Steam\steamapps\common\Heroes of Might and Magic 5 Tribes of the East\bin`.
-3. Start the game as usual (GameRanger, or the exe directly).
+1. Download the latest `open-homm5-<version>.zip` from the [releases page](https://github.com/jozrcr/open-homm5/releases/latest).
+2. Close the game. Extract the whole zip (Windows: right-click it, **Extract All**).
+3. Run the installer from the extracted folder:
+   - **Windows:** double-click `install.bat`. It finds the game through Steam, or asks you for the folder, and tells you what it did.
+   - **Linux (Steam / Proton):** run `bash install.sh`. At the end it prints one line to paste into the game's Steam launch options. The full walkthrough, with ZeroTier to play without GameRanger, is [linux.md](linux.md).
 
-The DLL writes `open-homm5.log` in the same `bin` folder. After starting the game, the log should contain lines like:
+The installer never changes the game's own files, and never replaces a `dinput8.dll` that is not ours.
 
-```
-game build: ToE 3.1 + MMH5.5 patches (MMH55_Utility)
-net tuning: idle links send every 50 ms (game: 1000)
-net tuning: links may send every 10 ms (game: 50)
-net tuning: idle PCs batch up to 0 segment reports (game: net_batched_segments, 3)
-fast paths: ported search loop on
-```
+## What gets installed
 
-During AI turns it adds one `ai-step` line per AI move, which is how we measure how long the AI waits.
+Everything goes into the game's `bin` folder (on Steam usually `C:\Program Files (x86)\Steam\steamapps\common\Heroes of Might and Magic 5 Tribes of the East\bin`):
 
-## What to try and report
+| File | What it is |
+|---|---|
+| `dinput8.dll` | the add-on; the game loads it when it starts |
+| `open-homm5.ini` | the settings. Every line is commented out and shows its default, so you can leave it alone |
+| `open-homm5\templates\OH-*.xdb` | 24 ready random map templates for the game's list. Every player of a multiplayer game needs the same ones |
 
-Play a co-op game with AI players, as usual. Useful to report back:
+## Check that it works
 
-- Did AI turns feel faster than before? (Rough seconds per AI turn is great.)
-- Any "out of sync" messages, crashes, or players seeing different things?
-- Each player's `open-homm5.log` (zipped) from that game.
+Start the game as you do for co-op games (GameRanger, or `MMH55_Utility_64.exe`). A file **`open-homm5.log`** appears in the same `bin` folder; its first line says `open-homm5 hook DLL <version> loaded`. If something goes wrong (a freeze, a crash, an "out of sync"), send that log. After a freeze, wait 30 seconds before closing the game, so the log can say where it was stuck.
 
-For a fair comparison, play once with the mod off (below) and once with it on.
+## Updating
 
-## Turn the mods off (keep the DLL)
-
-Create a text file `open-homm5.ini` in the same `bin` folder with:
-
-```ini
-[net]
-tuning=0
-[ai]
-fast_paths=0
-```
-
-`tuning=0`: the game's original network timings; all players should use the same setting. `fast_paths=0`: the game's own pathfinding. Leave out a line to keep that mod on. The DLL still logs AI steps.
+Install the new version the same way, over the old one. Your settings are kept. Our templates are replaced by the new ones; templates you added yourself stay.
 
 ## Uninstall
 
-Delete `dinput8.dll` (and `open-homm5.ini` / `open-homm5.log` / the `open-homm5` folder of templates, if present) from the `bin` folder. Nothing else was changed.
-
-## Linux (Wine / Proton)
-
-Wine prefers its own `dinput8.dll`. To make it load ours, set a DLL override for `dinput8` to "native, builtin": `WINEDLLOVERRIDES="dinput8=n,b"` in the launch options (Steam: game properties, launch options, `WINEDLLOVERRIDES="dinput8=n,b" %command%`). Not tested yet.
-
-The full walkthrough for a Linux player joining a Windows host (Proton, starting the MMH5.5 exe from Steam, ZeroTier instead of GameRanger) is in [linux.md](linux.md).
+Run `uninstall.bat` (Windows) or `bash uninstall.sh` (Linux) from the extracted folder. Only the add-on's own files are removed (the DLL, the log, our templates); it asks before deleting your settings file, and templates you added yourself stay.
