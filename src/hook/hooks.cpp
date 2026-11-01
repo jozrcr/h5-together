@@ -24,6 +24,7 @@
 #include "../mods/rmg_factions.h"
 #include "../mods/rmg_teams.h"
 #include "../mods/rmg_templates.h"
+#include "../mods/wheel.h"
 
 namespace hooks {
 
@@ -84,6 +85,7 @@ void InstallAll()
 	mods::ApplyRmgBuilderFromSettings();
 	overlay::ApplyTestPanelFromSettings();
 	mods::ApplyCameraFromSettings();
+	mods::ApplyWheelFromSettings();  // its DirectInput filter goes first (order -10)
 	mods::ApplyEdgeSkyFromSettings();  // [camera] edge_sky: before the first map reads its light
 	mods::ApplyAudioVolumeFromSettings();
 }

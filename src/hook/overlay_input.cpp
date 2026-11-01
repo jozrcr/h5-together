@@ -55,6 +55,16 @@ bool Muted()
 	return g_active && GetTickCount() - g_drawn_at < kTimeoutMs;
 }
 
+// Once per panel opening: the first input the game did not get (a log line, so
+// that a log shows whether the mute ever held anything back, and where from).
+volatile LONG g_held_logged = 0;
+
+void HeldBack(const char *what, unsigned long code)
+{
+	if (InterlockedExchange(&g_held_logged, 1) == 0)
+		hooklog::Write("overlay: first input held back from the game for panel \"%s\": %s %04lx", g_owner, what, code);
+}
+
 void Close(const char *why)
 {
 	if (!g_open)
@@ -245,6 +255,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 		}
 		switch (g_messages.Filter(msg, wp, lp, muted)) {
 		case inputmute::kSwallow:
+			HeldBack("window message", msg);
 			return 0;
 		case inputmute::kDefault:
 			return w->unicode ? DefWindowProcW(hwnd, msg, wp, lp) : DefWindowProcA(hwnd, msg, wp, lp);
@@ -348,6 +359,8 @@ HRESULT MuteState(dihook::DeviceKind kind, void *device, DWORD size, void *data,
 	if (FAILED(hr))
 		return hr;
 	const bool muted = Muted();
+	if (muted)
+		HeldBack(kind == dihook::kKeyboard ? "DirectInput keyboard state" : "DirectInput mouse state", size);
 	if (kind == dihook::kKeyboard && size >= 256) {
 		BYTE *keys = static_cast<BYTE *>(data);
 		if (muted && (keys[DIK_ESCAPE] & 0x80))
@@ -375,6 +388,8 @@ HRESULT MuteData(dihook::DeviceKind kind, void *device, DWORD size, DIDEVICEOBJE
 	if (FAILED(hr) || !data || !count || size < 8)
 		return hr;
 	const bool muted = Muted();
+	if (muted && *count)
+		HeldBack(kind == dihook::kKeyboard ? "DirectInput keyboard events" : "DirectInput mouse events", *count);
 	if (muted && !(flags & DIGDD_PEEK)) {
 		for (DWORD i = 0; i < *count; ++i) {
 			const DIDEVICEOBJECTDATA *e =
@@ -542,6 +557,7 @@ bool OpenModal(const char *owner)
 	TopScreen(g_screen, sizeof(g_screen));
 	lstrcpynA(g_owner, owner, sizeof(g_owner));
 	InterlockedExchange(&g_escape, 0);
+	InterlockedExchange(&g_held_logged, 0);
 	g_drawn_at = GetTickCount();
 	InterlockedExchange(&g_open, 1);
 	InterlockedExchange(&g_active, 1);

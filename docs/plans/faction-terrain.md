@@ -42,7 +42,7 @@ B(a) works in the robot's LAN games. How it is built, in short (details in [src/
 1. **The lobby unlock on fixed-town maps,** which the robot cannot test yet (see the README).
 2. **Linux (Proton).**
 3. **A line on the loading screen** while the map is built.
-4. **Every rebuild leaves a package in `Maps`,** as each join does in the game itself.
+4. **Every rebuild leaves a package in `Maps`,** as each join does in the game itself. *(2026-11-01: the owner saw each one as another copy of the map in the map list. Now hidden from the game's map lists on every PC with the DLL; kept on disk, because a save of that game needs its map. See [src/mods/README.md](../../src/mods/README.md).)*
 5. **After an MMH5.5 update,** an old `...-OH1-...` package of the same map and factions would be reused by the PCs that have one. Deleting old `-OH1-` packages after an update avoids that.
 
 ## Short version

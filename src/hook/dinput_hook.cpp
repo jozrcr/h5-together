@@ -26,7 +26,7 @@ struct User {
 	Filters filters;
 	int order;
 };
-const int kMaxUsers = 4;
+const int kMaxUsers = 6;
 User g_users[kMaxUsers];
 int g_user_count = 0;
 
@@ -193,6 +193,13 @@ void AddFilters(const Filters &filters, int order)
 		--i;
 	}
 	g_users[i] = {filters, order};
+}
+
+HRESULT RealGetDeviceState(void *device, DWORD size, void *data)
+{
+	if (!device || !g_device_count)
+		return E_FAIL;
+	return DeviceTableOf(device)->get_state(device, size, data);
 }
 
 void OnDirectInputCreated(void *direct_input)
