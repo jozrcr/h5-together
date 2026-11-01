@@ -41,6 +41,10 @@ bool PanelHero(PanelData *out);
 enum Applied { kAppliedNow, kAppliedSoon, kSavedForNextGames, kNotApplied };
 Applied ApplyLook(int hero, int look, std::string *note);
 
+// The portrait (.dds) of the look chosen for the selected hero (its own if none),
+// for the hero screen's button; false when there is no selected hero.
+bool SelectedLookPortrait(std::string *dds);
+
 // The catalog's InternalName of a position, and the text file of its name ("" if none).
 std::string InternalName(int hero);
 std::string NameFile(int hero);

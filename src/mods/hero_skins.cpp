@@ -982,6 +982,23 @@ std::string InternalName(int hero)
 	return hero >= 0 && hero < static_cast<int>(g_catalog.size()) ? g_catalog[hero].name : std::string();
 }
 
+bool SelectedLookPortrait(std::string *dds)
+{
+	dds->clear();
+	if (g_disabled || !g_local_iplayer || !g_catalog_ok)
+		return false;
+	Lock lock;
+	BYTE *hero = reinterpret_cast<BYTE *>(Read(g_local_iplayer, kPlayerSelected));
+	if (!hero || Dying(hero))
+		return false;
+	const int index = HeroIndex(hero);
+	if (index < 0)
+		return false;
+	auto it = g_local.find(index);
+	*dds = PortraitOf(it == g_local.end() ? index : it->second);
+	return true;
+}
+
 std::string NameFile(int hero)
 {
 	Lock lock;

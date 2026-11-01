@@ -243,12 +243,102 @@ void RobotCommand(const char *text)
 		hooklog::Write("hero skins: robot command \"%s\" not known", text);
 }
 
+// --- the hero screen's button ----------------------------------------------------------------------
+// MMH5.5's hero screen (UI/HeroScreen3): the panel SingleHero (512x724) sits at
+// x 60 from the left edge and is centred vertically 23 lower, so at the
+// reference height its top-left corner is (60, 45), and everything scales with
+// the screen height. In its "Armée & Stats" header the skill wheel's round
+// button (MMH55-Skillwheel.pak, Single/Army: Button_HS at 372,48, 32x32) is at
+// (432, 93); MMH5.5 draws a small square one just left of it (403..427, 93..117
+// in the owner's screenshot, 2026-11-01). Ours goes left of that one, the same
+// size. Drawn with ImGui (the screen's own files and command handler are not
+// researched yet); it reads the mouse itself, like the builder's fallback button.
+const float kHsButtonX = 375.0f, kHsButtonY = 93.0f, kHsButtonSize = 24.0f;
+bool g_button = true;            // [skins] hero_screen_button
+bool g_test_button = false;      // testing ([skins] test_button_on_map=1): also on the adventure map (the robot cannot open the hero screen)
+bool g_on_hero_screen = false;
+bool g_button_hovered = false, g_button_down = false;
+std::string g_button_face;       // the portrait shown on the button
+float g_back_w = 1024.0f, g_back_h = 768.0f;
+
+bool HeroScreenOnTop()
+{
+	char top[96];
+	const bool on = overlay::TopScreen(top, sizeof(top)) && strstr(top, "HeroScreen") != nullptr;
+	static char logged[96] = "";
+	if (on && strcmp(top, logged) != 0) {
+		lstrcpynA(logged, top, sizeof(logged));
+		hooklog::Write("hero skins: the hero screen (%s): the Look button is drawn in its header", top);
+	}
+	return on;
+}
+
+void ButtonRect(float w, float h, ImVec2 *p0, ImVec2 *p1)
+{
+	(void)w;
+	const float k = h / kRefHeight;
+	*p0 = ImVec2(floorf(kHsButtonX * k + 0.5f), floorf(kHsButtonY * k + 0.5f));
+	*p1 = ImVec2(floorf((kHsButtonX + kHsButtonSize) * k + 0.5f), floorf((kHsButtonY + kHsButtonSize) * k + 0.5f));
+}
+
+void ButtonInput(float w, float h)
+{
+	ImVec2 p0, p1;
+	ButtonRect(w, h, &p0, &p1);
+	float x, y;
+	HWND window = overlay::GameWindow();
+	const bool front = window && GetAncestor(GetForegroundWindow(), GA_ROOTOWNER) == GetAncestor(window, GA_ROOTOWNER);
+	g_button_hovered = front && overlay::CursorInBackBuffer(w, h, &x, &y) && x >= p0.x && x < p1.x && y >= p0.y && y < p1.y;
+	const bool down = front && (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
+	if (down && !g_button_down && g_button_hovered)
+		g_button_down = true;
+	else if (!down && g_button_down) {
+		g_button_down = false;
+		if (g_button_hovered)
+			OpenPanel("the hero screen's Look button");
+	}
+}
+
+void DrawHeroScreenButton(const overlay::Frame &frame)
+{
+	ImVec2 p0, p1;
+	ButtonRect(frame.width, frame.height, &p0, &p1);
+	const float k = frame.height / kRefHeight;
+	ImDrawList *draw = ImGui::GetForegroundDrawList();
+	const bool pressed = g_button_down && g_button_hovered;
+	draw->AddRectFilled(p0, p1, pressed ? IM_COL32(20, 14, 8, 255) : IM_COL32(52, 40, 26, 255), 3.0f * k);
+	int no_loads = 0;
+	void *tex = g_button_face.empty() ? nullptr : overlay::GameTexture(frame.device, g_button_face.c_str(), &no_loads);
+	const float inset = 2.0f * k;
+	if (tex)
+		draw->AddImage(reinterpret_cast<ImTextureID>(tex), ImVec2(p0.x + inset, p0.y + inset), ImVec2(p1.x - inset, p1.y - inset),
+		               ImVec2(0, 0), ImVec2(1, 1), pressed ? IM_COL32(200, 200, 200, 255) : IM_COL32_WHITE);
+	draw->AddRect(p0, p1, g_button_hovered ? ui::kGold : ui::kEdge, 3.0f * k, 0, (g_button_hovered ? 2.0f : 1.5f) * k);
+	if (g_button_hovered) {  // the tooltip
+		const char *tip = overlay::PanelLanguage() == overlay::kFrench ? "Apparence" : "Look";
+		const float px = Px(kBodyFont, k);
+		ImFont *font = overlay::Font(px);
+		const float tw = ui::TextWidth(font, px, tip);
+		const ImVec2 t0(p0.x, p1.y + 4.0f * k), t1(p0.x + tw + 12.0f * k, p1.y + 4.0f * k + px + 8.0f * k);
+		draw->AddRectFilled(t0, t1, IM_COL32(24, 18, 12, 235), 3.0f * k);
+		draw->AddRect(t0, t1, ui::kEdge, 3.0f * k, 0, 1.0f * k);
+		ui::ShadowText(draw, font, px, ImVec2(t0.x + 6.0f * k, t0.y + 4.0f * k), ui::kParchment, tip);
+	}
+}
+
 // --- the overlay client --------------------------------------------------------------------------
 bool Wanted()
 {
 	char command[256];
 	if (robot::TakePanelCommand(command, sizeof(command), "skins "))
 		RobotCommand(command);
+	char top[96];
+	g_on_hero_screen = g_button && !overlay::ModalOpen(kName) &&
+	                   (HeroScreenOnTop() || (g_test_button && overlay::TopScreen(top, sizeof(top)) && strstr(top, "AdventureScreen")));
+	if (g_on_hero_screen)
+		ButtonInput(g_back_w, g_back_h);
+	else
+		g_button_down = g_button_hovered = false;
 	if (overlay::KeyPressed(g_key, &g_key_down)) {
 		if (overlay::ModalOpen(kName))
 			Close("its key");
@@ -259,7 +349,7 @@ bool Wanted()
 		g.pending = 0;
 		DoApply();
 	}
-	return overlay::ModalOpen(kName);
+	return overlay::ModalOpen(kName) || g_on_hero_screen;
 }
 
 void Prepare(const overlay::Frame &frame)
@@ -272,6 +362,11 @@ void Prepare(const overlay::Frame &frame)
 	for (const skins::Look &look : g.data.looks)
 		if (!look.portrait.empty())
 			overlay::GameTexture(frame.device, look.portrait.c_str(), &loads);
+	if (g_on_hero_screen) {
+		skins::SelectedLookPortrait(&g_button_face);
+		if (!g_button_face.empty())
+			overlay::GameTexture(frame.device, g_button_face.c_str(), &loads);
+	}
 }
 
 void CentredText(ImDrawList *draw, ImFont *font, float px, float x0, float x1, float y, ImU32 colour, const char *text)
@@ -414,8 +509,12 @@ void DrawPanel(const overlay::Frame &frame)
 
 void Draw(const overlay::Frame &frame)
 {
+	g_back_w = frame.width;
+	g_back_h = frame.height;
 	if (overlay::ModalOpen(kName))
 		DrawPanel(frame);
+	else if (g_on_hero_screen)
+		DrawHeroScreenButton(frame);
 }
 
 void ReadSettings()
@@ -426,6 +525,8 @@ void ReadSettings()
 	GetPrivateProfileStringW(L"skins", L"key", L"F7", key, 16, path);
 	g_key = overlay::ParseKey(key, VK_F7);
 	g_early = GetPrivateProfileIntW(L"skins", L"skins", 1, path) != 0;
+	g_button = GetPrivateProfileIntW(L"skins", L"hero_screen_button", 1, path) != 0;
+	g_test_button = GetPrivateProfileIntW(L"skins", L"test_button_on_map", 0, path) != 0;
 }
 
 }  // namespace
