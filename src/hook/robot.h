@@ -53,7 +53,7 @@ void EnableGameInput();
 bool TakeOverlayKey(int vk);
 // A command for one of our panels (step "panel|preset 4"): true once, with the
 // step's text, for the panel that asks first (the robot cannot click). A panel
-// with a prefix ("rules ") gets only the commands that start with it (without
+// with a prefix ("skins ", "rules ") gets only the commands that start with it (without
 // the prefix); the others never get those.
 bool TakePanelCommand(char *out, int size, const char *prefix = nullptr);
 

@@ -893,7 +893,7 @@ bool TakeOverlayKey(int vk)
 
 bool TakePanelCommand(char *out, int size, const char *prefix)
 {
-	// Commands that start with a panel's own prefix ("rules ...") are left for
+	// Commands that start with a panel's own prefix ("skins ...", "rules ...") are left for
 	// that panel; the others go to the first panel that asks without one.
 	static const char *const kPrefixes[] = {"skins ", "rules "};
 	if (InterlockedCompareExchange(&g_panel_pending, 0, 0) != 1)

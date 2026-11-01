@@ -18,7 +18,7 @@ if (-not $vcvars) {
 }
 if (-not $vcvars) { throw "no Visual Studio found; set HOOK_VCVARS to vcvarsall.bat" }
 
-$sources = "dllmain.cpp", "log.cpp", "game_build.cpp", "hooks.cpp", "ai_trace.cpp", "robot.cpp", "robot_input.cpp", "robot_endturn.cpp", "robot_trace.cpp", "robot_menu.cpp", "robot_screen.cpp", "robot_ui.cpp", "robot_lobby.cpp", "robot_net.cpp", "robot_profile.cpp", "robot_paths.cpp", "robot_clock.cpp", "patch.cpp", "d3d9_hook.cpp", "watchdog.cpp", "..\mods\net_tuning.cpp", "..\mods\lan_discovery.cpp", "..\mods\coop_guard.cpp", "..\mods\lockstep.cpp", "..\mods\ai_pacing.cpp", "..\mods\autosave.cpp", "..\mods\notify.cpp", "..\mods\rmg_teams.cpp", "..\mods\rmg_templates.cpp", "..\mods\fast_paths.cpp", "..\mods\fast_paths_relax.cpp", "..\mods\fast_paths_search.cpp", "..\mods\fast_paths_expand.cpp", "..\mods\fast_paths_ashore.cpp", "..\mods\original_music.cpp", "..\mods\original_music_xdb.cpp", "..\mods\player_list.cpp", "..\mods\player_list_game.cpp", "..\mods\player_list_draw.cpp", "..\mods\rmg_maker.cpp", "..\mods\rmg_recipe.cpp", "..\mods\rmg_join.cpp", "..\mods\camera.cpp", "..\mods\languages.cpp", "..\mods\languages_text.cpp", "dinput_hook.cpp", "input_mute.cpp", "overlay.cpp", "overlay_input.cpp", "overlay_textures.cpp", "overlay_test_panel.cpp", "..\mods\rmg_builder.cpp", "..\mods\rmg_builder_data.cpp", "..\mods\rmg_builder_widgets.cpp", "..\mods\rmg_screen.cpp", "..\mods\rmg_factions.cpp", "..\mods\audio_volume.cpp", "..\mods\edge_sky.cpp", "..\mods\wheel.cpp", "..\mods\wheel_logic.cpp", "..\mods\host_rules.cpp", "..\mods\host_rules_logic.cpp", "..\mods\host_rules_panel.cpp"
+$sources = "dllmain.cpp", "log.cpp", "game_build.cpp", "hooks.cpp", "ai_trace.cpp", "robot.cpp", "robot_input.cpp", "robot_endturn.cpp", "robot_trace.cpp", "robot_menu.cpp", "robot_screen.cpp", "robot_ui.cpp", "robot_lobby.cpp", "robot_net.cpp", "robot_profile.cpp", "robot_paths.cpp", "robot_clock.cpp", "patch.cpp", "d3d9_hook.cpp", "watchdog.cpp", "..\mods\net_tuning.cpp", "..\mods\lan_discovery.cpp", "..\mods\coop_guard.cpp", "..\mods\lockstep.cpp", "..\mods\ai_pacing.cpp", "..\mods\autosave.cpp", "..\mods\notify.cpp", "..\mods\rmg_teams.cpp", "..\mods\rmg_templates.cpp", "..\mods\fast_paths.cpp", "..\mods\fast_paths_relax.cpp", "..\mods\fast_paths_search.cpp", "..\mods\fast_paths_expand.cpp", "..\mods\fast_paths_ashore.cpp", "..\mods\original_music.cpp", "..\mods\original_music_xdb.cpp", "..\mods\player_list.cpp", "..\mods\player_list_game.cpp", "..\mods\player_list_draw.cpp", "..\mods\rmg_maker.cpp", "..\mods\rmg_recipe.cpp", "..\mods\rmg_join.cpp", "..\mods\camera.cpp", "..\mods\languages.cpp", "..\mods\languages_text.cpp", "dinput_hook.cpp", "input_mute.cpp", "overlay.cpp", "overlay_input.cpp", "overlay_textures.cpp", "overlay_test_panel.cpp", "..\mods\rmg_builder.cpp", "..\mods\rmg_builder_data.cpp", "..\mods\rmg_builder_widgets.cpp", "..\mods\rmg_screen.cpp", "..\mods\rmg_factions.cpp", "..\mods\audio_volume.cpp", "..\mods\edge_sky.cpp", "..\mods\wheel.cpp", "..\mods\wheel_logic.cpp", "..\mods\host_rules.cpp", "..\mods\host_rules_logic.cpp", "..\mods\host_rules_panel.cpp", "..\mods\hero_skins.cpp", "..\mods\hero_skins_logic.cpp", "..\mods\hero_skins_panel.cpp"
 # Source paths are relative to src\hook (the build runs there): with the full
 # path of a deep folder, the command line grew past cmd's 8191 characters.
 # Dear ImGui (third_party\imgui, for the player list overlay): the same settings
@@ -40,40 +40,42 @@ Set-Content -Encoding ascii $dll_rsp "$flags /GL /LD $($sources -join ' ') $imgu
 $dll = "cl @`"$dll_rsp`""
 $cmd = "call `"$vcvars`" x86 >nul 2>&1 && cd /d `"$src`" && $imgui && $dll"
 if ($Test) {
-    # The tests' compiler flags go in a response file too: with every test on the
-    # one cmd line, it grew past cmd's 8191 characters again.
-    $flags_rsp = Join-Path $out "test_flags.rsp"
-    Set-Content -Encoding ascii $flags_rsp $flags
-    $cmd += " && cl @`"$flags_rsp`" test\proxy_test.cpp /Fo`"$out\\`" /Fe`"$out\proxy_test.exe`" dxguid.lib"
+    $cmd += " && cl $flags test\proxy_test.cpp /Fo`"$out\\`" /Fe`"$out\proxy_test.exe`" dxguid.lib"
     # calling-convention test of the AI hook: debug build with runtime stack checks (/RTCs)
     $tflags = "/nologo /Od /RTCs /MTd /W4 /WX /EHsc /std:c++17 /DUNICODE /D_UNICODE /DWIN32_LEAN_AND_MEAN /DAI_TRACE_TEST"
     # the "original music" mod's text work (no game needed)
-    $cmd += " && cl @`"$flags_rsp`" test\original_music_test.cpp ..\mods\original_music_xdb.cpp /Fo`"$out\\`" /Fe`"$out\original_music_test.exe`""
+    $cmd += " && cl $flags test\original_music_test.cpp ..\mods\original_music_xdb.cpp /Fo`"$out\\`" /Fe`"$out\original_music_test.exe`""
     # the "languages" mod's work on bytes: paths, text encodings, zip directories
-    $cmd += " && cl @`"$flags_rsp`" test\languages_test.cpp ..\mods\languages_text.cpp /Fo`"$out\\`" /Fe`"$out\languages_test.exe`""
+    $cmd += " && cl $flags test\languages_test.cpp ..\mods\languages_text.cpp /Fo`"$out\\`" /Fe`"$out\languages_test.exe`""
     # the C++ template maker against the JavaScript one, and the recipe names
-    $cmd += " && cl @`"$flags_rsp`" test\rmg_maker_test.cpp ..\mods\rmg_maker.cpp /Fo`"$out\\`" /Fe`"$out\rmg_maker_test.exe`""
-    $cmd += " && cl @`"$flags_rsp`" test\rmg_recipe_test.cpp ..\mods\rmg_recipe.cpp ..\mods\rmg_maker.cpp ..\mods\rmg_join.cpp ..\mods\rmg_templates.cpp log.cpp patch.cpp /Fo`"$out\\`" /Fe`"$out\rmg_recipe_test.exe`""
+    $cmd += " && cl $flags test\rmg_maker_test.cpp ..\mods\rmg_maker.cpp /Fo`"$out\\`" /Fe`"$out\rmg_maker_test.exe`""
+    $cmd += " && cl $flags test\rmg_recipe_test.cpp ..\mods\rmg_recipe.cpp ..\mods\rmg_maker.cpp ..\mods\rmg_join.cpp ..\mods\rmg_templates.cpp log.cpp patch.cpp /Fo`"$out\\`" /Fe`"$out\rmg_recipe_test.exe`""
     # the template builder's data: presets, zone map, words, the native button's files
-    $cmd += " && cl @`"$flags_rsp`" test\rmg_builder_test.cpp ..\mods\rmg_builder_data.cpp ..\mods\rmg_recipe.cpp ..\mods\rmg_maker.cpp /Fo`"$out\\`" /Fe`"$out\rmg_builder_test.exe`""
+    $cmd += " && cl $flags test\rmg_builder_test.cpp ..\mods\rmg_builder_data.cpp ..\mods\rmg_recipe.cpp ..\mods\rmg_maker.cpp /Fo`"$out\\`" /Fe`"$out\rmg_builder_test.exe`""
+    # the hero looks' rules: the choices file, the messages between PCs, who decides
+    $cmd += " && cl $flags test\hero_skins_test.cpp ..\mods\hero_skins_logic.cpp /Fo`"$out\\`" /Fe`"$out\hero_skins_test.exe`""
     # two presentation mods' pure work: the volume curve and the light file edit
-    $cmd += " && cl @`"$flags_rsp`" test\audio_edge_test.cpp /Fo`"$out\\`" /Fe`"$out\audio_edge_test.exe`""
+    $cmd += " && cl $flags test\audio_edge_test.cpp /Fo`"$out\\`" /Fe`"$out\audio_edge_test.exe`""
     # the overlay's modal input rules (what the game gets while a panel is open)
-    $cmd += " && cl @`"$flags_rsp`" test\input_mute_test.cpp input_mute.cpp /Fo`"$out\\`" /Fe`"$out\input_mute_test.exe`""
+    $cmd += " && cl $flags test\input_mute_test.cpp input_mute.cpp /Fo`"$out\\`" /Fe`"$out\input_mute_test.exe`""
     # the mouse wheel fix for Wine: steps turned into positions, and its check
-    $cmd += " && cl @`"$flags_rsp`" test\wheel_test.cpp ..\mods\wheel_logic.cpp /Fo`"$out\\`" /Fe`"$out\wheel_test.exe`""
-    # the host rules: H55-Settings.lua read and served with other values, the carried text, the hello's codes
-    $cmd += " && cl @`"$flags_rsp`" test\host_rules_test.cpp ..\mods\host_rules_logic.cpp /Fo`"$out\\`" /Fe`"$out\host_rules_test.exe`""
+    $cmd += " && cl $flags test\wheel_test.cpp ..\mods\wheel_logic.cpp /Fo`"$out\\`" /Fe`"$out\wheel_test.exe`""
+    # the host rules: H55-Settings.lua read and served with other values, the carried texts, the hello's codes
+    $cmd += " && cl $flags test\host_rules_test.cpp ..\mods\host_rules_logic.cpp /Fo`"$out\\`" /Fe`"$out\host_rules_test.exe`""
     # the hang watchdog on a thread of its own that freezes on purpose (own object folder: built with WATCHDOG_TEST)
     $wd_out = Join-Path $out "watchdog_test"
     New-Item -ItemType Directory -Force $wd_out | Out-Null
-    $cmd += " && cl @`"$flags_rsp`" /DWATCHDOG_TEST test\watchdog_test.cpp watchdog.cpp log.cpp patch.cpp game_build.cpp /Fo`"$wd_out\\`" /Fe`"$out\watchdog_test.exe`" user32.lib"
+    $cmd += " && cl $flags /DWATCHDOG_TEST test\watchdog_test.cpp watchdog.cpp log.cpp patch.cpp game_build.cpp /Fo`"$wd_out\\`" /Fe`"$out\watchdog_test.exe`" user32.lib"
     $cmd += " && cl $tflags test\ai_trace_test.cpp ai_trace.cpp ..\mods\ai_pacing.cpp log.cpp robot.cpp robot_input.cpp robot_endturn.cpp robot_trace.cpp robot_menu.cpp robot_screen.cpp robot_ui.cpp robot_lobby.cpp robot_net.cpp robot_profile.cpp robot_paths.cpp robot_clock.cpp patch.cpp d3d9_hook.cpp watchdog.cpp ..\mods\fast_paths.cpp ..\mods\fast_paths_relax.cpp ..\mods\fast_paths_search.cpp ..\mods\fast_paths_expand.cpp ..\mods\fast_paths_ashore.cpp game_build.cpp dinput_hook.cpp /Fo`"$out\\`" /Fe`"$out\ai_trace_test.exe`" dxguid.lib user32.lib"
 }
 # vcvarsall prints a harmless vswhere warning on stderr (silenced above);
 # PowerShell 5.1 would turn any native stderr line into an error.
 $ErrorActionPreference = "Continue"
-cmd /c "$cmd 2>&1"
+# One command per line of a batch file: with every test, the && chain grew past
+# cmd's 8191 characters per command line.
+$bat = Join-Path $out "build.cmd"
+Set-Content -Encoding ascii $bat ((($cmd -split ' && ') | ForEach-Object { "$_`r`nif errorlevel 1 exit /b 1" }) -join "`r`n")
+cmd /c "`"$bat`" 2>&1"
 if ($LASTEXITCODE -ne 0) { throw "build failed" }
 $ErrorActionPreference = "Stop"
 Write-Host "built $out\dinput8.dll"
@@ -104,6 +106,8 @@ if ($Test) {
         if ($LASTEXITCODE -ne 0) { throw "recipe name test failed" }
         & (Join-Path $out "rmg_builder_test.exe") (Join-Path $repo "src\mods\rmg\templates")
         if ($LASTEXITCODE -ne 0) { throw "template builder test failed" }
+        & (Join-Path $out "hero_skins_test.exe")
+        if ($LASTEXITCODE -ne 0) { throw "hero skins test failed" }
         & (Join-Path $out "audio_edge_test.exe")
         if ($LASTEXITCODE -ne 0) { throw "volume curve / edge sky test failed" }
         & (Join-Path $out "input_mute_test.exe")

@@ -62,6 +62,8 @@ def instance_args(args, name, steps):
         lang_setting=args.host_lang if name == "host" else args.client_lang,
         camera_setting=args.camera_setting + (args.host_camera if name == "host" else args.client_camera),
         debug_setting=args.host_debug if name == "host" else args.client_debug,
+        skins_setting=args.skins_setting + (args.host_skins if name == "host" else args.client_skins),
+        skins_file=args.host_skins_file if name == "host" else args.client_skins_file,
         rules_setting=args.rules_setting + (args.host_rules if name == "host" else args.client_rules),
         resolution=args.resolution,
         fast_paths=args.fast_paths, ai_setting=args.ai_setting,
@@ -128,6 +130,12 @@ def main():
     p.add_argument("--ui-setting", action="append", default=[], metavar="KEY=VALUE",
                    help="[ui] setting for both copies, e.g. trace_players=1 (src/mods/player_list.cpp)")
     p.add_argument("--host-ui", action="append", default=[], metavar="KEY=VALUE", help="[ui] setting, host only")
+    p.add_argument("--skins-setting", action="append", default=[], metavar="KEY=VALUE",
+                   help="[skins] setting for both copies, e.g. trace=1 (src/mods/hero_skins.cpp)")
+    p.add_argument("--host-skins", action="append", default=[], metavar="KEY=VALUE", help="[skins] setting, host only")
+    p.add_argument("--client-skins", action="append", default=[], metavar="KEY=VALUE", help="[skins] setting, client only")
+    p.add_argument("--host-skins-file", metavar="PATH", help="the host's hero looks (open-homm5-skins.ini format)")
+    p.add_argument("--client-skins-file", metavar="PATH", help="the client's hero looks (open-homm5-skins.ini format)")
     p.add_argument("--host-debug", action="append", default=[], metavar="KEY=VALUE",
                    help="[debug] setting, host only, e.g. hang_test_at=120 (src/hook/watchdog.cpp)")
     p.add_argument("--client-debug", action="append", default=[], metavar="KEY=VALUE", help="[debug] setting, client only")
