@@ -17,6 +17,7 @@ runs the scripts from the unzipped package. It never touches a real game folder.
 import argparse
 import hashlib
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -193,6 +194,153 @@ def template_tests(who, pkg, game_bin, install, uninstall):
     check(code == 0 and "no random map templates" in out and tree(game_bin) == before, "templates: uninstall with nothing installed: no error, nothing changed", out)
 
 
+# ---------------------------------------------------------------- the settings file
+
+# A player's open-homm5.ini from 0.2.3 (that version's file, with a few values set by
+# hand, builder_last as the DLL writes it, a setting this version does not know, and
+# two sections added by hand).
+OLD_INI = REPO / "tools" / "package" / "test_data" / "open-homm5-0.2.3.ini"
+KEPT = "; kept from your previous file:"
+
+
+def crlf(text):
+    return text.replace("\r\n", "\n").replace("\n", "\r\n").encode("ascii")
+
+
+def mentioned(text):
+    """{(section, key)} of the lines ";key=..." and "key=..." (names in lower case)."""
+    sec, out = "", set()
+    for line in text.replace("\r\n", "\n").split("\n"):
+        t = line.strip(" \t")
+        if t.startswith("[") and "]" in t:
+            sec = t[1:t.index("]")].strip(" \t").lower()
+            continue
+        m = re.match(r";?([A-Za-z0-9_]+)[ \t]*=", t)
+        if m:
+            out.add((sec, m.group(1).lower()))
+    return out
+
+
+def replaced(text, pairs):
+    for a, b in pairs:
+        if text.count(a) != 1:
+            check(False, f"settings: test setup: the package's ini should have {a.strip()!r} once")
+        text = text.replace(a, b)
+    return text
+
+
+def settings_tests(who, pkg, game_bin, install, uninstall):
+    """The settings file: refreshed from the package's, the player's values kept, backups.
+
+    install() and uninstall(answer) run the scripts for game_bin and return (exit code,
+    output). Returns {case: the refreshed file's bytes}, to compare Windows with Linux."""
+    print(f"\nThe settings file ({who})")
+    ini = game_bin / "open-homm5.ini"
+    bak = [game_bin / f"open-homm5.ini.{e}" for e in ("bak", "bak2", "bak3")]
+    tpl_bytes = (pkg / "open-homm5.ini").read_bytes()
+    tpl = tpl_bytes.decode("ascii").replace("\r\n", "\n")
+    results = {}
+
+    def backups():
+        return [p.read_bytes() if p.exists() else None for p in bak]
+
+    def plain(data):
+        return all(b < 0x80 for b in data) and b"\n" not in data.replace(b"\r\n", b"")
+
+    # fresh install: the package's file, no backup
+    code, out = install()
+    check(code == 0 and ini.read_bytes() == tpl_bytes and backups() == [None] * 3,
+          "settings: fresh install: the package's open-homm5.ini, no backup", out)
+    code, out = install()
+    check(code == 0 and ini.read_bytes() == tpl_bytes and backups() == [None] * 3 and "already up to date (every setting at its default)" in out,
+          "settings: install again over the untouched file: nothing changes, no backup", out)
+
+    # a 0.2.3 file with the player's values: refreshed into this version's file
+    old = crlf(OLD_INI.read_text(encoding="ascii"))
+    ini.write_bytes(old)
+    code, out = install()
+    want = replaced(tpl, [
+        ("\n;view_delay_ms=100\n", "\nview_delay_ms=50\n"),
+        ("\n;net_sleep_ms=2\n", f"\nnet_sleep_ms=1\n\n{KEPT}\nfast_turns=1\n"),
+        ("\n;language=auto\n", "\nlanguage=fr\n"),
+        ("\n;builder_last=\n", "\nbuilder_last=OH-X1-321110nnxxxxxxxa\n"),
+        ("\n;original_music=0\n", "\noriginal_music=1\n"),
+        ("\n;texts=game\n", "\ntexts=fr\n"),
+    ]) + f"\n[mine]\n{KEPT}\nnote=hello\n"
+    new = len(mentioned(tpl) - mentioned(old.decode("ascii")))
+    got = ini.read_bytes()
+    results["0.2.3 file"] = got
+    check(code == 0 and got == crlf(want), "settings: a 0.2.3 file: every value kept in its line, the rest is this version's file",
+          f"{out}\n--- got:\n{got.decode('ascii', 'replace')}")
+    check(plain(got), "settings: the refreshed file is plain ASCII with CRLF line endings, like the package's")
+    check(f"settings file refreshed: 8 of your settings kept, {new} new settings available (see the comments)" in out and new > 30,
+          "settings: the summary counts the settings kept and the new ones", out)
+    check("2 settings not listed in this version" in out and "open-homm5.ini.bak" in out,
+          "settings: the summary names the unknown settings and the backup", out)
+    check(backups() == [old, None, None], "settings: the previous file is saved as open-homm5.ini.bak, byte for byte")
+
+    # again: nothing to do, no second backup
+    code, out = install()
+    check(code == 0 and ini.read_bytes() == got and backups() == [old, None, None],
+          "settings: a second install changes nothing and makes no new backup", out)
+    check("settings file already up to date: 8 of your settings kept" in out, "settings: a second install says the file is up to date", out)
+
+    # odd files: a byte-order mark, LF, a setting before any section, other upper/lower
+    # case and spaces, a second copy, comments that are not settings, a line without "="
+    odd = (b"\xef\xbb\xbftop=1\n[NET]\n  Tuning = 0  \ntuning=1\n#keepalive_ms=5\n; keepalive_ms=7\n"
+           b"lonely line\n[ai]\nfast_paths=0\n")
+    ini.write_bytes(odd)
+    code, out = install()
+    want = replaced(tpl, [
+        ("same settings.\n\n[net]\n", f"same settings.\n\n{KEPT}\ntop=1\n\n[net]\n"),
+        ("\n;tuning=1\n", "\ntuning=0\n"),
+        ("\n;net_sleep_ms=2\n", f"\n;net_sleep_ms=2\n\n{KEPT}\ntuning=1\nlonely line\n"),
+        ("\n;fast_paths=1\n", "\nfast_paths=0\n"),
+    ])
+    got = ini.read_bytes()
+    results["odd file"] = got
+    check(code == 0 and got == crlf(want), "settings: odd file (BOM, LF, a setting before [net], case, spaces, a second copy): as expected",
+          f"{out}\n--- got:\n{got.decode('ascii', 'replace')}")
+    check(f"4 of your settings kept, {len(mentioned(tpl)) - 2} new settings available" in out and "1 setting not listed" in out,
+          "settings: odd file: the counts", out)
+    check(backups() == [odd, old, None], "settings: a second refresh keeps the older backup as open-homm5.ini.bak2")
+
+    # more refreshes: only the last three backups stay
+    ini.write_bytes(b"")
+    code, out = install()
+    results["empty file"] = ini.read_bytes()
+    check(code == 0 and ini.read_bytes() == tpl_bytes and backups() == [b"", odd, old],
+          "settings: an empty file becomes the package's file; three backups", out)
+    one = b"[net]\r\ntuning=0\r\n"
+    ini.write_bytes(one)
+    code, out = install()
+    results["one setting"] = ini.read_bytes()
+    check(code == 0 and ini.read_bytes() == crlf(replaced(tpl, [("\n;tuning=1\n", "\ntuning=0\n")])),
+          "settings: a file with one setting: refreshed", out)
+    check(backups() == [one, b"", odd] and not (game_bin / "open-homm5.ini.bak4").exists(),
+          "settings: a fourth refresh drops the oldest backup (three are kept)")
+
+    # a "Unicode" (UTF-16) file is left alone
+    current, saved = ini.read_bytes(), backups()
+    utf16 = "[net]\r\ntuning=0\r\n".encode("utf-16")
+    ini.write_bytes(utf16)
+    code, out = install()
+    check(code == 0 and ini.read_bytes() == utf16 and backups() == saved and "not a plain text file" in out,
+          "settings: a UTF-16 file is kept as it is, no backup", out)
+    ini.write_bytes(current)
+
+    # uninstall: one question for the file and its backups
+    code, out = uninstall("n\n")
+    check(code == 0 and ini.exists() and backups() == saved and "its old copies" in out,
+          "settings: uninstall (n): the file and its backups stay", out)
+    code, out = uninstall("y\n")
+    check(code == 0 and not ini.exists() and backups() == [None] * 3, "settings: uninstall (y): the file and its backups are removed", out)
+    bak[1].write_bytes(b"old copy")
+    code, out = uninstall("y\n")
+    check(code == 0 and not bak[1].exists() and "removed open-homm5.ini.bak2" in out, "settings: uninstall (y) with only a backup left: removed", out)
+    return results
+
+
 # ---------------------------------------------------------------- Windows
 
 def windows_tests(pkg, work):
@@ -234,12 +382,13 @@ def windows_tests(pkg, work):
     check(code == 0 and "replaced the older" in out, "re-install over an older build of ours: replaced", out)
     check((bin2 / "dinput8.dll").read_bytes() == our_dll, "re-install: new DLL in place")
 
-    # existing ini is kept
+    # an existing ini is refreshed: this version's file, with the player's values
     (bin2 / "open-homm5.ini").write_bytes(b"[net]\r\ntuning=0\r\n")
     code, out = install("-SteamDir", str(steam_only))
-    check(code == 0 and (bin2 / "open-homm5.ini").read_bytes() == b"[net]\r\ntuning=0\r\n",
-          "existing open-homm5.ini is kept", out)
-    check("kept your existing open-homm5.ini" in out, "existing ini: says it kept it")
+    check(code == 0 and (bin2 / "open-homm5.ini").read_bytes() == our_ini.replace(b"\r\n;tuning=1\r\n", b"\r\ntuning=0\r\n")
+          and (bin2 / "open-homm5.ini.bak").read_bytes() == b"[net]\r\ntuning=0\r\n",
+          "existing open-homm5.ini: refreshed, the player's value kept, the old file in .bak", out)
+    check("settings file refreshed: 1 of your settings kept" in out, "existing ini: says it refreshed it", out)
 
     # a foreign dinput8.dll is refused
     (bin2 / "dinput8.dll").write_bytes(b"MZ some other mod's dinput8")
@@ -350,6 +499,12 @@ def windows_tests(pkg, work):
     check(code == 0 and "Heads-up" not in out, "ZeroTier on a Private network: no hint", out)
     uninstall("-GameDir", str(bin2), stdin="y\n")
 
+    # the settings file: refreshed, values kept, backups
+    ini_bin = make_game(work / "ini lib")
+    results = settings_tests("Windows", pkg, ini_bin,
+                             lambda: install("-GameDir", str(ini_bin)),
+                             lambda answer: uninstall("-GameDir", str(ini_bin), stdin=answer))
+
     # random map templates: install, a player's own files, reinstall, uninstall
     tpl_bin = make_game(work / "tpl lib")
     template_tests("Windows", pkg, tpl_bin,
@@ -366,6 +521,7 @@ def windows_tests(pkg, work):
     # PowerShell 5.1 specifically (the script must run there)
     code, out = run(["powershell", "-NoProfile", "-Command", "$PSVersionTable.PSVersion.ToString()"])
     check(out.strip().startswith("5."), f"tests ran on Windows PowerShell 5.x (found {out.strip()})")
+    return results
 
 
 # ---------------------------------------------------------------- Linux
@@ -419,7 +575,10 @@ def linux_tests(pkg, work, bash):
 
     (bin2 / "open-homm5.ini").write_bytes(b"[net]\ntuning=0\n")
     code, out = sh("install.sh")
-    check(code == 0 and (bin2 / "open-homm5.ini").read_bytes() == b"[net]\ntuning=0\n" and "kept your existing" in out, "existing ini is kept", out)
+    our_ini = (pkg / "open-homm5.ini").read_bytes()
+    check(code == 0 and (bin2 / "open-homm5.ini").read_bytes() == our_ini.replace(b"\r\n;tuning=1\r\n", b"\r\ntuning=0\r\n")
+          and (bin2 / "open-homm5.ini.bak").read_bytes() == b"[net]\ntuning=0\n" and "settings file refreshed: 1 of your settings kept" in out,
+          "existing ini: refreshed, the player's value kept, the old file in .bak", out)
 
     (bin2 / "dinput8.dll").write_bytes(b"MZ some other mod")
     code, out = sh("install.sh")
@@ -490,6 +649,12 @@ def linux_tests(pkg, work, bash):
     code, out = run([bash, str(lone / "install.sh"), "--game-dir", posix(bin2)], "", env=env)
     check(code == 7 and not (bin2 / "dinput8.dll").exists(), "install.sh without dinput8.dll: exit 7", out)
 
+    # the settings file: refreshed, values kept, backups
+    ini_bin = make_game(work / "ini_lib")
+    results = settings_tests("Linux", pkg, ini_bin,
+                             lambda: sh("install.sh", "--game-dir", posix(ini_bin)),
+                             lambda answer: sh("uninstall.sh", "--game-dir", posix(ini_bin), stdin=answer))
+
     # random map templates: install, a player's own files, reinstall, uninstall
     tpl_bin = make_game(work / "tpl_lib")
     template_tests("Linux", pkg, tpl_bin,
@@ -515,6 +680,7 @@ def linux_tests(pkg, work, bash):
     check(sorted(p.name for p in old.iterdir()) == sorted([first.lower()] + [p.name for p in template_dir(pkg).iterdir() if p.name != first])
           and (old / first.lower()).read_bytes() == (template_dir(pkg) / first).read_bytes(),
           "templates: an existing file of ours under another spelling is overwritten, not duplicated")
+    return results
 
 
 def main():
@@ -536,8 +702,9 @@ def main():
     pkg = work / "package" / "open-homm5-0.0.0-test"  # the zip's one top folder
     package_checks(pkg, out_dir / "open-homm5-0.0.0-test.zip")
 
+    win = lin = None
     if os.name == "nt":
-        windows_tests(pkg, work / "win")
+        win = windows_tests(pkg, work / "win")
     else:
         print("\n(skipping the Windows script tests: not on Windows)")
 
@@ -546,9 +713,14 @@ def main():
         bash = None  # that is WSL's launcher
     if bash:
         (work / "lin").mkdir(exist_ok=True)
-        linux_tests(pkg, work / "lin", bash)
+        lin = linux_tests(pkg, work / "lin", bash)
     else:
         print("\n(skipping the Linux script tests: no bash; pass --bash)")
+
+    if win and lin:
+        print("\nThe settings file: Windows and Linux")
+        for case in win:
+            check(win[case] == lin.get(case), f"settings: {case}: install.ps1 and install.sh write the same bytes")
 
     print(f"\n{checks - len(failures)} of {checks} checks passed")
     if failures:

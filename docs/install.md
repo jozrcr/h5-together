@@ -33,8 +33,8 @@ Start the game as you do for co-op games (GameRanger, or `MMH55_Utility_64.exe`)
 
 ## Updating
 
-Install the new version the same way, over the old one. Your settings are kept. Our templates are replaced by the new ones; templates you added yourself stay.
+Install the new version the same way, over the old one. Your settings are kept, and the new ones are added: `open-homm5.ini` becomes the new version's file (every setting listed and commented out) with your values in it. The installer says `settings file refreshed: N of your settings kept, M new settings available (see the comments)`. A setting the new version no longer lists stays at the end of its section, under `; kept from your previous file:`. Your old file is saved as `open-homm5.ini.bak` (the last three are kept: `.bak`, `.bak2`, `.bak3`). Our templates are replaced by the new ones; templates you added yourself stay.
 
 ## Uninstall
 
-Run `uninstall.bat` (Windows) or `bash uninstall.sh` (Linux) from the extracted folder. Only the add-on's own files are removed (the DLL, the log, our templates); it asks before deleting your settings file, and templates you added yourself stay.
+Run `uninstall.bat` (Windows) or `bash uninstall.sh` (Linux) from the extracted folder. Only the add-on's own files are removed (the DLL, the log, our templates); it asks before deleting your settings file and its `.bak` copies, and templates you added yourself stay.

@@ -10,14 +10,14 @@ INSTALL
 
 Windows: extract this zip (right-click it, "Extract All"), then double-click install.bat. It finds your Steam copy of the game and tells you what it did.
 Linux (Steam / Proton): extract the zip, open a terminal in the folder, and run: bash install.sh. At the end it gives you one line to paste into the game's Steam launch options.
-Updating: install the new version over the old one. Your open-homm5.ini is kept.
+Updating: install the new version over the old one. Your settings are kept, and the new ones are added to open-homm5.ini (commented out, with what they do); the installer says how many. Your old file is saved as open-homm5.ini.bak.
 
 Check that it works: start the game. A file named open-homm5.log appears in the game's bin folder. Its first line says "open-homm5 hook DLL", the version and "loaded".
 
 
 UNINSTALL
 
-Double-click uninstall.bat (Windows) or run: bash uninstall.sh (Linux). Only our own files are removed (dinput8.dll, the log, our templates, and your settings file if you say yes). Templates you added yourself stay.
+Double-click uninstall.bat (Windows) or run: bash uninstall.sh (Linux). Only our own files are removed (dinput8.dll, the log, our templates, and your settings file and its .bak copies if you say yes). Templates you added yourself stay.
 
 
 SETTINGS (you can skip this)
