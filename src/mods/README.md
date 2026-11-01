@@ -799,3 +799,41 @@ log_volume=0        ; testing: log the first N changes of an audible channel vol
 edge_sky=game            ; game (the game's sky), none (no sky dome on the random maps' dusk light: black)
 edge_sky_test_light=     ; testing: one more light file to show without its sky dome
 ```
+
+## Game rules from the host (`host_rules*.cpp`; on, and nothing changes unless the host changes something)
+
+Plan, research and robot checks: [docs/plans/host-rules.md](../../docs/plans/host-rules.md).
+
+**What it is for:** MMH5.5 has switches for many of its rules (governors, town conversion, the town gate, mine guards, the computer's weekly bonus, mixed neutral armies, prank artifacts, the random map extras...), in `scripts/H55-Settings.lua`. Until now a group changed them by swapping a settings pak on every PC. With this mod **the host chooses them for each game**, in a panel, and every PC plays with them.
+
+- **The host:** on the game setup screen or in the waiting room, **F2** (or **"Rules..."** at the right of the waiting room's title) opens the panel: 15 switches, each with one line of explanation, in French or English. Gold = changed from your MMH5.5 file. **OK** keeps the choice (also for your next games, in `[rules]`); **MMH5.5's file** puts everything back.
+- **The other players** see the host's rules there, read only. On the adventure map, **F2** shows the running game's rules to everyone.
+- **They are used only when every player has the add-on.** Otherwise every PC uses its own MMH5.5 file, as without the add-on; the host's panel names who lacks it, and the button gets a red "!".
+- **The check:** each PC tells the host a fingerprint of its MMH5.5 files (`H55-Settings.lua`, the stats paks). If a player's files differ, the host's panel and log name that player (the game could go out of step); that player's panel says so too.
+- **How:** the values travel in one more part of the game's own start message, so it works on any map; when the map's scripts read `H55-Settings.lua`, every PC's add-on hands them the file with the host's values (only those numbers change). The log says which values were used, on every PC, with the same hash:
+  `rules: the scripts read scripts/H55-Settings.lua: served with the host's rules (governance 1->0, ai_cheat 4->0, mixed_stacks 1->0; ...); 8206 -> 8206 bytes, hash a07c5c34`
+- **Good to know:** MMH5.5's scripts only run on maps with a map script. Hand-made maps and random maps saved with a script (MMH5.5's Mapmixer, the editor: the group's usual maps) have one. **A random map straight from the game's generator, in a multiplayer game, has none: there MMH5.5's scripts do not run at all**, so these switches change nothing (the settings pak does not either).
+- Single player uses your MMH5.5 file, as before.
+
+**Robot checks** (2026-11-01, LAN, two copies; all world checksums equal):
+- A1M4 (RC19k) with `governance=0 ai_cheat=0 mixed_stacks=0`: both PCs served the same file (hash `a07c5c34`), MMH5.5 no longer mixed the neutral stacks (`H55 Stacks Qty: 36`, no `H55 Mixing`). The client saw the host's rules in the waiting room and in game.
+- The owner's `MAP_JoacJoz` (a random map with a map script): the same, plus `competitive_towns=0`.
+- A client without the rules (`enabled=0`): no rules sent, both PCs used their file (and mixed the stacks, as the file says).
+- A random map straight from the generator: MMH5.5's scripts did not run on either PC (no map script); the host's panel says so.
+- **Saves:** loading a save opens no script file; the scripts go on with the values the game started with (single player, robot).
+
+More in the plan.
+
+**Settings** (`open-homm5.ini`):
+
+```ini
+[rules]
+enabled=1     ; 0 = never take part (no hello, always this PC's own file)
+key=F2        ; the panel's key (setup screen, waiting room, adventure map); none = no key
+button=1      ; the "Rules..." button in the waiting room
+governance=   ; the host's choices, written by the panel (empty = MMH5.5's file); also
+              ; town_conversion, extra_conversions, town_gate, mine_control, dimension_doors,
+              ; ai_cheat, mixed_stacks, neutral_stack_size, bank_difficulty, negative_artifacts,
+              ; rpg_potions, competitive_towns, mana_observatories, moon_disc
+trace=0       ; testing: log every script file the game opens
+```

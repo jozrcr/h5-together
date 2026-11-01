@@ -15,6 +15,7 @@
 #include "../mods/fast_paths.h"
 #include "../mods/hero_skins.h"
 #include "../mods/hero_skins_internal.h"
+#include "../mods/host_rules.h"
 #include "../mods/lan_discovery.h"
 #include "../mods/languages.h"
 #include "../mods/lockstep.h"
@@ -60,6 +61,7 @@ void InstallEarly()
 	mods::InstallPlayerListEarly();  // the Direct3D import, before the game makes its device
 	mods::InstallRmgBuilderEarly();
 	mods::InstallHeroSkinsPanelEarly();  // the overlay's Direct3D import, for the looks' panel
+	mods::InstallHostRulesEarly();  // its panel: the Direct3D import
 	overlay::InstallTestPanelEarly();
 }
 
@@ -90,6 +92,7 @@ void InstallAll()
 	mods::ApplyCameraFromSettings();
 	mods::ApplyWheelFromSettings();  // its DirectInput filter goes first (order -10)
 	mods::ApplyEdgeSkyFromSettings();  // [camera] edge_sky: before the first map reads its light
+	mods::ApplyHostRulesFromSettings();  // [rules]: the host's rules, served as H55-Settings.lua
 	mods::ApplyAudioVolumeFromSettings();
 	mods::ApplyHeroSkinsFromSettings();  // after notify and the co-op guard: it stacks on their hooks
 }

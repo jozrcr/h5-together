@@ -64,6 +64,7 @@ def instance_args(args, name, steps):
         debug_setting=args.host_debug if name == "host" else args.client_debug,
         skins_setting=args.skins_setting + (args.host_skins if name == "host" else args.client_skins),
         skins_file=args.host_skins_file if name == "host" else args.client_skins_file,
+        rules_setting=args.rules_setting + (args.host_rules if name == "host" else args.client_rules),
         resolution=args.resolution,
         fast_paths=args.fast_paths, ai_setting=args.ai_setting,
         # the client never runs the AI (the host does), so "no AI step for 4
@@ -139,6 +140,12 @@ def main():
                    help="[debug] setting, host only, e.g. hang_test_at=120 (src/hook/watchdog.cpp)")
     p.add_argument("--client-debug", action="append", default=[], metavar="KEY=VALUE", help="[debug] setting, client only")
     p.add_argument("--client-ui", action="append", default=[], metavar="KEY=VALUE", help="[ui] setting, client only")
+    p.add_argument("--rules-setting", action="append", default=[], metavar="KEY=VALUE",
+                   help="[rules] setting for both copies, e.g. trace=1 (src/mods/host_rules.cpp)")
+    p.add_argument("--host-rules", action="append", default=[], metavar="KEY=VALUE",
+                   help="[rules] setting, host only: its choices, e.g. governance=0, ai_cheat=0")
+    p.add_argument("--client-rules", action="append", default=[], metavar="KEY=VALUE",
+                   help="[rules] setting, client only, e.g. enabled=0 (a PC without the rules)")
     p.add_argument("--camera-setting", action="append", default=[], metavar="KEY=VALUE",
                    help="[camera] setting for both copies, e.g. zoom_out=150 (src/mods/camera.cpp)")
     p.add_argument("--host-camera", action="append", default=[], metavar="KEY=VALUE",
