@@ -32,6 +32,8 @@ DWORD g_down_at = 0;
 bool g_uses_buffer = false;  // the game reads buffered events (GetDeviceData)
 DWORD g_sequence = 0x10000;
 
+bool g_game_input = false;  // the script has game keys or wheel steps (EnableGameInput)
+
 // The robot's mouse wheel: notches left to give (+ up, - down), one per read.
 volatile LONG g_wheel_pending = 0;
 volatile LONG g_wheel_steps = 0;  // 1 = as steps (Wine), 0 = as positions (Windows)
@@ -154,6 +156,22 @@ HRESULT FilterAcquire(dihook::DeviceKind kind, void *self, HRESULT hr)
 		}
 		return DI_OK;
 	}
+	// The game reads its devices only once all of them are acquired (0x00c42220,
+	// the mouse first), and with the window in the background the mouse never is
+	// (foreground cooperative level, 0x00c41fb0): its key and wheel events never
+	// get read. Scripts with game keys or wheel notches ("dik", "wheel") report
+	// success for the mouse too; its reads then fail (not acquired) and the
+	// filters above give "no events", plus the robot's.
+	if (kind == dihook::kMouse && g_game_input && FAILED(hr)) {
+		static bool logged = false;
+		if (!logged) {
+			logged = true;
+			hooklog::Write("robot: mouse Acquire failed (%08lx, window in background): reporting success (game keys "
+			               "and wheel steps)",
+			               static_cast<unsigned long>(hr));
+		}
+		return DI_OK;
+	}
 	return hr;
 }
 
@@ -192,6 +210,11 @@ bool PressKey(int dik_code, DWORD hold_ms)
 	InterlockedExchange(&g_phase, 1);
 	InterlockedExchange(&g_key, dik_code);
 	return true;
+}
+
+void EnableGameInput()
+{
+	g_game_input = true;
 }
 
 void TurnWheel(int notches, bool steps)

@@ -44,6 +44,9 @@ bool PressKey(int dik_code, DWORD hold_ms = 0);
 // that many notches (+ up, - down), one per buffered read, as positions (the
 // running sum, as Windows gives them) or as steps (+-120, as Wine gives them).
 void TurnWheel(int notches, bool steps);
+// The script has "dik" or "wheel" steps: the mouse's Acquire reports success
+// (the game reads no device until all are acquired). From the config reader.
+void EnableGameInput();
 // One of our overlay's own keys (step "key|F11"): true once for the next
 // overlay::KeyPressed(vk) after the step ran (the robot's window is in the
 // background, so the overlay's GetAsyncKeyState never sees a key).

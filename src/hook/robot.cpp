@@ -722,6 +722,8 @@ bool ReadConfig(const wchar_t *path)
 				         : strcmp(kind, "panel") == 0 ? 'b'
 				                                     : 'c';
 				lstrcpynA(s.text, text, sizeof(s.text));
+				if (s.kind == 'd' || s.kind == 'z')
+					EnableGameInput();
 			}
 		}
 		else if (strcmp(line, "command_delay_seconds") == 0)
