@@ -67,7 +67,7 @@ def markup_differs(english, french):
 
 def self_test():
     cases = [
-        ("<color=orange>Savage Mode<color_default><br>* AI heroes", "Bonus de depart : 3000 or", True),
+        ("<color=orange>Hard way<color_default><br>* Foes never run", "Un vieux texte sans couleur", True),
         ("Deals <value=damage> damage.<br>Fast.", "Inflige <value=damage> degats. Rapide.", False),
         ("Deals <value=damage> damage.", "Inflige des degats.", True),
         ("<color=red>A<color_default>", "<color=yellow>B<color_default>", False),
