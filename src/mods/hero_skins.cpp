@@ -67,6 +67,7 @@
 //                     so nobody's looks show there; single player is unchanged)
 //   trace=0           1 = log each figure built and each caller of the two slots
 //   test_ai_heroes=0  testing: computer players' heroes take this PC's looks
+//   live_hero_screen=1  0 = an open hero screen shows a new look only when opened again
 // Choices: open-homm5-skins.ini, [skins] section, hero=look by InternalName.
 #include "hero_skins.h"
 
@@ -85,6 +86,7 @@
 #include "hero_skins_logic.h"
 
 #include "../hook/log.h"
+#include "../hook/overlay.h"
 #include "../hook/patch.h"
 
 namespace mods {
@@ -131,6 +133,17 @@ const DWORD kSharedNameFile = 0x16c;       // the text file of its name (narrow 
 const DWORD kTextureVftable = 0x00e90318;  // NDb::STexture
 const DWORD kTextureFile = 0x40;           // DestName: the .dds in the game's data
 const DWORD kPlayerSelected = 0x1d0;       // IPlayer: its selected hero (slot 0x0c, 0x004fcc40)
+// The hero screen (7. below; docs/plans/hero-skins.md, "The hero screen's 3D figure").
+const DWORD kHeroScreenVftable = 0x00e3584c;  // NUI::CHeroScreen2 (also MMH5.5's HeroScreen3 layout)
+const DWORD kHeroScreenHero = 0x1b0;       // the hero it shows (IHero *)
+const DWORD kHeroScreenShown = 0x15a;      // 1 once its update showed it (0 while it loads)
+const DWORD kHeroScreenClosing = 0x160;    // set: its update closes it
+const DWORD kHeroScreenPage = 0x708;
+const DWORD kHeroScreenDialogs = 0x14c;    // a list head: not empty, its close (0x006d0960) refuses
+const DWORD kHeroScreenPending = 0x720;    // an object: its close asks "are you sure" instead
+const DWORD kHeroScreenMode = 0x7dc;       // 0: a hero of its owner's, alone (the only mode with the 3D figure
+                                           // that its "next hero" serves; 0x006c05e0, 0x006c49c0)
+const DWORD kHeroScreenSwitch = 0x006c4880;  // __thiscall(screen, hero): closes it and queues a new one for the hero
 const DWORD kReleaseResource = 0x008c6150; // __fastcall(object): frees it when both counts are 0
 const DWORD kUpdateCall = 0x0060895e;      // in 0x00608930: call 0x006082f0 (the adventure controller's frame)
 const DWORD kUpdate = 0x006082f0;          // __thiscall, 5 stack arguments
@@ -197,6 +210,21 @@ const Code kCode[] = {
 	{0x00e1a0a8, {0x40, 0xcc, 0x4f, 0x00}, 4},                           // ... its vtable cell
 	{0x00a0c4a2, {0x8d, 0x87, 0x2c, 0x01, 0x00, 0x00, 0x50, 0x50, 0x6a, 0x00, 0x68, 0x88, 0xd9, 0xe6, 0x00}, 15},  // FaceTexture
 	{0x00c7a69c, {0x8d, 0x47, 0x40}, 3},                                 // STexture: DestName at +0x40
+	// the hero screen's "next hero" (0x006c49c0): push the hero; mov ecx,esi; call 0x006c4880
+	// (with one hero, the hero itself), which closes the screen (0x006d0960) and, unless in
+	// mode 1, queues a new one with the screen's own values and page (0x006c43d0, 0x00838c10)
+	{0x006c4a61, {0x8b, 0x01, 0x50, 0x8b, 0xce, 0xe8, 0x15, 0xfe, 0xff, 0xff}, 10},
+	{kHeroScreenSwitch, {0x83, 0xec, 0x34, 0x53, 0x55, 0x56, 0x57, 0x8b, 0x7c, 0x24, 0x48, 0x33, 0xdb, 0x3b, 0xfb, 0x8b}, 16},
+	{0x006c48d5, {0xe8, 0x86, 0xc0, 0x00, 0x00}, 5},                     // call 0x006d0960 (close)
+	{0x006c4909, {0x39, 0xae, 0xdc, 0x07, 0x00, 0x00}, 6},               // cmp [esi+0x7dc] (mode),1
+	{0x006d0966, {0x8b, 0x86, 0x4c, 0x01, 0x00, 0x00, 0x39, 0x00, 0x74, 0x09}, 10},  // the close: the list at +0x14c,
+	{0x006d0979, {0x8b, 0x86, 0x20, 0x07, 0x00, 0x00, 0x85, 0xc0}, 8},   // ... the object at +0x720,
+	{0x006d0987, {0xf6, 0x40, 0x07, 0x80}, 4},                         // ... unless dying
+	{0x006c49a8, {0xe8, 0x23, 0xfa, 0xff, 0xff, 0x8b, 0xc8, 0xe8, 0x5c, 0x42, 0x17, 0x00}, 12},
+	{0x006c4a1e, {0x04, 0x00, 0x8b, 0x8e, 0xb0, 0x01, 0x00, 0x00}, 8},   // ... the hero at +0x1b0
+	{0x006c05e0, {0x8b, 0x81, 0xdc, 0x07, 0x00, 0x00}, 6},               // the 3D figure in modes 0 and 5
+	{0x006caee6, {0x80, 0xbe, 0x1c, 0xf9, 0xff, 0xff, 0x00}, 7},         // its update: closing at +0x160,
+	{0x006caf05, {0x80, 0xbe, 0x16, 0xf9, 0xff, 0xff, 0x00}, 7},         // ... shown at +0x15a
 	{kReleaseResource, {0x51, 0x83, 0x79, 0x08, 0x00, 0x75, 0x6b, 0xf7, 0x41, 0x04}, 10},
 	// the adventure controller's frame (as notify.cpp checks it)
 	{0x00608930, {0x56, 0x8b, 0xf1, 0x8b, 0x46, 0x3c}, 6},
@@ -304,6 +332,18 @@ struct Pending {
 std::vector<Pending> g_pending;
 
 void NewGame(const void *transceiver);
+
+// The hero screen's 3D figure after a look changed (7.).
+bool g_live_screen = true;               // [skins] live_hero_screen
+std::vector<int> g_screen_heroes;        // the heroes whose look changed (catalog positions), until the next frame
+const char *g_screen_why = nullptr;
+BYTE *g_screen_old = nullptr;            // the screen closed, until the new one is seen (never read)
+BYTE *g_screen_hero = nullptr;           // its hero (compared only)
+DWORD g_screen_since = 0;
+DWORD g_screen_tries = 0;                // frames it waited for the screen to finish loading
+void ServeHeroScreen();
+char g_robot_screen[32] = {};  // a robot helper asked for (8.), done at the next adventure frame
+void ServeRobot(const BYTE *controller);
 
 int g_logged = 0;  // log lines about figures and messages (capped)
 const int kMaxLog = 300;
@@ -683,6 +723,8 @@ void AfterFrame(const BYTE *controller)
 	}
 	for (BYTE *object : rebuild)
 		g_figure_cell_next(object, nullptr);  // the game's own figure builder (the slots answer the look)
+	ServeHeroScreen();
+	ServeRobot(controller);
 }
 
 void __fastcall UpdateHook(void *controller, void *edx, DWORD a, DWORD b, DWORD c, DWORD d, DWORD e)
@@ -911,6 +953,16 @@ void __fastcall SegmentHook(void *transceiver8, void *edx, DWORD time)
 	// After the game set the segment's time, before its commands: the same point on every PC.
 	for (BYTE *object : rebuild)
 		g_figure_cell_next(object, nullptr);
+	if (!rebuild.empty()) {  // this PC's hero screen, if open on one of them, opens again (7.)
+		std::vector<int> heroes;
+		Lock lock;
+		for (BYTE *object : rebuild) {
+			const int index = HeroIndex(reinterpret_cast<BYTE *>(Read(object, kFigureHero)));
+			if (index >= 0)
+				heroes.push_back(index);
+		}
+		skins::RefreshHeroScreen(heroes, "a look changed at this segment");
+	}
 }
 
 // ---- the panel's questions (hero_skins_internal.h) ----
@@ -972,14 +1024,220 @@ std::string NameFileOf(int hero)
 	return path;
 }
 
+// ---- 7. the hero screen's 3D figure ----
+// A shown hero screen never builds its 3D figure again (a try that made it do so
+// crashed). So, after a look changed, the hero screen showing that hero is closed
+// and opened again, the way its own "next hero" does it with a single hero
+// (0x006c49c0 -> 0x006c4880(screen, hero)): it closes the screen and queues a new
+// one with the same values and page. At the adventure controller's frame (the
+// game's update), never inside drawing or input. Anything unexpected: nothing is
+// done, and the screen shows the look when it is opened again.
+BYTE *HeroScreenOnTop()
+{
+	char top[96];
+	if (!overlay::TopScreen(top, sizeof(top)) || strcmp(top, ".?AVCHeroScreen2@NUI@@") != 0)
+		return nullptr;
+	BYTE *screen = static_cast<BYTE *>(overlay::TopScreenObject());
+	return screen && Read(screen, 0) == kHeroScreenVftable ? screen : nullptr;
+}
+
+// "<hero> with <look>'s look, battle model <file>" (under g_lock).
+std::string FigureShown(BYTE *hero)
+{
+	int index = -1;
+	const int look = hero && !Dying(hero) ? LookOf(hero, &index) : -1;
+	if (index < 0)
+		return "a hero not in the list";
+	const BYTE *model = FigureModel(look >= 0 ? look : index, kSharedArena);
+	const std::string file = model ? NarrowString(model, kResourcePath) : std::string();
+	return g_catalog[index].name + " with " + (look >= 0 ? g_catalog[look].name + "'s look" : std::string("its own look")) +
+	       ", battle model " + (file.empty() ? "?" : file);
+}
+
+enum ScreenPhase { kScreenIdle, kScreenClosed, kScreenLoading };
+ScreenPhase g_screen_phase = kScreenIdle;
+
+void ServeHeroScreen()
+{
+	if (g_disabled)
+		return;
+	BYTE *screen = HeroScreenOnTop();
+	if (g_screen_phase != kScreenIdle) {  // the screen was closed: wait for the new one, and log what it shows
+		// The new one usually takes the old one's place in memory and may load
+		// within one frame, so it is recognized by time: shown again, for the same
+		// hero, at least half a second after the close.
+		const DWORD since = GetTickCount() - g_screen_since;
+		if (screen && !screen[kHeroScreenShown])
+			g_screen_phase = kScreenLoading;
+		BYTE *hero = screen ? reinterpret_cast<BYTE *>(Read(screen, kHeroScreenHero)) : nullptr;
+		if (screen && screen[kHeroScreenShown] && hero == g_screen_hero && (since >= 500 || g_screen_phase == kScreenLoading)) {
+			std::string what;
+			{
+				Lock lock;
+				what = FigureShown(hero);
+			}
+			hooklog::Write("hero skins: the hero screen is open again after %lu ms (%s, page %lu, mode %lu): %s", since,
+			               screen != g_screen_old ? "a new screen" : "in the same place", Read(screen, kHeroScreenPage),
+			               Read(screen, kHeroScreenMode), what.c_str());
+			g_screen_phase = kScreenIdle;
+		}
+		else if (GetTickCount() - g_screen_since > 10000) {
+			hooklog::Write("hero skins: the hero screen was closed for the new look, but no new one showed within 10 s");
+			g_screen_phase = kScreenIdle;
+		}
+		return;
+	}
+	std::vector<int> heroes;
+	const char *why = nullptr;
+	{
+		Lock lock;
+		if (g_screen_heroes.empty())
+			return;
+		if (screen && !screen[kHeroScreenShown] && !screen[kHeroScreenClosing] && ++g_screen_tries < 300)
+			return;  // it is still loading: wait (up to about 300 frames)
+		heroes.swap(g_screen_heroes);
+		why = g_screen_why;
+		g_screen_tries = 0;
+	}
+	if (!screen || !g_live_screen)
+		return;  // no hero screen open (it shows the look when opened), or turned off
+	BYTE *hero = reinterpret_cast<BYTE *>(Read(screen, kHeroScreenHero));
+	const DWORD mode = Read(screen, kHeroScreenMode);
+	int index = -1;
+	std::string name;
+	{
+		Lock lock;
+		index = hero && !Dying(hero) ? HeroIndex(hero) : -1;
+		if (index >= 0)
+			name = g_catalog[index].name;
+	}
+	if (index < 0 || std::find(heroes.begin(), heroes.end(), index) == heroes.end())
+		return;  // it shows another hero
+	// As its close (0x006d0960) would go: no list entry (it would refuse) and no
+	// pending object (it would ask "are you sure" and keep the screen).
+	const BYTE *dialogs = reinterpret_cast<const BYTE *>(Read(screen, kHeroScreenDialogs));
+	const BYTE *pending = reinterpret_cast<const BYTE *>(Read(screen, kHeroScreenPending));
+	const char *busy = mode != 0                                      ? "not its own-hero mode"
+	                   : screen[kHeroScreenClosing]                   ? "closing"
+	                   : !screen[kHeroScreenShown]                    ? "still loading"
+	                   : !dialogs || Read(dialogs, 0) != reinterpret_cast<DWORD>(dialogs) ? "a dialog open"
+	                   : pending && !(pending[7] & 0x80)              ? "a change waits for a confirmation"
+	                                                                  : nullptr;
+	if (busy) {
+		hooklog::Write("hero skins: the hero screen is left as it is (mode %lu, %s): it shows the look when opened again",
+		               mode, busy);
+		return;
+	}
+	hooklog::Write("hero skins: the hero screen closes and opens again for %s (%s), page %lu, as its \"next hero\" does",
+	               name.c_str(), why, Read(screen, kHeroScreenPage));
+	g_screen_old = screen;
+	g_screen_hero = hero;
+	g_screen_since = GetTickCount();
+	g_screen_phase = kScreenClosed;
+	reinterpret_cast<void(__fastcall *)(void *, void *, void *)>(kHeroScreenSwitch)(screen, nullptr, hero);
+}
+
+// ---- 8. robot helpers (robot mode: the panel's robot commands) ----
+// The screens' own message handlers, called as the game's message dispatch calls
+// them (this = the screen, the message's number on the stack): the robot's msg|
+// step is not taken by these screens' observers.
+const DWORD kAdvScreenVftable = 0x00e230e4;   // NUI::CAdventureScreen
+const DWORD kAdvScreenController = 0x5f4;     // its adventure controller (checked: the one whose frame this is)
+const DWORD kTownScreenVftable = 0x00e2a64c;  // NUI::CTownScreen
+struct Handler {
+	const char *what;
+	DWORD address;
+	BYTE bytes[16];
+	int size;
+};
+const Handler kAdvHeroAttributes = {"hero_attributes", 0x00599b30,  // push 1; call 0x00599ab0; mov al,1; ret 4
+                                    {0x6a, 0x01, 0xe8, 0x79, 0xff, 0xff, 0xff, 0xb0, 0x01, 0xc2, 0x04, 0x00}, 12};
+const Handler kAdvSelectTown = {"input_select_town", 0x0058c420,  // (message, the town's place in the list), ret 8
+                                {0x56, 0x8b, 0xf1, 0x8b, 0x8e, 0xf4, 0x05, 0x00, 0x00, 0xe8, 0x52, 0x75}, 12};
+const Handler kAdvShowTown = {"adv_show_town", 0x0058c320,  // (message), ret 4
+                              {0x56, 0x8b, 0xf1, 0x8b, 0x8e, 0xf4, 0x05, 0x00, 0x00, 0xe8, 0x32, 0x72}, 12};
+const Handler kTownHeroAttributes = {"hero_attributes", 0x006194b0,  // (message), ret 4: ... push 1; call 0x00619320
+                                     {0x56, 0x8b, 0xf1, 0x8b, 0x86, 0x4c, 0x01, 0x00, 0x00, 0x39, 0x00, 0x75, 0x24}, 13};
+
+bool CallHandler(const Handler &h, BYTE *screen, DWORD a, DWORD b, bool two)
+{
+	if (!Matches(h.address, h.bytes, h.size)) {
+		hooklog::Write("hero skins: robot: the handler \"%s\" (%08lx) is not as expected: not called", h.what, h.address);
+		return false;
+	}
+	__try {
+		if (two)
+			reinterpret_cast<void(__fastcall *)(void *, void *, DWORD, DWORD)>(h.address)(screen, nullptr, a, b);
+		else
+			reinterpret_cast<void(__fastcall *)(void *, void *, DWORD)>(h.address)(screen, nullptr, a);
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER) {
+		hooklog::Write("hero skins: robot: the handler \"%s\" crashed (caught)", h.what);
+		return false;
+	}
+	hooklog::Write("hero skins: robot: called the screen's \"%s\"", h.what);
+	return true;
+}
+
+void ServeRobot(const BYTE *controller)
+{
+	char text[32];
+	{
+		Lock lock;
+		if (!g_robot_screen[0])
+			return;
+		memcpy(text, g_robot_screen, sizeof(text));
+		g_robot_screen[0] = 0;
+	}
+	char top[96] = {};
+	overlay::TopScreen(top, sizeof(top));
+	BYTE *screen = static_cast<BYTE *>(overlay::TopScreenObject());
+	if (strcmp(text, "town_hero_screen") == 0) {
+		if (!screen || Read(screen, 0) != kTownScreenVftable) {
+			hooklog::Write("hero skins: robot: \"%s\": no town screen on top (%s)", text, top);
+			return;
+		}
+		CallHandler(kTownHeroAttributes, screen, 0, 0, false);
+		return;
+	}
+	if (!screen || Read(screen, 0) != kAdvScreenVftable ||
+	    reinterpret_cast<const BYTE *>(Read(screen, kAdvScreenController)) != controller) {
+		hooklog::Write("hero skins: robot: \"%s\": no adventure screen of this controller on top (%s)", text, top);
+		return;
+	}
+	if (strcmp(text, "hero_screen") == 0)
+		CallHandler(kAdvHeroAttributes, screen, 0, 0, false);
+	else if (strncmp(text, "town", 4) == 0 &&
+	         CallHandler(kAdvSelectTown, screen, 0, static_cast<DWORD>(atoi(text + 4)), true))
+		CallHandler(kAdvShowTown, screen, 0, 0, false);
+}
+
 }  // namespace
 
 namespace skins {
+
+void RobotScreenCommand(const char *text)
+{
+	Lock lock;
+	strncpy_s(g_robot_screen, text, _TRUNCATE);
+}
 
 std::string InternalName(int hero)
 {
 	Lock lock;
 	return hero >= 0 && hero < static_cast<int>(g_catalog.size()) ? g_catalog[hero].name : std::string();
+}
+
+void RefreshHeroScreen(const std::vector<int> &heroes, const char *why)
+{
+	if (g_disabled || heroes.empty())
+		return;
+	Lock lock;  // done at the next adventure frame (ServeHeroScreen)
+	for (int h : heroes)
+		if (std::find(g_screen_heroes.begin(), g_screen_heroes.end(), h) == g_screen_heroes.end())
+			g_screen_heroes.push_back(h);
+	g_screen_why = why;
+	g_screen_tries = 0;
 }
 
 bool SelectedLookPortrait(std::string *dds)
@@ -1147,6 +1405,7 @@ void ApplyHeroSkinsFromSettings()
 	g_show_others = GetPrivateProfileIntW(L"skins", L"show_others", 1, path) != 0;
 	g_trace = static_cast<int>(GetPrivateProfileIntW(L"skins", L"trace", 0, path));
 	g_test_ai = GetPrivateProfileIntW(L"skins", L"test_ai_heroes", 0, path) != 0;
+	g_live_screen = GetPrivateProfileIntW(L"skins", L"live_hero_screen", 1, path) != 0;
 	ReadChoices();
 	if (g_entries.empty() && !g_show_others) {
 		hooklog::Write("hero skins: no look chosen and show_others=0: nothing installed");
@@ -1186,9 +1445,9 @@ void ApplyHeroSkinsFromSettings()
 	}
 	InstallHeroSkinsPanel();
 	hooklog::Write("hero skins: on; %d line(s) in open-homm5-skins.ini (read when the game's hero list is); multiplayer "
-	               "looks %s%s%s",
+	               "looks %s; an open hero screen %s%s%s",
 	               static_cast<int>(g_entries.size()), g_show_others ? "when every PC takes part" : "off (show_others=0)",
-	               g_trace ? "; trace" : "", g_test_ai ? "; TESTING: computer players' heroes take this PC's looks" : "");
+	               g_live_screen ? "opens again with a new look" : "keeps its figure (live_hero_screen=0)", g_trace ? "; trace" : "", g_test_ai ? "; TESTING: computer players' heroes take this PC's looks" : "");
 }
 
 }  // namespace mods

@@ -77,15 +77,15 @@ struct Words {
 	const char *single, *multi_soon, *multi_on, *multi_off;
 };
 const Words kEnglish = {"%s's look", "its own look", "Also worn by: %s", "Apply", "Cancel",
-                        "Pick a look of its faction: its figures on the map, in battle and on the hero screen "
-                        "(the next time it opens). Its portrait stays its own.",
+                        "Pick a look of its faction: its figures on the map, in battle and on the hero screen. "
+                        "Its portrait stays its own.",
                         "Multiplayer: the choice counts for every player a few seconds into the game.",
                         "Multiplayer: the choice counts for every player a few seconds after Apply.",
                         "In this game the looks are off (a PC lacks open-homm5, or another version): "
                         "the choice is kept for your next games."};
 const Words kFrench = {"Apparence : %s", "son apparence", "Aussi port\xc3\xa9\x65 par : %s", "Appliquer", "Annuler",
                        "Choisissez une apparence de sa faction : ses figures sur la carte, en combat et dans "
-                       "l'\xc3\xa9\x63ran du h\xc3\xa9ros (\xc3\xa0 sa prochaine ouverture). Son portrait reste le sien.",
+                       "l'\xc3\xa9\x63ran du h\xc3\xa9ros. Son portrait reste le sien.",
                        "Partie \xc3\xa0 plusieurs : le choix compte pour tous quelques secondes apr\xc3\xa8s le d\xc3\xa9\x62ut.",
                        "Partie \xc3\xa0 plusieurs : le choix compte pour tous quelques secondes apr\xc3\xa8s \xc2\xab Appliquer \xc2\xbb.",
                        "Dans cette partie, les apparences sont d\xc3\xa9sactiv\xc3\xa9\x65s (un PC n'a pas open-homm5, "
@@ -207,9 +207,8 @@ void DoApply()
 	                                       "saved for the next games (this game's looks are off)", "not applied"};
 	hooklog::Write("hero skins: Apply: %s: %s", note.c_str(), kResults[result]);
 	Close("Apply");
-	// No live refresh of an open hero screen: the game never rebuilds a shown hero
-	// screen's 3D figure, and making it do so crashed (docs/plans/hero-skins.md).
-	// The hero screen shows the look when it is opened again.
+	if (result == skins::kAppliedNow)  // multiplayer: when the look counts, at its segment (hero_skins.cpp)
+		skins::RefreshHeroScreen(std::vector<int>(1, g.data.hero), "Apply");
 }
 
 // The robot's "panel|skins ..." (it cannot click).
@@ -217,6 +216,11 @@ void RobotCommand(const char *text)
 {
 	if (strcmp(text, "open") == 0) {
 		OpenPanel("robot");
+		return;
+	}
+	// Robot helpers: the game's own message handlers, at the next adventure frame (hero_skins.cpp, 8.)
+	if (strcmp(text, "hero_screen") == 0 || strncmp(text, "town", 4) == 0) {
+		skins::RobotScreenCommand(text);
 		return;
 	}
 	if (!overlay::ModalOpen(kName)) {
