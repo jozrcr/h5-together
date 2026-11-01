@@ -133,7 +133,16 @@ const DWORD kTextureVftable = 0x00e90318;  // NDb::STexture
 const DWORD kTextureFile = 0x40;           // DestName: the .dds in the game's data
 const DWORD kPlayerSelected = 0x1d0;       // IPlayer: its selected hero (slot 0x0c, 0x004fcc40)
 const DWORD kHeroScreenVftable = 0x00e3584c;  // NUI::CHeroScreen2 (also MMH5.5's HeroScreen3 layout)
-const DWORD kHeroScreenDirty = 0x7d8;      // its "needs refresh" byte: 0x006ca4e0 rebuilds texts and the 3D figure
+// The hero screen's refresh (docs/plans/hero-skins.md, "The hero screen's 3D figure"):
+// its update (0x006caee0) refreshes it (0x006ca4e0) only while its "shown" byte is 0,
+// then sets it to 1. Showing another hero (0x006cb700) sets "shown" to 0 and
+// "needs refresh" to 1; the refresh builds a new 3D scene in modes 0 and 5.
+const DWORD kHeroScreenDirty = 0x7d8;      // its "needs refresh" byte (the refresh clears it first)
+const DWORD kHeroScreenShown = 0x15a;      // its "shown" byte
+const DWORD kHeroScreenHero = 0x1b0;       // the hero it shows (IHero *)
+const DWORD kHeroScreenScene = 0x71c;      // its 3D scene (0x006c7030 makes a new one)
+const DWORD kHeroScreenMode = 0x7dc;       // 0: own hero; the 3D figure is built in modes 0 and 5 (0x006c05e0)
+const DWORD kHeroScreenRefresh = 0x006ca4e0;  // __thiscall(screen)
 const DWORD kReleaseResource = 0x008c6150; // __fastcall(object): frees it when both counts are 0
 const DWORD kUpdateCall = 0x0060895e;      // in 0x00608930: call 0x006082f0 (the adventure controller's frame)
 const DWORD kUpdate = 0x006082f0;          // __thiscall, 5 stack arguments
@@ -200,9 +209,18 @@ const Code kCode[] = {
 	{0x00e1a0a8, {0x40, 0xcc, 0x4f, 0x00}, 4},                           // ... its vtable cell
 	{0x00a0c4a2, {0x8d, 0x87, 0x2c, 0x01, 0x00, 0x00, 0x50, 0x50, 0x6a, 0x00, 0x68, 0x88, 0xd9, 0xe6, 0x00}, 15},  // FaceTexture
 	{0x00c7a69c, {0x8d, 0x47, 0x40}, 3},                                 // STexture: DestName at +0x40
-	{0x006ca4e6, {0x80, 0xbe, 0xd8, 0x07, 0x00, 0x00, 0x00}, 7},         // hero screen refresh: cmp byte [esi+0x7d8],0
-	{0x006cbb49, {0xc6, 0x86, 0xd8, 0x07, 0x00, 0x00, 0x01}, 7},         // ... and the game setting it: mov byte [esi+0x7d8],1
-	{0x006ca5a9, {0x8b, 0x86, 0xb0, 0x01, 0x00, 0x00, 0x50, 0x8b, 0xce, 0xe8}, 10},  // ... which builds the 3D view (0x006c72e0)
+	// the hero screen: its refresh, the update that calls it, and how showing another hero asks for it
+	{kHeroScreenRefresh, {0x83, 0xec, 0x4c, 0x56, 0x8b, 0xf1, 0x80, 0xbe, 0xd8, 0x07, 0x00, 0x00, 0x00}, 13},
+	{0x006ca4fb, {0xc6, 0x86, 0xd8, 0x07, 0x00, 0x00, 0x00}, 7},         // ... mov byte [esi+0x7d8],0 (first)
+	{0x006ca5a9, {0x8b, 0x86, 0xb0, 0x01, 0x00, 0x00, 0x50, 0x8b, 0xce, 0xe8}, 10},  // ... builds the 3D view (0x006c72e0)
+	{0x006c05e0, {0x8b, 0x81, 0xdc, 0x07, 0x00, 0x00}, 6},               // ... in modes 0 and 5 (mode at +0x7dc)
+	{0x006c70c6, {0x89, 0x86, 0x1c, 0x07, 0x00, 0x00}, 6},               // ... a new scene at +0x71c (0x006c7030)
+	{0x006cd9a0, {0x2b, 0x49, 0xfc, 0xe9, 0x38, 0xd5, 0xff, 0xff}, 8},   // the update (esi = screen + 0x844):
+	{0x006caf05, {0x80, 0xbe, 0x16, 0xf9, 0xff, 0xff, 0x00}, 7},         // ... cmp byte [esi-0x6ea] (+0x15a),0
+	{0x006caf63, {0x8d, 0x8e, 0xbc, 0xf7, 0xff, 0xff, 0xe8, 0x72, 0xf5, 0xff, 0xff}, 11},  // ... the refresh
+	{0x006caf75, {0xc6, 0x86, 0x16, 0xf9, 0xff, 0xff, 0x01}, 7},         // ... mov byte [esi-0x6ea],1
+	{0x006cbabe, {0x88, 0x9e, 0x5a, 0x01, 0x00, 0x00}, 6},               // showing another hero: +0x15a = 0 (bl),
+	{0x006cbb49, {0xc6, 0x86, 0xd8, 0x07, 0x00, 0x00, 0x01}, 7},         // ... and +0x7d8 = 1
 	{kReleaseResource, {0x51, 0x83, 0x79, 0x08, 0x00, 0x75, 0x6b, 0xf7, 0x41, 0x04}, 10},
 	// the adventure controller's frame (as notify.cpp checks it)
 	{0x00608930, {0x56, 0x8b, 0xf1, 0x8b, 0x46, 0x3c}, 6},
@@ -310,6 +328,14 @@ struct Pending {
 std::vector<Pending> g_pending;
 
 void NewGame(const void *transceiver);
+
+// The hero screen's 3D figure, after a look changed (ServeHeroScreen).
+const char *g_screen_request = nullptr;  // asked for (why): done at the next adventure frame
+BYTE *g_screen_watch = nullptr;          // the hero screen asked to refresh, until its refresh is seen
+DWORD g_screen_scene = 0;                // its 3D scene before
+DWORD g_screen_since = 0;
+bool g_screen_direct = false;            // its own update skipped the refresh: this file called it
+void ServeHeroScreen();
 
 int g_logged = 0;  // log lines about figures and messages (capped)
 const int kMaxLog = 300;
@@ -689,6 +715,7 @@ void AfterFrame(const BYTE *controller)
 	}
 	for (BYTE *object : rebuild)
 		g_figure_cell_next(object, nullptr);  // the game's own figure builder (the slots answer the look)
+	ServeHeroScreen();
 }
 
 void __fastcall UpdateHook(void *controller, void *edx, DWORD a, DWORD b, DWORD c, DWORD d, DWORD e)
@@ -980,6 +1007,95 @@ std::string NameFileOf(int hero)
 	return path;
 }
 
+// ---- 6. the hero screen's 3D figure ----
+BYTE *HeroScreenOnTop()
+{
+	char top[96];
+	if (!overlay::TopScreen(top, sizeof(top)) || strcmp(top, ".?AVCHeroScreen2@NUI@@") != 0)
+		return nullptr;
+	BYTE *screen = static_cast<BYTE *>(overlay::TopScreenObject());
+	return screen && Read(screen, 0) == kHeroScreenVftable ? screen : nullptr;
+}
+
+// After the adventure controller's frame (the game's update, not its drawing).
+// A refresh asked for is done the way the game shows another hero (0x006cb700):
+// "shown" 0 and "needs refresh" 1; the screen's own update then refreshes it,
+// which builds the 3D figure again (the slot 0x248 answers the new look).
+// Then this checks, from the next frames on, that the refresh ran, and logs the model.
+void ServeHeroScreen()
+{
+	const char *why = nullptr;
+	{
+		Lock lock;
+		why = g_screen_request;
+		g_screen_request = nullptr;
+	}
+	if (why) {
+		BYTE *screen = HeroScreenOnTop();
+		if (!screen)
+			return;
+		g_screen_watch = screen;
+		g_screen_scene = Read(screen, kHeroScreenScene);
+		g_screen_since = GetTickCount();
+		g_screen_direct = false;
+		screen[kHeroScreenDirty] = 1;
+		screen[kHeroScreenShown] = 0;
+		hooklog::Write("hero skins: the hero screen is asked to refresh (%s), as when it shows another hero (mode %lu)", why,
+		               Read(screen, kHeroScreenMode));
+		return;
+	}
+	if (!g_screen_watch)
+		return;
+	BYTE *screen = HeroScreenOnTop();
+	if (screen != g_screen_watch) {
+		hooklog::Write("hero skins: the hero screen closed before its refresh was seen (it shows the look when opened again)");
+		g_screen_watch = nullptr;
+		return;
+	}
+	if (screen[kHeroScreenShown] == 0) {  // its update waits for its loaders
+		if (GetTickCount() - g_screen_since > 5000) {
+			hooklog::Write("hero skins: the hero screen did not refresh within 5 s (it waits for its loaders)");
+			g_screen_watch = nullptr;
+		}
+		return;
+	}
+	if (screen[kHeroScreenDirty] != 0 && !g_screen_direct) {
+		// Its update showed it again without the refresh (its loader was not ready):
+		// refresh it directly, as showing another hero does in modes 3 and 4.
+		g_screen_direct = true;
+		hooklog::Write("hero skins: the hero screen's update skipped the refresh: it is refreshed directly");
+		reinterpret_cast<void(__fastcall *)(void *, void *)>(kHeroScreenRefresh)(screen, nullptr);
+	}
+	g_screen_watch = nullptr;
+	if (screen[kHeroScreenDirty] != 0) {
+		hooklog::Write("hero skins: the hero screen did not refresh: its 3D figure keeps the old look until it is opened again");
+		return;
+	}
+	const DWORD mode = Read(screen, kHeroScreenMode);
+	if (mode != 0 && mode != 5) {
+		hooklog::Write("hero skins: the hero screen refreshed, in mode %lu: the game builds no 3D figure there", mode);
+		return;
+	}
+	std::string what = "its own look", model;
+	{
+		Lock lock;
+		BYTE *hero = reinterpret_cast<BYTE *>(Read(screen, kHeroScreenHero));
+		int index = -1;
+		const int look = hero && !Dying(hero) ? LookOf(hero, &index) : -1;
+		if (index >= 0) {
+			const int shown = look >= 0 ? look : index;
+			if (look >= 0)
+				what = g_catalog[look].name + "'s look";
+			const BYTE *m = FigureModel(shown, kSharedArena);
+			model = m ? NarrowString(m, kResourcePath) : std::string();
+			what = g_catalog[index].name + " with " + what;
+		}
+	}
+	hooklog::Write("hero skins: the hero screen built its 3D figure again%s: %s, model %s (scene %08lx -> %08lx)",
+	               g_screen_direct ? " (refreshed directly)" : "", what.c_str(), model.empty() ? "?" : model.c_str(),
+	               g_screen_scene, Read(screen, kHeroScreenScene));
+}
+
 }  // namespace
 
 namespace skins {
@@ -994,14 +1110,8 @@ void RefreshHeroScreen(const char *why)
 {
 	if (g_disabled)
 		return;
-	char top[96];
-	if (!overlay::TopScreen(top, sizeof(top)) || strcmp(top, ".?AVCHeroScreen2@NUI@@") != 0)
-		return;
-	BYTE *screen = static_cast<BYTE *>(overlay::TopScreenObject());
-	if (!screen || Read(screen, 0) != kHeroScreenVftable)
-		return;
-	screen[kHeroScreenDirty] = 1;
-	hooklog::Write("hero skins: the hero screen is refreshed (%s): its 3D figure is built again", why);
+	Lock lock;  // done at the next adventure frame (ServeHeroScreen), outside any drawing
+	g_screen_request = why;
 }
 
 bool SelectedLookPortrait(std::string *dds)
