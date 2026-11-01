@@ -181,22 +181,40 @@ else
     failed=1
 fi
 
+# The settings file, and the copies of it that the installer keeps when it adds new
+# settings (.bak, .bak2, .bak3). One question for all of them; no other name.
 ini="$(find_ci "$bin" open-homm5.ini)"
-if [ -z "$ini" ]; then
+backups=()
+for ext in bak bak2 bak3; do
+    f="$(find_ci "$bin" "open-homm5.ini.$ext")"
+    [ -n "$f" ] && [ -f "$f" ] && backups+=("$f")
+done
+if [ -z "$ini" ] && [ "${#backups[@]}" -eq 0 ]; then
     echo "  - no open-homm5.ini here"
 else
+    if [ -z "$ini" ]; then
+        question="Also delete the old copies of your settings (open-homm5.ini.bak)? [y/N] "; what="the old copies of open-homm5.ini"
+    elif [ "${#backups[@]}" -gt 0 ]; then
+        question="Also delete your settings file open-homm5.ini and its old copies (.bak)? [y/N] "; what="open-homm5.ini and its old copies"
+    else
+        question="Also delete your settings file open-homm5.ini? [y/N] "; what="open-homm5.ini"
+    fi
     answer=""
-    read -r -p "Also delete your settings file open-homm5.ini? [y/N] " answer || answer=""
+    read -r -p "$question" answer || answer=""
     case "$answer" in
         y|Y|yes|YES|Yes|o|O|oui|OUI|Oui)
-            if rm -f "$ini"; then
-                echo "  - removed open-homm5.ini"
-            else
-                echo "  - could not remove open-homm5.ini"
-                failed=1
-            fi
+            files=("${backups[@]}")
+            [ -n "$ini" ] && files=("$ini" "${backups[@]}")
+            for f in "${files[@]}"; do
+                if rm -f "$f"; then
+                    echo "  - removed $(basename "$f")"
+                else
+                    echo "  - could not remove $(basename "$f")"
+                    failed=1
+                fi
+            done
             ;;
-        *) echo "  - kept open-homm5.ini" ;;
+        *) echo "  - kept $what" ;;
     esac
 fi
 

@@ -5,15 +5,18 @@ A DLL the game loads at start-up. It lets our code run inside the game, so impro
 **What it does today:** forwards DirectInput to the real Windows DLL (so the game works normally). If the exe is a build we know, it also:
 
 - logs every step of every AI turn with its timing to `open-homm5.log` next to the exe;
-- applies our mods from `src/mods/`. Today that's one: **LAN link tuning** (`net_tuning.cpp`), modern network timings that make co-op AI turns about 4× faster. It's on by default; `open-homm5.ini` next to the exe can turn it off (`[net]`, `tuning=0`). See `src/mods/README.md`.
+- applies our mods from `src/mods/`: the co-op speed-ups, the fixes, the panels (player list, template builder, hero looks, game rules) and the camera, sound and text options. Each one is switched in `open-homm5.ini` next to the exe; the list, with every setting, is in [src/mods/README.md](../mods/README.md);
+- watches for freezes ([the hang watchdog](#the-hang-watchdog-watchdogcpp)).
 
 Robot mode (`robot*.cpp`, used by `tools/robot/`) only turns on when an `open-homm5-robot.ini` file sits next to the exe, i.e. in the test copy during robot runs.
+
+**Contents:** [how it gets into the game](#how-it-gets-into-the-game), [drawing over the game](#drawing-over-the-game-d3d9_hookcpp), [the overlay](#the-overlay-overlaycpp-our-panels-over-the-game), [which exes it hooks](#which-exes-it-hooks), [the AI trace](#the-ai-trace), [the hang watchdog](#the-hang-watchdog-watchdogcpp), [build](#build), [owner test](#owner-test-phase-0-gate-dll-loads-and-logs-ai-turns-game-runs-normally), [files](#files).
 
 ## How it gets into the game
 
 The game imports one function from `DINPUT8.dll` (`DirectInput8Create`). Windows looks for DLLs in the exe's own folder first, so a `dinput8.dll` placed next to the exe is loaded instead of the system one. Ours loads the real `dinput8.dll` from the Windows system folder and passes every call through.
 
-It **adds** one file and replaces none, and it does not collide with MMH5.5 (which uses `55u.dll` in the `um.dll` import slot). It does not replace `d3d9.dll` either (on Linux, Proton/DXVK supply their own): to draw the player list over the game, `d3d9_hook.cpp` only replaces the exe's `Direct3DCreate9` import entry and entries of the Direct3D objects' vtables, whichever `d3d9.dll` made them.
+It **adds** one file and replaces none, and it does not collide with MMH5.5 (which uses `55u.dll` in the `um.dll` import slot). It does not replace `d3d9.dll` either (on Linux, Proton/DXVK supply their own): to draw our panels over the game, `d3d9_hook.cpp` only replaces the exe's `Direct3DCreate9` import entry and entries of the Direct3D objects' vtables, whichever `d3d9.dll` made them.
 
 ## Drawing over the game (`d3d9_hook.cpp`)
 
@@ -21,7 +24,7 @@ The overlay (below) and the robot's screenshots share one set of Direct3D 9 hook
 
 ## The overlay (`overlay*.cpp`): our panels over the game
 
-Every panel we draw over the game is a **client** of one shared overlay: the player list (`src/mods/player_list.cpp`), the template builder (`src/mods/rmg_builder.cpp`) and a test panel (`overlay_test_panel.cpp`). The overlay owns what they share:
+Every panel we draw over the game is a **client** of one shared overlay: the player list (`src/mods/player_list.cpp`), the template builder (`src/mods/rmg_builder.cpp`), the hero looks panel (`src/mods/hero_skins_panel.cpp`), the game rules panel (`src/mods/host_rules_panel.cpp`) and a test panel (`overlay_test_panel.cpp`). The overlay owns what they share:
 
 - one **Dear ImGui** context. Dear ImGui v1.91.9b (MIT, <https://github.com/ocornut/imgui>, tag `v1.91.9b`) is in `third_party/imgui/`: its core files and its DirectX 9 renderer (`backends/imgui_impl_dx9.*`), unchanged, with its `LICENSE.txt`. Its Win32 backend is not used: it would change the mouse cursor and wants every window message. We feed it ourselves (below);
 - the **fonts** (Tahoma Bold, else Segoe UI Bold, else Arial Bold; Latin and Cyrillic). A client asks for the sizes it needs each frame; the font atlas is made again only when a new size is asked for;
@@ -33,7 +36,7 @@ Each frame, the overlay asks every client "do you draw now?", lets those that do
 
 ### Modal panels: the game gets no input (`overlay_input.cpp`, `input_mute.cpp`, `dinput_hook.cpp`)
 
-A modal panel (the template builder, the test panel) takes the whole mouse and keyboard while it is open. **When no modal panel is open, everything passes through untouched** (the player list is display-only, as before).
+A modal panel (the template builder, the hero looks, the game rules, the test panel) takes the whole mouse and keyboard while it is open. **When no modal panel is open, everything passes through untouched** (the player list is display-only, as before).
 
 How the game reads its input (static reading: the interface's event names in `0x00489550`, the cursor code `0x00835ce0`, the game's own `profiles/default_profile/input_a2.cfg` and `user_a2.cfg`; not yet checked in a running game, which is why both paths below are covered):
 
@@ -114,12 +117,15 @@ This builds `build\hook\dinput8.dll` and runs these tests outside the game:
 - `test/proxy_test.cpp`: loads the DLL, calls `DirectInput8Create`, and checks that a real DirectInput object comes back.
 - `test/ai_trace_test.cpp`: calls the AI hook exactly the way the game calls the AI (`__thiscall`, command list then flag) on a fake AI object, built with the compiler's runtime stack check (`/RTCs`). It checks that the arguments reach the original function unchanged and that the log line is right. A calling-convention mistake here would crash the game, so this test matters.
 - `test/original_music_test.cpp`: the "original music" mod's text work (`src/mods/original_music_xdb.cpp`) on small made-up data files: which music lines change and which stay.
+- `test/languages_test.cpp`: the French texts mod's work on bytes (`src/mods/languages_text.cpp`): paths, text encodings and a small zip archive made in the test.
 - `test/rmg_maker_test.cpp`: the C++ template maker (`src/mods/rmg_maker.cpp`) against the JavaScript one. First `node tools/rmg/test_template_maker.js --expected build/rmg_parity` writes what the page's maker builds for the 24 ready templates, 400 random choices and a few special ones; the test must build the same bytes, names, warnings and numbers, and refuse bad choices with the same message. Needs Node.js.
 - `test/rmg_recipe_test.cpp`: recipe names (`src/mods/rmg_recipe.cpp`): choices → `OH-X1-...` → the same choices, every bad name and path refused, reading a template link the way the game keeps it (`src/mods/rmg_join.cpp`), the teams of a recipe map, and each ready template built from its recipe name, compared with the file in `src/mods/rmg/templates/`. It also checks that 302 recorded `X1` names still build what they built when recorded (`tools/rmg/x1_fingerprints.txt`): what an `X1` name builds must never change.
 - `test/rmg_builder_test.cpp`: the template builder's data (`src/mods/rmg_builder_data.cpp`): each preset builds its ready file byte for byte and every ready file has a preset; every choice the panel offers has a recipe name, and the maker's check (`CheckChoices`) answers as `MakeTemplate`; the zone map's positions equal the web page's (numbers from Node); the French warnings; the game's text format; a UI file we do not know is left alone.
+- `test/hero_skins_test.cpp`: the hero looks' rules (`src/mods/hero_skins_logic.cpp`): the choices file, the messages between PCs and who decides a hero's look.
+- `test/audio_edge_test.cpp`: the wider volume curve (`src/mods/audio_volume.h`) and the light file edit of the black map edge (`src/mods/edge_sky.h`).
 - `test/input_mute_test.cpp`: the modal panels' input rules (`input_mute.cpp`): what the game gets of its window messages and of DirectInput while a panel is open and just after (held keys, Alt+F4, the mouse's motion, buffered events).
 - `test/wheel_test.cpp`: the mouse wheel fix for Wine (`src/mods/wheel_logic.cpp`) against a model of the game's own wheel reading, of Windows' mouse (positions) and Wine's (steps): the bug without the fix, every notch both ways with it (also when the game drops "presses"), no jump when it switches on or after an Acquire, positions never converted.
-
+- `test/host_rules_test.cpp`: the game rules' pure work (`src/mods/host_rules_logic.h`): reading MMH5.5's settings file, serving it with other values (only the numbers change), its hash, the text carried in the start message and the lobby.
 - `test/watchdog_test.cpp`: the hang watchdog on a thread that freezes on purpose, once in a busy loop and once in a long `Sleep` (1.5 s threshold instead of 20). It checks one look per freeze, 20 samples, EIP in the spinning function, the caller's return address on the stack, ~100% CPU for the busy freeze and ~0 for the blocked one, and that the thread goes on normally afterwards.
 
 The build runs in `src\hook` with relative source paths: with full paths, a deep folder (a git worktree) made the command line longer than `cmd.exe` accepts (8191 characters).
@@ -146,14 +152,16 @@ On **Linux** (Wine/Proton) Wine prefers its own built-in `dinput8.dll`. Tell it 
 | `ai_trace.cpp` | the AI turn trace |
 | `log.cpp/.h` | `open-homm5.log` writer |
 | `d3d9_hook.cpp/.h` | the shared Direct3D 9 hooks (overlay, robot screenshots) |
-| `dinput_hook.cpp/.h` | the shared DirectInput 8 hooks (the mouse wheel fix under Wine, `mods/wheel.cpp`; the robot's keyboard; the modal panels' mute). With none of them on (Windows, `[rmg] builder=0`, no robot, no `trace_wheel`), DirectInput is not hooked at all. |
+| `version.h` | the version number (log's first line, install package) |
+| `patch.cpp/.h` | redirecting the game's `call` instructions to our code (several hooks may stack on one call) |
+| `watchdog.cpp/.h` | the hang watchdog (freeze detector) |
+| `dinput_hook.cpp/.h` | the shared DirectInput 8 hooks (the mouse wheel fix under Wine, `mods/wheel.cpp`; the robot's keyboard; the modal panels' mute). With none of them on (Windows, no modal panel installed, no robot, no `trace_wheel`), DirectInput is not hooked at all. |
 | `overlay.cpp/.h`, `overlay_internal.h` | the overlay: clients, the ImGui frame, fonts, the screen on top, the panels' language, our keys |
 | `overlay_input.cpp` | modal panels: the window procedure, the ImGui feed, the DirectInput mute, the safety nets |
 | `input_mute.cpp/.h` | the rules of what is held back from the game while a modal panel is open (pure code, tested) |
 | `overlay_textures.cpp` | pictures from the game's data, as textures |
 | `overlay_test_panel.cpp` | the test panel (`[ui] overlay_test_panel=1`) |
 | `third_party/imgui/` | Dear ImGui v1.91.9b (MIT): core + DirectX 9 renderer, for the overlay |
-| `robot.cpp/.h`, `robot_endturn.cpp`, `robot_input.cpp` | robot mode for unattended test runs; only active when `open-homm5-robot.ini` is next to the exe (see `tools/robot/README.md`) |
-| `test/proxy_test.cpp` | smoke test |
-| `test/input_mute_test.cpp` | the modal input rules |
+| `robot.cpp/.h`, `robot_*.cpp` | robot mode for unattended test runs; only active when `open-homm5-robot.ini` is next to the exe (see [tools/robot/README.md](../../tools/robot/README.md)) |
+| `test/` | the tests that `build.ps1 -Test` runs ([Build](#build)) |
 | `build.ps1` | build script |

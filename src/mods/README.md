@@ -2,6 +2,15 @@
 
 Everything here changes how the original game behaves, on purpose. It is kept apart from the decompiled code (`src/decomp/`), which must stay byte-for-byte faithful. The mods are built into the hook DLL (`src/hook/`, `dinput8.dll`) and switched on and off with a settings file, `open-homm5.ini`, next to the game exe.
 
+**Contents**
+
+- Faster co-op: [LAN link tuning](#lan-link-tuning-net_tuningcpp), [LAN games over VPNs](#lan-games-over-vpns-lan_discoverycpp-on-by-default), [faster co-op segments](#faster-co-op-segments-coop_guardcpp-on-when-every-player-agrees), [quicker lockstep](#quicker-lockstep-lockstepcpp-the-drain-and-the-trace-on-by-default), [one AI decision per frame](#one-ai-decision-per-frame-ai_pacingcpp-on-by-default), [quicker autosaves](#quicker-autosaves-autosavecpp-the-trace-and-level-1-on-by-default), [fast AI pathfinding](#fast-ai-pathfinding-fast_pathscpp-on-by-default)
+- Interface: ["your turn" notification](#your-turn-notification-notifycpp-on-by-default), [player list](#player-list-player_listcpp-on-by-default), [hero looks](#hero-looks-hero_skinscpp-on-but-nothing-changes-until-a-look-is-chosen), [French texts](#one-language-french-texts-languagescpp-off-by-default)
+- Random maps: [teams](#teams-on-random-maps-rmg_teamscpp-on-by-default-only-for-recipe-maps), [templates and recipe names](#random-map-templates-rmg_templatescpp-rmg_makercpp-rmg_recipecpp-on-by-default), [template builder](#template-builder-rmg_buildercpp-rmg_screencpp-on-by-default), [start terrain that matches the factions](#start-terrain-that-matches-the-factions-rmg_factionscpp-off-by-default)
+- Rules: [game rules from the host](#game-rules-from-the-host-host_rulescpp-on-and-nothing-changes-unless-the-host-changes-something)
+- Camera, sound and visuals: [original music](#original-music-original_musiccpp-off-by-default), [camera zoom and start distance](#farther-camera-zoom-start-distance-cameracpp-off-by-default), [the mouse wheel under Wine](#the-mouse-wheel-under-wine--proton-wheelcpp-wheel_logiccpp-on-under-wine-only), [wider volume range](#wider-volume-range-audio_volumecpp-off-by-default), [black past the map's edge](#black-past-the-maps-edge-edge_skycpp-off-by-default)
+- The freeze detector (hang watchdog) is part of the DLL itself: [src/hook/README.md](../hook/README.md#the-hang-watchdog-watchdogcpp).
+
 ## LAN link tuning (`net_tuning.cpp`)
 
 **What it fixes:** slow AI turns in co-op (LAN and GameRanger games).
@@ -384,7 +393,7 @@ recipe_teams=1    ; maps made from a recipe template get the template's teams, a
 
 The robot sets these with `run_lan_test.py --host-rmg KEY=VALUE`, and presses a team arrow with the step `"38|arrow|<row> team left|right"`.
 
-**Not done yet:** a random map in a LAN robot game. The robot plays A1M4, which has no teams either.
+LAN robot games on random maps came later: the recipe maps' teams (above) and the faction terrain ([below](#start-terrain-that-matches-the-factions-rmg_factionscpp-off-by-default)).
 
 ## Random map templates (`rmg_templates.cpp`, `rmg_maker.cpp`, `rmg_recipe.cpp`, on by default)
 
@@ -506,7 +515,7 @@ trace_factions=0   ; research: lobby setups, the start, map builds, map files, f
 - **No faction changed** (setting on): no rebuild; the game started on the map as it was. 508 checksums, all equal.
 
 **Not done yet:**
-- **The lobby unlock on fixed-town maps** (every slot locked to one faction) is not robot-tested: the only such saved maps use recipe templates, which this branch does not serve.
+- **The lobby unlock on fixed-town maps** (every slot locked to one faction) is not robot-tested: the only such saved maps use recipe templates, which the DLL did not serve yet when this mod was tested.
 - **Linux (Proton).**
 - **A line on the loading screen** while the map is rebuilt: the screen just waits a few seconds.
 
