@@ -4,6 +4,7 @@
     python tools/lang/batch.py check build/lang/b001                           (en.txt vs fr.txt)
     python tools/lang/batch.py pack  build/lang/b001 --to build/lang/fr        (game files, UTF-16)
     python tools/lang/batch.py pak   build/lang/open-homm5-fr.pak build/lang/b001 build/lang/b002 ...
+    python tools/lang/batch.py add   OLD.pak NEW.pak build/lang/b006 ...
 
 make: LIST.txt has one game path per line (text/game/.../name.txt). Writes into
       the batch folder:
@@ -18,6 +19,9 @@ pack: one file per path as the game reads it (UTF-16 LE + BOM, CRLF), ready to
       zip into a .pak for open-homm5\\lang\\fr.
 pak:  the same, straight into one .pak from several batches (dated now, so it
       wins over an older pack on the same path). It holds game texts: build/ only.
+add:  a copy of an existing pack with the batches' texts added or replaced (those
+      dated now); every other file of the pack is kept as it is, date included.
+      For a fix to a pack already handed out. NEW must not be OLD.
 """
 import argparse
 import collections
@@ -171,12 +175,46 @@ def pak(args):
     print("%s: %d texts from %d batch(es)" % (args.out, n, len(args.batches)))
 
 
+def add(args):
+    """A copy of a pack with the batches' texts added or replaced (dated now)."""
+    import time
+    import zipfile
+    if os.path.abspath(args.old) == os.path.abspath(args.out):
+        sys.exit("add: NEW must be another file than OLD")
+    stamp = time.localtime()[:6]  # newer than the pack's other files and the packs made before
+    new = collections.OrderedDict()
+    for batch in args.batches:
+        en = h5texts.read_batch(os.path.join(batch, "en.txt"))
+        fr = h5texts.read_batch(os.path.join(batch, "fr.txt"))
+        for key, text in fr.items():
+            if key in en and h5texts.norm(key) not in new:
+                new[h5texts.norm(key)] = (key, text)
+    kept = replaced = 0
+    with zipfile.ZipFile(args.old) as old, zipfile.ZipFile(args.out, "w", zipfile.ZIP_DEFLATED) as z:
+        for info in old.infolist():
+            if h5texts.norm(info.filename) in new:
+                replaced += 1
+                continue
+            z.writestr(info, old.read(info))  # the same name, date and compression
+            kept += 1
+        for key, text in new.values():
+            info = zipfile.ZipInfo(key, date_time=stamp)
+            info.compress_type = zipfile.ZIP_DEFLATED
+            z.writestr(info, h5texts.to_game_bytes(text))
+    print("%s: %d files kept from %s, %d texts from %d batch(es) (%d of them replace a file)"
+          % (args.out, kept, os.path.basename(args.old), len(new), len(args.batches), replaced))
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
     k = sub.add_parser("pak")
     k.add_argument("out")
     k.add_argument("batches", nargs="+")
+    a = sub.add_parser("add")
+    a.add_argument("old")
+    a.add_argument("out")
+    a.add_argument("batches", nargs="+")
     m = sub.add_parser("make")
     m.add_argument("--paths", required=True)
     m.add_argument("--out", required=True)
@@ -193,6 +231,8 @@ def main():
         sys.exit(check(args))
     elif args.cmd == "pak":
         pak(args)
+    elif args.cmd == "add":
+        add(args)
     else:
         pack(args)
 

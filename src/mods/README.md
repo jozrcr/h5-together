@@ -645,3 +645,54 @@ combat_zoom_out=100   ; battles: the same
 ```
 
 The robot passes them with `--camera-setting KEY=VALUE` (`run_lan_test.py`: also `--host-camera` / `--client-camera`).
+
+## Wider volume range (`audio_volume.cpp`, off by default)
+
+**What it is for:** even at the lowest step of the options screen's sliders (music, sounds), the game was too loud. The sliders have 11 steps from 0 to 100%, and they are straight. The 10% step is a tenth of the sound wave's size, only 20 dB below full volume. With `volume_curve=wide` each step is about the same number of decibels: 10% becomes about −40 dB (10 times quieter), 50% −12 dB, and 100% stays as it is. Off (the default, `game`), the game's own sliders.
+
+**How** (details in [docs/plans/lobby-audio-classes.md](../../docs/plans/lobby-audio-classes.md), item 1):
+- The sliders store their value times 255 in the sound effects' manager and the music system.
+- Every channel's volume then goes to FMOD through one function, `0x00b26e80`, called from two places: `0x00d0439b` (sound effects) and `0x00d047ac` (music).
+- The mod redirects those two calls and multiplies the volume once more by its slider's value, so a slider value *s* counts as *s*².
+- Nothing stored changes: the slider, your profile and every place that lowers the music for a while (dialogs, cutscenes) keep working as before.
+- A sound the game makes audible stays audible at FMOD's quietest step.
+
+**Only your speakers change:** sound is not part of the game world. Each player can choose, also in co-op games. The log says `audio: volume_curve=wide: ...`.
+
+**To check with the robot** (not done yet):
+- `--audio-setting volume_curve=wide --audio-setting log_volume=40 --setvar "sound_sfxvolume = 0.1"`: the log lines must read `slider 25/255, game volume 25/255 -> 2/255` for a sound at full own volume;
+- the owner's ears: the lowest step quiet but audible, music and sounds balanced as before.
+
+**Settings** (`open-homm5.ini`):
+
+```ini
+[audio]
+volume_curve=game   ; game (the game's sliders), wide (each step about the same number of decibels)
+log_volume=0        ; testing: log the first N channel volumes (slider, game's volume, ours)
+```
+
+## Black past the map's edge (`edge_sky.cpp`, off by default)
+
+**What it is for:** zoomed out (above), you see past the adventure map's edge. On many random maps that is a flat dark violet with a lavender corner. It is a **sky dome**, the Sylvan siege battlefield's sky: MMH5.5 gave it to `Lights/_(AmbientLight)/Arena/Dusk_light_BoatArena01(VicTest).xdb`, one of the 4 lights the random map generator picks from (`RMG/Params/Default.xdb`). The original game's copy of that light has no sky dome. With `edge_sky=none`, the game gets that light without its sky dome, so past the edge the screen stays black, like unexplored land. Off (the default, `game`), the game's sky.
+
+**How:** when the game opens that light file, the mod hands it the same file with an empty `<SkyDome/>`, as the lights without one have. This uses the game's file system hook (the one the original music and the French texts use). Nothing on disk changes.
+- In the game data only the generator's list names this light, so **battles keep their sky**.
+- The other 3 random-map lights and hand-made maps keep theirs. They show the Haven sky; if that should go too, it is the same work.
+- Restart the game after a change: the game keeps a light once it has read it.
+
+**Only your screen changes:** lights are drawn, not simulated. Each player can choose. The log says `edge sky: ... served without its sky dome (edge_sky=none)` when a map uses that light.
+
+**To check with the robot** (not done yet):
+- the robot's map A1M4 uses another light, so add `--camera-setting edge_sky_test_light=Lights/_(AmbientLight)/AdvMap/Addon/AC1M4.xdb` with `edge_sky=none` and `zoom_out=300` and the far start (camera.md);
+- the sky above the far edge must turn black, and the light's log line must appear;
+- a battle keeps its sky;
+- a LAN game with only the host using it keeps equal world checksums;
+- then a random map that drew the dusk light (the map's `map.xdb` names it under `GroundAmbientLights`).
+
+**Settings** (`open-homm5.ini`):
+
+```ini
+[camera]
+edge_sky=game            ; game (the game's sky), none (no sky dome on the random maps' dusk light: black)
+edge_sky_test_light=     ; testing: one more light file to show without its sky dome
+```

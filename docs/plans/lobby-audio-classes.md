@@ -9,6 +9,53 @@ The owner asked for five things:
 4. **Later:** "an additional setting (when starting a game) to select whether we use classes or standard HoMM 5 random skills."
 5. **Map edges:** "could we modify the way the game displays the map borders? Right now it looks cut off with a violet square background; could we make it dark / foggy / look like a map?"
 
+## The owner's answers (2026-11-01) and what is built
+
+| Item | Answer | Status |
+|---|---|---|
+| 1. Volume | "Wider range": `[audio] volume_curve=wide`, off by default; no scale settings. | **Built:** `src/mods/audio_volume.cpp`. Not yet checked in a game. |
+| 2. Lobby labels | (the fix is ours, no choice needed) | **Done:** 4 tooltips in the private packs; outdated-text check in `tools/lang/inventory.py`. |
+| 3. ToE bonuses | "Each player picks": option A (a mode chooser in the lobby, the bonus arrows back to ToE). | Later. |
+| 4. Hero skills | "Per game in the lobby" (option 2). | Later. |
+| 5. Map edges | "Black": `[camera] edge_sky=none`, off by default. | **Built:** `src/mods/edge_sky.cpp`. Not yet checked in a game. |
+| The French pack in `data\` | The coordinator asks the owner. | Open. |
+
+**What was built (2026-11-01, no game or robot run: the owner was playing):**
+
+- **Volume** (`audio_volume.cpp`, setting `[audio] volume_curve=game|wide`, testing `log_volume=N`).
+  - The two calls of `0x00b26e80` (`0x00d0439b` sounds, `0x00d047ac` music) are redirected, after checking each still calls `0x00b26e80`.
+  - The volume is multiplied once more by its slider (`audiovol::Wide`, in `audio_volume.h`), and a sound that was audible stays at least at FMOD's quietest step.
+  - The 2D and 3D per-sound factors (`0x00d043c0`, `0x00d045b0`) both include the sounds slider, so one factor fits every sound.
+  - Unit test: `src/hook/test/audio_edge_test.cpp`. For example, at the lowest step FMOD gets 2/255 instead of 25/255, and the result is never louder than the game.
+- **Edge sky** (`edge_sky.cpp`, setting `[camera] edge_sky=game|none`, testing `edge_sky_test_light=`).
+  - It wraps the game's open-file function (slot 7, stacked with the music and language mods) and serves `Lights/_(AmbientLight)/Arena/Dusk_light_BoatArena01(VicTest).xdb` with an empty `<SkyDome/>`.
+  - **Battle skies are unchanged:** 6 other light files in the game data (arena and scene lights) name this same sky dome, and they are not touched; neither is the dome itself. The dusk light is named only by the generator's list. Of the generator's other three lights, `0_Default_AmbientLight` is used by 21 battle maps (MMH5.5's bank arenas), which is one more reason they are left alone.
+  - The same unit test covers the file edit (only the sky dome element changes; lights without one are left alone).
+- **Lobby texts** (private, in `build/lang/`, never in git):
+  - batch `gap-batches/b6-lobby-modes` (the 4 tooltips; `batch.py check`: 0 errors, 0 warnings);
+  - `private-fr/open-homm5-fr-rc19d.pak` (183 + 4 texts, SHA-256 `633dd665…`) and `private-fr/open-homm5-fr.pak` (480 texts, 2 of them replaced, SHA-256 `a82628db…`), made with the new `batch.py add`. Their 4 new texts are dated 2026-11-01, so they win over the official French packs (dated 2025);
+  - the ready zip `open-homm5-francais-RC19d.zip` (the same 3 files, the gap pack replaced).
+
+  They were made in this worktree's `build/lang/` (the main checkout's `build/` was read only), so they still have to be copied over the main checkout's files.
+- **Outdated-text check:** `inventory.py --fr-pack` now also writes `outdated.txt`, the translated files whose markup differs from the English text's. RC19i's pack on RC19k: 108 candidates, among them the gold and resources tooltips. `inventory.py --self-test` checks the comparison.
+
+**What the robot should check later** (with the robot lock):
+1. **Volume:**
+   - run `run_ai_test.py --audio-setting volume_curve=wide --audio-setting log_volume=40 --setvar "sound_sfxvolume = 0.1" --setvar "sound_musicvolume = 0.1"`;
+   - the log has `audio: volume_curve=wide: ...` and lines like `audio: sound: slider 25/255, game volume 25/255 -> 2/255`;
+   - the game runs normally (a battle, a dialog);
+   - then the owner's ears.
+2. **Edge sky:**
+   - A1M4 uses another light, so add `--camera-setting edge_sky=none --camera-setting "edge_sky_test_light=Lights/_(AmbientLight)/AdvMap/Addon/AC1M4.xdb" --camera-setting zoom_out=300` and the far start position ([../subsystems/camera.md](../subsystems/camera.md), robot checks);
+   - the log has `edge sky: lights/_(ambientlight)/advmap/addon/ac1m4.xdb served without its sky dome`;
+   - the screenshot shows black above the map's far edge, where the game's run shows its sky;
+   - a battle keeps its sky.
+3. **A random map that drew the dusk light** (its `map.xdb` names it under `GroundAmbientLights`), without the test light: black past the edge.
+4. **LAN:** only the host with `volume_curve=wide` and `edge_sky=none`: world checksums all equal.
+5. **French texts:**
+   - with the new RC19d packs in the test copy's `bin\open-homm5\lang\fr\` and `texts=fr`, hover the lobby's bonus icons;
+   - all 4 tooltips must be in French and describe Default, Savage and Nightmare.
+
 ## Summary
 
 | # | What we found | Recommended | Effort | Desync risk |
