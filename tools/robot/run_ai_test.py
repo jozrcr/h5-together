@@ -127,6 +127,10 @@ def write_mod_settings(game, args, instance):
     if camera:
         lines += ["[camera]"] + camera
     # [debug] = the hang watchdog (src/hook/watchdog.cpp), on by default
+    # [rules] = the host's game rules (src/mods/host_rules.cpp), on by default
+    rules = getattr(args, "rules_setting", None) or []  # e.g. governance=0, ai_cheat=0, enabled=0, trace=1
+    if rules:
+        lines += ["[rules]"] + rules
     debug = getattr(args, "debug_setting", None) or []  # e.g. hang_test_at=60, hang_seconds=10
     if debug:
         lines += ["[debug]"] + debug
@@ -427,6 +431,8 @@ def main():
                    help="[lang] setting, e.g. texts=fr or log_texts=300 (repeatable; src/mods/languages.cpp)")
     p.add_argument("--camera-setting", action="append", default=[], metavar="KEY=VALUE",
                    help="[camera] setting, e.g. zoom_out=150 or combat_zoom_out=150 (repeatable; src/mods/camera.cpp)")
+    p.add_argument("--rules-setting", action="append", default=[], metavar="KEY=VALUE",
+                   help="[rules] setting, e.g. governance=0 or trace=1 (repeatable; src/mods/host_rules.cpp)")
     p.add_argument("--debug-setting", action="append", default=[], metavar="KEY=VALUE",
                    help="[debug] setting, e.g. hang_test_at=60 or hang_seconds=10 (repeatable; src/hook/watchdog.cpp)")
     p.add_argument("--resolution", default="1024x768", metavar="WxH",

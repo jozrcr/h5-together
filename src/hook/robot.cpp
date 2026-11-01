@@ -891,11 +891,27 @@ bool TakeOverlayKey(int vk)
 	return vk && InterlockedCompareExchange(&g_overlay_key, 0, vk) == vk;
 }
 
-bool TakePanelCommand(char *out, int size)
+bool TakePanelCommand(char *out, int size, const char *prefix)
 {
+	// Commands that start with a panel's own prefix ("rules ...") are left for
+	// that panel; the others go to the first panel that asks without one.
+	static const char *const kPrefixes[] = {"skins ", "rules "};
+	if (InterlockedCompareExchange(&g_panel_pending, 0, 0) != 1)
+		return false;
+	const char *text = g_panel_command;
+	if (prefix) {
+		if (strncmp(text, prefix, strlen(prefix)) != 0)
+			return false;
+		text += strlen(prefix);
+	}
+	else {
+		for (const char *p : kPrefixes)
+			if (strncmp(text, p, strlen(p)) == 0)
+				return false;
+	}
 	if (InterlockedCompareExchange(&g_panel_pending, 0, 1) != 1)
 		return false;
-	lstrcpynA(out, g_panel_command, size);
+	lstrcpynA(out, text, size);
 	return true;
 }
 
