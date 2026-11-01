@@ -22,7 +22,7 @@ python tools\package\make_package.py --rebuild  # build the DLL again first
 | `install.bat`, `install.ps1` | Windows installer (the `.bat` only starts the `.ps1`) |
 | `uninstall.bat`, `uninstall.ps1` | Windows uninstaller |
 | `install.sh`, `uninstall.sh` | Linux (Steam / Proton) installer and uninstaller |
-| `README.txt` | ten lines for a friend; `@VERSION@` is filled in |
+| `README.txt` | a short read-me for players (install, uninstall, settings, what's new; plain ASCII); `@VERSION@` is filled in |
 | `open-homm5/templates/OH-*.xdb` | the ready random map templates (see below) |
 
 The scripts and text files are in `tools/package/files/`. Everything is in one top folder, `open-homm5-<version>/`, so that unzipping on Linux does not spread the files around. Line endings are set when the zip is written: CRLF for `.bat`, `.ps1`, `.txt` and `.ini` (Notepad, cmd.exe), LF for `.sh`, which also get the executable bit. In the repo, `.gitattributes` keeps `.bat` as CRLF and `.sh` as LF.
