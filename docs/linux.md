@@ -159,6 +159,7 @@ All players should keep the mod on (the default). Each PC speeds up only what it
 | The host's game is not in the LAN list | `sudo zerotier-cli listnetworks` must say `OK` on your side; in the host's ZeroTier console both PCs must be ticked **Auth** and show as online. Check your firewall (step 7) and that the host marked the ZeroTier network as **Private** in Windows. Start the game only after ZeroTier says `OK`. |
 | You can join but the game says it's out of sync, or players see different things | Both PCs must have the same files: copy the host's folder again. Send both logs. |
 | It worked before, then stopped after a Steam update | Steam replaced some files: copy the host's files again (step 2). |
+| The mouse wheel zooms in but never out | A Wine quirk (the game expects the wheel's position, Wine gives its steps). Our DLL fixes it under Wine by itself (`[camera] wheel_fix=auto`): the log says `wheel: Wine reports the mouse wheel as steps ...` after a few notches. Page Down / Page Up always zoom out / in. If the wheel still fails: set `wheel_fix=1` and `[debug] trace_wheel=1`, play a minute, send the log. |
 
 If the list stays empty with the new DLL on both PCs:
 - Look in your `open-homm5.log` for the line `lan: game queries also go to ...`. It must list the ZeroTier network (`... (zt...)`).

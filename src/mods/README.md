@@ -510,7 +510,9 @@ trace_factions=0   ; research: lobby setups, the start, map builds, map files, f
 - **Linux (Proton).**
 - **A line on the loading screen** while the map is rebuilt: the screen just waits a few seconds.
 
-**Each rebuild leaves a map package in the game's `Maps` folder,** like each join of a random map in the game itself. It shows in the map list under the same name.
+**Each rebuild leaves a map package in the game's `Maps` folder** (`Maps\<name>.N.h5m`), like each join of a random map in the game itself. **It is hidden from the game's map lists** (on every PC with the DLL, whatever its settings): only the map it was rebuilt from shows. The lists (multiplayer, single player, random map screen) get their maps from `0x007c2ce0`, every `map-tag` resource under a folder from the game's resource index; the mod takes out those under `Maps/RMG/<guid>-OH1-<8 hex digits>/`. Log: `rmg factions: map list of ...: 1 rebuilt map(s) (-OH1-) hidden, 23 shown`.
+- **The packages are not deleted:** a save of such a game names its map's path, and reading a save's setup needs the map's description (`0x00ca0c70` → the setup constructor). The start and the saves find the package by that exact path, which the lists do not touch.
+- So do not delete them by hand while you keep saves of those games. (A save's setup is read by the same code as the start message, `0x005a1430` → `0x00ca0c70`, where the mod rebuilds a missing rebuilt map; not tested with a save.)
 
 ## Original music (`original_music*.cpp`, off by default)
 
@@ -597,7 +599,7 @@ languages: version text: French pack "Version: 5.69i" (MMH55-Texts-FR.pak), the 
 
 The version line compares the MMH5.5 version written in the French pack with the one the game shows in its main menu. When they differ, some French descriptions may describe another version's numbers. The menu itself keeps showing the game's own version.
 
-## Farther camera zoom (`camera.cpp`, off by default)
+## Farther camera zoom, start distance (`camera.cpp`, off by default)
 
 **What it is for:** the camera cannot zoom out far. `zoom_out=150` lets the adventure map's camera go 1.5 times as far from the ground as the game allows; `combat_zoom_out` does the same in battles. Off (the default, 100), the game's own limits.
 
@@ -642,6 +644,40 @@ log_texts=0    ; testing: log the first N texts taken from the packs
 [camera]
 zoom_out=100          ; adventure map: % of the game's farthest zoom (100 = the game's; e.g. 150; up to 400)
 combat_zoom_out=100   ; battles: the same
+start_zoom=           ; adventure map: the camera's start distance (the game: 25; empty = the game's)
+wheel_fix=auto        ; the mouse wheel under Wine (wheel.cpp, below); 0 = off, 1 = from the first turn
 ```
 
 The robot passes them with `--camera-setting KEY=VALUE` (`run_lan_test.py`: also `--host-camera` / `--client-camera`).
+
+**Start distance** (`start_zoom`, off by default): the adventure map's camera starts at distance 25 (the game's `mission_camera_def_pos`). With `start_zoom=70` it starts at 70 (the game keeps it within its limits, so with `zoom_out=150` up to 105). The camera set-up asks for its soft limits right before it reads the start position, so the mod's soft-limit hook writes the distance there (`0x00f339f0`). Log: `camera: adventure map: the camera starts at distance 70 (the game: 25; start_zoom)`.
+
+## The mouse wheel under Wine / Proton (`wheel.cpp`, `wheel_logic.cpp`; on under Wine only)
+
+**The problem** (a Linux player, 2026-11-01): the wheel zooms in once and never out; Page Up / Page Down work. It happened before our DLL too.
+
+**Why** (static reading of the exe; [docs/subsystems/camera.md](../../docs/subsystems/camera.md), "The mouse wheel"):
+- The game sets its DirectInput mouse to **absolute** axis mode and works the wheel's motion out itself: "this value minus the last one". Windows reports positions (the running sum of the notches), so that difference is the motion.
+- **Wine reports the wheel as steps** (+120 or -120 a notch), even in absolute mode. The difference then turns every repeated notch into 0.
+- The game also drops a "press" (bit 7 of the value's low byte) while it thinks its window is inactive or the cursor is outside it. With positions that is harmless (the next value carries the motion). A step down, -120, ends in `0x88`: it looks like a press, so wheel-down can be dropped every time.
+
+**The fix:** the game gets positions, the running sum of Wine's steps, in its wheel events and in the mouse state's `lZ`, as on Windows. Its own "this minus the last" then gives each notch, both ways.
+- `wheel_fix=auto` (the default) does it **only under Wine** (ntdll's `wine_get_version`), and only after a check: after a batch of wheel events the mouse's own state is read. With positions its `lZ` is the last event's value; with steps it is their sum. Two clear "steps" checks switch the fix on, within the first 3 or 4 notches. Positions, or nothing clear in 16 checks: left as they are.
+- `wheel_fix=1` converts from the first notch (for a Wine the check misreads; never on Windows, where it breaks the wheel). `wheel_fix=0` leaves the wheel alone.
+- **On Windows nothing is installed** (unless `trace_wheel=1`).
+- DirectInput filter order -10: before the robot's keys (0) and the modal panels (100).
+- Only this PC's camera changes: the camera is not part of the game world.
+
+**The log:**
+
+```
+wheel: Wine 9.0: the first mouse wheel events are checked; if Wine reports them as steps, the game gets positions, as on Windows (wheel_fix=auto)
+wheel: first mouse wheel event from DirectInput: -120 (20-byte events; checking)
+wheel: Wine reports the mouse wheel as steps (2 of 3 checks): from now on the game gets positions, as on Windows, so the wheel zooms both ways (wheel_fix=auto)
+```
+
+**The trace** (`[debug] trace_wheel=1`): every wheel event (raw and what the game gets, and whether the game drops it as a press), the game's own `GetDeviceState` reads, each Acquire, each check, the game's checks for presses at the first event (window active, cursor inside), and the window's `WM_MOUSEWHEEL` messages (a `WH_GETMESSAGE` hook on the game's thread, watch only).
+
+**Tests:** `test/wheel_test.cpp` models the game's reading, Windows' and Wine's mice: without the fix, 5 notches up zoom in once and 10 down do nothing; with it, every notch counts, also when the game drops presses; positions are never converted. **Not checked yet:** a real Linux PC (the robot runs on Windows).
+
+**Keyboard:** Page Down zooms out and Page Up zooms in (`bind +camera_zoom 'PG_DOWN'`, `bind -camera_zoom 'PG_UP'` in the profile's `input_a2.cfg`), on every system.

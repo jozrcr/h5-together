@@ -59,6 +59,41 @@ All modes have a field of view of 50 and a **farthest distance of 70**. The soft
 | `CAdvMapCameraConfigurator` | vftable `0x00e44688`; slot 7 `0x007d3180` (the camera operator), slot 8 `0x007d3310` (the camera) | Byte `+0x14` set = a mini dialog (mode 3), otherwise mode 1000. Slot 8 also sets the default position, the field of view, the bounds (map size × 2) and probably the clip planes (1, 1000). Calls: `0x007d31fa`, `0x007d3332` (limits), `0x007d321b`, `0x007d3353` (soft limits). |
 | Camera mode change | `adv_camera_mode_changed` `0x00593340` → `0x00593240` | Makes a new configurator (`0x007d3950`) and runs its slot 7 again. |
 
+## The mouse wheel and the zoom keys
+
+Static reading of the vanilla 3.1 exe, 2026-11-01 (the same code in `MMH55_Utility`). It explains a Linux player's report: under Proton the wheel zooms in once and never out, Page Up / Page Down work, with or without our DLL. The fix is `src/mods/wheel.cpp`.
+
+**The bindings** (the profile's `input_a2.cfg`, from `profiles\default_profile`):
+
+```
+bindconfigure  MOUSE_AXIS_Z 160
+bind +camera_zoom        'PG_DOWN'      (zoom out)
+bind -camera_zoom        'PG_UP'        (zoom in)
+bind -camera_zoom_mouse  'MOUSE_AXIS_Z' (wheel up = closer)
+bind -mouse_wheel_scroll 'MOUSE_AXIS_Z' (lists)
+```
+
+The input names are a table at `0x00e8cae8` (16-byte entries: name, device `0x12` mouse / `0x13` keyboard, offset or DIK code, kind `2` axis / `0` button): `MOUSE_AXIS_Z` is the mouse's offset 8 (`DIMOFS_Z`), `PG_DOWN` is `DIK_NEXT` (`0xd1`).
+
+**How the game reads its devices:**
+
+| What | Address | Notes |
+|---|---|---|
+| Set-up | `0x00c43be0` | `DirectInput8Create`, then the mouse (`GUID_SysMouse`) with `c_dfDIMouse2` (`0x00eba574`, 20 bytes: X, Y, Z at 0/4/8, 8 buttons at 12..19), `DIPROP_AXISMODE` = **`DIPROPAXISMODE_ABS`**, `DIPROP_BUFFERSIZE` 0x400 (or the caller's); then the keyboard (`c_dfDIKeyboard`, buffer 0x400). |
+| Every frame | `0x00c42530` | Only **buffered** events: `GetDeviceData(20, buf, 0x400, 0)` on each device. For each event: its input record by `dwOfs | device << 24`; the motion = **this value minus the last value kept for that input** (`+0x10` of the record = `value - last`, then `last = value`). On `DI_BUFFEROVERFLOW` the device is read again from its state at the end. |
+| Re-read from the state | `0x00c420b0` | On each Acquire (`0x00c42220`) and after an overflow: `GetDeviceState`, and for each input whose state differs from its last value, an event with the difference. |
+| "Press" filter | in `0x00c42530` | An event whose value has bit 7 of its low byte set (a press for a key or button) is **dropped** while the game's window is inactive (`0x00f7a208`, `0x00f7a207`) or, for the mouse, the cursor is outside its client area (`0x00c3b190`: `GetClientRect` of `0x010d85b8`, `GetCursorPos`), unless `0x010d8669` is set. |
+
+So the game expects **positions** for the wheel: with an absolute axis, Windows reports the running sum of the notches (120 each) in every event and in the state's `lZ`, and "this minus the last" is the motion. A dropped "press" then costs nothing: the next value the game takes carries the whole motion.
+
+**Wine** reports **steps**: its mouse code queues the wheel's step (`(short)HIWORD(mouseData)`, or the raw input's `usButtonData`) also in absolute mode, while X and Y get the absolute position there; its state's `lZ` is the sum of the steps since the last Acquire. (From Wine's `dlls/dinput/mouse.c` as we know it, not re-read for this; the fix checks it at run time, and `trace_wheel=1` shows it.) The game's difference then gives:
+- the first notch up after an Acquire: +120 (zoom in once); every further notch up: 0;
+- a notch down: -120 is `0xffffff88`, bit 7 set: dropped whenever the game's press filter is on (the Linux player's case, it seems); otherwise -240 the first time after a notch up, then 0.
+
+**The fix** (`wheel.cpp`, `[camera] wheel_fix=auto`, under Wine only): the game gets positions, the running sum of the steps, in the events and in the state's `lZ`. It switches on after two checks show steps (the device's `lZ` is the sum of the events, not the last one). `[debug] trace_wheel=1` logs the raw events, the game's view and the window's `WM_MOUSEWHEEL` messages.
+
+**The keys work everywhere:** `PG_DOWN` / `PG_UP` are keyboard buttons (`0x80` down, `0` up) read through the same loop; only the window-inactive part of the press filter applies to them.
+
 ## Battles
 
 The battle camera's limits are not in a config file. `CArenaCameraConfigurator` (vftable `0x00e446b0`, slot 7 `0x007d3730`) builds them each time a battle starts: it copies the adventure map's normal record as a template, then sets
@@ -111,4 +146,6 @@ The robot cannot turn the mouse wheel (its windows are in the background), so it
 | 24 AI turns, `combat_zoom_out=150`, one battle (the AI attacked the robot's hero) | battle limit 84 | log `camera: battle: farthest zoom 56 -> 84`; the battle ran to its end with auto-combat. The battle camera starts at its usual place, so the farther limit itself is not visible without a player's mouse wheel. |
 | **LAN game** (2 copies, 2 humans + 1 AI, 4 AI turns): only the host with `zoom_out=200`, `combat_zoom_out=200` and the far start | host 140, client 25 | **698 world checksums, all equal on both copies (no desync)** |
 
-Not checked by the robot: zooming with the mouse wheel during play (a player's test), the frame rate on a big explored map, Linux.
+Not checked by the robot: zooming with the mouse wheel during play (a player's test), the frame rate on a big explored map, Linux. (Under Proton the wheel needs `wheel_fix`: see "The mouse wheel and the zoom keys" above.)
+
+**Start distance** (`[camera] start_zoom`, 2026-11-01): the camera set-up `0x007d3310` calls the limits (`0x007d3332`), the soft limits (`0x007d3353`), then hands the camera the default position `0x00f339f0` (`0x007d3360`; distance at +0, tilt +4, turn +8, field of view +0x10, as `mission_camera_def_pos` `0x0058a930` stores them). The mod's soft-limit hook writes the distance just before.

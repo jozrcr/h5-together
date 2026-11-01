@@ -195,6 +195,13 @@ void AddFilters(const Filters &filters, int order)
 	g_users[i] = {filters, order};
 }
 
+HRESULT RealGetDeviceState(void *device, DWORD size, void *data)
+{
+	if (!device || !g_device_count)
+		return E_FAIL;
+	return DeviceTableOf(device)->get_state(device, size, data);
+}
+
 void OnDirectInputCreated(void *direct_input)
 {
 	if (!g_user_count || !direct_input)

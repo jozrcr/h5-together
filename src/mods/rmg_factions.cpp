@@ -39,6 +39,9 @@
 //      start message, the host when its world starts. Same inputs, same
 //      generator: the same map on every PC. A package with that name that already
 //      opens (a game played before) is used as it is.
+//   5. Every PC: the rebuilt maps' packages stay in the Maps folder (a save of
+//      such a game needs its map), but the game's map lists do not show them:
+//      only the map they were rebuilt from shows.
 //
 // Settings, open-homm5.ini [rmg]:
 //   faction_terrain=0   1 = as the host, offer it (see above); off by default
@@ -861,6 +864,86 @@ void __fastcall RunGameHook(void *start, void *edx, void *arg)
 	g_run_game_next(start, edx, arg);
 }
 
+// --- 5. the game's map lists: the rebuilt maps are hidden ---------------------------------------
+// Each rebuild is a map package of its own (Maps\<name>.N.h5m, its files at
+// Maps/RMG/<guid>-OH1-<factions>/), so the game's map lists would show it as one
+// more copy of the map, one per faction combination (the owner, 2026-11-01).
+// The lists (multiplayer 0x00705800, single player 0x0068e5f0, random map screen
+// 0x00798e40) get their maps from 0x007c2ce0: __fastcall(vector *out, const
+// string *folder), every "map-tag" resource under the folder from the game's
+// resource index (data\index.bin), as 8-byte resource pointers {resource,
+// loaded}. A resource's own id (a CDBID) is at +0xc, so its path at +0x20. Ours
+// are taken out of the list. Everything else finds them by their exact path, as
+// before: the start (the start message names the path), the saves (a save's
+// setup names its map's path, and needs the map's description: so the packages
+// are kept on disk, never deleted).
+const DWORD kMapTagsCalls[] = {0x0068e65d, 0x00705864, 0x00798e8d};
+const DWORD kMapTags = 0x007c2ce0;
+const DWORD kResourceRelease = 0x008c6150;  // __fastcall(resource): frees it when its count (+8) is 0
+
+struct DbPtr {
+	BYTE *resource;
+	BYTE loaded;
+	BYTE pad[3];
+};
+struct DbPtrs {
+	DbPtr *begin;
+	DbPtr *end;
+	DbPtr *cap;
+};
+typedef void(__fastcall *MapTagsFn)(DbPtrs *out, const GameString *folder);
+typedef void(__fastcall *ResourceReleaseFn)(void *resource);
+MapTagsFn g_map_tags_next = nullptr;
+
+bool IsRebuiltMap(const BYTE *resource)
+{
+	if (!resource || !Readable(resource, 0x2c))
+		return false;
+	const std::string path = Text(reinterpret_cast<const GameString *>(resource + 0x20));
+	size_t at = 0;
+	std::string folder, guid;
+	DWORD races[kMaxPlayers];
+	return MapFolder(path, &at, &folder) && ParseOurs(folder, &guid, races);
+}
+
+void __fastcall MapTagsHook(DbPtrs *out, const GameString *folder)
+{
+	const size_t before = out && out->begin && out->end > out->begin ? static_cast<size_t>(out->end - out->begin) : 0;
+	g_map_tags_next(out, folder);
+	if (!out || !out->begin || out->end < out->begin + before)
+		return;
+	DbPtr *keep = out->begin + before;
+	int hidden = 0;
+	for (DbPtr *p = keep; p != out->end; ++p) {
+		if (IsRebuiltMap(p->resource)) {
+			LONG *count = reinterpret_cast<LONG *>(p->resource + 8);  // the list's reference
+			if (--*count == 0)
+				reinterpret_cast<ResourceReleaseFn>(kResourceRelease)(p->resource);
+			++hidden;
+			continue;
+		}
+		*keep++ = *p;
+	}
+	out->end = keep;
+	static LONG logged = 0;
+	if (hidden && InterlockedIncrement(&logged) <= 5)
+		hooklog::Write("rmg factions: map list of %s: %d rebuilt map(s) (-OH1-) hidden, %d shown", Text(folder).c_str(),
+		               hidden, static_cast<int>(out->end - out->begin));
+}
+
+void HideRebuiltMaps()
+{
+	static const BYTE kReleaseCode[] = {0x51, 0x83, 0x79, 0x08, 0x00, 0x75};  // push ecx; cmp [ecx+8], 0; jnz
+	static const BYTE kListCode[] = {0x83, 0xec, 0x24, 0x53, 0x55, 0x56};     // sub esp, 0x24; push ebx, ebp, esi
+	if (memcmp(reinterpret_cast<const void *>(kResourceRelease), kReleaseCode, sizeof(kReleaseCode)) != 0 ||
+	    memcmp(reinterpret_cast<const void *>(kMapTags), kListCode, sizeof(kListCode)) != 0)
+		g_map_tags_next = nullptr;
+	else
+		g_map_tags_next = reinterpret_cast<MapTagsFn>(hookpatch::RedirectCalls(kMapTagsCalls, 3, kMapTags, &MapTagsHook));
+	if (!g_map_tags_next)
+		hooklog::Write("rmg factions: the game's map lists are not as expected: rebuilt maps (-OH1-) show in them");
+}
+
 // The game's functions this mod calls must be the ones it knows.
 bool CodeAsExpected()
 {
@@ -894,6 +977,9 @@ void ApplyRmgFactionsFromSettings()
 	hooklog::PathNextToExe(L"open-homm5", L".ini", path, MAX_PATH);
 	g_host = GetPrivateProfileIntW(L"rmg", L"faction_terrain", 0, path) != 0;
 	g_trace = GetPrivateProfileIntW(L"rmg", L"trace_factions", 0, path) != 0;
+	// Every PC, whatever happens below: a rebuilt map of an earlier game never
+	// shows in the map lists.
+	HideRebuiltMaps();
 	if (!CodeAsExpected()) {
 		hooklog::Write("rmg factions: off (this PC cannot rebuild random maps with the lobby's factions)");
 		return;
