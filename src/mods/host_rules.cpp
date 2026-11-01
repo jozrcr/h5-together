@@ -176,6 +176,8 @@ struct Pc {
 	bool told[3];  // the difference was logged
 	std::string sent;  // the last lobby text sent to it
 	BYTE seq;          // of the last text's pieces
+	DWORD hello_at;    // when its last hello came (a client says it every ~4 s)
+	std::string name;  // its player's name then (another PC may get its number later)
 };
 std::vector<Pc> g_pcs;
 const void *g_pcs_logic = nullptr;  // the host lobby they belong to
@@ -493,7 +495,8 @@ void CheckPlayers(const void *logic, const BYTE *info, bool log)
 	for (int pc : HumanClients(logic, info)) {
 		Pc *p = FindPc(pc);
 		const std::string name = PcName(info, pc);
-		if (!p || p->version != rules::kProtocol) {
+		// a hello of this version, fresh, from this player (not from a PC that left before it joined)
+		if (!p || p->version != rules::kProtocol || GetTickCount() - p->hello_at > 15000 || p->name != name) {
 			g_missing.push_back(name);
 			continue;
 		}
@@ -611,7 +614,7 @@ int __fastcall HostRequestHook(void *logic, void *edx, int sender, BYTE *message
 		if (type == rules::kHelloType || rules::ReadHashRequest(type, byte, &mark, &hash)) {
 			Pc *p = FindPc(sender);
 			if (!p) {
-				g_pcs.push_back(Pc{sender, 0, {}, {}, {}, std::string(), 0});
+				g_pcs.push_back(Pc{sender, 0, {}, {}, {}, std::string(), 0, 0, std::string()});
 				p = &g_pcs.back();
 			}
 			if (type == rules::kHelloType) {
@@ -619,6 +622,8 @@ int __fastcall HostRequestHook(void *logic, void *edx, int sender, BYTE *message
 					hooklog::Write("rules: hello from PC %d (version %u%s)", sender, byte,
 					               byte == rules::kProtocol ? "" : ", not this PC's: the files' rules unless it updates");
 				p->version = byte;
+				p->hello_at = GetTickCount();
+				p->name = PcName(reinterpret_cast<const BYTE *>(Read(logic, 0x74)), sender);
 			}
 			else {
 				const int k = mark == rules::kMarkSettingsRest ? 0 : mark == rules::kMarkSettingsWhole ? 1 : 2;

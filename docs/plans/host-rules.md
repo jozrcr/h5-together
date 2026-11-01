@@ -118,7 +118,7 @@ Screenshots: the session's `scratchpad\rules-shots\`.
 1. **The class skill lock** ([lobby-audio-classes.md](lobby-audio-classes.md) item 4) and **ToE start bonuses** (item 3) in the same panel: a new group, new keys in the carried text (protocol 2), served data files (`HeroClass.xdb`, the hero files, `H55-AdvMap.lua`) the same way.
 2. **The button's place** from the owner's sketch (and one on the setup screen).
 3. **The check in the co-op hello** too, for games joined without our lobby (a second ignored checksum message with the served file's hash).
-4. **MMH5.5's scripts on generated random maps in multiplayer** (an owner's choice: it changes the game; MMH5.5's way is the Mapmixer).
+4. **MMH5.5's scripts on generated random maps in multiplayer** (an owner's choice: it changes the game; MMH5.5's way is the Mapmixer). Where to start: the two places that run `scripts/advmap-startup.lua`, `0x00603b20` (called from `0x006089a0`) and `0x00992d00` (called from `0x009941a0`; it returns early when two bytes of the world's settings, its slot `0x14`, are both 0). Not studied further.
 5. Single player and hotseat could use the host's choices too (today they use the file).
 
 ## Addresses (vanilla 3.1, also `MMH55_Utility`)
