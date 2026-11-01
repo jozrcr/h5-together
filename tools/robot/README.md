@@ -180,6 +180,8 @@ Besides starting a map, the DLL runs a script of timed steps (`--step`, or `--ho
 | `shot` | a label | saves the next frame as `frame-NNN-<label>.png` |
 | `rmg` | (none) | opens the random map screen from the custom game screen (`menu|single custom_game` first). Its button posts the game message `rmg_screen`, but the screen's observer (`0x0077b090`) drops a message without the button as sender, so `msg|rmg_screen` does nothing; the step calls the observer's handler `0x0077a6c0` on the live `NUI::CHSCreate` instead (`robot_ui.cpp`) |
 | `key` | `F1`..`F12` | presses one of **our overlay's** keys (the DLL's own key handling sees it; the game does not): e.g. `F11` opens the template builder on the random map screen, `F9` is not covered (the player list reads its key itself) |
+| `dik` | `<hex DIK code> [hold ms]` | presses a **game** key through the robot's DirectInput keyboard (`robot_input.cpp`), held 150 ms or the given time: e.g. `d1 1500` = Page Down (zoom out) for 1.5 s, `c9 1500` = Page Up |
+| `wheel` | `<notches> [steps]` | turns the mouse wheel: that many notches (+ up = zoom in, - down = zoom out), one per read of the game's mouse events, as positions (the running sum, as Windows gives them) or with `steps` as +-120 steps (as Wine gives them, to check `[camera] wheel_fix`) |
 | `panel` | a command | for our open panel, what a click would do (the robot cannot click): the template builder takes `preset <n>`, `distance on\|off`, `scroll <units>\|end`, `use`, `save`, `cancel` and `open` (`rmg_builder.cpp`) |
 | `peek` | `<screen class> <hex offset> ...` | research: logs the objects along a pointer chain from a screen, with their class names |
 

@@ -118,6 +118,7 @@ This builds `build\hook\dinput8.dll` and runs these tests outside the game:
 - `test/rmg_recipe_test.cpp`: recipe names (`src/mods/rmg_recipe.cpp`): choices → `OH-X1-...` → the same choices, every bad name and path refused, reading a template link the way the game keeps it (`src/mods/rmg_join.cpp`), the teams of a recipe map, and each ready template built from its recipe name, compared with the file in `src/mods/rmg/templates/`. It also checks that 302 recorded `X1` names still build what they built when recorded (`tools/rmg/x1_fingerprints.txt`): what an `X1` name builds must never change.
 - `test/rmg_builder_test.cpp`: the template builder's data (`src/mods/rmg_builder_data.cpp`): each preset builds its ready file byte for byte and every ready file has a preset; every choice the panel offers has a recipe name, and the maker's check (`CheckChoices`) answers as `MakeTemplate`; the zone map's positions equal the web page's (numbers from Node); the French warnings; the game's text format; a UI file we do not know is left alone.
 - `test/input_mute_test.cpp`: the modal panels' input rules (`input_mute.cpp`): what the game gets of its window messages and of DirectInput while a panel is open and just after (held keys, Alt+F4, the mouse's motion, buffered events).
+- `test/wheel_test.cpp`: the mouse wheel fix for Wine (`src/mods/wheel_logic.cpp`) against a model of the game's own wheel reading, of Windows' mouse (positions) and Wine's (steps): the bug without the fix, every notch both ways with it (also when the game drops "presses"), no jump when it switches on or after an Acquire, positions never converted.
 
 - `test/watchdog_test.cpp`: the hang watchdog on a thread that freezes on purpose, once in a busy loop and once in a long `Sleep` (1.5 s threshold instead of 20). It checks one look per freeze, 20 samples, EIP in the spinning function, the caller's return address on the stack, ~100% CPU for the busy freeze and ~0 for the blocked one, and that the thread goes on normally afterwards.
 
@@ -145,7 +146,7 @@ On **Linux** (Wine/Proton) Wine prefers its own built-in `dinput8.dll`. Tell it 
 | `ai_trace.cpp` | the AI turn trace |
 | `log.cpp/.h` | `open-homm5.log` writer |
 | `d3d9_hook.cpp/.h` | the shared Direct3D 9 hooks (overlay, robot screenshots) |
-| `dinput_hook.cpp/.h` | the shared DirectInput 8 hooks (the robot's keyboard, the modal panels' mute) |
+| `dinput_hook.cpp/.h` | the shared DirectInput 8 hooks (the mouse wheel fix under Wine, `mods/wheel.cpp`; the robot's keyboard; the modal panels' mute). With none of them on (Windows, `[rmg] builder=0`, no robot, no `trace_wheel`), DirectInput is not hooked at all. |
 | `overlay.cpp/.h`, `overlay_internal.h` | the overlay: clients, the ImGui frame, fonts, the screen on top, the panels' language, our keys |
 | `overlay_input.cpp` | modal panels: the window procedure, the ImGui feed, the DirectInput mute, the safety nets |
 | `input_mute.cpp/.h` | the rules of what is held back from the game while a modal panel is open (pure code, tested) |

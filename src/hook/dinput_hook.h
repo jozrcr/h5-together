@@ -11,12 +11,13 @@
 //   IDirectInputDevice8::GetDeviceData    what the game reads as events ("key pressed").
 // Keyboard and mouse share one device vtable, so every hook asks which device
 // it was called for. After the real call, each user's filter runs in order
-// (lower first) and may change what the game gets: the robot adds its key
-// presses (order 0), then the overlay holds everything back while a modal
-// panel is open (order 100).
+// (lower first) and may change what the game gets: the mouse wheel fix for
+// Wine turns its wheel steps into positions (order -10, mods/wheel.cpp), the
+// robot adds its key presses (order 0), then the overlay holds everything back
+// while a modal panel is open (order 100).
 //
 // Nothing is hooked until a user has registered its filters (no robot, no
-// modal panel: DirectInput is untouched).
+// modal panel, no wheel fix or trace: DirectInput is untouched).
 #pragma once
 #include <windows.h>
 
@@ -48,5 +49,9 @@ void AddFilters(const Filters &filters, int order);
 // From the DirectInput8Create proxy, with the new object: hooks its vtable
 // (when any filters are registered).
 void OnDirectInputCreated(void *direct_input);
+
+// The real GetDeviceState of a device we hooked, without any filter (for a
+// filter that wants to compare the device's state with its events).
+HRESULT RealGetDeviceState(void *device, DWORD size, void *data);
 
 }  // namespace dihook
