@@ -20,6 +20,7 @@ struct View {
 	bool shown_known = false;
 	Values shown;
 	bool will_apply = false;  // host and client: every player has open-homm5's rules (else the files' rules)
+	int map_script = -1;      // host and client: the lobby's map has a map script (1), none (0: MMH5.5's scripts will not run), unknown (-1)
 	std::vector<std::string> missing;  // host: the players without it (names)
 	std::vector<std::string> differ;   // host: players whose MMH5.5 files differ ("Name: settings"...)
 	bool this_differs = false;         // client: the host said this PC's files differ from its own

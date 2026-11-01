@@ -183,6 +183,8 @@ std::vector<Pc> g_pcs;
 const void *g_pcs_logic = nullptr;  // the host lobby they belong to
 DWORD g_host_seen = 0, g_client_seen = 0;  // the last update of each lobby logic (tick)
 bool g_will_apply = false;
+std::string g_map_path;   // host: the lobby's map
+int g_map_script = -1;    // host: does it have a map script (-1 unknown)
 std::vector<std::string> g_missing, g_differ;
 
 bool g_lobby_known = false;  // client: what the host sent in the lobby
@@ -658,6 +660,36 @@ void SendLobbyText(void *logic, int pc, const std::string &text, BYTE seq)
 	}
 }
 
+// The lobby's map (the host logic's map id, +0x80, its path at +0x14): does it
+// name a map script? In a multiplayer game MMH5.5's scripts run only on maps
+// that do (a random map straight from the generator does not). Read once per map.
+void CheckMap(void *logic)
+{
+	const GameString *p = reinterpret_cast<const GameString *>(static_cast<BYTE *>(logic) + 0x80 + 0x14);
+	std::string path;
+	if (Readable(p, sizeof(*p)) && p->begin && p->end > p->begin && p->end - p->begin < 400 && Readable(p->begin, p->end - p->begin))
+		path.assign(p->begin, p->end);
+	{
+		Lock lock;
+		if (path == g_map_path)
+			return;
+	}
+	std::string file = path.substr(0, path.find('#'));
+	while (!file.empty() && (file[0] == '/' || file[0] == '\\'))
+		file.erase(0, 1);
+	std::string xdb;
+	const int script = file.empty() || !ReadInstalled(file.c_str(), &xdb) ? -1 : rules::HasMapScript(xdb) ? 1 : 0;
+	Lock lock;
+	g_map_path = path;
+	g_map_script = script;
+	if (!path.empty())
+		hooklog::Write(script == 1   ? "rules: the lobby's map %s has a map script: MMH5.5's scripts run on it"
+		               : script == 0 ? "rules: the lobby's map %s has NO map script: in a multiplayer game MMH5.5's scripts do not "
+		                               "run on it, so these rules change nothing there"
+		                             : "rules: the lobby's map %s could not be read",
+		               path.c_str());
+}
+
 void __fastcall HostUpdateHook(void *logic, void *edx)
 {
 	const DWORD now = GetTickCount();
@@ -665,6 +697,7 @@ void __fastcall HostUpdateHook(void *logic, void *edx)
 	if (g_enabled && now - last >= 500) {
 		last = now;
 		LoadFiles();
+		CheckMap(logic);
 		const BYTE *info = reinterpret_cast<const BYTE *>(Read(logic, 0x74));
 		struct Send {
 			int pc;
@@ -685,6 +718,8 @@ void __fastcall HostUpdateHook(void *logic, void *edx)
 				if (p.version != rules::kProtocol)
 					continue;
 				int flags = g_will_apply ? rules::kWillApply : 0;
+				if (g_map_script == 0)
+					flags |= rules::kNoScript;
 				const uint32_t mine[3] = {g_hash_rest, g_hash_whole, g_hash_stats};
 				if (g_file_known && ((p.has[0] && p.hash[0] != mine[0]) || (p.has[2] && p.hash[2] != mine[2])))
 					flags |= rules::kDiffers;
@@ -866,6 +901,7 @@ View GetView(View::Role role)
 		v.shown = role == View::kNoGame ? g_file_values : Effective();
 		if (role == View::kHost) {
 			v.will_apply = g_will_apply;
+			v.map_script = g_map_script;
 			v.missing = g_missing;
 			v.differ = g_differ;
 		}
@@ -875,6 +911,7 @@ View GetView(View::Role role)
 		v.shown = g_lobby_values;
 		v.will_apply = g_lobby_known && (g_lobby_flags & rules::kWillApply);
 		v.this_differs = g_lobby_known && (g_lobby_flags & rules::kDiffers);
+		v.map_script = !g_lobby_known ? -1 : (g_lobby_flags & rules::kNoScript) ? 0 : 1;
 	}
 	else if (role == View::kInGame) {
 		v.in_game_rules = g_serving;

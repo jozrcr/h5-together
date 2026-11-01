@@ -80,10 +80,15 @@ bool Decode(const std::string &text, Values *values);
 // The host's lobby message to a client, short (it travels in 4-byte pieces):
 // "L1|<flags>|" then every rule's value in the table's order, separated by ","
 // (empty = none). Flags: kWillApply = every player has the mod (the rules will
-// be used), kDiffers = this client's MMH5.5 files differ from the host's.
-const int kWillApply = 1, kDiffers = 2;
+// be used), kDiffers = this client's MMH5.5 files differ from the host's,
+// kNoScript = the map has no map script (MMH5.5's scripts will not run).
+const int kWillApply = 1, kDiffers = 2, kNoScript = 4;
 std::string LobbyText(int flags, const Values &values);
 bool ReadLobbyText(const std::string &text, int *flags, Values *values);
+
+// Does this map.xdb name a map script (<MapScript href="..."/>)? MMH5.5's
+// scripts run in a multiplayer game only on maps that do.
+bool HasMapScript(const std::string &map_xdb);
 
 // The pieces of a lobby text, each a (row, mask) pair of the game's "lock
 // buttons" command (NUI::CMPWaitLockButtonsUICommand: a client ignores a row

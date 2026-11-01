@@ -292,6 +292,15 @@ void TestPieces()
 	Check(LobbyPieces(std::string(kLobbyTextMax + 1, 'x'), 1).empty() && LobbyPieces("", 1).empty(), "too long or empty: no pieces");
 }
 
+void TestMapScript()
+{
+	Check(HasMapScript("<AdvMapDesc>\n\t<MapScript href=\"MapScript.xdb#xpointer(/Script)\"/>\n</AdvMapDesc>"),
+	      "a map script is found");
+	Check(!HasMapScript("<AdvMapDesc>\n\t<MapScript/>\n\t<Script href=\"x\"/>\n</AdvMapDesc>"),
+	      "<MapScript/> (a generated random map) is none, whatever follows");
+	Check(!HasMapScript("<MapScript href=\"\"/>") && !HasMapScript("<AdvMapDesc/>"), "an empty link or no field is none");
+}
+
 void TestHello()
 {
 	uint32_t type = 0;
@@ -320,6 +329,7 @@ int main()
 	TestHash();
 	TestText();
 	TestPieces();
+	TestMapScript();
 	TestHello();
 	printf(g_failures ? "%d FAILED\n" : "all host rules tests passed\n", g_failures);
 	return g_failures ? 1 : 0;

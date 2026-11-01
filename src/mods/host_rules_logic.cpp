@@ -344,6 +344,16 @@ bool ReadLobbyText(const std::string &text, int *flags, Values *values)
 	return true;
 }
 
+bool HasMapScript(const std::string &map_xdb)
+{
+	const size_t at = map_xdb.find("<MapScript");
+	if (at == std::string::npos)
+		return false;
+	const size_t end = map_xdb.find('>', at);
+	const size_t href = map_xdb.find("href=\"", at);
+	return end != std::string::npos && href != std::string::npos && href < end && map_xdb.compare(href + 6, 1, "\"") != 0;
+}
+
 bool IsLobbyRow(uint32_t row)
 {
 	return (row & 0xffff0000u) == kLobbyRowBase;

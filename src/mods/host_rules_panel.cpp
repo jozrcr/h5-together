@@ -98,7 +98,7 @@ struct Words {
 	const char *on, *off;
 	const char *file_value;  // %s
 	const char *apply, *missing, *differ, *setup, *client_wait, *client_apply, *client_no, *client_differ;
-	const char *game_host, *game_file, *no_file;
+	const char *game_host, *game_file, *no_file, *no_script;
 	const char *ok, *file, *cancel, *close;
 	const char *button;
 };
@@ -142,6 +142,8 @@ const Words kEnglish = {
 	"This game uses the host's rules.",
 	"This game uses this PC's MMH5.5 file.",
 	"MMH5.5's settings file (scripts/H55-Settings.lua) was not found: nothing to choose.",
+	"This map has no map script: in multiplayer MMH5.5's scripts do not run on it (a random map straight from the "
+	"generator), so these rules change nothing there.",
 	"OK", "MMH5.5's file", "Cancel", "Close",
 	"Rules...",
 };
@@ -189,6 +191,8 @@ const Words kFrench = {
 	"Cette partie utilise les r" E_GRAVE "gles de l'h" O_CIRC "te.",
 	"Cette partie utilise le fichier MMH5.5 de ce PC.",
 	"Le fichier de r" E_ACUTE "glages de MMH5.5 (scripts/H55-Settings.lua) est introuvable" NBSP ": rien " A_GRAVE " choisir.",
+	"Cette carte n'a pas de script" NBSP ": en multijoueur, les scripts de MMH5.5 n'y tournent pas (carte al" E_ACUTE "atoire "
+	"sortie du g" E_ACUTE "n" E_ACUTE "rateur), ces r" E_GRAVE "gles n'y changent donc rien.",
 	"OK", "Fichier MMH5.5", "Annuler", "Fermer",
 	"R" E_GRAVE "gles...",
 };
@@ -381,7 +385,8 @@ bool Wanted()
 	if (g_button_shown) {
 		ButtonInput(top);
 		const View v = rules::GetView(role);
-		g_button_warn = role == View::kHost ? (!v.missing.empty() || !v.differ.empty()) : (v.this_differs || (v.shown_known && !v.will_apply));
+		g_button_warn = v.map_script == 0 ||
+		                (role == View::kHost ? (!v.missing.empty() || !v.differ.empty()) : (v.this_differs || (v.shown_known && !v.will_apply)));
 		static bool told = false;
 		if (!told) {
 			told = true;
@@ -627,6 +632,8 @@ void DrawPanel(const overlay::Frame &frame)
 			_snprintf_s(line, sizeof(line), _TRUNCATE, w.differ, names(g.view.differ).c_str());
 			sy = Wrapped(draw, small, small_px, sx, sy, sw, ui::kError, line);
 		}
+		if (g.view.map_script == 0)
+			sy = Wrapped(draw, small, small_px, sx, sy, sw, ui::kWarn, w.no_script);
 	}
 	else if (g.role == View::kSetup)
 		sy = Wrapped(draw, small, small_px, sx, sy, sw, ui::kDim, w.setup);
@@ -638,6 +645,8 @@ void DrawPanel(const overlay::Frame &frame)
 			             g.view.will_apply ? w.client_apply : w.client_no);
 		if (g.view.this_differs)
 			sy = Wrapped(draw, small, small_px, sx, sy, sw, ui::kError, w.client_differ);
+		if (g.view.map_script == 0)
+			sy = Wrapped(draw, small, small_px, sx, sy, sw, ui::kWarn, w.no_script);
 	}
 	else if (g.role == View::kInGame)
 		sy = Wrapped(draw, small, small_px, sx, sy, sw, ui::kDim, g.view.in_game_rules ? w.game_host : w.game_file);
