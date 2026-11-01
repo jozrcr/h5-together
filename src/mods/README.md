@@ -693,6 +693,54 @@ Page Down (1.5 s) zoomed out to the farthest and Page Up back in, with `builder=
 
 **Keyboard:** Page Down zooms out and Page Up zooms in (`bind +camera_zoom 'PG_DOWN'`, `bind -camera_zoom 'PG_UP'` in the profile's `input_a2.cfg`), on every system.
 
+## Hero looks (`hero_skins*.cpp`; on, but nothing changes until a look is chosen)
+
+**What it is for:** the owner's request, "a way in game to select our hero's skin". A hero can wear the look of another hero **of the same faction**: its 3D figures on the adventure map, in battle and on the hero screen. The portrait, the class, the skills, the music and everything the rules use stay the hero's own. Plan and findings: [docs/plans/hero-skins.md](../../docs/plans/hero-skins.md).
+
+**How a player chooses:** the small **Look / Apparence** button on the hero screen (in the "Armée & Stats" header, left of MMH5.5's two buttons, where the owner's sketch put it; it shows the portrait of the hero's look and a tooltip), or **F7** (`[skins] key`) on the adventure map, the hero screen or the town screen, opens a panel for this PC's player's selected hero (`hero_skins_panel.cpp`, the template builder's style, a modal overlay panel: the game gets no input while it is open). It shows the looks of the hero's faction as portraits, its own first ("son apparence"), each with the name of the hero it is named after and how many others wear it; the selected one lists them ("Aussi portée par : ..."). **Appliquer / Apply** saves the choice to `open-homm5-skins.ini` (next to `open-homm5.ini`, by the hero's internal name: `Godric=Freyda`; "Own look" removes the line) and makes it count: at once in single player and hot seat (the map figure is rebuilt); in multiplayer for every player a few seconds later (below). The choice is remembered for every game. The button is drawn by the DLL (ImGui) at MMH5.5's hero screen layout, scaled with the screen height: the screen's panel `UI/HeroScreen3/SingleHero` is at x 60, centred vertically, and the skill wheel's round button (`MMH55-Skillwheel.pak`, `Single/Army`, `Button_HS`) at 372,48 inside it; ours is 24×24 at 403,94 of the 1024×768 reference: the slot of MMH5.5's small square button (which MMH5.5 shows only sometimes, and which is in none of the screen's UI files), centred on the round button's line (y 106, measured in the owner's two screenshots). `[skins] hero_screen_button_x` / `_y` move it. It reads the mouse itself (the click also reaches the game, on an empty spot of the header). Not native yet: serving the screen's own UI file would need its command handler, not researched.
+
+**The hero screen shows the new look the next time it opens.** An open hero screen keeps its 3D figure: the game never rebuilds the figure of a hero screen that is already shown (switching hero makes a new screen), and making it do so crashed the game (DLL `9823B52E`). Details: [the plan](../../docs/plans/hero-skins.md), "An open hero screen shows the new look the next time it opens".
+
+**Who decides a hero's look:** its owner, if human. In single player and hot seat, the file's choices count for every human player's heroes. In multiplayer, a PC's choices count for its own player's heroes; the other players' choices arrive by message. Computer players' heroes keep their looks. A look of another faction is left out (the log says so).
+
+**How it works** (details at the top of `hero_skins.cpp`):
+- The game asks the hero object for its battle figure and its map figure (two virtual functions, `IHero` slots `0x248` and `0x24c`). For a hero with a look they answer the look hero's figures; the hero object itself, which goes into saves and world checksums, never changes.
+- The look's strike figure, map animations and hero screen camera are put into the hero's data object, in memory only, with counted references; the hero's own are put back when the look goes.
+- The DLL notes each map figure the game builds. In single player and hot seat it rebuilds a figure with the game's own code when its look should change (just after the map shows, when a hero changes owner). Battles and the hero screen pick up the look when they open.
+- **Multiplayer: all or nothing.** Rebuilding a map figure makes new game objects, which take numbers from the world's counter, so every PC must rebuild the same figures at the same moment of the game, or the PCs' worlds part (the robot saw the world checksums split). After its second segment each PC sends its choices as world-checksum messages with check number −1, which the game ignores (the co-op guard's trick): a header with a fingerprint of the hero list (`k`), then one message per choice (`K`). At the start of segment 20 every PC applies the same rule: if every PC sent its looks in time (before its own report of segment 11) with the same game data, every PC rebuilds the same figures, in the order of their object numbers, and the game builds later figures with the looks; otherwise **nobody's looks show in that game**. So one friend without the DLL (or with another MMH5.5 version, or `show_others=0`) means normal looks for everyone in that game; the log says which PC.
+- **A choice made during a multiplayer game** (the panel's Apply) is sent at this PC's next segment report R, and every PC (this one too) takes it in at the start of segment R + 10 and rebuilds that hero's figure there: the same moment everywhere, a fraction of a second to two seconds later. In a game whose looks are off, it is only saved, for the next games (the panel says so).
+
+The log says what happened, for example:
+
+```
+hero skins: on; 3 line(s) in open-homm5-skins.ini (read when the game's hero list is); multiplayer looks when every PC takes part
+hero skins: 179 heroes in the game's list (fingerprint 0518, other entries skipped); 2 look(s) chosen in open-homm5-skins.ini
+hero skins:   Godric wears the look of Freyda
+hero skins:   Axel=Giovanni: another faction: left out (same faction only)
+hero skins: Jeddite: the map figure is rebuilt with Freyda's look
+hero skins: sent to the other PCs: 2 look(s) for player 1 (after this PC's report 2)
+hero skins: from PC 1: player 2 sends its looks (same game data)
+hero skins: looks on for this game (all 2 PCs sent theirs, with the same game data)
+hero skins: no looks in this game: PC 1 sent none in time (no open-homm5 DLL, an old one, other game data, or show_others=0)
+```
+
+**Checked with the robot** (A1M4; details in the plan's "Robot results"): single player (the look on the map and in a battle the AI started; the panel opened, a look picked and applied: the map figure changed at once), LAN with different looks on each PC (793 checksums, all equal), LAN with one PC taking no part (no looks, 517 checksums, all equal), LAN with a look changed through the panel during the game (both PCs rebuilt the figure at the same segment, 702 checksums, all equal).
+
+**Settings** (`open-homm5.ini`):
+
+```ini
+[skins]
+skins=1            ; 0 = install nothing
+key=F7             ; the panel's key (F1 to F12, or none)
+hero_screen_button=1   ; 0 = no Look button on the hero screen
+test_button_on_map=0   ; testing only: the button also on the adventure map (the robot cannot open the hero screen)
+show_others=1      ; 0 = this PC takes no part in multiplayer looks (then nobody's show there)
+trace=0            ; testing: log each figure built and who asks for the figures
+test_ai_heroes=0   ; testing only: computer players' heroes take this PC's looks too
+```
+
+The robot passes them with `--skins-setting KEY=VALUE` and the choices with `--skins-file PATH` (`run_lan_test.py`: `--host-skins` / `--client-skins`, `--host-skins-file` / `--client-skins-file`). `tools/robot/make_skins_file.py` writes a choices file where every hero of a faction wears one look, read from the test copy's data.
+
 ## Wider volume range (`audio_volume.cpp`, off by default)
 
 **What it is for:** even at the lowest step of the options screen's sliders (music, sounds), the game was too loud. The sliders have 11 steps from 0 to 100%, and they are straight. The 10% step is a tenth of the sound wave's size, only 20 dB below full volume. With `volume_curve=wide` each step is about the same number of decibels: 10% becomes about −40 dB (10 times quieter), 50% −12 dB, and 100% stays as it is. Off (the default, `game`), the game's own sliders.

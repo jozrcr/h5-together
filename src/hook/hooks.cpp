@@ -13,6 +13,8 @@
 #include "../mods/coop_guard.h"
 #include "../mods/edge_sky.h"
 #include "../mods/fast_paths.h"
+#include "../mods/hero_skins.h"
+#include "../mods/hero_skins_internal.h"
 #include "../mods/lan_discovery.h"
 #include "../mods/languages.h"
 #include "../mods/lockstep.h"
@@ -57,6 +59,7 @@ void InstallEarly()
 	mods::InstallOriginalMusicEarly();
 	mods::InstallPlayerListEarly();  // the Direct3D import, before the game makes its device
 	mods::InstallRmgBuilderEarly();
+	mods::InstallHeroSkinsPanelEarly();  // the overlay's Direct3D import, for the looks' panel
 	overlay::InstallTestPanelEarly();
 }
 
@@ -88,6 +91,7 @@ void InstallAll()
 	mods::ApplyWheelFromSettings();  // its DirectInput filter goes first (order -10)
 	mods::ApplyEdgeSkyFromSettings();  // [camera] edge_sky: before the first map reads its light
 	mods::ApplyAudioVolumeFromSettings();
+	mods::ApplyHeroSkinsFromSettings();  // after notify and the co-op guard: it stacks on their hooks
 }
 
 }  // namespace hooks

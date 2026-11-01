@@ -52,8 +52,10 @@ void EnableGameInput();
 // background, so the overlay's GetAsyncKeyState never sees a key).
 bool TakeOverlayKey(int vk);
 // A command for one of our panels (step "panel|preset 4"): true once, with the
-// step's text, for the panel that asks first (the robot cannot click).
-bool TakePanelCommand(char *out, int size);
+// step's text, for the panel that asks first (the robot cannot click). A panel
+// with a prefix ("skins ") gets only the commands that start with it (without
+// the prefix); the others never get those.
+bool TakePanelCommand(char *out, int size, const char *prefix = nullptr);
 
 // Robot human player (robot_endturn.cpp): ends the passive human's turns.
 void OnAiStep();               // from the AI trace, every AI step
