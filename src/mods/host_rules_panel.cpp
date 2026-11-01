@@ -101,6 +101,10 @@ struct Words {
 	const char *game_host, *game_file, *no_file, *no_script;
 	const char *ok, *file, *cancel, *close;
 	const char *button;
+	const char *modes[5];  // the game mode rule's values
+	const char *mode_with_toe;  // its help when the ToE bonuses are on and it says "the arrows"
+	const char *start_no;       // %s = why
+	const char *client_start_no;
 };
 
 const Words kEnglish = {
@@ -109,10 +113,11 @@ const Words kEnglish = {
 	"Chosen by the host (read only).",
 	"The rules of this game (read only).",
 	"MMH5.5's settings file on this PC (read only).",
-	{"Towns and heroes", "Computer players and neutral armies", "Artifacts and items", "Random maps"},
+	{"Game mode and start bonuses", "Towns and heroes", "Computer players and neutral armies", "Artifacts and items", "Random maps"},
 	{"Governors", "Town and dwelling conversion", "Extra conversions", "Town gate", "Mine guards",
 	 "Dimension doors visit towns", "Computer bonus", "Mixed neutral armies", "Neutral army size", "Battle site guards",
-	 "Prank artifacts", "Potions for sale", "Mage guild in every town", "Mana at observatories", "Moon disc quest"},
+	 "Prank artifacts", "Potions for sale", "Mage guild in every town", "Mana at observatories", "Moon disc quest",
+	 "Game mode", "ToE start bonuses"},
 	{"A hero can govern a town and give it bonuses.",
 	 "Captured towns and dwellings can change to your faction.",
 	 "How many more towns and dwellings may convert (1 = MMH5.5's balance).",
@@ -127,7 +132,9 @@ const Words kEnglish = {
 	 "Trading posts sell potions on multiplayer and random maps.",
 	 "Random map towns start with a level 1 mage guild.",
 	 "Redwood observatories also restore mana (random maps).",
-	 "The moon disc artifact quest on random maps."},
+	 "The moon disc artifact quest on random maps.",
+	 "Default, Savage or Nightmare for everyone (MMH5.5: the bonus arrows choose it).",
+	 "Each player keeps the start bonus picked with the arrows: gold, resources, artifact."},
 	{"Off", "40%", "60%", "80%", "100% (MMH5.5)", "120%", "140%"},
 	"On", "Off",
 	"your file: %s",
@@ -146,6 +153,11 @@ const Words kEnglish = {
 	"generator), so these rules change nothing there.",
 	"OK", "MMH5.5's file", "Cancel", "Close",
 	"Rules...",
+	{"Bonus arrows (MMH5.5)", "Default", "Savage", "Nightmare", "Random"},
+	"With ToE start bonuses the arrows choose a bonus, so the mode is Default.",
+	"Game mode and ToE start bonuses stay MMH5.5's way: %s.",
+	"Game mode and ToE start bonuses stay MMH5.5's way: MMH5.5's start script (H55-AdvMap.lua) is not the same on "
+	"every PC.",
 };
 
 const Words kFrench = {
@@ -155,11 +167,13 @@ const Words kFrench = {
 	"Choisies par l'h" O_CIRC "te (lecture seule).",
 	"Les r" E_GRAVE "gles de cette partie (lecture seule).",
 	"Le fichier de r" E_ACUTE "glages MMH5.5 de ce PC (lecture seule).",
-	{"Villes et h" E_ACUTE "ros", "Ordinateur et arm" E_ACUTE "es neutres", "Artefacts et objets", "Cartes al" E_ACUTE "atoires"},
+	{"Mode de jeu et bonus de d" E_ACUTE "part", "Villes et h" E_ACUTE "ros", "Ordinateur et arm" E_ACUTE "es neutres",
+	 "Artefacts et objets", "Cartes al" E_ACUTE "atoires"},
 	{"Gouverneurs", "Conversion des villes et habitations", "Conversions en plus", "Portail des villes", "Gardes des mines",
 	 "Portes dimensionnelles", "Bonus de l'ordinateur", "Arm" E_ACUTE "es neutres m" E_ACUTE "lang" E_ACUTE "es",
 	 "Taille des arm" E_ACUTE "es neutres", "Gardes des sites de combat", "Artefacts farceurs", "Potions en vente",
-	 "Guilde des mages dans chaque ville", "Mana aux observatoires", "Qu" E_CIRC "te du disque lunaire"},
+	 "Guilde des mages dans chaque ville", "Mana aux observatoires", "Qu" E_CIRC "te du disque lunaire", "Mode de jeu",
+	 "Bonus de d" E_ACUTE "part de ToE"},
 	{"Un h" E_ACUTE "ros peut gouverner une ville et lui donner des bonus.",
 	 "Les villes et habitations prises peuvent passer " A_GRAVE " votre faction.",
 	 "Combien de conversions en plus (1 = l'" E_ACUTE "quilibre de MMH5.5).",
@@ -174,7 +188,9 @@ const Words kFrench = {
 	 "Les comptoirs vendent des potions (cartes multijoueur et al" E_ACUTE "atoires).",
 	 "Sur les cartes al" E_ACUTE "atoires, chaque ville a une guilde des mages niveau 1.",
 	 "Les observatoires rendent aussi le mana (cartes al" E_ACUTE "atoires).",
-	 "La qu" E_CIRC "te de l'artefact du disque lunaire sur les cartes al" E_ACUTE "atoires."},
+	 "La qu" E_CIRC "te de l'artefact du disque lunaire sur les cartes al" E_ACUTE "atoires.",
+	 "Par d" E_ACUTE "faut, Sauvage ou Cauchemar pour tous (MMH5.5" NBSP ": choisi par les fl" E_GRAVE "ches de bonus).",
+	 "Chacun garde le bonus de d" E_ACUTE "part choisi avec les fl" E_GRAVE "ches" NBSP ": or, ressources, artefact."},
 	{"Aucun", "40" NBSP "%", "60" NBSP "%", "80" NBSP "%", "100" NBSP "% (MMH5.5)", "120" NBSP "%", "140" NBSP "%"},
 	"Oui", "Non",
 	"votre fichier" NBSP ": %s",
@@ -195,6 +211,11 @@ const Words kFrench = {
 	"sortie du g" E_ACUTE "n" E_ACUTE "rateur), ces r" E_GRAVE "gles n'y changent donc rien.",
 	"OK", "Fichier MMH5.5", "Annuler", "Fermer",
 	"R" E_GRAVE "gles...",
+	{"Fl" E_GRAVE "ches (MMH5.5)", "Par d" E_ACUTE "faut", "Sauvage", "Cauchemar", "Al" E_ACUTE "atoire"},
+	"Avec les bonus de ToE, les fl" E_GRAVE "ches choisissent un bonus" NBSP ": le mode est Par d" E_ACUTE "faut.",
+	"Le mode de jeu et les bonus de ToE restent ceux de MMH5.5" NBSP ": %s.",
+	"Le mode de jeu et les bonus de ToE restent ceux de MMH5.5" NBSP ": le script de d" E_ACUTE "part de MMH5.5 "
+	"(H55-AdvMap.lua) n'est pas le m" E_CIRC "me sur tous les PC.",
 };
 
 const Words &WordsNow()
@@ -216,6 +237,15 @@ State g;
 int g_key = VK_F2;
 bool g_key_down = false;
 bool g_button = true;
+
+// Do these values change a start rule (game mode, ToE bonuses) from MMH5.5's way?
+bool StartChanged(const Values &v)
+{
+	for (int r = 0; r < kRuleCount; ++r)
+		if (rules::IsStartRule(r) && !v[r].empty() && v[r] != rules::kStartRuleOff)
+			return true;
+	return false;
+}
 
 bool Editable()
 {
@@ -449,6 +479,8 @@ std::string Shown(const rules::RuleDef &rule, const std::string &value, const Wo
 		return value == "1" ? w.on : w.off;
 	if (rule.kind == rules::kChoice) {
 		const int v = atoi(value.c_str());
+		if (&rule == &kRules[rules::kGameModeRule])
+			return v >= 0 && v < 5 ? w.modes[v] : value;
 		return v >= 0 && v < 7 ? w.ai[v] : value;
 	}
 	if (rule.kind == rules::kMultiplier)
@@ -474,6 +506,8 @@ void RuleRow(ImDrawList *draw, ImVec2 origin, float k, float width, float y, int
 	ui::ShadowText(draw, body, body_px, at(4, y), changed ? ui::kGold : ui::kParchment,
 	               ui::Fit(body, body_px, w.names[r], (width - used - 12) * k).c_str());
 	std::string help = w.help[r];
+	if (r == rules::kGameModeRule && (value.empty() || value == rules::kStartRuleOff) && g.edit[rules::kToeBonusRule] == "1")
+		help = w.mode_with_toe;
 	if (changed) {
 		char note[64];
 		_snprintf_s(note, sizeof(note), _TRUNCATE, w.file_value, Shown(rule, file, w).c_str());
@@ -634,10 +668,21 @@ void DrawPanel(const overlay::Frame &frame)
 		}
 		if (g.view.map_script == 0)
 			sy = Wrapped(draw, small, small_px, sx, sy, sw, ui::kWarn, w.no_script);
+		if (StartChanged(g.edit) && !g.view.start_ok && g.view.missing.empty()) {
+			_snprintf_s(line, sizeof(line), _TRUNCATE, w.start_no, g.view.start_why.c_str());
+			sy = Wrapped(draw, small, small_px, sx, sy, sw, ui::kWarn, line);
+		}
 	}
-	else if (g.role == View::kSetup)
+	else if (g.role == View::kSetup) {
 		sy = Wrapped(draw, small, small_px, sx, sy, sw, ui::kDim, w.setup);
+		if (StartChanged(g.edit) && !g.view.start_ok) {
+			_snprintf_s(line, sizeof(line), _TRUNCATE, w.start_no, g.view.start_why.c_str());
+			sy = Wrapped(draw, small, small_px, sx, sy, sw, ui::kWarn, line);
+		}
+	}
 	else if (g.role == View::kClient) {
+		if (g.view.shown_known && g.view.will_apply && !g.view.start_ok)
+			sy = Wrapped(draw, small, small_px, sx, sy, sw, ui::kWarn, w.client_start_no);
 		if (!g.view.shown_known)
 			sy = Wrapped(draw, small, small_px, sx, sy, sw, ui::kWarn, w.client_wait);
 		else

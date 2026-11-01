@@ -66,9 +66,17 @@ void TestTable()
 	bool unique = true;
 	for (int a = 0; a < kRuleCount; ++a)
 		for (int b = a + 1; b < kRuleCount; ++b)
-			if (strcmp(kRules[a].key, kRules[b].key) == 0 || strcmp(kRules[a].var, kRules[b].var) == 0)
+			if (strcmp(kRules[a].key, kRules[b].key) == 0 || (kRules[a].var && kRules[b].var && strcmp(kRules[a].var, kRules[b].var) == 0))
 				unique = false;
 	Check(unique, "every rule has its own key and variable");
+	bool start = Index("game_mode") == kGameModeRule && Index("toe_bonuses") == kToeBonusRule;
+	for (int r = 0; r < kRuleCount; ++r)
+		start = start && (IsStartRule(r) == (kRules[r].var == nullptr)) && (IsStartRule(r) == (kRules[r].group == kStart)) &&
+		        (!IsStartRule(r) || ValidValue(kRules[r], kStartRuleOff));
+	Check(start, "the start rules: the last two, no settings variable, their own group, \"0\" = MMH5.5's way");
+	Check(ValidValue(kRules[kGameModeRule], "4") && !ValidValue(kRules[kGameModeRule], "5") &&
+	          ValidValue(kRules[kToeBonusRule], "1") && !ValidValue(kRules[kToeBonusRule], "2"),
+	      "game mode 0 to 4, ToE bonuses 0 or 1");
 	bool plain = true;
 	for (int r = 0; r < kRuleCount; ++r)
 		for (const char *c = kRules[r].key; *c; ++c)
@@ -164,6 +172,12 @@ void TestSubstitute()
 	      "the block comment is untouched");
 	Check(changes.size() == 5, "five changes are reported");
 	Check(!changes.empty() && changes[0] == "governance 1->0", "a change reads \"governance 1->0\"");
+	Values start = NoValues();
+	start[kGameModeRule] = "2";
+	start[kToeBonusRule] = "1";
+	changes.clear();
+	Check(Substitute(file, start, &changes) == file && changes.empty() && ParseSettings(file)[kGameModeRule].empty(),
+	      "the start rules never touch the settings file");
 
 	// a rule the file does not have: a line at the end (with the file's line ends)
 	Values only = NoValues();
@@ -204,23 +218,28 @@ void TestHash()
 void TestText()
 {
 	Values v = NoValues();
-	Check(Encode(v) == "OHR1", "no values: \"OHR1\"");
+	Check(Encode(v) == "OHR2", "no values: \"OHR2\"");
 	v[Index("governance")] = "0";
 	v[Index("ai_cheat")] = "0";
 	v[Index("neutral_stack_size")] = "1.25";
 	const std::string text = Encode(v);
-	Check(text == "OHR1;governance=0;ai_cheat=0;neutral_stack_size=1.25", "values in the table's order");
+	Check(text == "OHR2;governance=0;ai_cheat=0;neutral_stack_size=1.25", "values in the table's order");
 	Values back;
 	Check(Decode(text, &back) && back == v, "decoded back to the same values");
-	Check(!Decode("OHR2;governance=0", &back), "another version is refused");
-	Check(!Decode("OHR1;governance=2", &back), "a bad value is refused");
-	Check(!Decode("OHR1;governance=0;governance=1", &back), "a key twice is refused");
-	Check(!Decode("OHR1;new_rule=1", &back), "an unknown key is refused (a newer host: nothing is used)");
-	Check(!Decode("OHR1;governance", &back) && !Decode("OHR1governance=0", &back) && !Decode("OHR1;", &back),
+	Values with_start = v;
+	with_start[kGameModeRule] = "3";
+	with_start[kToeBonusRule] = "1";
+	Check(Encode(with_start) == text + ";game_mode=3;toe_bonuses=1" && Decode(Encode(with_start), &back) && back == with_start,
+	      "the start rules travel too");
+	Check(!Decode("OHR1;governance=0", &back), "another version (1: no start rules) is refused");
+	Check(!Decode("OHR2;governance=2", &back) && !Decode("OHR2;game_mode=5", &back), "a bad value is refused");
+	Check(!Decode("OHR2;governance=0;governance=1", &back), "a key twice is refused");
+	Check(!Decode("OHR2;new_rule=1", &back), "an unknown key is refused (a newer host: nothing is used)");
+	Check(!Decode("OHR2;governance", &back) && !Decode("OHR2governance=0", &back) && !Decode("OHR2;", &back),
 	      "broken texts are refused");
 	Values bad = NoValues();
 	bad[Index("governance")] = "7";
-	Check(Encode(bad) == "OHR1", "invalid values are never sent");
+	Check(Encode(bad) == "OHR2", "invalid values are never sent");
 	// the longest text: every rule with an 8-character value
 	Values longest = NoValues();
 	for (int r = 0; r < kRuleCount; ++r)
@@ -232,13 +251,16 @@ void TestText()
 
 	const std::string lobby = LobbyText(kWillApply | kDiffers, v);
 	int flags = 0;
-	Check(lobby == "L1|3|0,,,,,,0,,1.25,,,,,," && ReadLobbyText(lobby, &flags, &back) && flags == 3 && back == v,
-	      "the lobby text: L1|flags|every value in the table's order");
-	Check(!ReadLobbyText(text, &flags, &back) && !ReadLobbyText("L1|x|0,,,,,,0,,1.25,,,,,,", &flags, &back) &&
-	          !ReadLobbyText("L1||0,,,,,,0,,1.25,,,,,,", &flags, &back) && !ReadLobbyText("L2|3|0,,,,,,0,,1.25,,,,,,", &flags, &back),
+	Check(lobby == "L2|3|0,,,,,,0,,1.25,,,,,,,," && ReadLobbyText(lobby, &flags, &back) && flags == 3 && back == v,
+	      "the lobby text: L2|flags|every value in the table's order");
+	Check(LobbyText(kWillApply | kNoStart, with_start) == "L2|9|0,,,,,,0,,1.25,,,,,,,3,1" &&
+	          ReadLobbyText(LobbyText(kWillApply | kNoStart, with_start), &flags, &back) && flags == 9 && back == with_start,
+	      "the start rules and their flag in the lobby text");
+	Check(!ReadLobbyText(text, &flags, &back) && !ReadLobbyText("L2|x|0,,,,,,0,,1.25,,,,,,,,", &flags, &back) &&
+	          !ReadLobbyText("L2||0,,,,,,0,,1.25,,,,,,,,", &flags, &back) && !ReadLobbyText("L1|3|0,,,,,,0,,1.25,,,,,,", &flags, &back),
 	      "a lobby text without flags, or of another version, is refused");
-	Check(!ReadLobbyText("L1|1|0,,,,,,0,,1.25,,,,,", &flags, &back) && !ReadLobbyText("L1|1|0,,,,,,0,,1.25,,,,,,,", &flags, &back) &&
-	          !ReadLobbyText("L1|1|7,,,,,,0,,1.25,,,,,,", &flags, &back),
+	Check(!ReadLobbyText("L2|1|0,,,,,,0,,1.25,,,,,,,", &flags, &back) && !ReadLobbyText("L2|1|0,,,,,,0,,1.25,,,,,,,,,", &flags, &back) &&
+	          !ReadLobbyText("L2|1|7,,,,,,0,,1.25,,,,,,,,", &flags, &back),
 	      "too few or too many values, or a bad one, is refused");
 	Check(LobbyText(kWillApply, longest).size() < 100, "the lobby text stays short (it travels 4 bytes at a time)");
 }
@@ -301,6 +323,151 @@ void TestMapScript()
 	Check(!HasMapScript("<MapScript href=\"\"/>") && !HasMapScript("<AdvMapDesc/>"), "an empty link or no field is none");
 }
 
+// A start script in the layout of MMH5.5's H55-AdvMap.lua "StartingBonus" part
+// (our own short text, not MMH5.5's): the flags, the computer players' count,
+// the humans' loop that takes the bonus back and gives the start artifact, and
+// the mode's decision. Line ends mixed, as in MMH5.5's file.
+const char kStartSample[] =
+	"function H55_PrepareAdvMap()\r\n"
+	"\tH55_DEBUG = {101,\"ShamanPatterns\",1,\"NoHero\"};----\r\n"
+	"\tH55_DEBUG = {102,\"StartingBonus\",1,\"NoHero\"};----\n"
+	"\t----\n"
+	"\n"
+	"\tif H55_EnableModes == 1 then\n"
+	"\t\tlocal somebodygold = 0;\n"
+	"\t\tlocal somebodyres = 0;\t\t\t\n"
+	"\t\tlocal somebodyartifact = 0;\n"
+	"\t\tlocal amountai = table.containsamount(H55_PlayerStatus,1);\r\n"
+	"\t\tif H55_MapType ~= \"Campaign\" then\n"
+	"\t\t\tfor i=1,8 do\n"
+	"\t\t\t\tif (GetPlayerState(i) == 1) and (H55_IsThisAIPlayer(i) ~= 1) then\n"
+	"\t\t\t\t\tlocal heroes = GetPlayerHeroes(i);\n"
+	"\t\t\t\t\tif GetPlayerResource(i,6) > 25000 then somebodygold = 1; SetPlayerResource(i,6,25000); end;\n"
+	"\t\t\t\t\tif heroes ~= nil then RemoveArtefact(heroes[0],1); somebodyartifact = 1; end;\n"
+	"\t\t\t\t\tif heroes ~= nil then\n"
+	"\t\t\t\t\t\tH55_ArtifactStartBonus(heroes[0]);\n"
+	"\t\t\t\t\tend;\n"
+	"\t\t\t\tend;\n"
+	"\t\t\tend;\n"
+	"\t\tend;\n"
+	"\t\tif H55_MapType == \"Scenario\" then\r\n"
+	"\t\t\tH55_GameMode = 1;\n"
+	"\t\telseif H55_MapType == \"Campaign\" then\n"
+	"\t\t\tH55_GameMode = 1;\n"
+	"\t\telse\n"
+	"\t\t\tif H55_GameMode ~= 0 and somebodyartifact == 1 then H55_GameMode = 1;\n"
+	"\t\t\telseif H55_GameMode ~= 0 and somebodygold == 1 then H55_GameMode = 2; H55_TeamHumansvsAI();\n"
+	"\t\t\telseif H55_GameMode ~= 0 and somebodyres == 1 then H55_GameMode = 3; H55_TeamHumansvsAI();\n"
+	"\t\t\tend;\n"
+	"\t\tend;\n"
+	"\tend;\n"
+	"\t----\r\n"
+	"\tH55_DEBUG = {103,\"StartingArmies\",1,\"NoHero\"};----\r\n"
+	"end;\r\n";
+
+// The script without our lines and with the loop's condition as it was: the original?
+std::string WithoutOurs(std::string s)
+{
+	for (;;) {
+		const size_t at = s.find("-- open-homm5");
+		if (at == std::string::npos)
+			break;
+		size_t b = at, e = s.find('\n', at);
+		while (b > 0 && s[b - 1] != '\n')
+			--b;
+		s.erase(b, e - b + 1);
+	}
+	const char ours[] = " and OH55_KeepToEBonus ~= 1";
+	const size_t at = s.find(ours);
+	if (at != std::string::npos)
+		s.erase(at, strlen(ours));
+	return s;
+}
+
+void TestStartScript()
+{
+	const std::string lua = kStartSample;
+	size_t b = 0, e = 0;
+	Check(FindStartBlock(lua, &b, &e) && b < e && lua.compare(e, 15, "H55_DEBUG = {10") == 0, "the StartingBonus part is found");
+	Check(StartBlockHash(lua) != 0 && StartBlockHash("no such part") == 0, "its hash (0 when not found)");
+	std::string outside = lua;
+	outside.replace(outside.find("ShamanPatterns"), 6, "Witchy");
+	std::string inside = lua;
+	inside.replace(inside.find("25000); end"), 5, "20000");
+	Check(StartBlockHash(outside) == StartBlockHash(lua) && StartBlockHash(inside) != StartBlockHash(lua),
+	      "the hash sees the part only");
+	Check(ModeUsed(0, false) == 0 && ModeUsed(0, true) == 1 && ModeUsed(2, true) == 2 && ModeUsed(4, false) == 4 &&
+	          ModeUsed(7, false) == 0,
+	      "the mode used: the rule's, or Default with ToE bonuses and \"the arrows\"");
+
+	std::string out, why;
+	Check(PatchStartScript(lua, 0, false, false, &out, &why) && out == lua, "MMH5.5's way for both: the script as it is");
+
+	out.clear();
+	Check(PatchStartScript(lua, 0, true, false, &out, &why), "ToE bonuses: patched");
+	Check(out.find("\t\tlocal amountai = table.containsamount(H55_PlayerStatus,1);\r\n"
+	               "\t\tlocal OH55_KeepToEBonus, OH55_Mode = 1, 1; -- open-homm5") != std::string::npos,
+	      "edit 1: the values after the computer players' count, its indent and line end; mode Default");
+	Check(out.find("\t\tif H55_MapType ~= \"Campaign\" and OH55_KeepToEBonus ~= 1 then\n\t\t\tfor i=1,8 do") != std::string::npos,
+	      "edit 2: the humans' loop is skipped when the ToE bonuses are kept");
+	const std::string decide = "\t\tif OH55_Mode ~= 0 then if OH55_Mode == 4 then OH55_Mode = random(3)+1 end; "
+	                           "somebodyartifact = 0; somebodygold = 0; somebodyres = 0; "
+	                           "if OH55_Mode == 1 then somebodyartifact = 1 elseif OH55_Mode == 2 then somebodygold = 1 else "
+	                           "somebodyres = 1 end; end; -- open-homm5: the game mode is the host's rule, not the bonus arrows\r\n"
+	                           "\t\tif H55_MapType == \"Scenario\" then\r\n";
+	Check(out.find(decide) != std::string::npos, "edit 3: the mode's flags just before the decision (its indent and line end)");
+	Check(WithoutOurs(out) == lua, "nothing else changes");
+	Check(out.find("print(") == std::string::npos, "no trace line without trace");
+
+	Check(PatchStartScript(lua, 2, false, false, &out, &why) && out.find("OH55_KeepToEBonus, OH55_Mode = 0, 2;") != std::string::npos &&
+	          WithoutOurs(out) == lua,
+	      "Savage without the ToE bonuses: the loop stays (MMH5.5 takes the bonus back), the mode is Savage");
+	Check(PatchStartScript(lua, 4, true, false, &out, &why) && out.find("OH55_KeepToEBonus, OH55_Mode = 1, 4;") != std::string::npos,
+	      "Random: decided in the script by the game's shared random numbers");
+	Check(PatchStartScript(lua, 3, true, true, &out, &why) && WithoutOurs(out) == lua &&
+	          out.find("print(\"open-homm5: start of player \"") != std::string::npos &&
+	          out.find("-- open-homm5: [rules] trace=1\r\n\tH55_DEBUG = {103,") != std::string::npos,
+	      "trace: one print line just before the next part");
+	Check(PatchStartScript(lua, 0, false, true, &out, &why) && out.find("OH55_Mode") == std::string::npos && WithoutOurs(out) == lua,
+	      "trace alone: only the print line");
+
+	// MMH5.5's text not as expected: refused, nothing served
+	const auto refused = [](const std::string &text) {
+		std::string o = "untouched", w;
+		return !PatchStartScript(text, 1, true, false, &o, &w) && o == "untouched" && !w.empty();
+	};
+	const auto without = [&lua](const char *what) {
+		std::string s = lua;
+		s.erase(s.find(what), strlen(what));
+		return s;
+	};
+	const auto twice = [&lua](const char *what) {
+		std::string s = lua;
+		const size_t at = s.find(what);
+		s.insert(at, std::string(what) + "\n");
+		return s;
+	};
+	Check(refused(without("H55_DEBUG = {102,\"StartingBonus\",1,\"NoHero\"};")) &&
+	          refused(without("H55_DEBUG = {103,\"StartingArmies\",1,\"NoHero\"};")),
+	      "refused: a marker is missing");
+	Check(refused(without("local amountai = table.containsamount(H55_PlayerStatus,1);")) &&
+	          refused(twice("if H55_MapType == \"Scenario\" then")) && refused(twice("if H55_MapType ~= \"Campaign\" then")),
+	      "refused: an edit's place is missing or there twice");
+	Check(refused(without("H55_ArtifactStartBonus(heroes[0]);")) && refused(without("SetPlayerResource(i,6,25000);")) &&
+	          refused(without("local somebodyres = 0;")),
+	      "refused: the loop no longer takes the bonus back, or a flag is not a local of the part");
+	Check(refused(without("H55_GameMode ~= 0 and somebodygold == 1")), "refused: the decision no longer reads a flag");
+	std::string moved = lua;
+	const std::string scenario = "\t\tif H55_MapType == \"Scenario\" then\r\n";
+	moved.erase(moved.find(scenario), scenario.size());
+	moved.insert(moved.find("\t\tif H55_MapType ~= \"Campaign\" then"), scenario);
+	Check(refused(moved), "refused: the places in another order");
+	std::string o = "untouched", w;
+	Check(PatchStartScript(without("H55_ArtifactStartBonus(heroes[0]);"), 0, false, false, &o, &w) &&
+	          o == without("H55_ArtifactStartBonus(heroes[0]);"),
+	      "MMH5.5's way needs no edit: any script is fine");
+}
+
 void TestHello()
 {
 	uint32_t type = 0;
@@ -313,6 +480,9 @@ void TestHello()
 	HashRequest(kMarkStats, 0x00000001u, &type, &byte);
 	Check(ReadHashRequest(type, byte, &mark, &hash) && mark == kMarkStats && hash == 1, "a small hash too");
 	Check(type >= 0x4e000000u, "hash types are far above the game's request types (1, 2, ...)");
+	HashRequest(kMarkStartScript, 0x00345678u, &type, &byte);
+	Check(ReadHashRequest(type, byte, &mark, &hash) && mark == kMarkStartScript && hash == 0x00345678u && type >= 0x41000000u,
+	      "the start script's hash ('A') too, also far above the game's types");
 	Check(!ReadHashRequest(kHelloType, kProtocol, &mark, &hash) && !ReadHashRequest(0x4f48, 1, &mark, &hash) &&
 	          !ReadHashRequest(2, 0, &mark, &hash),
 	      "the hellos (ours, the faction mod's) and the game's types are not hashes");
@@ -330,6 +500,7 @@ int main()
 	TestText();
 	TestPieces();
 	TestMapScript();
+	TestStartScript();
 	TestHello();
 	printf(g_failures ? "%d FAILED\n" : "all host rules tests passed\n", g_failures);
 	return g_failures ? 1 : 0;

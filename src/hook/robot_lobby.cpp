@@ -347,7 +347,9 @@ void LogWaitSlots()
 
 // Press a player row's arrow in the waiting room: "<row> left|right", or
 // "<row> team left|right" for the team arrows, "<row> race left|right" for the
-// faction arrows (0x007138a0 / 0x007138c0: +0xc4 = 3).
+// faction arrows (0x007138a0 / 0x007138c0: +0xc4 = 3), "<row> bonus left|right"
+// for the start bonus arrows (0x007138e0 / 0x00713900: +0xc4 = 4; bonuses 0
+// random, 1 minor artifact, 2 gold, 3 resources, right = the next one).
 // The arrows (UI/MPWait/PlayersList/Item/OpenCloseLeft|Right, TeamColorLeft|Right)
 // only record a pending change on the row (CMPWaitItem, 0x00713820 / 0x00713840,
 // team: 0x00713860 / 0x00713880):
@@ -366,6 +368,7 @@ bool PressSlotArrow(const char *spec)
 	const bool right = ready || strstr(spec, "right") != nullptr;
 	const bool team = strstr(spec, "team") != nullptr;
 	const bool race = strstr(spec, "race") != nullptr;
+	const bool bonus = strstr(spec, "bonus") != nullptr;
 	BYTE *screen = static_cast<BYTE *>(FindScreen("NUI::CMPWaitScreen"));
 	if (!screen) {
 		hooklog::Write("robot: waiting room: not open (arrow %s skipped)", spec);
@@ -389,15 +392,15 @@ bool PressSlotArrow(const char *spec)
 			}
 		}
 		BYTE *full = begin[row] - 8;
-		*reinterpret_cast<DWORD *>(full + 0xc4) = race ? 3 : team ? 2 : 1;
+		*reinterpret_cast<DWORD *>(full + 0xc4) = bonus ? 4 : race ? 3 : team ? 2 : 1;
 		*(full + 0xc8) = right ? 1 : 0;
 	}
 	__except (EXCEPTION_EXECUTE_HANDLER) {
 		hooklog::Write("robot: waiting room: pressing an arrow crashed (caught)");
 		return false;
 	}
-	hooklog::Write("robot: waiting room: row %d %s arrow %s pressed", row, race ? "race" : team ? "team" : "state",
-	               right ? "right" : "left");
+	hooklog::Write("robot: waiting room: row %d %s arrow %s pressed", row,
+	               bonus ? "bonus" : race ? "race" : team ? "team" : "state", right ? "right" : "left");
 	return true;
 }
 
