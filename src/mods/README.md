@@ -2,6 +2,15 @@
 
 Everything here changes how the original game behaves, on purpose. It is kept apart from the decompiled code (`src/decomp/`), which must stay byte-for-byte faithful. The mods are built into the hook DLL (`src/hook/`, `dinput8.dll`) and switched on and off with a settings file, `open-homm5.ini`, next to the game exe.
 
+**Contents**
+
+- Faster co-op: [LAN link tuning](#lan-link-tuning-net_tuningcpp), [LAN games over VPNs](#lan-games-over-vpns-lan_discoverycpp-on-by-default), [faster co-op segments](#faster-co-op-segments-coop_guardcpp-on-when-every-player-agrees), [quicker lockstep](#quicker-lockstep-lockstepcpp-the-drain-and-the-trace-on-by-default), [one AI decision per frame](#one-ai-decision-per-frame-ai_pacingcpp-on-by-default), [quicker autosaves](#quicker-autosaves-autosavecpp-the-trace-and-level-1-on-by-default), [fast AI pathfinding](#fast-ai-pathfinding-fast_pathscpp-on-by-default)
+- Interface: ["your turn" notification](#your-turn-notification-notifycpp-on-by-default), [player list](#player-list-player_listcpp-on-by-default), [hero looks](#hero-looks-hero_skinscpp-on-but-nothing-changes-until-a-look-is-chosen), [French texts](#one-language-french-texts-languagescpp-off-by-default)
+- Random maps: [teams](#teams-on-random-maps-rmg_teamscpp-on-by-default-only-for-recipe-maps), [templates and recipe names](#random-map-templates-rmg_templatescpp-rmg_makercpp-rmg_recipecpp-on-by-default), [template builder](#template-builder-rmg_buildercpp-rmg_screencpp-on-by-default), [start terrain that matches the factions](#start-terrain-that-matches-the-factions-rmg_factionscpp-off-by-default)
+- Rules: [game rules from the host](#game-rules-from-the-host-host_rulescpp-on-and-nothing-changes-unless-the-host-changes-something)
+- Camera, sound and visuals: [original music](#original-music-original_musiccpp-off-by-default), [camera zoom and start distance](#farther-camera-zoom-start-distance-cameracpp-off-by-default), [the mouse wheel under Wine](#the-mouse-wheel-under-wine--proton-wheelcpp-wheel_logiccpp-on-under-wine-only), [wider volume range](#wider-volume-range-audio_volumecpp-off-by-default), [black past the map's edge](#black-past-the-maps-edge-edge_skycpp-off-by-default)
+- The freeze detector (hang watchdog) is part of the DLL itself: [src/hook/README.md](../hook/README.md#the-hang-watchdog-watchdogcpp).
+
 ## LAN link tuning (`net_tuning.cpp`)
 
 **What it fixes:** slow AI turns in co-op (LAN and GameRanger games).
@@ -384,7 +393,7 @@ recipe_teams=1    ; maps made from a recipe template get the template's teams, a
 
 The robot sets these with `run_lan_test.py --host-rmg KEY=VALUE`, and presses a team arrow with the step `"38|arrow|<row> team left|right"`.
 
-**Not done yet:** a random map in a LAN robot game. The robot plays A1M4, which has no teams either.
+LAN robot games on random maps came later: the recipe maps' teams (above) and the faction terrain ([below](#start-terrain-that-matches-the-factions-rmg_factionscpp-off-by-default)).
 
 ## Random map templates (`rmg_templates.cpp`, `rmg_maker.cpp`, `rmg_recipe.cpp`, on by default)
 
@@ -506,7 +515,7 @@ trace_factions=0   ; research: lobby setups, the start, map builds, map files, f
 - **No faction changed** (setting on): no rebuild; the game started on the map as it was. 508 checksums, all equal.
 
 **Not done yet:**
-- **The lobby unlock on fixed-town maps** (every slot locked to one faction) is not robot-tested: the only such saved maps use recipe templates, which this branch does not serve.
+- **The lobby unlock on fixed-town maps** (every slot locked to one faction) is not robot-tested: the only such saved maps use recipe templates, which the DLL did not serve yet when this mod was tested.
 - **Linux (Proton).**
 - **A line on the loading screen** while the map is rebuilt: the screen just waits a few seconds.
 
@@ -807,7 +816,7 @@ Plan, research and robot checks: [docs/plans/host-rules.md](../../docs/plans/hos
 
 **What it is for:** MMH5.5 has switches for many of its rules (governors, town conversion, the town gate, mine guards, the computer's weekly bonus, mixed neutral armies, prank artifacts, the random map extras...), in `scripts/H55-Settings.lua`. Until now a group changed them by swapping a settings pak on every PC. With this mod **the host chooses them for each game**, in a panel, and every PC plays with them.
 
-- **The host:** on the game setup screen or in the waiting room, **F2** (or **"Rules..."** at the right of the waiting room's title) opens the panel: 15 switches and "MMH5.5 scripts on random maps" (below), each with one line of explanation, in French or English. Gold = changed from your MMH5.5 file. **OK** keeps the choice (also for your next games, in `[rules]`); **MMH5.5's file** puts everything back.
+- **The host:** on the game setup screen or in the waiting room, **F2** (or **"Rules..."** at the right of the waiting room's title) opens the panel: the game mode and ToE start bonuses, 15 of MMH5.5's switches and "MMH5.5 scripts on random maps" (below), each with one line of explanation, in French or English. Gold = changed from your MMH5.5 file. **OK** keeps the choice (also for your next games, in `[rules]`); **MMH5.5's file** puts everything back.
 - **The other players** see the host's rules there, read only. On the adventure map, **F2** shows the running game's rules to everyone.
 - **They are used only when every player has the add-on.** Otherwise every PC uses its own MMH5.5 file, as without the add-on; the host's panel names who lacks it, and the button gets a red "!".
 - **The check:** each PC tells the host a fingerprint of its MMH5.5 files (`H55-Settings.lua`, the stats paks). If a player's files differ, the host's panel and log name that player (the game could go out of step); that player's panel says so too.
@@ -816,6 +825,13 @@ Plan, research and robot checks: [docs/plans/host-rules.md](../../docs/plans/hos
 - **MMH5.5 scripts on random maps** ("Scripts MMH5.5 sur les cartes aléatoires", `map_scripts`): in a multiplayer game the game runs MMH5.5's scripts (governors, mixed armies, the computer's bonus, the modes...) only on maps with a map script. Hand-made maps and random maps saved with a script (MMH5.5's Mapmixer, the editor: the group's usual maps) have one; **a random map straight from the game's generator has none**. With MMH5.5 RC19d the scripts then do not run there (and these switches change nothing); RC19k runs them anyway. This rule decides it for every PC of the game: **On** = the add-on gives such a map an empty map script (as the Mapmixer does), so the scripts run; **Off** = they do not run, as in the original game (also with RC19k). **The default is what your MMH5.5 does by itself** (RC19d: off, RC19k: on), so nothing changes unless the host changes it. Maps that have their own script are never changed. Logged on every PC: `rules: the world starts its scripts: this map has no map script, and this game's rules say map_scripts=1: it gets an empty one, so MMH5.5's scripts run`.
 - Single player uses your MMH5.5 file, as before (and always runs MMH5.5's scripts).
 - **Saves:** a loaded game goes on with what it started with (the rules' values and whether the scripts run): a load does not start the map's scripts again.
+
+**Game mode and ToE start bonuses** (the panel's first group; `host_rules_bonus.cpp` for the lobby's tooltips). In MMH5.5 the lobby's bonus arrows choose the game mode (artifact = Default, gold = Savage, resources = Nightmare, random = one of them), and MMH5.5's start script then takes every human's bonus back and gives each first hero a random minor artifact instead. Two host rules change that:
+- **Game mode:** "Bonus arrows (MMH5.5)" (the default: as today), or Default, Savage, Nightmare, Random for everyone. Savage and Nightmare still team the computer players against the humans, as MMH5.5 does (MMH5.5's own code runs; only its input changes). Scenarios, campaigns and games without computer players keep MMH5.5's choice (Default).
+- **ToE start bonuses:** on = each player picks a start bonus with the arrows, as in Tribes of the East (gold, resources, a minor artifact, or random), and keeps it; MMH5.5's start artifact is not given (it is the same kind of bonus, so a player would get two). With this on and the mode on "Bonus arrows", the mode is Default.
+- **How:** when the map's scripts read `scripts/H55-AdvMap.lua`, every PC serves it with three small edits in its "StartingBonus" part. Each edit is checked against MMH5.5's text; if MMH5.5 changes that text in an update, the file is served as it is (MMH5.5's way) and the log says why. RC19d and RC19k have the same part. The start rules are used only when every PC has the same part (its hash travels in the hello); otherwise the panel says why and MMH5.5's way stays.
+- **The tooltips:** with these rules on, the bonus icons' tooltips in the waiting room describe ToE's bonuses and the game mode (English or French, as the panel). Not changed: the icons themselves (MMH5.5's mode pictures).
+- The log: `rules: the scripts read scripts/H55-AdvMap.lua: served with game mode Default, each human keeps the ToE start bonus; ... hash ...` (the same hash on every PC).
 
 **Robot checks** (2026-11-01, LAN, two copies; all world checksums equal):
 - A1M4 (RC19k) with `governance=0 ai_cheat=0 mixed_stacks=0`: both PCs served the same file (hash `a07c5c34`), MMH5.5 no longer mixed the neutral stacks (`H55 Stacks Qty: 36`, no `H55 Mixing`). The client saw the host's rules in the waiting room and in game.
@@ -837,7 +853,11 @@ button=1      ; the "Rules..." button in the waiting room
 governance=   ; the host's choices, written by the panel (empty = MMH5.5's file); also
               ; town_conversion, extra_conversions, town_gate, mine_control, dimension_doors,
               ; ai_cheat, mixed_stacks, neutral_stack_size, bank_difficulty, negative_artifacts,
-              ; rpg_potions, map_scripts, competitive_towns, mana_observatories, moon_disc
-              ; (map_scripts: empty = what this PC's MMH5.5 does by itself)
-trace=0       ; testing: log every script file the game opens
+              ; rpg_potions, competitive_towns, mana_observatories, moon_disc
+game_mode=    ; 0 or empty = the bonus arrows (MMH5.5), 1 Default, 2 Savage, 3 Nightmare, 4 Random
+toe_bonuses=  ; 1 = each player keeps the ToE start bonus picked with the arrows (0 or empty = MMH5.5's way)
+map_scripts=  ; 1 = MMH5.5's scripts also run on maps without a map script (multiplayer), 0 = not;
+              ; empty = what this PC's MMH5.5 does by itself (RC19d 0, RC19k 1)
+trace=0       ; testing: log every script file the game opens, and print each player's start
+              ; resources and minor artifacts to the game's console
 ```

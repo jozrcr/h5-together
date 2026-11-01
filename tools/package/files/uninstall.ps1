@@ -195,23 +195,35 @@ try {
         Write-Host "  - no open-homm5.log here"
     }
 
+    # The settings file, and the copies of it that the installer keeps when it adds new
+    # settings (.bak, .bak2, .bak3). One question for all of them; no other name.
     $ini = Join-Path $bin "open-homm5.ini"
-    if (Test-Path -LiteralPath $ini) {
+    $hasIni = Test-Path -LiteralPath $ini -PathType Leaf
+    $backups = @(@(".bak", ".bak2", ".bak3") | ForEach-Object { $ini + $_ } | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })
+    if (-not $hasIni -and $backups.Count -eq 0) {
+        Write-Host "  - no open-homm5.ini here"
+    } else {
+        if (-not $hasIni) { $question = "Also delete the old copies of your settings (open-homm5.ini.bak)? [y/N]"; $what = "the old copies of open-homm5.ini" }
+        elseif ($backups.Count -gt 0) { $question = "Also delete your settings file open-homm5.ini and its old copies (.bak)? [y/N]"; $what = "open-homm5.ini and its old copies" }
+        else { $question = "Also delete your settings file open-homm5.ini? [y/N]"; $what = "open-homm5.ini" }
         $answer = $null
-        try { $answer = Read-Host "Also delete your settings file open-homm5.ini? [y/N]" } catch { }
+        try { $answer = Read-Host $question } catch { }
         if ($answer -and $answer.Trim() -match '^(y|yes|o|oui)$') {
-            try {
-                Remove-Item -LiteralPath $ini -Force
-                Write-Host "  - removed open-homm5.ini"
-            } catch {
-                Write-Host ("  - could not remove open-homm5.ini: " + $_.Exception.Message) -ForegroundColor Red
-                $failed = $true
+            $files = @($backups)
+            if ($hasIni) { $files = @($ini) + $files }
+            foreach ($f in $files) {
+                $name = Split-Path -Leaf $f
+                try {
+                    Remove-Item -LiteralPath $f -Force
+                    Write-Host "  - removed $name"
+                } catch {
+                    Write-Host ("  - could not remove " + $name + ": " + $_.Exception.Message) -ForegroundColor Red
+                    $failed = $true
+                }
             }
         } else {
-            Write-Host "  - kept open-homm5.ini"
+            Write-Host "  - kept $what"
         }
-    } else {
-        Write-Host "  - no open-homm5.ini here"
     }
 
     # The random map templates: only the names this package holds, never another file.

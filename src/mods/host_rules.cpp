@@ -2,18 +2,24 @@
 // (docs/plans/host-rules.md). Step 1: MMH5.5's own switches of
 // scripts/H55-Settings.lua (governors, town conversion, town gate, mine guards,
 // AI bonus, mixed neutral stacks, prank artifacts, random map extras...).
+// Step 2: the start rules, the game mode (Default / Savage / Nightmare / Random)
+// and ToE's start bonuses (each player keeps the bonus picked with the lobby's
+// arrows), served in MMH5.5's start script scripts/H55-AdvMap.lua; the lobby's
+// bonus tooltips then describe ToE's bonuses (host_rules_bonus.cpp).
 //
 // How a game gets its rules:
 //   1. Lobby hello (every PC with this mod, any map). Each client's DLL sends the
 //      host, now and then, waiting-room requests the game ignores (as the faction
 //      mod's hello, rmg_factions.cpp: CMPWaitChangeRequest, type unknown to the
-//      host's handler 0x0071f3d0): "I apply the host's rules, version 1" (type
-//      'OR'), and three hashes of its MMH5.5 files (types 'N', 'S', 'X' in the
+//      host's handler 0x0071f3d0): "I apply the host's rules, version 3" (type
+//      'OR'), and four hashes of its MMH5.5 files (types 'N', 'S', 'X', 'A' in the
 //      top byte: H55-Settings.lua without the rules' values, the whole of it,
-//      and MMH5.5's stats paks, which 55u.dll reads itself). The host logs (and
-//      the panel shows) a player whose files differ from its own.
+//      MMH5.5's stats paks, which 55u.dll reads itself, and the "StartingBonus"
+//      part of H55-AdvMap.lua). The host logs (and the panel shows) a player
+//      whose files differ from its own; the start rules are used only when every
+//      PC has the same "StartingBonus" part as the host, which our edits know.
 //   2. Lobby display (host -> clients). The host sends each client that said
-//      hello its rules (a short text, "L1|1|0,1,..."), 4 bytes at a time, as the
+//      hello its rules (a short text, "L3|1|0,1,..."), 4 bytes at a time, as the
 //      game's "lock buttons" commands (CMPWaitLockButtonsUICommand, 0x007111d0,
 //      sent to one PC like the game's own, transport slot 8) for rows that do not
 //      exist (0x4f52xxxx): a client without this mod ignores them (0x0071ef10
@@ -24,10 +30,11 @@
 //      player said hello, the start message (NMP::CMPStart) carries one more
 //      chunk, 0x4f, after the game's own fields (its serializer, vtable slot 3
 //      0x007208a0, through the IBinSaver: a chunk with an unknown number is
-//      skipped by the game's reader, 0x00cb6370): "OHR1;governance=0;...", the
+//      skipped by the game's reader, 0x00cb6370): "OHR3;governance=0;...", the
 //      value of every rule (the host's file, with its choices). The host keeps
 //      the same values. If a player lacks the mod (no hello), no chunk is sent
 //      and every PC keeps its own file: the game as without the mod (logged).
+//      If a PC's start script differs, the start rules go as "0" (MMH5.5's way).
 //   4. Each PC, when its game starts (NUI::CRunMPGame, slot 7 0x0071d660),
 //      takes those values for this game. A single-player start
 //      (NUI::CStartSingleAdventureMap, slot 7 0x007e1030) drops them.
@@ -35,7 +42,10 @@
 //      -> H55-Core.lua, on every PC), our wrap of the game's "open file"
 //      (NVFS::CWinVFS slot 7, stacked with the other mods) serves the file with
 //      those values: only the numbers change (host_rules_logic.cpp). Logged.
-//   6. One rule is not in that file: map_scripts, MMH5.5's scripts on maps
+//      When they read scripts/H55-AdvMap.lua and a start rule is not MMH5.5's
+//      way, the file is served with three checked edits (PatchStartScript); if
+//      MMH5.5's text is not as expected, it is served as it is (logged).
+//   6. One rule is in no file: map_scripts, MMH5.5's scripts on maps
 //      without a map script (a random map straight from the generator). In a
 //      multiplayer game the world starts the map's scripts only for a map with
 //      one (NWorld::CWorld slot 128, 0x009941a0 -> 0x00992d00, given the map's
@@ -58,7 +68,10 @@
 //   key=F2         the panel's key (lobby and adventure map); none = no key
 //   button=1       our "Rules..." button in the waiting room (0 = the key only)
 //   <rule>=        the host's choices (written by the panel); empty = MMH5.5's file
-//   trace=0        1 = log every script file the game opens (research)
+//                  (game_mode=, toe_bonuses=: empty or 0 = MMH5.5's way)
+//   trace=0        1 = log every script file the game opens (research), and print
+//                  each player's start resources and minor artifacts to the
+//                  game's console (a line added to H55-AdvMap.lua; testing)
 #include "host_rules.h"
 #include "host_rules_internal.h"
 
@@ -136,6 +149,7 @@ const BYTE kChunk = 0x4f;          // our chunk in the start message (the game's
 const int kChunkSize = 512;        // fixed: a reader copies this many bytes (a new size needs a new chunk number)
 
 const char kSettingsPath[] = "scripts/h55-settings.lua";
+const char kStartScriptPath[] = "scripts/h55-advmap.lua";
 
 struct GameString {
 	const char *begin;
@@ -212,14 +226,18 @@ bool g_file_known = false;  // this PC's settings file, as installed
 std::string g_file;
 Values g_file_values = rules::NoValues();
 uint32_t g_hash_rest = 0, g_hash_whole = 0, g_hash_stats = 0;
+bool g_start_known = false;      // this PC's start script (H55-AdvMap.lua) was looked at
+uint32_t g_start_hash = 0;       // its "StartingBonus" part (0 = not found)
+bool g_start_patchable = false;  // our edits fit it
+std::string g_start_problem;     // why not
 Values g_chosen = rules::NoValues();  // host: [rules] <key>= (valid values only)
 
 struct Pc {
 	int sender;
 	BYTE version;  // 0 = no hello yet
-	bool has[3];   // rest, whole, stats
-	uint32_t hash[3];
-	bool told[3];  // the difference was logged
+	bool has[4];   // rest, whole, stats, start script
+	uint32_t hash[4];
+	bool told[4];  // the difference was logged
 	std::string sent;  // the last lobby text sent to it
 	BYTE seq;          // of the last text's pieces
 	DWORD hello_at;    // when its last hello came (a client says it every ~4 s)
@@ -229,6 +247,8 @@ std::vector<Pc> g_pcs;
 const void *g_pcs_logic = nullptr;  // the host lobby they belong to
 DWORD g_host_seen = 0, g_client_seen = 0;  // the last update of each lobby logic (tick)
 bool g_will_apply = false;
+bool g_start_ok = false;   // host: every PC can take the start rules (the same start script, our edits fit)
+std::string g_start_why;   // host: why not
 std::string g_map_path;   // host: the lobby's map
 int g_map_script = -1;    // host: does it have a map script (-1 unknown)
 std::vector<std::string> g_missing, g_differ;
@@ -447,6 +467,33 @@ uint32_t StatsHash()
 // file system is up).
 void LoadFiles()
 {
+	bool start_known;
+	{
+		Lock lock;
+		if (g_file_known && g_start_known)
+			return;
+		start_known = g_start_known;
+	}
+	if (!start_known) {
+		// MMH5.5's start script: its "StartingBonus" part's hash, and whether our edits fit it
+		std::string lua, served, why;
+		const bool read = ReadInstalled(kStartScriptPath, &lua);
+		const uint32_t hash = read ? rules::StartBlockHash(lua) : 0;
+		const bool fits = read && rules::PatchStartScript(lua, 4, true, false, &served, &why);
+		if (!read)
+			why = "the file was not found";
+		if (read || g_vfs) {
+			hooklog::Write("rules: this PC's scripts/H55-AdvMap.lua: %u bytes, its StartingBonus part's hash %08x; the start "
+			               "rules (game mode, ToE start bonuses) %s%s",
+			               static_cast<unsigned>(lua.size()), hash, fits ? "can be served" : "can NOT be served: ",
+			               fits ? "" : why.c_str());
+			Lock lock;
+			g_start_known = true;
+			g_start_hash = hash;
+			g_start_patchable = fits;
+			g_start_problem = fits ? std::string() : why;
+		}
+	}
 	{
 		Lock lock;
 		if (g_file_known)
@@ -456,7 +503,10 @@ void LoadFiles()
 	if (!ReadInstalled(kSettingsPath, &file))
 		return;
 	Values values = rules::ParseSettings(file);
-	// map_scripts is not in the file: its "file" value is what this PC's MMH5.5 does by itself
+	for (int r = 0; r < kRuleCount; ++r)
+		if (rules::IsStartRule(r))
+			values[r] = rules::kStartRuleOff;  // not in that file: "MMH5.5's way" is this PC's default
+	// map_scripts is not in the file either: its "file" value is what this PC's MMH5.5 does by itself
 	const int own = OwnMapScripts();
 	if (own >= 0)
 		values[rules::kMapScripts] = own ? "1" : "0";
@@ -488,6 +538,45 @@ Values Effective()
 	return v;
 }
 
+// MMH5.5's start script, when the scripts read it (dofile from H55-Core.lua, every
+// PC): with this game's start rules (game mode, ToE start bonuses), or as it is.
+GameStream *ServeStartScript(GameStream *s)
+{
+	int mode = 0;
+	bool toe = false;
+	bool serving;
+	{
+		Lock lock;
+		serving = g_serving;
+		if (serving) {
+			mode = atoi(g_serving_values[rules::kGameModeRule].c_str());
+			toe = g_serving_values[rules::kToeBonusRule] == "1";
+		}
+	}
+	const int used = rules::ModeUsed(mode, toe);
+	if (used == 0 && !toe && !g_trace) {
+		hooklog::Write("rules: the scripts read scripts/H55-AdvMap.lua: served as it is (%s)",
+		               serving ? "this game's game mode and start bonuses are MMH5.5's way" : "this game uses the files' rules");
+		return s;
+	}
+	const std::string file(s->begin, s->end);
+	std::string served, why;
+	if (!rules::PatchStartScript(file, mode, toe, g_trace, &served, &why)) {
+		hooklog::Write("rules: the scripts read scripts/H55-AdvMap.lua: REFUSED, served as it is (MMH5.5's way): %s", why.c_str());
+		return s;
+	}
+	if (served != file)
+		s = WithContent(s, served);
+	const bool ok = !(s->flags & 1) && static_cast<size_t>(s->end - s->begin) == served.size() &&
+	                memcmp(s->begin, served.data(), served.size()) == 0;
+	static const char *const kModes[5] = {"the bonus arrows (MMH5.5)", "Default", "Savage", "Nightmare", "Random"};
+	hooklog::Write("rules: the scripts read scripts/H55-AdvMap.lua: served with game mode %s, %s%s; %u -> %u bytes, hash %08x%s",
+	               kModes[used], toe ? "each human keeps the ToE start bonus" : "MMH5.5's start bonus (the ToE bonus taken back)",
+	               g_trace ? ", the trace line" : "", static_cast<unsigned>(file.size()), static_cast<unsigned>(served.size()),
+	               rules::Fnv1a(served.data(), served.size()), ok ? "" : " - FAILED: the game got the file as installed");
+	return s;
+}
+
 GameStream *__fastcall OpenFileHook(void *vfs, void *edx, const GameString *path)
 {
 	g_vfs = vfs;
@@ -503,8 +592,11 @@ GameStream *__fastcall OpenFileHook(void *vfs, void *edx, const GameString *path
 		if (InterlockedIncrement(&traced) <= 200)
 			hooklog::Write("rules: the game opens %s: %s", key.c_str(), s && !(s->flags & 1) ? "found" : "not found");
 	}
-	if (key != kSettingsPath || !s || (s->flags & 1) || !s->begin || s->end < s->begin || s->pos != s->begin)
+	if ((key != kSettingsPath && key != kStartScriptPath) || !s || (s->flags & 1) || !s->begin || s->end < s->begin ||
+	    s->pos != s->begin)
 		return s;
+	if (key == kStartScriptPath)
+		return ServeStartScript(s);
 	Values values;
 	{
 		Lock lock;
@@ -604,12 +696,25 @@ std::vector<int> HumanClients(const void *logic, const BYTE *info)
 	return pcs;
 }
 
-// Host, under the lock: who lacks the mod, whose files differ (for the log, the
-// panel and the start).
+// Are the start rules (game mode, ToE bonuses) other than MMH5.5's way in these values?
+bool StartRulesChanged(const Values &v)
+{
+	for (int r = 0; r < kRuleCount; ++r)
+		if (rules::IsStartRule(r) && !v[r].empty() && v[r] != rules::kStartRuleOff)
+			return true;
+	return false;
+}
+
+// Host, under the lock: who lacks the mod, whose files differ, can every PC take
+// the start rules (for the log, the panel and the start).
 void CheckPlayers(const void *logic, const BYTE *info, bool log)
 {
 	g_missing.clear();
 	g_differ.clear();
+	g_start_ok = g_start_known && g_start_patchable;
+	g_start_why = !g_start_known ? "this PC's H55-AdvMap.lua was not read yet"
+	              : !g_start_patchable ? "the host's H55-AdvMap.lua: " + g_start_problem
+	                                   : std::string();
 	static const char *const kWhat[3] = {"H55-Settings.lua (besides the rules)", "H55-Settings.lua", "MMH5.5's stats files"};
 	for (int pc : HumanClients(logic, info)) {
 		Pc *p = FindPc(pc);
@@ -618,6 +723,19 @@ void CheckPlayers(const void *logic, const BYTE *info, bool log)
 		if (!p || p->version != rules::kProtocol || GetTickCount() - p->hello_at > 15000 || p->name != name) {
 			g_missing.push_back(name);
 			continue;
+		}
+		// the start script: the same "StartingBonus" part as the host's (then our edits fit it there too)
+		if (!p->has[3] || p->hash[3] != g_start_hash) {
+			if (g_start_ok)
+				g_start_why = name + (p->has[3] ? "'s H55-AdvMap.lua is not the host's (its StartingBonus part differs)"
+				                                : " has not sent its H55-AdvMap.lua's hash yet");
+			g_start_ok = false;
+			if (log && p->has[3] && !p->told[3]) {
+				p->told[3] = true;
+				hooklog::Write("rules: CHECK: %s (PC %d) has another StartingBonus part in H55-AdvMap.lua than the host (%08x, "
+				               "host %08x): the game mode and ToE start bonuses stay MMH5.5's way",
+				               name.c_str(), pc, p->hash[3], g_start_hash);
+			}
 		}
 		const uint32_t mine[3] = {g_hash_rest, g_hash_whole, g_hash_stats};
 		for (int k = 0; k < 3; ++k) {
@@ -663,30 +781,47 @@ void __fastcall ClientUpdateHook(void *logic, void *edx)
 		if (full && Readable(full + 0xc4, 8) && *reinterpret_cast<DWORD *>(full + 0xc4) == 0) {
 			uint32_t type = rules::kHelloType;
 			uint8_t byte = rules::kProtocol;
-			bool known;
-			uint32_t rest, whole, stats;
+			bool known, start_known;
+			uint32_t rest, whole, stats, start;
 			{
 				Lock lock;
 				known = g_file_known;
-				rest = g_hash_rest, whole = g_hash_whole, stats = g_hash_stats;
+				start_known = g_start_known;
+				rest = g_hash_rest, whole = g_hash_whole, stats = g_hash_stats, start = g_start_hash;
 			}
+			bool send = step == 0 || known;
 			if (step == 1 && known)
 				rules::HashRequest(rules::kMarkSettingsRest, rest, &type, &byte);
 			else if (step == 2 && known)
 				rules::HashRequest(rules::kMarkSettingsWhole, whole, &type, &byte);
 			else if (step == 3)
 				rules::HashRequest(rules::kMarkStats, stats, &type, &byte);
-			if (step == 0 || known) {
+			else if (step == 4) {
+				rules::HashRequest(rules::kMarkStartScript, start, &type, &byte);
+				send = start_known;
+			}
+			if (send) {
 				*reinterpret_cast<DWORD *>(full + 0xc4) = type;
 				full[0xc8] = byte;
 			}
 			static int logged = 0;
 			if (step == 0 && logged++ < 1)
 				hooklog::Write("rules: hello to the host (this PC applies the host's rules, version %u)", rules::kProtocol);
-			step = (step + 1) % 4;
+			step = (step + 1) % 5;
 			if (step == 0)
 				next_at = now + 4000;
 		}
+	}
+	static DWORD tips_at = 0;
+	if (g_enabled && now - tips_at >= 500) {
+		tips_at = now;
+		rules::BonusTips tips;
+		{
+			Lock lock;
+			if (g_lobby_known && (g_lobby_flags & rules::kWillApply) && !(g_lobby_flags & rules::kNoStart))
+				tips = rules::TipsFor(g_lobby_values);
+		}
+		rules::SyncBonusTips(logic, tips);
 	}
 	g_client_update_next(logic, edx);
 }
@@ -745,7 +880,10 @@ int __fastcall HostRequestHook(void *logic, void *edx, int sender, BYTE *message
 				p->name = PcName(reinterpret_cast<const BYTE *>(Read(logic, 0x74)), sender);
 			}
 			else {
-				const int k = mark == rules::kMarkSettingsRest ? 0 : mark == rules::kMarkSettingsWhole ? 1 : 2;
+				const int k = mark == rules::kMarkSettingsRest    ? 0
+				              : mark == rules::kMarkSettingsWhole ? 1
+				              : mark == rules::kMarkStats         ? 2
+				                                                  : 3;
 				if (!p->has[k] || p->hash[k] != hash)
 					p->told[k] = false;
 				p->has[k] = true;
@@ -822,6 +960,7 @@ void __fastcall HostUpdateHook(void *logic, void *edx)
 			BYTE seq;
 		};
 		std::vector<Send> sends;
+		rules::BonusTips tips;
 		{
 			Lock lock;
 			HostLobby(logic);
@@ -831,12 +970,16 @@ void __fastcall HostUpdateHook(void *logic, void *edx)
 				g_in_game = false;
 			CheckPlayers(logic, info, true);
 			const Values values = Effective();
+			if (g_will_apply && g_start_ok)
+				tips = rules::TipsFor(values);
 			for (Pc &p : g_pcs) {
 				if (p.version != rules::kProtocol)
 					continue;
 				int flags = g_will_apply ? rules::kWillApply : 0;
 				if (g_map_script == 0)
 					flags |= rules::kNoScript;
+				if (StartRulesChanged(values) && !g_start_ok)
+					flags |= rules::kNoStart;
 				const uint32_t mine[3] = {g_hash_rest, g_hash_whole, g_hash_stats};
 				if (g_file_known && ((p.has[0] && p.hash[0] != mine[0]) || (p.has[2] && p.hash[2] != mine[2])))
 					flags |= rules::kDiffers;
@@ -851,6 +994,7 @@ void __fastcall HostUpdateHook(void *logic, void *edx)
 			SendLobbyText(logic, s.pc, s.text, s.seq);
 			hooklog::Write("rules: the host's rules sent to PC %d for its lobby: %s", s.pc, s.text.c_str());
 		}
+		rules::SyncBonusTips(logic, tips);
 	}
 	else if (g_enabled) {
 		Lock lock;
@@ -868,7 +1012,15 @@ void __fastcall HostStartHook(void *logic, void *edx)
 		Lock lock;
 		HostLobby(logic);
 		CheckPlayers(logic, info, true);
-		const Values values = Effective();
+		Values values = Effective();
+		if (g_will_apply && StartRulesChanged(values) && !g_start_ok) {
+			hooklog::Write("rules: START: the game mode and ToE start bonuses stay MMH5.5's way (the bonus arrows choose the "
+			               "mode): %s",
+			               g_start_why.c_str());
+			for (int r = 0; r < kRuleCount; ++r)
+				if (rules::IsStartRule(r))
+					values[r] = rules::kStartRuleOff;
+		}
 		if (!g_will_apply) {
 			std::string names;
 			for (const std::string &n : g_missing)
@@ -1072,6 +1224,12 @@ View GetView(View::Role role)
 			v.map_script = g_map_script;
 			v.missing = g_missing;
 			v.differ = g_differ;
+			v.start_ok = g_start_ok;
+			v.start_why = g_start_why;
+		}
+		else {  // the setup screen: only this PC's own start script is known
+			v.start_ok = !g_start_known || g_start_patchable;
+			v.start_why = g_start_problem;
 		}
 	}
 	else if (role == View::kClient) {
@@ -1080,6 +1238,7 @@ View GetView(View::Role role)
 		v.will_apply = g_lobby_known && (g_lobby_flags & rules::kWillApply);
 		v.this_differs = g_lobby_known && (g_lobby_flags & rules::kDiffers);
 		v.map_script = !g_lobby_known ? -1 : (g_lobby_flags & rules::kNoScript) ? 0 : 1;
+		v.start_ok = !(g_lobby_known && (g_lobby_flags & rules::kNoStart));
 	}
 	else if (role == View::kInGame) {
 		v.in_game_rules = g_serving;
