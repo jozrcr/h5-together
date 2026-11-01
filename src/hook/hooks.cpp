@@ -12,6 +12,7 @@
 #include "../mods/coop_guard.h"
 #include "../mods/fast_paths.h"
 #include "../mods/hero_skins.h"
+#include "../mods/hero_skins_internal.h"
 #include "../mods/lan_discovery.h"
 #include "../mods/languages.h"
 #include "../mods/lockstep.h"
@@ -55,6 +56,7 @@ void InstallEarly()
 	mods::InstallOriginalMusicEarly();
 	mods::InstallPlayerListEarly();  // the Direct3D import, before the game makes its device
 	mods::InstallRmgBuilderEarly();
+	mods::InstallHeroSkinsPanelEarly();  // the overlay's Direct3D import, for the looks' panel
 	overlay::InstallTestPanelEarly();
 }
 

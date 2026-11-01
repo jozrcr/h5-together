@@ -84,15 +84,14 @@ struct Owner {
 	int number = 0;        // 1..8
 };
 struct Situation {
-	bool known = false;        // the kind of game is known (single or multiplayer)
+	bool known = false;        // the kind of game is known (single, or multiplayer with looks on)
 	bool multiplayer = false;
-	int local_player = 0;      // multiplayer: this PC's player number
-	bool show_others = true;   // [skins] show_others
 };
 // The look `hero` wears now, or -1 for its own. Only a human owner's choice
 // counts: in single player and hot seat, the choices of this PC's file for
-// every human; in multiplayer, this PC's choices for its own player and the
-// received ones for the others. Computer players' heroes keep their looks.
+// every human; in multiplayer, each player's choices as that player's PC sent
+// them (this PC's own included, so every PC decides alike). Computer players'
+// heroes keep their looks.
 int Decide(int hero, const Owner &owner, const Situation &s, const Choices &local, const Remotes &remotes,
            const Catalog &catalog);
 

@@ -181,9 +181,9 @@ int Decide(int hero, const Owner &owner, const Situation &s, const Choices &loca
 	if (hero < 0 || !s.known || !owner.present || !owner.human || owner.number < 1 || owner.number > kMaxPlayers)
 		return -1;
 	const Choices *choices = nullptr;
-	if (!s.multiplayer || owner.number == s.local_player)
+	if (!s.multiplayer)
 		choices = &local;
-	else if (s.show_others && remotes[owner.number].same_data)
+	else if (remotes[owner.number].same_data)  // this PC's own player too: its choices as it sent them
 		choices = &remotes[owner.number].choices;
 	if (!choices)
 		return -1;

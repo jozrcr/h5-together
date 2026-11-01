@@ -156,7 +156,8 @@ python tools\robot\run_lan_test.py --seconds 200 --turns 3 --host-skins-file bui
 
 - `make_skins_file.py` gives every hero of a faction one look, so whatever heroes A1M4 deals out, the robot's players show it. The camera position step brings the camera close to the hero.
 - What to look for: `hero skins: ...: the map figure is rebuilt with ...'s look` (single player), `looks on for this game` and the same rebuilds at the same moment on both copies (LAN), `no looks in this game: PC 1 sent none in time` (LAN, client off), and `lan_report.py`: checksums all equal. `trace=1` also lists who calls the hero's figure slots.
-- Not possible yet: opening the hero screen.
+- **The panel** (F7): `--step "18|panel|skins open"`, then `"21|panel|skins pick <n or InternalName>"` (n = the tile, 0 = the hero's own look), `"23|panel|skins apply"` or `"skins cancel"`; `"20|shot|panel"` for screenshots. In a LAN run use `--host-step` (after segment 20, about 70 s into the run). Commands that start with `skins ` only go to this panel (`robot::TakePanelCommand` with a prefix); the builder never takes them.
+- Not possible yet: opening the hero screen. `ui|NUI::CAdventureScreen hero_dbl_click` (the hero list's double click) crashed, caught: it needs the clicked list item.
 
 ## Robot script
 

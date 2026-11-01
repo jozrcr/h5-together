@@ -81,6 +81,7 @@
 #include <utility>
 #include <vector>
 
+#include "hero_skins_internal.h"
 #include "hero_skins_logic.h"
 
 #include "../hook/log.h"
@@ -122,6 +123,14 @@ const DWORD kListBegin = 0x44, kListEnd = 0x48;
 const DWORD kGetBase = 0x004a5020;         // CDBPtr<SAdvMapObjectBaseShared>::Get, __fastcall(ptr)
 const DWORD kGetCharacter = 0x004f0dc0;    // CDBPtr<SCharacter>::Get
 const DWORD kGetAnimSet = 0x00680240;      // CDBPtr<SAnimSet>::Get
+const DWORD kGetModel = 0x00453ff0;        // CDBPtr<SModel>::Get
+const DWORD kCharacterModel = 0x44;        // SCharacter: its model
+const DWORD kResourcePath = 0x20;          // an NDb resource: its own file (narrow string; its CDBID is at +0xc)
+const DWORD kSharedFace = 0x12c;           // FaceTexture (CDBPtr<STexture>)
+const DWORD kSharedNameFile = 0x16c;       // the text file of its name (narrow string; docs/subsystems/players.md)
+const DWORD kTextureVftable = 0x00e90318;  // NDb::STexture
+const DWORD kTextureFile = 0x40;           // DestName: the .dds in the game's data
+const DWORD kPlayerSelected = 0x1d0;       // IPlayer: its selected hero (slot 0x0c, 0x004fcc40)
 const DWORD kReleaseResource = 0x008c6150; // __fastcall(object): frees it when both counts are 0
 const DWORD kUpdateCall = 0x0060895e;      // in 0x00608930: call 0x006082f0 (the adventure controller's frame)
 const DWORD kUpdate = 0x006082f0;          // __thiscall, 5 stack arguments
@@ -146,6 +155,7 @@ const DWORD kNet = 0x34, kReports = 0x3c, kReportsEnd = 0x40, kMe = 0x54;
 const DWORD kSendAt = 2;     // own report after which this PC sends its looks
 const DWORD kSendBy = 10;    // messages after the sender's report kSendBy do not count
 const DWORD kDecideAt = 20;  // the segment at whose start every PC decides and rebuilds
+const DWORD kChangeDelay = 10;  // a choice changed during the game counts at the sender's report + this
 
 // The code whose layout this file relies on; checked before anything is changed.
 struct Code {
@@ -182,6 +192,11 @@ const Code kCode[] = {
 	{kGetBase, {0x56, 0x8b, 0xf1, 0x80, 0x7e, 0x04, 0x00, 0x8b, 0x0d, 0x0c, 0x16, 0xf9, 0x00}, 13},
 	{kGetCharacter, {0x56, 0x8b, 0xf1, 0x80, 0x7e, 0x04, 0x00, 0x8b, 0x0d, 0x78, 0x42, 0xfd, 0x00}, 13},
 	{kGetAnimSet, {0x56, 0x8b, 0xf1, 0x80, 0x7e, 0x04, 0x00, 0x8b, 0x0d, 0xac, 0x20, 0xf9, 0x00}, 13},
+	{kGetModel, {0x56, 0x8b, 0xf1, 0x80, 0x7e, 0x04, 0x00, 0x8b, 0x0d, 0x7c, 0x12, 0xf9, 0x00}, 13},
+	{0x004fcc40, {0x8b, 0x81, 0xd0, 0x01, 0x00, 0x00, 0x85, 0xc0}, 8},   // IPlayer slot 0x0c: the selected hero
+	{0x00e1a0a8, {0x40, 0xcc, 0x4f, 0x00}, 4},                           // ... its vtable cell
+	{0x00a0c4a2, {0x8d, 0x87, 0x2c, 0x01, 0x00, 0x00, 0x50, 0x50, 0x6a, 0x00, 0x68, 0x88, 0xd9, 0xe6, 0x00}, 15},  // FaceTexture
+	{0x00c7a69c, {0x8d, 0x47, 0x40}, 3},                                 // STexture: DestName at +0x40
 	{kReleaseResource, {0x51, 0x83, 0x79, 0x08, 0x00, 0x75, 0x6b, 0xf7, 0x41, 0x04}, 10},
 	// the adventure controller's frame (as notify.cpp checks it)
 	{0x00608930, {0x56, 0x8b, 0xf1, 0x8b, 0x46, 0x3c}, 6},
@@ -246,13 +261,14 @@ int g_single_frames = 0;        // frames since the game was found to be single 
 DWORD g_frame_tick = 0;         // GetTickCount() of the controller's last frame
 volatile DWORD g_step_tick = 0; // GetTickCount() of the last transceiver step (both kinds)
 int g_local_player = 0;         // this PC's player number (controller +0x3c)
+const BYTE *g_local_iplayer = nullptr;  // that player (IPlayer *)
 
 // The hero's data object, with the look's references put in.
-struct Applied {
+struct SwapState {
 	int look = -1;
 	BYTE saved[3][8];  // the hero's own references, in kSwapped order
 };
-std::vector<Applied> g_applied;
+std::vector<SwapState> g_applied;
 struct Swapped {
 	DWORD offset;
 	DWORD getter;  // 0: copied as it is (the reader resolves it)
@@ -277,6 +293,15 @@ bool g_header_ok[kMaxPcs];    // a header in time, with our game data, from each
 DWORD g_segments = 0;         // segments the runner has started for this game
 bool g_decided = false;
 bool g_agreed = false;        // looks are on in this multiplayer game
+// Choices changed during a multiplayer game: this PC's, waiting for its next
+// step to be sent, and everybody's (this PC's own too), waiting for the
+// segment at which every PC takes them in.
+std::vector<DWORD> g_outgoing;
+struct Pending {
+	DWORD at;  // the segment
+	skins::Message message;
+};
+std::vector<Pending> g_pending;
 
 void NewGame(const void *transceiver);
 
@@ -448,8 +473,6 @@ skins::Situation Now()
 	// PC (nothing here may depend on this PC's frames).
 	s.known = g_kind == kMulti ? g_agreed : g_kind == kSingle && g_world != nullptr;
 	s.multiplayer = g_kind == kMulti;
-	s.local_player = g_local_player;
-	s.show_others = true;  // in multiplayer, looks are on only when every PC takes part
 	return s;
 }
 
@@ -470,7 +493,7 @@ void EnsureFields(int index, int look)
 {
 	if (index < 0 || index >= static_cast<int>(g_applied.size()))
 		return;
-	Applied &a = g_applied[index];
+	SwapState &a = g_applied[index];
 	if (a.look == look)
 		return;
 	BYTE *shared = g_shared[index];
@@ -485,7 +508,7 @@ void EnsureFields(int index, int look)
 	a.look = -1;
 	if (look >= 0) {
 		// The look hero's own references (its saved ones if it wears a look itself).
-		Applied &source = g_applied[look];
+		SwapState &source = g_applied[look];
 		for (int i = 0; i < 3; ++i) {
 			BYTE *from = source.look >= 0 ? source.saved[i] : g_shared[look] + kSwapped[i].offset;
 			BYTE *field = shared + kSwapped[i].offset;
@@ -649,7 +672,8 @@ void AfterFrame(const BYTE *controller)
 		}
 		g_frame_tick = GetTickCount();
 		const BYTE *local = reinterpret_cast<const BYTE *>(Read(controller, kControllerLocal));
-		g_local_player = local && Read(local, 0) == kPlayerVftable ? static_cast<int>(Read(local, kPlayerNumber)) : 0;
+		g_local_iplayer = local && Read(local, 0) == kPlayerVftable ? local : nullptr;
+		g_local_player = g_local_iplayer ? static_cast<int>(Read(local, kPlayerNumber)) : 0;
 		if (!g_catalog_ok && !g_catalog_tried)
 			EnsureCatalog();
 		// Single player only: a multiplayer game rebuilds at one segment, on every PC (5.).
@@ -713,6 +737,8 @@ void NewGame(const void *transceiver)
 	g_segments = 0;
 	g_decided = false;
 	g_agreed = false;
+	g_outgoing.clear();
+	g_pending.clear();
 	for (skins::Remote &r : g_remotes)
 		r = skins::Remote();
 }
@@ -735,11 +761,20 @@ void __fastcall MpStepHook(void *self, void *edx)
 		if (t != g_transceiver || reports < g_last_reports)
 			NewGame(t);
 		g_last_reports = reports;
+		// A choice changed during the game (the panel): sent now, and taken in
+		// by every PC (this one too) at this report + kChangeDelay.
+		if (g_sent && !g_outgoing.empty()) {
+			values.swap(g_outgoing);
+			for (DWORD v : values)
+				g_pending.push_back({reports + kChangeDelay, skins::Decode(v)});
+			hooklog::Write("hero skins: sent to the other PCs: %d changed look(s) (after this PC's report %lu; they count "
+			               "at segment %lu)", static_cast<int>(values.size()), reports, reports + kChangeDelay);
+		}
 		// Looks are sent once, between this PC's reports kSendAt and kSendBy;
 		// show_others=0: this PC takes no part (it sends nothing).
-		if (g_sent || reports < kSendAt || reports > kSendBy || !g_show_others || g_local_player < 1 ||
+		if (!values.empty() || g_sent || reports < kSendAt || reports > kSendBy || !g_show_others || g_local_player < 1 ||
 		    g_local_player > skins::kMaxPlayers || !EnsureCatalog())
-			return;
+			goto send;
 		if (g_catalog.size() > static_cast<size_t>(skins::kMaxCatalog)) {
 			if (reports == kSendBy)
 				hooklog::Write("hero skins: %d heroes do not fit in the messages: no looks in multiplayer games",
@@ -747,15 +782,19 @@ void __fastcall MpStepHook(void *self, void *edx)
 			return;
 		}
 		g_sent = true;
+		g_outgoing.clear();  // the file's choices go now
 		values.push_back(skins::EncodeHeader(g_local_player, g_fingerprint));
 		for (const auto &c : g_local) {
 			if (values.size() > 200)
 				break;
 			values.push_back(skins::EncodeChoice(g_local_player, c.first, c.second));
 		}
+		for (DWORD v : values)  // this PC takes its own in as the others do
+			skins::Receive(g_remotes, skins::Decode(v), g_catalog, g_fingerprint, nullptr);
 		hooklog::Write("hero skins: sent to the other PCs: %d look(s) for player %d (after this PC's report %lu)",
 		               static_cast<int>(values.size()) - 1, g_local_player, reports);
 	}
+send:
 	for (DWORD v : values)
 		SendValue(t, v);
 }
@@ -792,7 +831,14 @@ void __fastcall CheckHook(void *self, void *edx, int pc, const BYTE *cmd)
 			// the same messages count on every PC.
 			const DWORD sender_reports = Reports(t, pc);
 			if (sender_reports > kSendBy) {
-				if (CanLog())
+				// A choice changed during the game: every PC takes it in at the same segment.
+				if (m.kind == skins::Message::kChoice && g_header_ok[pc]) {
+					g_pending.push_back({sender_reports + kChangeDelay, m});
+					if (CanLog())
+						hooklog::Write("hero skins: from PC %d: a changed look for player %d (counts at segment %lu)", pc,
+						               m.player, sender_reports + kChangeDelay);
+				}
+				else if (CanLog())
 					hooklog::Write("hero skins: from PC %d: a message after its report %lu: too late, not counted", pc,
 					               sender_reports);
 				return;
@@ -840,12 +886,205 @@ void __fastcall SegmentHook(void *transceiver8, void *edx, DWORD time)
 			if (g_agreed && g_kind == kMulti)
 				rebuild = FiguresToRebuild(kMaxFigures);
 		}
+		else if (g_decided && !g_pending.empty()) {
+			// Changed choices whose segment has come, in the order they arrived
+			// (each sender's in its own order: the same on every PC).
+			bool changed = false;
+			for (size_t i = 0; i < g_pending.size();) {
+				if (g_pending[i].at > g_segments) {
+					++i;
+					continue;
+				}
+				if (g_agreed && g_catalog_ok) {
+					std::string note;
+					changed = skins::Receive(g_remotes, g_pending[i].message, g_catalog, g_fingerprint, &note) || changed;
+					if (!note.empty() && CanLog())
+						hooklog::Write("hero skins: segment %lu: %s", g_segments, note.c_str());
+				}
+				g_pending.erase(g_pending.begin() + i);
+			}
+			if (changed && g_kind == kMulti)
+				rebuild = FiguresToRebuild(kMaxFigures);
+		}
 	}
 	g_segment_next(transceiver8, edx, time);
 	// After the game set the segment's time, before its commands: the same point on every PC.
 	for (BYTE *object : rebuild)
 		g_figure_cell_next(object, nullptr);
 }
+
+// ---- the panel's questions (hero_skins_internal.h) ----
+bool CopyNarrow(const BYTE *object, DWORD offset, char *text, int size)
+{
+	__try {
+		text[0] = 0;
+		const char *b = reinterpret_cast<const char *>(Read(object, offset));
+		const char *e = reinterpret_cast<const char *>(Read(object, offset + 4));
+		if (!b || e <= b || e - b >= size)
+			return false;
+		memcpy(text, b, e - b);
+		text[e - b] = 0;
+		return true;
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER) {
+		text[0] = 0;
+		return false;
+	}
+}
+
+std::string NarrowString(const BYTE *object, DWORD offset)
+{
+	char text[401];
+	return CopyNarrow(object, offset, text, sizeof(text)) ? std::string(text) : std::string();
+}
+
+std::string Lower(std::string s)
+{
+	for (char &c : s)
+		if (c >= 'A' && c <= 'Z')
+			c = static_cast<char>(c - 'A' + 'a');
+	return s;
+}
+
+// The model (an NDb resource) a hero's figure shows: data object + field -> SCharacter -> its model.
+BYTE *FigureModel(int hero, DWORD field)
+{
+	BYTE *character = static_cast<BYTE *>(reinterpret_cast<GetFn>(kGetCharacter)(g_shared[hero] + field));
+	return character ? static_cast<BYTE *>(reinterpret_cast<GetFn>(kGetModel)(character + kCharacterModel)) : nullptr;
+}
+
+std::string PortraitOf(int hero)
+{
+	const BYTE *texture = reinterpret_cast<const BYTE *>(Read(g_shared[hero], kSharedFace));
+	if (!texture || Read(texture, 0) != kTextureVftable)
+		return std::string();
+	const std::string path = NarrowString(texture, kTextureFile);
+	return path.size() > 4 && Lower(path.substr(path.size() - 4)) == ".dds" ? path : std::string();
+}
+
+std::string NameFileOf(int hero)
+{
+	std::string path = NarrowString(g_shared[hero], kSharedNameFile);
+	if (path.size() < 5 || Lower(path.substr(path.size() - 4)) != ".txt")
+		return std::string();
+	while (!path.empty() && (path[0] == '/' || path[0] == '\\'))
+		path.erase(0, 1);
+	return path;
+}
+
+}  // namespace
+
+namespace skins {
+
+std::string InternalName(int hero)
+{
+	Lock lock;
+	return hero >= 0 && hero < static_cast<int>(g_catalog.size()) ? g_catalog[hero].name : std::string();
+}
+
+std::string NameFile(int hero)
+{
+	Lock lock;
+	return hero >= 0 && hero < static_cast<int>(g_catalog.size()) ? NameFileOf(hero) : std::string();
+}
+
+bool PanelHero(PanelData *out)
+{
+	*out = PanelData();
+	if (g_disabled || !g_local_iplayer)
+		return false;
+	Lock lock;
+	if (!EnsureCatalog())
+		return false;
+	BYTE *hero = reinterpret_cast<BYTE *>(Read(g_local_iplayer, kPlayerSelected));
+	if (!hero || Dying(hero))
+		return false;
+	const int target = HeroIndex(hero);
+	if (target < 0)
+		return false;
+	out->hero = target;
+	out->internal = g_catalog[target].name;
+	out->name_file = NameFileOf(target);
+	out->portrait = PortraitOf(target);
+	auto it = g_local.find(target);
+	out->chosen = it == g_local.end() ? -1 : it->second;
+	out->multiplayer = g_kind == kMulti;
+	out->decided = g_decided;
+	out->agreed = g_agreed;
+	// The faction's looks: heroes grouped by the models of their map and battle figures.
+	std::vector<std::pair<std::pair<BYTE *, BYTE *>, Look>> groups;
+	for (int j = 0; j < static_cast<int>(g_catalog.size()); ++j) {
+		if (g_catalog[j].town != g_catalog[target].town)
+			continue;
+		BYTE *map_model = FigureModel(j, kSharedMap);
+		BYTE *battle_model = FigureModel(j, kSharedArena);
+		if (!map_model || !battle_model)
+			continue;
+		const std::pair<BYTE *, BYTE *> key(map_model, battle_model);
+		size_t g = 0;
+		while (g < groups.size() && groups[g].first != key)
+			++g;
+		if (g == groups.size())
+			groups.push_back({key, Look()});
+		groups[g].second.members.push_back(j);
+		if (j == target)
+			groups[g].second.own = true;
+	}
+	for (auto &group : groups) {
+		Look &look = group.second;
+		// Its name: the panel's hero for its own look; else the hero the models are named after; else the first.
+		const std::string paths = Lower(NarrowString(group.first.first, kResourcePath) + "|" +
+		                                NarrowString(group.first.second, kResourcePath));
+		look.hero = look.own ? target : look.members[0];
+		for (int m : look.members)
+			if (!look.own && paths.find(Lower(g_catalog[m].name)) != std::string::npos) {
+				look.hero = m;
+				break;
+			}
+		look.internal = g_catalog[look.hero].name;
+		look.portrait = PortraitOf(look.hero);
+		look.name_file = NameFileOf(look.hero);
+		if (look.own)
+			out->looks.insert(out->looks.begin(), look);
+		else
+			out->looks.push_back(look);
+	}
+	return true;
+}
+
+Applied ApplyLook(int hero, int look, std::string *note)
+{
+	Lock lock;
+	if (!g_catalog_ok || hero < 0 || hero >= static_cast<int>(g_catalog.size()) ||
+	    (look >= 0 && !LookAllowed(g_catalog, hero, look))) {
+		*note = "not a look this hero may wear";
+		return kNotApplied;
+	}
+	if (look == hero)
+		look = -1;
+	wchar_t path[MAX_PATH];
+	hooklog::PathNextToExe(L"open-homm5-skins", L".ini", path, MAX_PATH);
+	const std::wstring key(g_catalog[hero].name.begin(), g_catalog[hero].name.end());
+	const std::wstring value = look >= 0 ? std::wstring(g_catalog[look].name.begin(), g_catalog[look].name.end()) : L"";
+	if (!WritePrivateProfileStringW(L"skins", key.c_str(), look >= 0 ? value.c_str() : nullptr, path))
+		hooklog::Write("hero skins: open-homm5-skins.ini could not be written (error %lu)", GetLastError());
+	if (look >= 0)
+		g_local[hero] = look;
+	else
+		g_local.erase(hero);
+	*note = g_catalog[hero].name + (look >= 0 ? " wears the look of " + g_catalog[look].name : " wears its own look");
+	if (g_kind != kMulti)
+		return kAppliedNow;  // the frame pass rebuilds it (single player, hot seat)
+	if (g_decided && !g_agreed)
+		return kSavedForNextGames;
+	if (g_local_player >= 1)
+		g_outgoing.push_back(EncodeChoice(g_local_player, hero, look));
+	return kAppliedSoon;
+}
+
+}  // namespace skins
+
+namespace {
 
 // ---- settings ----
 void ReadChoices()
@@ -928,6 +1167,7 @@ void ApplyHeroSkinsFromSettings()
 		               g_segment_next != nullptr);
 		return;
 	}
+	InstallHeroSkinsPanel();
 	hooklog::Write("hero skins: on; %d line(s) in open-homm5-skins.ini (read when the game's hero list is); multiplayer "
 	               "looks %s%s%s",
 	               static_cast<int>(g_entries.size()), g_show_others ? "when every PC takes part" : "off (show_others=0)",

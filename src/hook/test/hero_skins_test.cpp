@@ -101,7 +101,10 @@ int main()
 	Check(!Receive(remotes, Decode(EncodeHeader(0, fp)), cat, fp, &note), "player 0 is ignored");
 
 	// --- deciding ---
+	// multiplayer: player 1 is this PC (its own messages are taken in too), player 2 another PC
 	Remotes rs;
+	Receive(rs, Decode(EncodeHeader(1, fp)), cat, fp, nullptr);
+	Receive(rs, Decode(EncodeChoice(1, godric, freyda)), cat, fp, nullptr);
 	Receive(rs, Decode(EncodeHeader(2, fp)), cat, fp, nullptr);
 	Receive(rs, Decode(EncodeChoice(2, axel, godric)), cat, fp, nullptr);
 	Owner human1{true, true, 1}, human2{true, true, 2}, ai3{true, false, 3}, nobody;
@@ -111,19 +114,16 @@ int main()
 	Situation multi;
 	multi.known = true;
 	multi.multiplayer = true;
-	multi.local_player = 1;
 	Check(Decide(godric, human1, unknown, local, rs, cat) == -1, "decide: nothing while the kind of game is unknown");
 	Check(Decide(godric, human1, single, local, rs, cat) == freyda, "single player: this PC's choice");
 	Check(Decide(godric, human2, single, local, rs, cat) == freyda, "hot seat: this PC's choice for every human");
 	Check(Decide(godric, ai3, single, local, rs, cat) == -1, "a computer player's hero keeps its look");
 	Check(Decide(godric, nobody, single, local, rs, cat) == -1, "a hero without an owner keeps its look");
-	Check(Decide(godric, human1, multi, local, rs, cat) == freyda, "multiplayer: this PC's choice for its own player");
+	Check(Decide(godric, human1, multi, local, rs, cat) == freyda, "multiplayer: player 1's choice, as it sent it");
+	Check(Decide(giovanni, human1, multi, local, rs, cat) == -1, "multiplayer: not what its file says now, only what it sent");
 	Check(Decide(godric, human2, multi, local, rs, cat) == -1, "multiplayer: not for another player");
 	Check(Decide(axel, human2, multi, local, rs, cat) == godric, "multiplayer: the other player's own choice");
-	Check(Decide(axel, human1, multi, local, rs, cat) == -1, "multiplayer: its choice is not for this PC's heroes");
-	Situation hidden = multi;
-	hidden.show_others = false;
-	Check(Decide(axel, human2, hidden, local, rs, cat) == -1, "show_others=0: friends' looks not shown");
+	Check(Decide(axel, human1, multi, local, rs, cat) == -1, "multiplayer: its choice is not for player 1's heroes");
 	Owner human4{true, true, 4};
 	Check(Decide(godric, human4, multi, local, remotes, cat) == -1, "a player with other game data: own looks");
 	Check(Decide(-1, human1, single, local, rs, cat) == -1, "a hero outside the list keeps its look");

@@ -650,7 +650,7 @@ The robot passes them with `--camera-setting KEY=VALUE` (`run_lan_test.py`: also
 
 **What it is for:** the owner's request, "a way in game to select our hero's skin". A hero can wear the look of another hero **of the same faction**: its 3D figures on the adventure map, in battle and on the hero screen. The portrait, the class, the skills, the music and everything the rules use stay the hero's own. Plan and findings: [docs/plans/hero-skins.md](../../docs/plans/hero-skins.md).
 
-**How a player chooses (for now):** a line per hero in `open-homm5-skins.ini`, next to `open-homm5.ini`, by the hero's internal name (the `InternalName` of its data file): `Godric=Freyda`. The choice is remembered for every game. A panel on the hero screen comes next (step 2 of the plan).
+**How a player chooses:** **F7** (for now; `[skins] key`) on the adventure map, the hero screen or the town screen opens a panel for this PC's player's selected hero (`hero_skins_panel.cpp`, the template builder's style, a modal overlay panel: the game gets no input while it is open). It shows the looks of the hero's faction as portraits, its own first ("son apparence"), each with the name of the hero it is named after and how many others wear it; the selected one lists them ("Aussi portée par : ..."). **Appliquer / Apply** saves the choice to `open-homm5-skins.ini` (next to `open-homm5.ini`, by the hero's internal name: `Godric=Freyda`; "Own look" removes the line) and makes it count: at once in single player and hot seat (the map figure is rebuilt); in multiplayer for every player a few seconds later (below). The choice is remembered for every game. A button on the hero screen comes when the owner's sketch says where.
 
 **Who decides a hero's look:** its owner, if human. In single player and hot seat, the file's choices count for every human player's heroes. In multiplayer, a PC's choices count for its own player's heroes; the other players' choices arrive by message. Computer players' heroes keep their looks. A look of another faction is left out (the log says so).
 
@@ -659,6 +659,7 @@ The robot passes them with `--camera-setting KEY=VALUE` (`run_lan_test.py`: also
 - The look's strike figure, map animations and hero screen camera are put into the hero's data object, in memory only, with counted references; the hero's own are put back when the look goes.
 - The DLL notes each map figure the game builds. In single player and hot seat it rebuilds a figure with the game's own code when its look should change (just after the map shows, when a hero changes owner). Battles and the hero screen pick up the look when they open.
 - **Multiplayer: all or nothing.** Rebuilding a map figure makes new game objects, which take numbers from the world's counter, so every PC must rebuild the same figures at the same moment of the game, or the PCs' worlds part (the robot saw the world checksums split). After its second segment each PC sends its choices as world-checksum messages with check number −1, which the game ignores (the co-op guard's trick): a header with a fingerprint of the hero list (`k`), then one message per choice (`K`). At the start of segment 20 every PC applies the same rule: if every PC sent its looks in time (before its own report of segment 11) with the same game data, every PC rebuilds the same figures, in the order of their object numbers, and the game builds later figures with the looks; otherwise **nobody's looks show in that game**. So one friend without the DLL (or with another MMH5.5 version, or `show_others=0`) means normal looks for everyone in that game; the log says which PC.
+- **A choice made during a multiplayer game** (the panel's Apply) is sent at this PC's next segment report R, and every PC (this one too) takes it in at the start of segment R + 10 and rebuilds that hero's figure there: the same moment everywhere, a fraction of a second to two seconds later. In a game whose looks are off, it is only saved, for the next games (the panel says so).
 
 The log says what happened, for example:
 
@@ -674,13 +675,14 @@ hero skins: looks on for this game (all 2 PCs sent theirs, with the same game da
 hero skins: no looks in this game: PC 1 sent none in time (no open-homm5 DLL, an old one, other game data, or show_others=0)
 ```
 
-**Checked with the robot** (A1M4; details in the plan's "Robot results"): single player (the look on the map and in a battle the AI started), LAN with different looks on each PC (793 checksums, all equal), LAN with one PC taking no part (no looks, 517 checksums, all equal).
+**Checked with the robot** (A1M4; details in the plan's "Robot results"): single player (the look on the map and in a battle the AI started; the panel opened, a look picked and applied: the map figure changed at once), LAN with different looks on each PC (793 checksums, all equal), LAN with one PC taking no part (no looks, 517 checksums, all equal), LAN with a look changed through the panel during the game (both PCs rebuilt the figure at the same segment, 702 checksums, all equal).
 
 **Settings** (`open-homm5.ini`):
 
 ```ini
 [skins]
 skins=1            ; 0 = install nothing
+key=F7             ; the panel's key (F1 to F12, or none)
 show_others=1      ; 0 = this PC takes no part in multiplayer looks (then nobody's show there)
 trace=0            ; testing: log each figure built and who asks for the figures
 test_ai_heroes=0   ; testing only: computer players' heroes take this PC's looks too
