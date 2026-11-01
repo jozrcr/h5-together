@@ -7,9 +7,11 @@
 #include "overlay.h"
 #include "watchdog.h"
 #include "../mods/ai_pacing.h"
+#include "../mods/audio_volume.h"
 #include "../mods/autosave.h"
 #include "../mods/camera.h"
 #include "../mods/coop_guard.h"
+#include "../mods/edge_sky.h"
 #include "../mods/fast_paths.h"
 #include "../mods/lan_discovery.h"
 #include "../mods/languages.h"
@@ -84,6 +86,8 @@ void InstallAll()
 	overlay::ApplyTestPanelFromSettings();
 	mods::ApplyCameraFromSettings();
 	mods::ApplyWheelFromSettings();  // its DirectInput filter goes first (order -10)
+	mods::ApplyEdgeSkyFromSettings();  // [camera] edge_sky: before the first map reads its light
+	mods::ApplyAudioVolumeFromSettings();
 }
 
 }  // namespace hooks

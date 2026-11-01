@@ -383,8 +383,8 @@ Next:
 
 | File | What |
 |---|---|
-| `inventory.py` | Counts by layer and language. Writes `tools/lang/inventory.md` (counts only, committed) and `build/lang/inventory.csv`. With `--fr-pack`, it adds coverage and `build/lang/gaps.txt`. |
+| `inventory.py` | Counts by layer and language. Writes `tools/lang/inventory.md` (counts only, committed) and `build/lang/inventory.csv`. With `--fr-pack`, it adds coverage, `build/lang/gaps.txt`, and `build/lang/outdated.txt`: translated files whose markup differs from the English text's, so probably translated from an older MMH5.5 text (found the lobby's difficulty tooltips, [lobby-audio-classes.md](lobby-audio-classes.md) item 2; 108 candidates with RC19i on RC19k, to review). `--self-test` checks that comparison. |
 | `glossary.py` | English-French names, written to `build/lang/glossary.tsv`. |
-| `batch.py` | `make` (English text + context for a list of paths), `check` (tags, placeholders, lines, leftover English, length), `pack` (game files: UTF-16 + BOM, CRLF), `pak` (several batches into one `.pak`, dated now so it wins). |
+| `batch.py` | `make` (English text + context for a list of paths), `check` (tags, placeholders, lines, leftover English, length), `pack` (game files: UTF-16 + BOM, CRLF), `pak` (several batches into one `.pak`, dated now so it wins), `add` (a copy of a pack already handed out, with some batches' texts added or replaced, dated now; the pack's other files unchanged). |
 | `build_pack.py` | A pack from a GitHub snapshot of one of MMH5.5's text repos (UTF-8 under `mod/` → UTF-16 + BOM, CRLF), as their `prep_game_package.ps1` does, without running it. |
 | `h5texts.py` | Shared code: reading the archives, the date rule, the markup, the language guess. |

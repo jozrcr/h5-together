@@ -692,3 +692,62 @@ wheel: Wine reports the mouse wheel as steps (2 of 3 checks): from now on the ga
 Page Down (1.5 s) zoomed out to the farthest and Page Up back in, with `builder=1` (the modal panels' input hooks installed and idle). **Not checked yet:** a real Linux PC (that `auto` switches on there by itself).
 
 **Keyboard:** Page Down zooms out and Page Up zooms in (`bind +camera_zoom 'PG_DOWN'`, `bind -camera_zoom 'PG_UP'` in the profile's `input_a2.cfg`), on every system.
+
+## Wider volume range (`audio_volume.cpp`, off by default)
+
+**What it is for:** even at the lowest step of the options screen's sliders (music, sounds), the game was too loud. The sliders have 11 steps from 0 to 100%, and they are straight. The 10% step is a tenth of the sound wave's size, only 20 dB below full volume. With `volume_curve=wide` each step is about the same number of decibels: 10% becomes about −40 dB (10 times quieter), 50% −12 dB, and 100% stays as it is. Off (the default, `game`), the game's own sliders.
+
+**How** (details in [docs/plans/lobby-audio-classes.md](../../docs/plans/lobby-audio-classes.md), item 1):
+- The sliders store their value times 255 in the sound effects' manager and the music system.
+- Every channel's volume then goes to FMOD through one function, `0x00b26e80`, called from two places: `0x00d0439b` (sound effects) and `0x00d047ac` (music).
+- The mod redirects those two calls and multiplies the volume once more by its slider's value, so a slider value *s* counts as *s*².
+- Nothing stored changes: the slider, your profile and every place that lowers the music for a while (dialogs, cutscenes) keep working as before.
+- A sound the game makes audible stays audible at FMOD's quietest step.
+
+**Only your speakers change:** sound is not part of the game world. Each player can choose, also in co-op games. The log says `audio: volume_curve=wide: ...`.
+
+**Checked with the robot** (2026-11-01; `--audio-setting volume_curve=wide --audio-setting log_volume=200 --setvar "sound_sfxvolume = 0.1" --setvar "sound_musicvolume = 0.1"`):
+- the log has `audio: volume_curve=wide: ...`;
+- the main menu's music fades in from `game volume 1/255 -> 1/255` to `game volume 25/255 -> 2/255` and stays there;
+- on the map, a sound effect has `audio: sound: slider 25/255, game volume 25/255 -> 2/255`. So at the lowest step FMOD gets 2 instead of 25 (about −42 dB instead of −20 dB);
+- the game ran normally, with a battle.
+
+Still to check: the owner's ears (the lowest step quiet but audible, music and sounds balanced as before). In a LAN game where only the host used it, the world checksums stayed equal (700, below).
+
+**Settings** (`open-homm5.ini`):
+
+```ini
+[audio]
+volume_curve=game   ; game (the game's sliders), wide (each step about the same number of decibels)
+log_volume=0        ; testing: log the first N changes of an audible channel volume (slider, game's volume, ours)
+```
+
+## Black past the map's edge (`edge_sky.cpp`, off by default)
+
+**What it is for:** zoomed out (above), you see past the adventure map's edge. On many random maps that is a flat dark violet with a lavender corner. It is a **sky dome**, the Sylvan siege battlefield's sky: MMH5.5 gave it to `Lights/_(AmbientLight)/Arena/Dusk_light_BoatArena01(VicTest).xdb`, one of the 4 lights the random map generator picks from (`RMG/Params/Default.xdb`). The original game's copy of that light has no sky dome. With `edge_sky=none`, the game gets that light without its sky dome, so past the edge the screen stays black, like unexplored land. Off (the default, `game`), the game's sky.
+
+**How:** when the game opens that light file, the mod hands it the same file with an empty `<SkyDome/>`, as the lights without one have. This uses the game's file system hook (the one the original music and the French texts use). Nothing on disk changes.
+- In the game data only the generator's list names this light, so **battles keep their sky**.
+- The other 3 random-map lights and hand-made maps keep theirs. They show the Haven sky; if that should go too, it is the same work.
+- Restart the game after a change: the game keeps a light once it has read it.
+
+**Only your screen changes:** lights are drawn, not simulated. Each player can choose. The log says `edge sky: ... served without its sky dome (edge_sky=none)` when a map uses that light.
+
+**Checked with the robot** (2026-11-01, `zoom_out=300` and the far start position of camera.md):
+
+| Map | `edge_sky=game` | `edge_sky=none` |
+|---|---|---|
+| a random map of the owner's that drew the dusk light (`MAP_JoacJoz`, started with `--map /Maps/RMG/81CD0EF2-7D11-41D7-AE71-0A74BF0872A0/map.xdb`) | past the top-left edge: the flat violet and lavender of the owner's screenshot | black; the log has `edge sky: lights/_(ambientlight)/arena/dusk_light_boatarena01(victest).xdb served without its sky dome` |
+| A1M4 (another light: tested with `edge_sky_test_light=Lights/_(AmbientLight)/AdvMap/Addon/AC1M4.xdb`) | a pale sky glow above the far edge | black |
+
+- **Battles:** a battle in the same game drew its battlefield as usual. The log showed no other light served, so only the named light files change.
+- **LAN game**, only the host with `edge_sky=none`, the test light, `volume_curve=wide` and French texts: 700 world checksums, all equal on both copies.
+- Give a Git Bash command line `MSYS_NO_PATHCONV=1`, or use PowerShell: Git Bash rewrites `--map /Maps/...` into a Windows path, and the game then says `Couldn't find map`.
+
+**Settings** (`open-homm5.ini`):
+
+```ini
+[camera]
+edge_sky=game            ; game (the game's sky), none (no sky dome on the random maps' dusk light: black)
+edge_sky_test_light=     ; testing: one more light file to show without its sky dome
+```
