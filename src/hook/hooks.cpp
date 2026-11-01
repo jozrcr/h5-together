@@ -7,9 +7,11 @@
 #include "overlay.h"
 #include "watchdog.h"
 #include "../mods/ai_pacing.h"
+#include "../mods/audio_volume.h"
 #include "../mods/autosave.h"
 #include "../mods/camera.h"
 #include "../mods/coop_guard.h"
+#include "../mods/edge_sky.h"
 #include "../mods/fast_paths.h"
 #include "../mods/hero_skins.h"
 #include "../mods/hero_skins_internal.h"
@@ -85,6 +87,8 @@ void InstallAll()
 	mods::ApplyRmgBuilderFromSettings();
 	overlay::ApplyTestPanelFromSettings();
 	mods::ApplyCameraFromSettings();
+	mods::ApplyEdgeSkyFromSettings();  // [camera] edge_sky: before the first map reads its light
+	mods::ApplyAudioVolumeFromSettings();
 	mods::ApplyHeroSkinsFromSettings();  // after notify and the co-op guard: it stacks on their hooks
 }
 

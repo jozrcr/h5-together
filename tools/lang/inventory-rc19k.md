@@ -1,6 +1,6 @@
 # Text inventory (counts only)
 
-Made by `python tools/lang/inventory.py` on 2026-10-25 from the game copy `C:\Games\H5_test_k` (read only). No game text is in this file. Plan: [../../docs/plans/languages.md](../../docs/plans/languages.md).
+Made by `python tools/lang/inventory.py` on 2026-11-01 from the game copy `C:GamesH5_test_k` (read only). No game text is in this file. Plan: [../../docs/plans/languages.md](../../docs/plans/languages.md).
 
 Words are counted without the markup tags. The language is a guess from common words and accents; "neutral" means names, numbers or too short to tell (a name like a hero's is often the same in both).
 
@@ -163,4 +163,5 @@ Not needed for co-op on multiplayer or random maps. Their archives compete with 
 ## 9. The French pack MMH55-Texts-FR-RC19i.pak
 
 - 5875 text files; it has 3677 of the 4162 English files the player sees; 271 of those are still the English text. Left to translate: 756 files, 12072 words (list: gaps.txt in the --detail folder).
+- 108 translated files may be outdated: their markup (colours, styles, values) differs from the English text's, as when MMH5.5 rewrote a text after it was translated. To review (list with the reason: outdated.txt in the --detail folder).
 

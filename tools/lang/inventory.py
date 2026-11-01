@@ -40,13 +40,56 @@ def table(rows, head):
     return out
 
 
+def markup_differs(english, french):
+    """Why a French text may be outdated: its markup differs from the English one's.
+
+    A translation keeps the markup of the text it translates. When MMH5.5 rewrote
+    an English text (new colours, new values) and the French pack kept an older
+    translation, the two differ: the English lobby tooltips got <color=...>
+    titles for the difficulty modes, the French kept plain start-bonus texts.
+    Line breaks (<br>) are not compared: translators may lay a text out
+    differently. Returns a short reason, or None when the markup matches.
+    """
+    def style(text):
+        return collections.Counter(h5texts.tag_name(t) for t in h5texts.tags(text)
+                                   if h5texts.tag_name(t) not in ("br", "value=", "hotkey="))
+    reasons = []
+    pe, pf = sorted(h5texts.placeholders(english)), sorted(h5texts.placeholders(french))
+    if pe != pf:
+        reasons.append("placeholders %s / %s" % (",".join(pe) or "none", ",".join(pf) or "none"))
+    se, sf = style(english), style(french)
+    if se != sf:
+        def show(c):
+            return ",".join("%s%s" % (k, "" if n == 1 else "x%d" % n) for k, n in sorted(c.items())) or "none"
+        reasons.append("tags %s / %s" % (show(se), show(sf)))
+    return "; ".join(reasons) or None
+
+
+def self_test():
+    cases = [
+        ("<color=orange>Hard way<color_default><br>* Foes never run", "Un vieux texte sans couleur", True),
+        ("Deals <value=damage> damage.<br>Fast.", "Inflige <value=damage> degats. Rapide.", False),
+        ("Deals <value=damage> damage.", "Inflige des degats.", True),
+        ("<color=red>A<color_default>", "<color=yellow>B<color_default>", False),
+        ("Plain text", "Texte simple", False),
+    ]
+    bad = [(e, f) for e, f, want in cases if (markup_differs(e, f) is not None) != want]
+    for e, f in bad:
+        print("FAIL markup_differs(%r, %r) = %r" % (e, f, markup_differs(e, f)))
+    print("markup check: %d of %d cases right" % (len(cases) - len(bad), len(cases)))
+    return 1 if bad else 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--game", default=h5texts.DEFAULT_GAME)
     ap.add_argument("--fr-pack", help="a French text pack (.pak/.zip) to measure its coverage")
     ap.add_argument("--summary", default=os.path.join(REPO, "tools", "lang", "inventory.md"))
     ap.add_argument("--detail", default=os.path.join(REPO, "build", "lang"))
+    ap.add_argument("--self-test", action="store_true", help="check markup_differs on made-up texts, then stop")
     args = ap.parse_args()
+    if args.self_test:
+        sys.exit(self_test())
 
     layers = h5texts.load_layers(args.game)
     data = [l for l in layers if l.group == "data"]
@@ -305,15 +348,29 @@ def main():
                 and h5texts.decode(z.read(fr[k])).strip() == look(win[k], k)[2].strip()]
         gaps = sorted([k for k in keys if k not in fr] + same, key=lambda k: (area(k), k))
         gap_words = sum(look(win[k], k)[1] for k in gaps)
+        # translated, but perhaps from an older English text (markup_differs)
+        same_set = set(same)
+        outdated = []
+        for k in sorted(covered, key=lambda k: (area(k), k)):
+            if k in same_set:
+                continue
+            why = markup_differs(look(win[k], k)[2], h5texts.decode(z.read(fr[k])))
+            if why:
+                outdated.append("%s\t%s" % (k, why))
         md.append("## 9. The French pack %s" % os.path.basename(args.fr_pack))
         md.append("")
         md.append("- %d text files; it has %d of the %d English files the player sees; %d of those are still the "
                   "English text. Left to translate: %d files, %d words (list: gaps.txt in the --detail folder)."
                   % (len(fr), len(covered), len(keys), len(same), len(gaps), gap_words))
+        md.append("- %d translated files may be outdated: their markup (colours, styles, values) differs from the "
+                  "English text's, as when MMH5.5 rewrote a text after it was translated. To review "
+                  "(list with the reason: outdated.txt in the --detail folder)." % len(outdated))
         md.append("")
         os.makedirs(args.detail, exist_ok=True)
         with open(os.path.join(args.detail, "gaps.txt"), "w", encoding="utf-8", newline="\n") as f:
             f.write("\n".join(gaps) + "\n")
+        with open(os.path.join(args.detail, "outdated.txt"), "w", encoding="utf-8", newline="\n") as f:
+            f.write("\n".join(outdated) + ("\n" if outdated else ""))
 
     os.makedirs(os.path.dirname(args.summary), exist_ok=True)
     with open(args.summary, "w", encoding="utf-8", newline="\n") as f:
