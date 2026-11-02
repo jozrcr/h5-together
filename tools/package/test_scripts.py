@@ -130,6 +130,34 @@ def package_checks(pkg, zip_path):
         check(all(((i.external_attr >> 16) & 0o777) == 0o644 for i in entries), "package: the templates are plain data files (mode 644)")
 
 
+def licence_checks(pkg, zip_path):
+    """Our licence and Dear ImGui's (the only third-party code in the DLL) travel with the DLL."""
+    print("\nLicence notices in the package")
+    imgui_dir = REPO / "src" / "hook" / "third_party" / "imgui"
+    lf = lambda raw: raw.replace(b"\r\n", b"\n")
+    check(lf((pkg / "LICENSE.txt").read_bytes()) == lf((REPO / "LICENSE").read_bytes()),
+          "licence: LICENSE.txt is the LICENSE of the repo, word for word")
+    raw = (pkg / "THIRD-PARTY-NOTICES.txt").read_bytes()
+    text = lf(raw).decode("ascii", errors="replace")
+    imgui_licence = lf((imgui_dir / "LICENSE.txt").read_bytes()).decode("ascii").strip("\n")
+    check(imgui_licence in text, "licence: THIRD-PARTY-NOTICES.txt carries Dear ImGui's LICENSE.txt word for word")
+    version = re.search(r'#define IMGUI_VERSION\s+"([^"]+)"', (imgui_dir / "imgui.h").read_text(encoding="utf-8")).group(1)
+    check(f"Dear ImGui {version}" in text, f"licence: the notices name the Dear ImGui version we ship ({version})")
+    stb = sorted(p.name for p in imgui_dir.glob("imstb_*.h"))
+    check(stb == ["imstb_rectpack.h", "imstb_textedit.h", "imstb_truetype.h"],
+          "licence: Dear ImGui still bundles exactly the 3 stb files the notices list", str(stb))
+    check("stb_truetype" in text and "stb_rect_pack" in text and "stb_textedit" in text and "Sean Barrett" in text,
+          "licence: the notices cover the stb files, by Sean Barrett")
+    check("Tristan Grimmer" in text and "ProggyClean" in text, "licence: the notices cover the ProggyClean font built into Dear ImGui")
+    check(b"@" not in raw and all(b < 0x80 for b in raw) and raw.count(b"\r\n") == raw.count(b"\n"),
+          "licence: the notices are plain ASCII with CRLF line endings and no unreplaced placeholder")
+    readme = (pkg / "README.txt").read_text(encoding="ascii")
+    check("LICENSE.txt" in readme and "THIRD-PARTY-NOTICES.txt" in readme, "licence: README.txt tells where the licences are")
+    with zipfile.ZipFile(zip_path) as z:
+        names = {i.filename.split("/", 1)[1] for i in z.infolist() if "/" in i.filename}
+        check({"LICENSE.txt", "THIRD-PARTY-NOTICES.txt"} <= names, "licence: both are in the zip, next to README.txt")
+
+
 def template_tests(who, pkg, game_bin, install, uninstall):
     """The templates in a fake game folder: install, a player's own files, reinstall, uninstall.
 
@@ -704,6 +732,7 @@ def main():
         z.extractall(work / "package")
     pkg = work / "package" / "open-homm5-0.0.0-test"  # the zip's one top folder
     package_checks(pkg, out_dir / "open-homm5-0.0.0-test.zip")
+    licence_checks(pkg, out_dir / "open-homm5-0.0.0-test.zip")
 
     win = lin = None
     if os.name == "nt":

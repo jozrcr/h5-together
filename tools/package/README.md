@@ -23,6 +23,8 @@ python tools\package\make_package.py --rebuild  # build the DLL again first
 | `uninstall.bat`, `uninstall.ps1` | Windows uninstaller |
 | `install.sh`, `uninstall.sh` | Linux (Steam / Proton) installer and uninstaller |
 | `README.txt` | a short read-me for players (install, uninstall, settings, what's new; plain ASCII); `@VERSION@` is filled in |
+| `LICENSE.txt` | our MIT licence: the repo's `LICENSE`, copied word for word |
+| `THIRD-PARTY-NOTICES.txt` | the licence notices of what else is inside `dinput8.dll`: Dear ImGui (its `LICENSE.txt` is pasted in word for word, with the version from `imgui.h`), the stb files it carries (Sean Barrett) and its built-in ProggyClean font (Tristan Grimmer). The MIT licences ask for the notice to go along with copies. The text is the template `files/THIRD-PARTY-NOTICES.txt`; if third-party code is added to the DLL, add it there (and see `licence_checks` in `test_scripts.py`) |
 | `open-homm5/templates/OH-*.xdb` | the ready random map templates (see below) |
 
 The scripts and text files are in `tools/package/files/`. Everything is in one top folder, `open-homm5-<version>/`, so that unzipping on Linux does not spread the files around. Line endings are set when the zip is written: CRLF for `.bat`, `.ps1`, `.txt` and `.ini` (Notepad, cmd.exe), LF for `.sh`, which also get the executable bit. In the repo, `.gitattributes` keeps `.bat` as CRLF and `.sh` as LF.

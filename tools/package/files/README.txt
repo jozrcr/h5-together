@@ -49,4 +49,8 @@ NEW IN 0.2.7
 
 If a game freezes: wait 30 seconds before closing it, then send open-homm5.log.
 
+LICENCES
+
+open-homm5 is free software under the MIT licence: see LICENSE.txt in this folder. Dear ImGui (the panels) and the small parts it carries are under their own licences: see THIRD-PARTY-NOTICES.txt. The add-on is an unofficial fan project, not made or endorsed by Ubisoft.
+
 Project page, guides and bug reports: https://github.com/jozrcr/open-homm5

@@ -86,4 +86,6 @@ The project started with a bigger long-term idea: rebuild the original exe funct
 
 ## Legal
 
-This repository contains only our own code, notes and tools. It contains **no game files**, so you need your own legal copy of Heroes of Might and Magic V: Tribes of the East (for example from Steam) to use anything here. Heroes of Might and Magic is a trademark of Ubisoft; this is an unofficial fan project, not affiliated with or endorsed by Ubisoft.
+Our code is under the [MIT licence](LICENSE). The only third-party code in the DLL is Dear ImGui (MIT, with the stb files and the small ProggyClean font it carries), in [src/hook/third_party/imgui/](src/hook/third_party/imgui/); the install zip carries both licences as `LICENSE.txt` and `THIRD-PARTY-NOTICES.txt`.
+
+Apart from that, this repository contains only our own code, notes and tools. It contains **no game files**, so you need your own legal copy of Heroes of Might and Magic V: Tribes of the East (for example from Steam) to use anything here. Heroes of Might and Magic is a trademark of Ubisoft; this is an unofficial fan project, not affiliated with or endorsed by Ubisoft.
