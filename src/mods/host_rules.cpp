@@ -305,7 +305,8 @@ std::vector<rules::Peer> g_host_list;  // client: the host's list
 bool g_host_list_known = false;     // client: it came
 bool g_host_list_unreadable = false;  // client: a list of a later format came
 DWORD g_client_lobby_at = 0;        // client: when this lobby was first seen
-std::string g_versions_logged;      // the differences logged last
+const char kNotLogged[] = "-";
+std::string g_versions_logged = kNotLogged;  // the differences logged last (in this lobby)
 std::string VersionList(const std::vector<rules::Peer> &peers);
 void LogVersions(const std::vector<rules::Peer> &differ, int players);
 
@@ -739,6 +740,7 @@ void HostLobby(const void *logic)
 	g_pcs.clear();
 	g_peers.clear();
 	g_seen.clear();
+	g_versions_logged = kNotLogged;
 	g_start_text.clear();
 	g_in_game = false;
 }
@@ -878,6 +880,7 @@ void __fastcall ClientUpdateHook(void *logic, void *edx)
 			g_host_list_unreadable = false;
 			g_host_list.clear();
 			g_client_lobby_at = GetTickCount();
+			g_versions_logged = kNotLogged;
 		}
 	}
 	static int step = 0;

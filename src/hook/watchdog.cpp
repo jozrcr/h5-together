@@ -804,11 +804,13 @@ void OnMessages()
 		HangTestKey();
 	if (g_slow_frame_ms)
 		Sleep(g_slow_frame_ms);  // [debug] hang_test_frame_ms: every frame this much longer (a slow PC)
-	if (g_hang_test_at_ms && GetTickCount() - g_first_beat >= g_hang_test_at_ms) {
+	// (signed: g_first_beat may be 1 ms ahead of the clock, "| 1"; unsigned, that read as 49 days)
+	const LONG since_first = static_cast<LONG>(GetTickCount() - g_first_beat);
+	if (g_hang_test_at_ms && since_first >= static_cast<LONG>(g_hang_test_at_ms)) {
 		g_hang_test_at_ms = 0;
 		HangTest("[debug] hang_test_at");
 	}
-	if (g_main_loop_fn && GetTickCount() - g_first_beat >= g_main_loop_at_ms) {
+	if (g_main_loop_fn && since_first >= static_cast<LONG>(g_main_loop_at_ms)) {
 		void (*fn)() = g_main_loop_fn;
 		g_main_loop_fn = nullptr;
 		fn();

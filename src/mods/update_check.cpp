@@ -35,10 +35,11 @@ namespace {
 
 const char kName[] = "update notice";
 const char kMainMenu[] = ".?AVCMainMenuScreen@NUI@@";
-// The notice: two short lines at the bottom left of the main menu (its 1024x768 layout,
-// centred and scaled with the height, as the game draws it).
+// The notice: two short lines at the bottom left of the main menu, just above MMH5.5's
+// "Version: 5.69k" (its 1024x768 layout, centred and scaled with the height, as the game
+// draws it), on a dark field so that they read over the grass.
 const float kRefW = 1024.0f, kRefH = 768.0f;
-const float kNoticeX = 14.0f, kNoticeY = 716.0f, kLineFont = 14.0f, kLineGap = 18.0f;
+const float kNoticeX = 34.0f, kNoticeY = 664.0f, kLineFont = 14.0f, kLineGap = 18.0f;
 
 CRITICAL_SECTION g_lock;
 bool g_on = false;
@@ -210,6 +211,10 @@ void Draw(const overlay::Frame &frame)
 	ImDrawList *draw = ImGui::GetForegroundDrawList();
 	const std::string line1 = texts::Format("update.available", {{"new", latest}, {"ours", OPEN_HOMM5_VERSION}});
 	const std::string line2 = texts::Format("update.where", {{"page", update::kReleasesPage}});
+	const float w1 = builder_ui::TextWidth(font, px, line1.c_str()), w2 = builder_ui::TextWidth(font, px, line2.c_str());
+	draw->AddRectFilled(ImVec2(x0 + (kNoticeX - 6) * k, (kNoticeY - 4) * k),
+	                    ImVec2(x0 + kNoticeX * k + (w1 > w2 ? w1 : w2) + 6 * k, (kNoticeY + kLineGap + kLineFont + 4) * k),
+	                    IM_COL32(20, 14, 8, 190), 4 * k);
 	builder_ui::ShadowText(draw, font, px, ImVec2(x0 + kNoticeX * k, kNoticeY * k), builder_ui::kGold, line1.c_str());
 	builder_ui::ShadowText(draw, font, px, ImVec2(x0 + kNoticeX * k, (kNoticeY + kLineGap) * k), builder_ui::kParchment, line2.c_str());
 	if (!g_told) {

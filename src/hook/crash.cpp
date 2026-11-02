@@ -418,6 +418,7 @@ void Install(const char *when)
 		CloseHandle(t);
 	g_next = SetUnhandledExceptionFilter(&Filter);
 	watchdog::NameFunction(reinterpret_cast<const void *>(&Filter), "crash filter");
+	watchdog::NameFunction(reinterpret_cast<const void *>(&CrashOnPurpose), "crash test (on purpose)");
 	hooklog::Write("crash: on (%s): if the game crashes, h5-together-crash-<date>.txt (what crashed) and .dmp (a small "
 	               "minidump) go next to this log, then the game's own crash handling as before%s",
 	               when, t ? "" : "; the report thread could not start: the crashed thread writes it");
