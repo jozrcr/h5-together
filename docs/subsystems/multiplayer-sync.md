@@ -164,9 +164,36 @@ So the extra segment or two of co-op hero moves is not the walk itself. It is st
 
 1. A player on the LAN screen **broadcasts a 5-byte query** (first byte `02`) to `net_lan_match_maker_port`, about once a second.
 2. A PC hosting a game **answers by unicast** to the sender with an 826-byte game description (first byte `03`).
-3. Joining: the joiner sends 9-byte packets (first byte `07`) to **each** of the host's addresses (the host's game description seems to carry its address list), on `net_game_port`, and the host answers from the address that worked.
+3. Joining: the joiner sends 9-byte packets (first byte `07`) to **each** of the host's addresses (the host's game description carries its address list: see "Addresses inside the packets" below), on `net_game_port`, and the host answers from the address that worked.
 
 The query goes to only two addresses: `255.255.255.255` and the **classful** broadcast of one local address. On the owner's PC the game picked the WSL adapter `172.28.192.1/20` and sent to `172.28.255.255` (its class B /16), never to `192.168.1.255` of the real Ethernet card. In 50 runs no other broadcast address appeared.
+
+### Addresses inside the packets (2026-11-02)
+
+**Why it matters:** online play over Steam ([../plans/online-steam.md](../plans/online-steam.md)) carries the game's LAN packets between PCs and gives every player a made-up address. Any place where the game writes a real address into a packet would break that, and would show a player's real addresses to the others.
+
+**How it was found:** a robot LAN game (two copies on one PC, A1M4, 8 AI turns) with whole packets in the log and a scan of **every** packet for this PC's own IPv4 addresses (`run_lan_test.py --net-log-bytes 2048 --net-scan`, `src/hook/robot_net.cpp`; read with `tools/robot/packet_map.py`). Run `build/robot/20261102-192943-lan`: the host sent 6,012 packets and got 4,780. The PC had 10 addresses (Ethernet, ZeroTier, two Hyper-V/WSL adapters, self-assigned ones, loopback); the game's list held 4 of them (ZeroTier first).
+
+**Two forms.** Every address the game writes is in one of these two forms, and both come from the same place: the socket's port plus **`gethostbyname(gethostname())`**, through the "my addresses" function `0x00484ac0` (slot 11 of the socket object). Addresses are in network byte order.
+
+| Form | Bytes | Where it is used |
+|---|---|---|
+| **Raw address list** (the output of `0x00484ac0`, sent as it is) | port as a little-endian 16-bit number (2), 2 unused bytes, then up to 4 IPv4 addresses (4 × 4) | packets `01` and `04` |
+| **Player address record**, inside the game's tagged serialization (each field: a tag byte, a length byte = size × 2, the data) | field 3 (`03 24`) = a `sockaddr_in` (`02 20`, 16 bytes: `02 00`, the game port big-endian, the **first** address of the list, 8 zero bytes); field 4 (`04 2c`) = the port little-endian (`02 04`, 2 bytes) and the address list (`03 20`, 16 bytes) | packets `03` and the lobby's `00` data |
+
+**Which packets** (offsets from the packet's first byte; one copy on one PC, so the joiner's and the host's addresses are the same here):
+
+| Packet | Size | Socket, direction | Addresses inside |
+|---|---|---|---|
+| `01` join request | 31 | discovery, joiner → host | raw list at bytes 9–28: the joiner's **discovery** port (`bb 22` = 8891) and its addresses at 13, 17, 21, 25 |
+| `04` join accepted (probably `SEnterGameAllowedPacket`) | 33 | discovery, host → joiner | raw list at bytes 9–28: the host's discovery port (`b9 22` = 8889) and its addresses at 13–25; bytes 1–4 repeat a token of the `01` |
+| `03` game description | 826 | discovery, host → asker | the host's player record **twice** (the game's host, and the first row of its player list): `sockaddr_in` at 351 (port 8888 at 353, address at 355) and the list at 369 (port at 371, addresses at 375–387); again at 768 (770, 772) and 786 (788, 792–804). The rest is the game name, the map's path, the host's name and settings |
+| `00` lobby link data | 106 | discovery, joiner → host | the joiner's player record (its name, `sockaddr_in` at 54 with its game port 8890, list at 72–93) |
+| `00` lobby link data | 273 | discovery, host → joiners | the lobby's **player list**: every player's record, so the host passes each player's addresses to the others (how clients reach each other). The data is a byte stream: one record can be split across two packets |
+| `07` address probe | 9 | game, both ways | none; but it goes to every address of the other PC's list |
+| `02` query, `00` acknowledgements, `00` game data | 5–273 | both | none. 17 `00` packets held an address, all in the lobby and while the game started; from the first AI turn on, none (the count stayed at 119 of the host's 10,792 packets). Three game-link packets held `01 00 00 7f` (127.0.0.1 backwards) by chance, inside acknowledgement bits |
+
+**What it means:** nothing in these packets comes from anywhere else than `0x00484ac0` and its `gethostbyname(gethostname())`. So answering that call with a made-up address puts only the made-up address into every packet, and no packet has to be rewritten (rewriting would be fragile anyway: a record can straddle two packets). The virtual LAN does exactly that (`src/mods/virtual_lan.cpp`); its robot run is in the plan.
 
 ### Over the internet with ZeroTier (2026-10-23, failed)
 

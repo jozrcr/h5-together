@@ -41,14 +41,17 @@ From the robot's two copies on one PC (host ports 8889/8888, client ports 8891/8
 | Byte 0 | Size | Socket | Direction | Meaning |
 |---|---|---|---|---|
 | `02` | 5 | discovery | everyone, broadcast, once a second | "Any games here?" plus 4 bytes that change each time. |
-| `03` | 826 | discovery | host → asker, unicast | The game's description (what the LAN list shows). |
-| `01` | 31 | discovery | joiner → host | Probably the join request. It contains the joiner's discovery port (`bb 22` = 8891), probably followed by its address list. |
-| `00` | 18–273 | both | both ways | The reliable link: data and acknowledgements (see [multiplayer-sync.md](../subsystems/multiplayer-sync.md), "The LAN link"). |
+| `03` | 826 | discovery | host → asker, unicast | The game's description (what the LAN list shows), in the game's tagged serialization. It holds the host's **address record twice** (step 1, below). |
+| `01` | 31 | discovery | joiner → host | The join request. Bytes 9–28: the joiner's discovery port (`bb 22` = 8891, little endian) and its **4 addresses**. |
+| `04` | 33 | discovery | host → joiner | The join answer (probably `SEnterGameAllowedPacket`). Bytes 9–28: the host's discovery port and its **4 addresses**. |
+| `00` | 18–273 | both | both ways | The reliable link: data and acknowledgements (see [multiplayer-sync.md](../subsystems/multiplayer-sync.md), "The LAN link"). In the lobby its data carries every player's **address record** (the host sends the player list to everyone). |
 | `07` | 9 | game | both ways | Address probe. `07 00` + a 4-byte token goes to **each** address of the other PC; `07 01` + the same token is the answer. The first address that answers wins. |
+
+**Step 1, the packet map (2026-11-02):** where each address sits, byte by byte, is in [multiplayer-sync.md, "Addresses inside the packets"](../subsystems/multiplayer-sync.md#addresses-inside-the-packets-2026-11-02). In short: every address in every packet comes from `gethostbyname(gethostname())` (through `0x00484ac0`), in two forms: the raw list of `01`/`04` (port + 4 addresses), and a player's record in `03` and the lobby's `00` data (a `sockaddr_in` with the first address and the game port, plus the list). A robot run scanned all 10,792 packets of the host for the PC's own addresses: 119 held some (`03` ×100, `00` ×17, `01`, `04`), all before the first AI turn; none came from anywhere else.
 
 ### Address-dependent things (what a virtual LAN must get right)
 
-- **The game sends its own IPs inside packets.** Each PC tells the others its addresses (from `0x00484ac0`, via `gethostbyname`). The other PC sends its `07` probes to all of them. In the robot logs the host probed the client's 4 addresses (ZeroTier, WSL, Ethernet, Hyper-V), and the client probed the host's 4.
+- **The game sends its own IPs inside packets.** Each PC tells the others its addresses (from `0x00484ac0`, via `gethostbyname`): in `01`, `03`, `04` and the lobby's `00` data (step 1 above). The other PC sends its `07` probes to all of them. In the robot logs the host probed the client's 4 addresses (ZeroTier, WSL, Ethernet, Hyper-V), and the client probed the host's 4.
 - **A link is the other PC's IP:port.** Received packets are matched to links by their sender address. So a friend's fake address must stay the same for the whole game, and their packets must always arrive from that address **and from the same port**.
 - **Every PC talks to every other PC.** The "segment done" reports go directly between all PCs, not through the host ([responsiveness.md](responsiveness.md)). So in a 4-player game each client also needs a path to the other clients. The host passes their addresses along.
 - **Versions.** The game has a `NetGameVersion` check on connect (`0x00402c60`, next to "request for connect is sent"). Our co-op guard also compares add-on versions in its hello.
@@ -223,6 +226,8 @@ keep_lan=0        ; later: also accept plain LAN/ZeroTier players in a Steam gam
 log=1             ; log lobby events and each new peer (fake address <-> SteamID)
 ```
 
+Built so far (step 2): `mode=off|loopback` (`steam` is read but says "not built yet" and stays off), and for the loopback `loopback_port` / `loopback_peers`. The shipped `h5-together.ini` has only `;mode=off`, in an `[online]` section of its own. The peer log is always on (a few lines per game), so `log` is not needed yet.
+
 - **Off by default** at first. It changes no gameplay (only gameplay changes must default to the original), so it can be turned on by default once it has proven itself.
 - **Picking Steam or LAN:** a small ImGui box on the game's LAN screen: "Play over: Steam / LAN", with Steam's status ("Steam: 3 friends online with H5 Together"). It applies the next time the LAN screen opens, because the game creates its sockets then.
 - **The list:** the games stay in the game's own LAN list. Our box beside it lists Steam games with problems ("needs H5 Together 0.3.1") and has "Invite friends...".
@@ -232,7 +237,7 @@ log=1             ; log lobby events and each new peer (fake address <-> SteamID
 
 - **The robot can't use Steam:** it runs two game copies on **one** PC, and one PC runs only one Steam account. So the virtual LAN code gets a **transport interface** with two versions:
   - **Steam:** the real one.
-  - **Loopback** (`mode=loopback`): the two copies exchange the same messages over a local UDP socket of our own (127.0.0.1, one port per robot instance), with fake SteamIDs from `OPEN_HOMM5_INSTANCE`. A tiny fake lobby (the host announces itself to the other copy) stands in for Steam's.
+  - **Loopback** (`mode=loopback`): the two copies exchange the same messages over a local UDP socket of our own (127.0.0.1, one port per robot instance), with made-up SteamIDs (built from that port: `LoopbackId`). A tiny fake lobby (every copy tells the others once a second whether it hosts) stands in for Steam's.
   - All the address mapping, broadcast fan-out, hosting detection and port handling is the **same code** in both.
 - **Robot checks (loopback):**
   - the client finds the host's game through the virtual LAN only (real broadcasts off);
