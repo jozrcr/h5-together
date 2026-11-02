@@ -37,8 +37,10 @@ The add-on is one file, `dinput8.dll`, that the game loads when it starts, plus 
 
 - The **host** chooses MMH5.5's rule switches for each game: governors, town conversion, the town gate, mine guards, the computer's weekly bonus, mixed neutral stacks, prank artifacts, random map extras and more. **Règles... / Rules...** in the multiplayer waiting room, or **F2**.
 - Every PC plays with the host's rules, so nobody swaps settings files any more. The others see the rules in the lobby and during the game.
-- It works only when **every player** has the add-on (0.2.6 or later). Otherwise everyone uses their own MMH5.5 file, as before.
-- **Good to know:** on random maps straight from the game's generator, MMH5.5's scripts do not run in multiplayer, so these rules change nothing there.
+- **Tribes of the East start bonuses:** each player keeps the bonus picked with the lobby arrows (gold, resources, artifact), and the game mode (Default, Savage, Nightmare, Random) gets its own choice.
+- **MMH5.5 scripts on random maps:** in multiplayer, MMH5.5's scripts (and so these rules) also run on random maps straight from the game's generator. Off on RC19d and on on RC19k by default, which is what each version does by itself.
+- **Skills of each class:** MMH5.5's lock (the default), or **Unlocked**: each class keeps its own skills and can also be offered the others at a small chance, as in the original game.
+- It works only when **every player** has the add-on (0.2.7 or later for the last three). Otherwise everyone uses their own MMH5.5 file, as before.
 
 ### Camera, sound and visuals (off by default)
 
