@@ -103,9 +103,20 @@ void Ip(uint32_t ip, char *out, size_t size)
 	vlan::FormatIp(ip, out, size);
 }
 
+// Our own fake address, once the transport knows our id (the loopback's at once;
+// Steam's after its start, which comes before the game's LAN screen). False until then.
+bool HaveSelf()
+{
+	if (g_peers.Count() == 0 && g_transport->SelfId() != 0)
+		g_peers.Reset(g_transport->SelfId());
+	return g_peers.Count() != 0;
+}
+
 // The transport starts at the first hooked call (the game has started Winsock by then).
 bool Ready()
 {
+	if (!HaveSelf())
+		return false;
 	if (!g_started && !g_failed) {
 		g_started = g_transport->Start();
 		g_failed = !g_started;
@@ -367,6 +378,14 @@ hostent *WINAPI VlanGetHostByName(const char *name)
 		return g_gethostbyname(name);
 	OwnHost &own = t_own;
 	EnterCriticalSection(&g_lock);
+	if (!HaveSelf()) {
+		// no fake address yet: no address at all, never a real one
+		LeaveCriticalSection(&g_lock);
+		hooklog::Write("vlan: the game asked for this PC's own addresses before the %s transport knew our id: none given",
+		               g_transport->Name());
+		WSASetLastError(WSANO_DATA);
+		return nullptr;
+	}
 	lstrcpynA(own.name, g_host_name[0] ? g_host_name : "localhost", sizeof(own.name));
 	own.address.s_addr = htonl(g_peers.SelfAddress());
 	LeaveCriticalSection(&g_lock);
@@ -415,7 +434,7 @@ void InstallVirtualLan()
 	const int peer_count = vlan::ParsePorts(peers_text, peers, 8);
 	InitializeCriticalSection(&g_lock);
 	g_transport = vlan::MakeLoopbackTransport(static_cast<uint16_t>(own_port), peers, peer_count);
-	g_peers.Reset(g_transport->SelfId());
+	HaveSelf();  // (the loopback knows its id at once)
 	char self[20];
 	Ip(g_peers.SelfAddress(), self, sizeof(self));
 	for (int i = 0; i < peer_count; ++i)
