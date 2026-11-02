@@ -1,7 +1,7 @@
 # open-homm5 uninstaller for Windows. Runs on Windows PowerShell 5.1.
 #
 # Removes only what install.ps1 put in the game's bin folder:
-#   dinput8.dll (only if it is ours), open-homm5.log, open-homm5.ini (after asking),
+#   dinput8.dll (only if it is ours), open-homm5.log (and open-homm5.old.log), open-homm5.ini (after asking),
 #   and the random map templates of this package (the OH-*.xdb files whose names are in
 #   this package's open-homm5\templates folder), then the folders if they are empty.
 # Nothing else is touched: a template of your own stays.
@@ -30,7 +30,7 @@ function Wait-AndExit([int]$Code) {
     exit $Code
 }
 
-# ---- shared with uninstall.ps1: finding the game (keep both copies identical) ----
+# ---- shared with uninstall.ps1 and bug-report.ps1: finding the game (keep all copies identical) ----
 $Marker = "open-homm5 hook DLL"
 $GameFolderName = "Heroes of Might and Magic 5 Tribes of the East"
 
@@ -193,6 +193,17 @@ try {
         }
     } else {
         Write-Host "  - no open-homm5.log here"
+    }
+    # The log is kept to 5 MB: when it got bigger, the game kept the last full one as open-homm5.old.log.
+    $oldLog = Join-Path $bin "open-homm5.old.log"
+    if (Test-Path -LiteralPath $oldLog) {
+        try {
+            Remove-Item -LiteralPath $oldLog -Force
+            Write-Host "  - removed open-homm5.old.log"
+        } catch {
+            Write-Host ("  - could not remove open-homm5.old.log: " + $_.Exception.Message) -ForegroundColor Red
+            $failed = $true
+        }
     }
 
     # The settings file, and the copies of it that the installer keeps when it adds new

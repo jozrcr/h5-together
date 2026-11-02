@@ -2,7 +2,7 @@
 # open-homm5 uninstaller for Linux (Steam / Proton).
 #
 # Removes only what install.sh put in the game's bin folder:
-#   dinput8.dll (only if it is ours), open-homm5.log, open-homm5.ini (after asking),
+#   dinput8.dll (only if it is ours), open-homm5.log (and open-homm5.old.log), open-homm5.ini (after asking),
 #   and the random map templates of this package (the OH-*.xdb files whose names are in
 #   this package's open-homm5/templates folder), then the folders if they are empty.
 # Nothing else is touched: a template of your own stays. Steam's launch options are
@@ -32,7 +32,7 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-# ---- shared with uninstall.sh: finding the game (keep both copies identical) ----
+# ---- shared with uninstall.sh and bug-report.sh: finding the game (keep all copies identical) ----
 
 # True if the file is the dinput8.dll of open-homm5 (it contains our marker text).
 is_ours() { grep -q -a -F -- "$MARKER" "$1" 2>/dev/null; }
@@ -179,6 +179,16 @@ elif rm -f "$log"; then
 else
     echo "  - could not remove open-homm5.log"
     failed=1
+fi
+# The log is kept to 5 MB: when it got bigger, the game kept the last full one as open-homm5.old.log.
+old_log="$(find_ci "$bin" open-homm5.old.log)"
+if [ -n "$old_log" ]; then
+    if rm -f "$old_log"; then
+        echo "  - removed open-homm5.old.log"
+    else
+        echo "  - could not remove open-homm5.old.log"
+        failed=1
+    fi
 fi
 
 # The settings file, and the copies of it that the installer keeps when it adds new

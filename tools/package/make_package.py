@@ -2,9 +2,11 @@
 """Build the easy-install package: build/package/open-homm5-<version>.zip
 
 The zip holds the hook DLL (build/hook/dinput8.dll), the settings template, the
-install and uninstall scripts for Windows and Linux, a short README.txt, and the
-ready random map templates (src/mods/rmg/templates/*.xdb, packed byte for byte
-as open-homm5/templates/). The scripts and text templates live in tools/package/files/.
+install and uninstall scripts and the bug report script for Windows and Linux, a short
+README.txt, the licence notices (LICENSE.txt is the repo's LICENSE; THIRD-PARTY-NOTICES.txt
+carries Dear ImGui's licence file), and the ready random map templates
+(src/mods/rmg/templates/*.xdb, packed byte for byte as open-homm5/templates/).
+The scripts and text templates live in tools/package/files/.
 
     python tools/package/make_package.py                    # the version in src/hook/version.h
     python tools/package/make_package.py --version 0.1.0-test2   # a test build (with a '-')
@@ -33,6 +35,10 @@ OUT_DIR = REPO / "build" / "package"
 MARKER = b"open-homm5 hook DLL"
 VERSION_H = REPO / "src" / "hook" / "version.h"
 
+# The licence notices: our LICENSE, and Dear ImGui's (the one third-party code in the DLL).
+LICENSE_FILE = REPO / "LICENSE"
+IMGUI_DIR = REPO / "src" / "hook" / "third_party" / "imgui"
+
 
 def source_version():
     """The version in src/hook/version.h (OPEN_HOMM5_VERSION), which the DLL logs."""
@@ -42,16 +48,22 @@ def source_version():
     return m.group(1)
 
 # Order in the zip. (name, source file in tools/package/files/ or None for the DLL)
+# LICENSE.txt has no file of its own there: it is the LICENSE at the repo's root.
 CONTENTS = [
     ("README.txt", "README.txt"),
+    ("LICENSE.txt", "LICENSE"),
+    ("THIRD-PARTY-NOTICES.txt", "THIRD-PARTY-NOTICES.txt"),
     ("dinput8.dll", None),
     ("open-homm5.ini", "open-homm5.ini"),
     ("install.bat", "install.bat"),
     ("install.ps1", "install.ps1"),
     ("uninstall.bat", "uninstall.bat"),
     ("uninstall.ps1", "uninstall.ps1"),
+    ("bug-report.bat", "bug-report.bat"),
+    ("bug-report.ps1", "bug-report.ps1"),
     ("install.sh", "install.sh"),
     ("uninstall.sh", "uninstall.sh"),
+    ("bug-report.sh", "bug-report.sh"),
 ]
 
 # The ready random map templates (tools/rmg/make_templates.js writes them) go in
@@ -69,9 +81,11 @@ TEMPLATE_NAME = re.compile(r"OH-[A-Za-z0-9.-]+\.xdb")
 CRLF_SUFFIXES = {".bat", ".ps1", ".txt", ".ini"}
 EXECUTABLE_SUFFIXES = {".sh"}
 
-# The code that finds the game is written twice (install and uninstall) so that
-# each script stands alone. The two copies sit between these lines and must match.
-SHARED_PAIRS = [("install.ps1", "uninstall.ps1"), ("install.sh", "uninstall.sh")]
+# The code that finds the game is written three times (install, uninstall and the bug
+# report script) so that each script stands alone. The copies sit between these lines
+# and must match.
+SHARED_PAIRS = [("install.ps1", "uninstall.ps1"), ("install.ps1", "bug-report.ps1"),
+                ("install.sh", "uninstall.sh"), ("install.sh", "bug-report.sh")]
 SHARED_START = "# ---- shared with uninstall."
 SHARED_END = "# ---- end of the shared block ----"
 
@@ -81,15 +95,27 @@ def fail(message):
     sys.exit(1)
 
 
-def read_template(name):
-    """Template text with LF line endings; must be plain ASCII (PowerShell 5.1
+def read_ascii(path):
+    """Text of a file with LF line endings; must be plain ASCII (PowerShell 5.1
     reads a script without a byte-order mark as ANSI, so accents would break)."""
-    raw = (FILES / name).read_bytes()
+    raw = Path(path).read_bytes()
     try:
         text = raw.decode("ascii")
     except UnicodeDecodeError as e:
-        fail(f"{name} must be plain ASCII ({e})")
+        fail(f"{Path(path).name} must be plain ASCII ({e})")
     return text.replace("\r\n", "\n")
+
+
+def read_template(name):
+    return read_ascii(FILES / name)
+
+
+def imgui_version():
+    """Dear ImGui's version, from its header (IMGUI_VERSION)."""
+    m = re.search(r'#define IMGUI_VERSION\s+"([^"]+)"', (IMGUI_DIR / "imgui.h").read_text(encoding="utf-8"))
+    if not m:
+        fail(f"no IMGUI_VERSION in {IMGUI_DIR / 'imgui.h'}")
+    return m.group(1)
 
 
 def shared_block(name, text):
@@ -126,11 +152,19 @@ def file_bytes(name, source, dll_path, version):
         if logged not in data:
             fail(f"{dll_path} is not version {source_version()} (src/hook/version.h): rebuild it (--rebuild)")
         return data
-    text = read_template(source)
+    if name == "LICENSE.txt":
+        text = read_ascii(LICENSE_FILE)
+    else:
+        text = read_template(source)
     if name == "README.txt":
         text = text.replace("@VERSION@", version)
-    if "@VERSION@" in text:
-        fail(f"{name}: unreplaced @VERSION@")
+    if name == "THIRD-PARTY-NOTICES.txt":
+        # Dear ImGui's licence file, word for word (a newer ImGui brings its own)
+        text = text.replace("@IMGUI_VERSION@", imgui_version())
+        text = text.replace("@IMGUI_LICENSE@", read_ascii(IMGUI_DIR / "LICENSE.txt").strip("\n"))
+    for placeholder in ("@VERSION@", "@IMGUI_VERSION@", "@IMGUI_LICENSE@"):
+        if placeholder in text:
+            fail(f"{name}: unreplaced {placeholder}")
     if Path(name).suffix in CRLF_SUFFIXES:
         text = text.replace("\n", "\r\n")
     return text.encode("ascii")

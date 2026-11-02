@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Install help
+    url: https://github.com/jozrcr/open-homm5/blob/main/docs/install.md
+    about: Step by step, with what each file does, how to update and how to remove the add-on.
+  - name: A problem of MMH5.5 itself
+    url: https://www.moddb.com/mods/might-magic-heroes-55
+    about: Its scripts, balance, installer or translations. The MMH5.5 team looks after them, not this add-on.
