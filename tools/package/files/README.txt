@@ -39,10 +39,12 @@ WHAT IT DOES
 - Linux: the mouse wheel zooms out again (automatic).
 
 
-NEW IN 0.2.6
+NEW IN 0.2.7
 
-- Game rules menu for the host: MMH5.5's switches (governors, town conversion, mine guards, the computer's weekly bonus, mixed stacks...) chosen for each game and sent to every PC. No more swapping settings files. On random maps straight from the game's generator, MMH5.5's scripts do not run in multiplayer, so the rules change nothing there.
-- Hero looks show at once on the hero screen after "Apply".
+- Game rules (host): Tribes of the East start bonuses (each player keeps the bonus picked with the lobby arrows: gold, resources, artifact, with ToE's own icons) and a separate game mode choice (Default, Savage, Nightmare, Random).
+- Game rules (host): MMH5.5's scripts can also run on random maps straight from the game's generator in multiplayer, so the other rules work there too.
+- Game rules (host): "Skills of each class": MMH5.5's lock, or Unlocked (any skill can be offered, the ones off the class's list at a small chance, as in the original game).
+- The installer updates open-homm5.ini: your values are kept, the new settings are added, and the old file is saved as open-homm5.ini.bak.
 
 
 If a game freezes: wait 30 seconds before closing it, then send open-homm5.log.
