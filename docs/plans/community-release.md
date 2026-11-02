@@ -1,6 +1,6 @@
 # Plan: v0.3, the community release
 
-Status: proposal for the owner (2026-11-02). This is research and a plan only: nothing is built yet, no game was run, nothing was downloaded.
+Status: proposal for the owner (2026-11-02), being built. Block 1 (quick wins) is in `main`. **Block 2 (texts in files, part 3) is built in the branch `v03-texts`**: see "Built" at the start of part 3.
 
 The goal: share the add-on with the wider Heroes V / MMH5.5 community. Someone who has never heard of us should be able to:
 1. download one file and double-click it;
@@ -303,7 +303,23 @@ The same frame, fonts and buttons as the template builder and the game rules pan
 
 ## Part 3: language-independent texts
 
-### Today
+### Built (2026-11-02, branch `v03-texts`)
+
+How it works now: [src/mods/README.md, "Our panels in your language"](../../src/mods/README.md#our-panels-in-your-language-srcmodstextstxt-srchooktextscpp); for translators: [src/mods/texts/TRANSLATING.md](../../src/mods/texts/TRANSLATING.md).
+
+- **201 texts per language** in `src/mods/texts/en.txt` and `fr.txt`, shipped as `bin\h5-together\texts\` (installer, uninstaller, `test_scripts.py`). English is built into the DLL (`build.ps1` makes `texts_en.inc` from `en.txt`). Every text is the same as before in English and French, except the few listed below.
+- **Steps 3.1, 3.2, 3.3 and 3.5 done**; 3.4 in part: `tools/lang/ui_texts.py long` makes the long test language and the robot can install it (`--texts-dir`), but its screenshots and any overflow fixes are left for the settings menu block, which adds ~150 texts that need the same check.
+- **Where it differs from the plan, and why:**
+  - The code uses string keys (`texts::Get("rules.title")`), and each panel keeps its table of words as a table of keys (`texts::Table`), so the drawing code did not change. `tools/lang/ui_texts.py check` (in `build.ps1 -Test`) finds every key the code uses and checks it against `en.txt`.
+  - Rule 3 (the game's own texts): instead of a table in the code, each texts file names the game's red player in its language (`[language] red_player`), so a translator adds the clue with the file. A name that no file has means "a language we have no file for": English, as before for a non-French game.
+  - Rule 2 (Steam's file): used only when its `installdir` is the game folder the exe runs from, so a copy of the game elsewhere (the robot's test copies) does not borrow Steam's language.
+  - `en.txt` in the game folder is not read: the built-in English is always the reference (an `en.txt` left from another version cannot bring old words back). It is there for translators.
+  - The "why" reasons shown in panels were 11 sentences plus 3 file names, not ~35 (the other "why"s in the code only go to the log). They became `rules.why.*` and `rules.differ.*`; the technical detail stays in the log.
+  - `Localize()` is gone: the template maker gives each message an id and its numbers (`rmg::MessageId`), next to its English sentence (which stays the web page's, for the parity test and the log).
+- **Text changes** (all others are word for word): the "why" sentences of the rules panel are now short and translated (before: English only, with technical details); the "your turn" pop-up has French words (before: English only); "Not saved: error N" says "erreur" in French; the builder's "Auto" is a text (same word in both languages). New: `[language] name` and `red_player`.
+- **Still open:** the two buttons placed on French screens (items 6 and 7 of the audit) need screenshots from players of other languages; the installer's own messages (item 11) belong to block 4; a font range for Greek, Romanian's ș/ț, Vietnamese and CJK when a translator comes.
+
+### Today (before block 2)
 
 - Every panel has two tables in its C++ file: one English, one French (`kEnglish` / `kFrench`). The French words are written as UTF-8 bytes (`E_ACUTE` and friends).
 - `overlay::PanelLanguage()` (`src/hook/overlay.cpp`) picks one, once:
