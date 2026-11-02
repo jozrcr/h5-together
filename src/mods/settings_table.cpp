@@ -33,7 +33,9 @@ const Value kStartZoom[] = {{"", "settings.value.game_start_zoom"},
                             {"10", nullptr}, {"15", nullptr}, {"20", nullptr}, {"30", nullptr}, {"40", nullptr},
                             {"50", nullptr}, {"60", nullptr}, {"70", nullptr}, {"100", nullptr}, {"150", nullptr}};
 const Value kWheelFix[] = {{"auto", "settings.value.wheel_auto"}, {"1", "settings.value.wheel_always"}, {"0", "settings.value.off"}};
-const Value kEdgeSky[] = {{"game", nullptr}, {"none", nullptr}};          // a check box: ticked = none (black)
+const Value kEdgeSky[] = {{"game", nullptr}, {"none", nullptr}};
+const Value kMenuScene[] = {{"default", "settings.value.menu_default"}, {"toe", "settings.value.menu_toe"},
+                            {"homm5", "settings.value.menu_homm5"}, {"random", "settings.value.menu_random"}};          // a check box: ticked = none (black)
 const Value kVolumeCurve[] = {{"game", nullptr}, {"wide", nullptr}};      // ticked = wide
 const Value kLanguages[] = {{"auto", "settings.value.language_auto"}, {"en", nullptr}, {"fr", nullptr}};  // + the files found
 const Value kGameTexts[] = {{"game", "settings.value.texts_game"}, {"fr", "settings.value.texts_fr"}};
@@ -183,6 +185,9 @@ const Setting kSettings[] = {
 	ROW("camera", "edge_sky", "game", kChoice, 0, 0, kEdgeSky, COUNT(kEdgeSky), nullptr, kPlayer, kRestart, kCamera, kCheck,
 	    "settings.camera.edge_sky", "settings.camera.edge_sky.help"),
 	FILE_ONLY("camera", "edge_sky_test_light", "", kText, 0, 0, kTester, kRestart),
+	// [menu]
+	ROW("menu", "scene", "default", kChoice, 0, 0, kMenuScene, COUNT(kMenuScene), nullptr, kPlayer, kRestart, kCamera, kList,
+	    "settings.menu.scene", "settings.menu.scene.help"),
 	// [skins]
 	ROW("skins", "skins", "1", kBool, 0, 1, nullptr, 0, nullptr, kPlayer, kRestart, kInterface, kCheck,
 	    "settings.skins.skins", "settings.skins.skins.help"),
