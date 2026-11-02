@@ -4,9 +4,11 @@
 The zip holds the hook DLL (build/hook/dinput8.dll), the settings template, the
 install and uninstall scripts and the bug report script for Windows and Linux, a short
 README.txt, the licence notices (LICENSE.txt is the repo's LICENSE; THIRD-PARTY-NOTICES.txt
-carries Dear ImGui's licence file), and the ready random map templates
-(src/mods/rmg/templates/*.xdb, packed byte for byte as h5-together/templates/).
-The scripts and text templates live in tools/package/files/.
+carries Dear ImGui's licence file), the ready random map templates
+(src/mods/rmg/templates/*.xdb, packed byte for byte as h5-together/templates/) and our
+language files (src/mods/texts/*.txt, as h5-together/texts/: UTF-8 with a BOM and CRLF).
+The scripts and text templates live in tools/package/files/ (plain ASCII: PowerShell 5.1
+and cmd read them in the Windows code page); only the language files hold other letters.
 
     python tools/package/make_package.py                    # the version in src/hook/version.h
     python tools/package/make_package.py --version 0.1.0-test2   # a test build (with a '-')
@@ -75,6 +77,15 @@ CONTENTS = [
 TEMPLATES_SRC = REPO / "src" / "mods" / "rmg" / "templates"
 TEMPLATES_IN_ZIP = "h5-together/templates"
 TEMPLATE_NAME = re.compile(r"OH-[A-Za-z0-9.-]+\.xdb")
+
+# Our language files (src/mods/texts/<code>.txt: the words of the add-on's panels, English
+# and the translations) go in the zip as h5-together/texts/<code>.txt. Unlike the scripts
+# they are UTF-8 by design (accents, Cyrillic...): in the zip with a byte-order mark and
+# CRLF line ends, so that every Notepad opens and saves them as UTF-8. The DLL reads them
+# with or without the mark, CRLF or LF; its English is built in from en.txt anyway.
+TEXTS_SRC = REPO / "src" / "mods" / "texts"
+TEXTS_IN_ZIP = "h5-together/texts"
+TEXT_NAME = re.compile(r"[a-z]{2,3}(-[a-z0-9]{1,8})?\.txt")
 
 # Line endings inside the zip: Windows files get CRLF (Notepad, cmd.exe), shell
 # scripts must stay LF. The repo keeps LF (and CRLF for .bat, see .gitattributes).
@@ -187,6 +198,27 @@ def template_files():
     return out
 
 
+def text_files():
+    """[(file name, bytes)] of every language file, sorted by name: UTF-8 with a BOM and CRLF."""
+    found = sorted(p for p in TEXTS_SRC.glob("*.txt") if p.is_file())
+    if not any(p.name == "en.txt" for p in found):
+        fail(f"no en.txt in {TEXTS_SRC}")
+    out = []
+    for p in found:
+        if not TEXT_NAME.fullmatch(p.name):
+            fail(f"{p.name}: a language file must be called <code>.txt (2 or 3 small letters, maybe -xx: de.txt, pt-br.txt)")
+        raw = p.read_bytes()
+        try:
+            text = raw.decode("utf-8-sig")
+        except UnicodeDecodeError as e:
+            fail(f"{p.name} must be UTF-8 ({e})")
+        if "\0" in text or "﻿" in text:
+            fail(f"{p.name}: a zero byte or a second byte-order mark inside")
+        text = text.replace("\r\n", "\n").replace("\n", "\r\n")
+        out.append((p.name, b"\xef\xbb\xbf" + text.encode("utf-8")))
+    return out
+
+
 def zip_time():
     epoch = int(os.environ.get("SOURCE_DATE_EPOCH", time.time()))
     t = time.localtime(max(epoch, 315532800))  # a zip cannot hold dates before 1980
@@ -221,6 +253,7 @@ def main():
     stamp = zip_time()
     entries = [(name, file_bytes(name, source, args.dll, args.version)) for name, source in CONTENTS]
     entries += [(f"{TEMPLATES_IN_ZIP}/{n}", data) for n, data in template_files()]
+    entries += [(f"{TEXTS_IN_ZIP}/{n}", data) for n, data in text_files()]
     with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
         for name, data in entries:
             info = zipfile.ZipInfo(f"h5-together-{args.version}/{name}", stamp)  # one top folder

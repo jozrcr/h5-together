@@ -3,9 +3,10 @@
 # Removes only what install.ps1 put in the game's bin folder:
 #   dinput8.dll (only if it is ours), h5-together.log (and h5-together.old.log), h5-together.ini (after asking),
 #   and the random map templates of this package (the OH-*.xdb files whose names are in
-#   this package's h5-together\templates folder), then the folders if they are empty.
+#   this package's h5-together\templates folder), the language files of this package
+#   (h5-together\texts, the same names as in the package), then the folders if they are empty.
 # The same files under the add-on's old name (open-homm5, until 0.2.7) go too.
-# Nothing else is touched: a template of your own stays.
+# Nothing else is touched: a template or a translation of your own stays.
 #
 # Keep this file plain ASCII (see install.ps1 for why).
 #
@@ -237,6 +238,50 @@ try {
             }
         } else {
             Write-Host "  - kept $what"
+        }
+    }
+
+    # The language files: only the names this package holds; a translation of the
+    # player's own (another name) stays. Before the templates, so that the folder
+    # h5-together can go once both are empty.
+    $srcTexts = Join-Path $PSScriptRoot "h5-together\texts"
+    $txtNames = @()
+    if (Test-Path -LiteralPath $srcTexts) {
+        $txtNames = @(Get-ChildItem -LiteralPath $srcTexts -File | Where-Object { $_.Extension -ieq ".txt" } | ForEach-Object { $_.Name })
+    }
+    $ourDir = Join-Path $bin "h5-together"
+    $dstTexts = Join-Path $ourDir "texts"
+    if (Test-Path -LiteralPath $dstTexts) {
+        if ($txtNames.Count -eq 0) {
+            Write-Host "  - this folder has no list of our language files, so I left h5-together\texts alone" -ForegroundColor Yellow
+        } else {
+            $removed = 0
+            foreach ($n in $txtNames) {
+                $p = Join-Path $dstTexts $n
+                if (Test-Path -LiteralPath $p -PathType Leaf) {
+                    try {
+                        Remove-Item -LiteralPath $p -Force
+                        $removed++
+                    } catch {
+                        Write-Host ("  - could not remove " + $n + ": " + $_.Exception.Message) -ForegroundColor Red
+                        $failed = $true
+                    }
+                }
+            }
+            Write-Host ("  - removed {0} language files (h5-together\texts)" -f $removed)
+            $left = @(Get-ChildItem -LiteralPath $dstTexts -Force)
+            if ($left.Count -gt 0) {
+                Write-Host ("  - kept {0} other file(s) in h5-together\texts (not ours)" -f $left.Count)
+            } else {
+                try {
+                    Remove-Item -LiteralPath $dstTexts -Force
+                    if (@(Get-ChildItem -LiteralPath $ourDir -Force).Count -eq 0) { Remove-Item -LiteralPath $ourDir -Force }
+                    Write-Host "  - removed the empty folder h5-together\texts"
+                } catch {
+                    Write-Host ("  - could not remove the empty folder: " + $_.Exception.Message) -ForegroundColor Red
+                    $failed = $true
+                }
+            }
         }
     }
 

@@ -10,8 +10,9 @@
 # folder, so a fake $HOME works for tests.
 #
 # It also copies the random map templates of this package (h5-together/templates/*.xdb)
-# into <game bin>/h5-together/templates. It overwrites its own files there and
-# never touches another file.
+# into <game bin>/h5-together/templates, and its language files (h5-together/texts/*.txt:
+# the words of the add-on's panels) into <game bin>/h5-together/texts. It overwrites its
+# own files there and never touches another file.
 #
 # An existing h5-together.ini is refreshed: it becomes this package's file with the
 # player's values in it (the old one is kept as h5-together.ini.bak; see merge_ini).
@@ -402,8 +403,14 @@ tpl_files=()
 for f in "$src_tpl"/*.xdb; do
     [ -f "$f" ] && tpl_files+=("$f")
 done
-if [ ! -f "$src_dll" ] || [ ! -f "$src_ini" ] || [ "${#tpl_files[@]}" -eq 0 ]; then
-    echo "dinput8.dll, h5-together.ini and the folder h5-together/templates must be next to this script."
+src_txt="$here/h5-together/texts"
+txt_files=()
+for f in "$src_txt"/*.txt; do
+    [ -f "$f" ] && txt_files+=("$f")
+done
+if [ ! -f "$src_dll" ] || [ ! -f "$src_ini" ] || [ "${#tpl_files[@]}" -eq 0 ] || [ "${#txt_files[@]}" -eq 0 ]; then
+    echo "dinput8.dll, h5-together.ini and the folders h5-together/templates and h5-together/texts"
+    echo "must be next to this script."
     echo "Please extract the whole zip first, then run install.sh from the new folder."
     echo "Nothing was installed."
     exit 7
@@ -489,6 +496,28 @@ done
 tpl_total="$(find "$tpl_sub" -mindepth 1 -maxdepth 1 -type f | wc -l)"
 tpl_others=$((tpl_total - ${#tpl_files[@]}))
 
+# Our language files: the same way (a translation of the player's own stays).
+txt_sub="$(find_ci "$tpl_dir" texts)"
+[ -n "$txt_sub" ] && [ -d "$txt_sub" ] || txt_sub="$tpl_dir/texts"
+if ! mkdir -p "$txt_sub"; then
+    echo "Could not create the folder $txt_sub (see the message above)."
+    exit 5
+fi
+txt_replaced=0
+txt_codes=""
+for f in "${txt_files[@]}"; do
+    name="$(basename "$f")"
+    txt_codes="$txt_codes, ${name%.txt}"
+    dst="$(find_ci "$txt_sub" "$name")"
+    if [ -n "$dst" ]; then txt_replaced=$((txt_replaced + 1)); else dst="$txt_sub/$name"; fi
+    if ! cp -f "$f" "$dst"; then
+        echo "Could not copy $name into $txt_sub (see the message above)."
+        exit 5
+    fi
+done
+txt_total="$(find "$txt_sub" -mindepth 1 -maxdepth 1 -type f | wc -l)"
+txt_others=$((txt_total - ${#txt_files[@]}))
+
 echo
 echo "Done. What I did:"
 if [ "$old_moved" != " " ]; then
@@ -532,6 +561,9 @@ echo "  - installed ${#tpl_files[@]} random map templates in h5-together/templat
 [ "$tpl_replaced" -gt 0 ] && echo "    ($tpl_replaced of them replaced our files from an earlier install)"
 [ "$tpl_others" -gt 0 ] && echo "    (left the $tpl_others other file(s) in that folder alone)"
 echo "    Everyone in a multiplayer game needs the same templates: install the same version."
+echo "  - installed ${#txt_files[@]} language files in h5-together/texts (${txt_codes#, }): the words of the add-on's panels"
+[ "$txt_replaced" -gt 0 ] && echo "    ($txt_replaced of them replaced our files from an earlier install)"
+[ "$txt_others" -gt 0 ] && echo "    (left the $txt_others other file(s) in that folder alone)"
 echo "  - did not change or replace any file of the game itself"
 
 if [ -z "$(find_ci "$bin" MMH55_Utility_64.exe)" ]; then

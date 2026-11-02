@@ -8,6 +8,10 @@
 #   -SteamDir <folder>  look in this Steam folder instead of the one in the registry
 #   -NoPause            do not wait for Enter at the end
 #
+# The add-on's language files (h5-together\texts\*.txt: its panels' words, English and
+# French) go to bin\h5-together\texts: ours are overwritten, any other file (a translation
+# of the player's own) stays.
+#
 # An existing h5-together.ini is refreshed: it becomes this package's file with the
 # player's values in it (the old one is kept as h5-together.ini.bak; see Merge-Settings).
 # The files of the add-on's old name (open-homm5, until 0.2.7) get the new name first,
@@ -472,8 +476,14 @@ try {
     if (Test-Path -LiteralPath $srcTemplates) {
         $templateFiles = @(Get-ChildItem -LiteralPath $srcTemplates -File | Where-Object { $_.Extension -ieq ".xdb" })
     }
-    if (-not (Test-Path -LiteralPath $srcDll) -or -not (Test-Path -LiteralPath $srcIni) -or $templateFiles.Count -eq 0) {
-        Write-Host "dinput8.dll, h5-together.ini and the folder h5-together\templates must be next to this script." -ForegroundColor Red
+    $srcTexts = Join-Path $PSScriptRoot "h5-together\texts"
+    $textFiles = @()
+    if (Test-Path -LiteralPath $srcTexts) {
+        $textFiles = @(Get-ChildItem -LiteralPath $srcTexts -File | Where-Object { $_.Extension -ieq ".txt" })
+    }
+    if (-not (Test-Path -LiteralPath $srcDll) -or -not (Test-Path -LiteralPath $srcIni) -or $templateFiles.Count -eq 0 -or $textFiles.Count -eq 0) {
+        Write-Host "dinput8.dll, h5-together.ini and the folders h5-together\templates and h5-together\texts" -ForegroundColor Red
+        Write-Host "must be next to this script." -ForegroundColor Red
         Write-Host "Please extract the whole zip first (right-click the zip, Extract All)," -ForegroundColor Red
         Write-Host "then run install.bat from the new folder. Nothing was installed." -ForegroundColor Red
         Wait-AndExit 7
@@ -495,6 +505,7 @@ try {
     $dstDll = Join-Path $bin "dinput8.dll"
     $dstIni = Join-Path $bin "h5-together.ini"
     $dstTemplates = Join-Path $bin "h5-together\templates"
+    $dstTexts = Join-Path $bin "h5-together\texts"
 
     # Never overwrite a dinput8.dll that belongs to something else.
     $dllWas = "new"
@@ -543,6 +554,17 @@ try {
             Copy-Item -LiteralPath $f.FullName -Destination $dst -Force
         }
         $tplOthers = @(Get-ChildItem -LiteralPath $dstTemplates -File | Where-Object { -not $ours.ContainsKey($_.Name) }).Count
+        # Our language files: the same way (a translation of the player's own stays).
+        [void](New-Item -ItemType Directory -Path $dstTexts -Force)
+        $oursTxt = @{}
+        $txtReplaced = 0
+        foreach ($f in $textFiles) {
+            $oursTxt[$f.Name] = $true
+            $dst = Join-Path $dstTexts $f.Name
+            if (Test-Path -LiteralPath $dst) { $txtReplaced++ }
+            Copy-Item -LiteralPath $f.FullName -Destination $dst -Force
+        }
+        $txtOthers = @(Get-ChildItem -LiteralPath $dstTexts -File | Where-Object { -not $oursTxt.ContainsKey($_.Name) }).Count
     } catch {
         Write-Host ""
         Write-Host "Could not copy the files into the game folder:" -ForegroundColor Red
@@ -617,6 +639,10 @@ try {
     if ($tplReplaced -gt 0) { Write-Host ("    ({0} of them replaced our files from an earlier install)" -f $tplReplaced) }
     if ($tplOthers -gt 0) { Write-Host ("    (left the {0} other file(s) in that folder alone)" -f $tplOthers) }
     Write-Host "    Everyone in a multiplayer game needs the same templates: install the same version."
+    $codes = ($textFiles | ForEach-Object { $_.BaseName }) -join ", "
+    Write-Host ("  - installed {0} language files in h5-together\texts ({1}): the words of the add-on's panels" -f $textFiles.Count, $codes)
+    if ($txtReplaced -gt 0) { Write-Host ("    ({0} of them replaced our files from an earlier install)" -f $txtReplaced) }
+    if ($txtOthers -gt 0) { Write-Host ("    (left the {0} other file(s) in that folder alone)" -f $txtOthers) }
     Write-Host "  - did not change or replace any file of the game itself"
     if (-not (Test-Path -LiteralPath (Join-Path $bin "MMH55_Utility_64.exe"))) {
         Write-Host ""

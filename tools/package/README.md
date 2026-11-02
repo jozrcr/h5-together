@@ -27,6 +27,7 @@ python tools\package\make_package.py --rebuild  # build the DLL again first
 | `LICENSE.txt` | our MIT licence: the repo's `LICENSE`, copied word for word |
 | `THIRD-PARTY-NOTICES.txt` | the licence notices of what else is inside `dinput8.dll`: Dear ImGui (its `LICENSE.txt` is pasted in word for word, with the version from `imgui.h`), the stb files it carries (Sean Barrett) and its built-in ProggyClean font (Tristan Grimmer). The MIT licences ask for the notice to go along with copies. The text is the template `files/THIRD-PARTY-NOTICES.txt`; if third-party code is added to the DLL, add it there (and see `licence_checks` in `test_scripts.py`) |
 | `h5-together/templates/OH-*.xdb` | the ready random map templates (see below) |
+| `h5-together/texts/<code>.txt` | our language files, the words of the add-on's panels: `en.txt`, `fr.txt` (see below) |
 
 The scripts and text files are in `tools/package/files/`. Everything is in one top folder, `h5-together-<version>/`, so that unzipping on Linux does not spread the files around. Line endings are set when the zip is written: CRLF for `.bat`, `.ps1`, `.txt` and `.ini` (Notepad, cmd.exe), LF for `.sh`, which also get the executable bit. In the repo, `.gitattributes` keeps `.bat` as CRLF and `.sh` as LF.
 
@@ -39,6 +40,14 @@ The scripts and text files are in `tools/package/files/`. Everything is in one t
 - **Every player of a multiplayer game needs the same template files** (each PC builds the map from the template). So a name that has shipped must keep building the same file; add a new entry for a changed template, and everyone installs the same version.
 - `test_template_maker.js` fails if the files in `src/mods/rmg/templates` are not what `make_templates.js` builds now, so the package never carries a stale file.
 
+## The language files
+
+`make_package.py` packs every `src/mods/texts/*.txt` (named `<code>.txt`: `en.txt`, `fr.txt`; not `TRANSLATING.md`) as `h5-together/texts/<code>.txt`. They hold the words of our panels and messages ([src/mods/README.md](../../src/mods/README.md#our-panels-in-your-language-srcmodstextstxt-srchooktextscpp)).
+
+- **UTF-8, by design.** They are the only files of the package that are not plain ASCII (accents, and later Cyrillic...): the scripts, `README.txt`, the notices and `h5-together.ini` stay ASCII (`test_scripts.py` checks every other file). In the zip they get a byte-order mark and CRLF line ends, so that every Notepad opens and saves them as UTF-8; the DLL reads them with or without the mark, CRLF or LF.
+- The English in the DLL is built in from `en.txt` (`src/hook/build.ps1`): a missing or damaged texts folder only loses the other languages.
+- `python tools/lang/ui_texts.py check` (run by `build.ps1 -Test`) checks the files against the code before they are packed.
+
 ## What the scripts do
 
 - Windows (`install.ps1`, Windows PowerShell 5.1, French Windows included):
@@ -47,12 +56,13 @@ The scripts and text files are in `tools/package/files/`. Everything is in one t
   - gives the files of the add-on's old name their new name first (see "The old name" below);
   - copies `h5-together.ini` if there is none, and otherwise **refreshes** the player's file (see "The settings file" below);
   - copies the templates into `bin\h5-together\templates\` (making the folder). It overwrites its own `OH-*.xdb` files there (by name) and touches no other file, so a player's own templates stay. The summary says how many templates were installed (and how many replaced older copies of ours, and how many other files it left alone);
+  - copies the language files into `bin\h5-together\texts\` the same way: ours are overwritten, a translation of the player's own (`de.txt`) stays; the summary names them (`en, fr`);
   - looks at the network profiles and explains how to make a Public ZeroTier network Private. It changes no Windows setting and no firewall rule;
   - ends with "Press Enter to close".
 - Linux (`install.sh`): the same, looking for Steam in `~/.steam/steam`, `~/.local/share/Steam` and the Flatpak folder. It prints the Steam launch option `WINEDLLOVERRIDES="dinput8=n,b" %command%`, and which exe to start. It does not edit Steam's files.
 - "Ours" means the file contains the text `H5 Together hook DLL` (a string in `src/hook/dllmain.cpp`), or `open-homm5 hook DLL` (the DLLs of 0.2.7 and older). `make_package.py` refuses to pack a DLL without the first.
 - The Linux installer also reuses an existing `h5-together\templates` folder and existing template files under another upper/lower case spelling (Wine reads them either way), so it never makes a second copy.
-- Uninstall removes our `dinput8.dll`, `h5-together.log` (and `h5-together.old.log`, the older log the DLL keeps once the log passes 5 MB), and `h5-together.ini` after asking. The same question covers the installer's backups of it (`h5-together.ini.bak`, `.bak2`, `.bak3`): "yes" removes the file and its backups (they are copies of the settings the player asked to delete), "no" keeps them all. It also removes the templates: only the `OH-*.xdb` names that are in the package it runs from, never another file. If the `templates` folder is then empty it is removed, and then `h5-together` too if it is empty. The same files under the old name (`open-homm5.log`, `open-homm5.ini` and its copies, `open-homm5\templates`) go the same way. Nothing else: the hero looks' file (`h5-together-skins.ini`) and the French packs (`lang\fr`) stay.
+- Uninstall removes our `dinput8.dll`, `h5-together.log` (and `h5-together.old.log`, the older log the DLL keeps once the log passes 5 MB), and `h5-together.ini` after asking. The same question covers the installer's backups of it (`h5-together.ini.bak`, `.bak2`, `.bak3`): "yes" removes the file and its backups (they are copies of the settings the player asked to delete), "no" keeps them all. It also removes the language files and the templates: only the `<code>.txt` and `OH-*.xdb` names that are in the package it runs from, never another file. If the `texts` and `templates` folders are then empty they are removed, and then `h5-together` too if it is empty. The same files under the old name (`open-homm5.log`, `open-homm5.ini` and its copies, `open-homm5\templates`) go the same way. Nothing else: the hero looks' file (`h5-together-skins.ini`) and the French packs (`lang\fr`) stay.
   - A template that an older version of the package installed, and a newer one no longer has, is not in the newer package's list: uninstalling from the newer package leaves it. This is on purpose (the alternative is deleting every `OH-*.xdb`, which would also delete a player's own template made with the template maker page).
 
 ## The old name
@@ -97,13 +107,13 @@ Files are handled byte for byte (no re-encoding), so an ASCII file stays ASCII. 
 
 Windows (`Merge-Settings` in `install.ps1`, PowerShell 5.1) and Linux (`merge_ini` in `install.sh`, POSIX awk, so mawk works too) implement the same rules, and `test_scripts.py` checks that they write the same bytes. Change both together.
 
-Exit codes of the scripts: 0 done, 3 refused (not our `dinput8.dll`), 4 game not found or cancelled, 5 copy/delete failed, 6 unexpected error, 7 package incomplete (for example `install.bat` started from inside the zip without extracting it, or a package without its `h5-together\templates` folder).
+Exit codes of the scripts: 0 done, 3 refused (not our `dinput8.dll`), 4 game not found or cancelled, 5 copy/delete failed, 6 unexpected error, 7 package incomplete (for example `install.bat` started from inside the zip without extracting it, or a package without its `h5-together\templates` or `h5-together\texts` folder).
 
 Test options (also handy for odd setups): `-GameDir <folder>`, `-SteamDir <folder>`, `-NoPause` on Windows; `--game-dir <folder>`, `--steam-dir <folder>` on Linux (which otherwise reads `$HOME`). `install.ps1 -TestProfiles "name|category;..."` fakes the network profiles, to test the ZeroTier hint.
 
 ## Rules for editing the scripts
 
-- **Plain ASCII only** in `files/*` (`make_package.py` checks). Windows PowerShell 5.1 reads a script without a byte-order mark as ANSI, so an accent would be garbled on a French Windows.
+- **Plain ASCII only** in `files/*` (`make_package.py` checks; the language files are not in `files/` and are UTF-8 on purpose). Windows PowerShell 5.1 reads a script without a byte-order mark as ANSI, so an accent would be garbled on a French Windows.
 - The code that finds the game is written three times, in the install, uninstall and bug report scripts, between the lines `# ---- shared with uninstall...` and `# ---- end of the shared block ----`. Edit all copies; `make_package.py` stops if they differ.
 - Keep the messages plain and short: the readers are not programmers.
 
@@ -135,6 +145,8 @@ For the templates it checks that the zip holds every source file byte for byte, 
 - an uninstall removes only our names, then the empty folders, but not an `h5-together` folder that holds something else;
 - a package without its `templates` folder is refused (exit 7);
 - on Linux, a folder and a file that exist under another spelling (`H5-Together/Templates`) are reused.
+
+For the language files it checks that the zip holds every `src/mods/texts/*.txt` and nothing else, each as its source with a byte-order mark and CRLF, that `fr.txt` keeps its accents, and that every other file of the package is plain ASCII. Then (Windows and Linux alike): an install puts exactly ours in `bin/h5-together/texts` and names them; a re-install overwrites our `fr.txt` changed by hand and keeps a player's own `de.txt` and notes; an uninstall removes only ours, and install then uninstall leaves the game folder as it was; a package without its `texts` folder is refused (exit 7).
 
 For the licence files it checks that `LICENSE.txt` is the repo's `LICENSE`, that `THIRD-PARTY-NOTICES.txt` carries Dear ImGui's licence file word for word and names the stb files and the font, and that Dear ImGui still bundles exactly the three stb files the notices list.
 
