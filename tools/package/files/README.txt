@@ -8,8 +8,9 @@ Everyone who plays the same co-op game should install the same version.
 
 INSTALL
 
-Windows: extract this zip (right-click it, "Extract All"), then double-click install.bat. It finds your Steam copy of the game and tells you what it did.
-Linux (Steam / Proton): extract the zip, open a terminal in the folder, and run: bash install.sh. At the end it gives you one line to paste into the game's Steam launch options.
+Windows: extract this zip (right-click it, "Extract All"), then double-click install.bat. It looks for the game (Steam, GOG), shows you what it found (the folder, the language, which MMH5.5 you have), and tells you what it did and what to do next. If it cannot find the game, or finds several, it asks: type a number, or B to choose the folder in a window. If the game is running it asks you to close it first.
+Linux (Steam / Proton): extract the zip, open a terminal in the folder, and run: bash install.sh. Same screens. At the end it gives you one line to paste into the game's Steam launch options.
+It warns you in plain words if MMH5.5 is missing or is a version we have not tested (we tested RC19d and RC19k).
 Updating: install the new version over the old one. Your settings are kept, and the new ones are added to h5-together.ini (commented out, with what they do); the installer says how many. Your old file is saved as h5-together.ini.bak.
 H5 Together was called open-homm5 until version 0.2.7. Installing over an old version gives your files the new name: open-homm5.ini becomes h5-together.ini, open-homm5-skins.ini becomes h5-together-skins.ini, and the folder open-homm5 becomes h5-together (with everything in it). Nothing you set is lost.
 
