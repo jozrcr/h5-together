@@ -66,5 +66,9 @@ std::string NameFile(int hero);
 // from h5-together.ini [skins] key (F7 by default).
 void InstallHeroSkinsPanel();
 void InstallHeroSkinsPanelEarly();
+// From the settings menu: [skins] key and hero_screen_button again, at once.
+void ReloadHeroSkinsPanelSettings();
+// From the settings menu: [skins] live_hero_screen again, at once.
+void ReloadHeroSkinsSettings();
 
 }  // namespace mods

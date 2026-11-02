@@ -76,6 +76,8 @@ int PanelKey();
 bool PanelButton();
 // From ApplyHostRulesFromSettings: the overlay client (host_rules_panel.cpp).
 bool InstallPanel();
+// From the settings menu: [rules] key and button again, at once.
+void ReloadPanelSettings();
 
 // Is the waiting room on top, and this PC's role there (the logic seen in the
 // last second)? kNoGame when not in a waiting room.

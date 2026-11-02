@@ -585,6 +585,22 @@ bool Matches(DWORD address, const BYTE *bytes, size_t size)
 
 }  // namespace
 
+void ReloadAutosaveSettings()
+{
+	wchar_t path[MAX_PATH];
+	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
+	int level = ReadInt(path, L"compression", 1), every = ReadInt(path, L"autosave_every", 1);
+	if (level < -1 || level > 9)
+		level = -1;
+	if (every < 1)
+		every = 1;
+	g_level = level;
+	g_every = every;
+	hooklog::Write("autosave: from the settings menu: compression %d%s, autosave every %d day(s)%s", level,
+	               level >= 0 && !g_deflate_init ? " (not before a restart: the save hook is not in)" : "", every,
+	               every > 1 && !g_day_ok ? " (the world code is not as expected: every day)" : "");
+}
+
 void ApplyAutosaveFromSettings()
 {
 	wchar_t path[MAX_PATH];
