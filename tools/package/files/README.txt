@@ -47,7 +47,12 @@ NEW IN 0.2.7
 - The installer updates open-homm5.ini: your values are kept, the new settings are added, and the old file is saved as open-homm5.ini.bak.
 
 
-If a game freezes: wait 30 seconds before closing it, then send open-homm5.log.
+REPORTING A PROBLEM
+
+Windows: double-click bug-report.bat. Linux: run: bash bug-report.sh
+It makes open-homm5-bug-report-<date>.zip on your Desktop (Linux: in the folder you ran it from). The zip holds open-homm5.log (and the older open-homm5.old.log), your settings, and a short list of versions (the add-on, MMH5.5, Windows or Linux, the game's exes and DLLs). No saves, no maps. It sends nothing anywhere: the zip is a normal zip, so you can open it and look first. The log lists player names and LAN addresses.
+Attach the zip to a new report at https://github.com/jozrcr/open-homm5/issues/new/choose. It also works when the game does not start.
+If a game freezes: wait 30 seconds before closing it (so the log can say where it was stuck), then make the report.
 
 LICENCES
 

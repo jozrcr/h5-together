@@ -32,7 +32,7 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-# ---- shared with uninstall.sh: finding the game (keep both copies identical) ----
+# ---- shared with uninstall.sh and bug-report.sh: finding the game (keep all copies identical) ----
 
 # True if the file is the dinput8.dll of open-homm5 (it contains our marker text).
 is_ours() { grep -q -a -F -- "$MARKER" "$1" 2>/dev/null; }

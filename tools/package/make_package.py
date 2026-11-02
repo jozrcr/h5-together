@@ -2,7 +2,7 @@
 """Build the easy-install package: build/package/open-homm5-<version>.zip
 
 The zip holds the hook DLL (build/hook/dinput8.dll), the settings template, the
-install and uninstall scripts for Windows and Linux, a short
+install and uninstall scripts and the bug report script for Windows and Linux, a short
 README.txt, the licence notices (LICENSE.txt is the repo's LICENSE; THIRD-PARTY-NOTICES.txt
 carries Dear ImGui's licence file), and the ready random map templates
 (src/mods/rmg/templates/*.xdb, packed byte for byte as open-homm5/templates/).
@@ -59,8 +59,11 @@ CONTENTS = [
     ("install.ps1", "install.ps1"),
     ("uninstall.bat", "uninstall.bat"),
     ("uninstall.ps1", "uninstall.ps1"),
+    ("bug-report.bat", "bug-report.bat"),
+    ("bug-report.ps1", "bug-report.ps1"),
     ("install.sh", "install.sh"),
     ("uninstall.sh", "uninstall.sh"),
+    ("bug-report.sh", "bug-report.sh"),
 ]
 
 # The ready random map templates (tools/rmg/make_templates.js writes them) go in
@@ -78,9 +81,11 @@ TEMPLATE_NAME = re.compile(r"OH-[A-Za-z0-9.-]+\.xdb")
 CRLF_SUFFIXES = {".bat", ".ps1", ".txt", ".ini"}
 EXECUTABLE_SUFFIXES = {".sh"}
 
-# The code that finds the game is written twice (install and uninstall) so that
-# each script stands alone. The two copies sit between these lines and must match.
-SHARED_PAIRS = [("install.ps1", "uninstall.ps1"), ("install.sh", "uninstall.sh")]
+# The code that finds the game is written three times (install, uninstall and the bug
+# report script) so that each script stands alone. The copies sit between these lines
+# and must match.
+SHARED_PAIRS = [("install.ps1", "uninstall.ps1"), ("install.ps1", "bug-report.ps1"),
+                ("install.sh", "uninstall.sh"), ("install.sh", "bug-report.sh")]
 SHARED_START = "# ---- shared with uninstall."
 SHARED_END = "# ---- end of the shared block ----"
 

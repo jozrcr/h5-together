@@ -30,7 +30,7 @@ function Wait-AndExit([int]$Code) {
     exit $Code
 }
 
-# ---- shared with uninstall.ps1: finding the game (keep both copies identical) ----
+# ---- shared with uninstall.ps1 and bug-report.ps1: finding the game (keep all copies identical) ----
 $Marker = "open-homm5 hook DLL"
 $GameFolderName = "Heroes of Might and Magic 5 Tribes of the East"
 

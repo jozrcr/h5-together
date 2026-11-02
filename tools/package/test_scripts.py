@@ -369,6 +369,234 @@ def settings_tests(who, pkg, game_bin, install, uninstall):
     return results
 
 
+# ---------------------------------------------------------------- the bug report script
+
+# What the report may hold: these four files and system.txt, nothing else.
+REPORT_FILES = ("open-homm5.log", "open-homm5.old.log", "open-homm5.ini", "open-homm5-skins.ini")
+RC19K_DOC = REPO / "docs" / "plans" / "mmh55-rc19k.md"
+
+
+def package_version(pkg):
+    """The version the package's dinput8.dll says in its text, like 0.2.7."""
+    return re.search(rb"open-homm5 hook DLL (\S+) loaded", (Path(pkg) / "dinput8.dll").read_bytes()).group(1).decode("ascii")
+
+
+def make_report_game(pkg, library, add_on=True, pak_version="19k"):
+    """A fake game folder for the bug report tests. Returns its bin folder.
+
+    With add_on: our dinput8.dll, a log, an older log, the settings and the skins file. Always
+    MMH5.5's version pak, a 55u.dll, and things that must NOT end up in a report (a save, a map,
+    an old copy of the settings, another file in bin)."""
+    b = make_game(library)
+    root = b.parent
+    if add_on:
+        shutil.copy(Path(pkg) / "dinput8.dll", b / "dinput8.dll")
+        shutil.copy(Path(pkg) / "open-homm5.ini", b / "open-homm5.ini")
+        (b / "open-homm5.log").write_bytes(b"       0 [ 1234] open-homm5 hook DLL test loaded\n    1000 [ 1234] a line of the log\n")
+        (b / "open-homm5.old.log").write_bytes(b"       0 [ 4321] an older log\n")
+        (b / "open-homm5-skins.ini").write_bytes(b"[skins]\nhero=1\n")
+    (b / "55u.dll").write_bytes(b"pretend 55u.dll")
+    (b / "other-mod.asi").write_bytes(b"pretend asi")
+    (b / "secret.txt").write_bytes(b"not for the report")
+    (b / "open-homm5.ini.bak").write_bytes(b"an old copy of the settings")
+    (root / "Profiles").mkdir(exist_ok=True)
+    (root / "Profiles" / "game1.sav").write_bytes(b"a save")
+    (root / "Maps").mkdir(exist_ok=True)
+    (root / "Maps" / "x.h5m").write_bytes(b"a map")
+    (root / "data").mkdir(exist_ok=True)
+    with zipfile.ZipFile(root / "data" / "MMH55-Index.pak", "w") as z:
+        z.writestr("scripts/Other.lua", "-- not it\n")
+        if pak_version:
+            z.writestr("scripts/H55-Version.lua", f'H55_Version = "{pak_version}"\n-- more\n')
+    return b
+
+
+def read_report(path):
+    """{name: bytes} of a .zip or .tar.gz report."""
+    path = Path(path)
+    if path.name.endswith(".zip"):
+        with zipfile.ZipFile(path) as z:
+            return {i.filename: z.read(i) for i in z.infolist()}
+    import tarfile
+    with tarfile.open(path) as t:
+        return {m.name: t.extractfile(m).read() for m in t.getmembers() if m.isfile()}
+
+
+def report_files(folder, prefix="open-homm5-bug-report-"):
+    return sorted(p for p in Path(folder).iterdir() if p.name.startswith(prefix)) if Path(folder).is_dir() else []
+
+
+def bug_report_package_checks(pkg, zip_path):
+    print("\nBug report script in the package")
+    with zipfile.ZipFile(zip_path) as z:
+        info = {i.filename.split("/", 1)[1]: i for i in z.infolist() if "/" in i.filename}
+    check({"bug-report.bat", "bug-report.ps1", "bug-report.sh"} <= set(info), "bug report: the 3 files are in the zip")
+    check(((info["bug-report.sh"].external_attr >> 16) & 0o777) == 0o755, "bug report: bug-report.sh is executable in the zip")
+    for name in ("bug-report.bat", "bug-report.ps1"):
+        raw = (pkg / name).read_bytes()
+        check(raw.count(b"\r\n") == raw.count(b"\n") and raw.count(b"\n") > 0 and all(b < 0x80 for b in raw), f"bug report: {name} is plain ASCII with CRLF line endings")
+    raw = (pkg / "bug-report.sh").read_bytes()
+    check(b"\r" not in raw and all(b < 0x80 for b in raw), "bug report: bug-report.sh is plain ASCII with LF line endings")
+    readme = (pkg / "README.txt").read_text(encoding="ascii")
+    check("bug-report.bat" in readme and "bug-report.sh" in readme, "bug report: README.txt tells how to make one")
+    # the 55u.dll hashes that name an MMH5.5 version come from the notes in docs/plans/mmh55-rc19k.md
+    row = next((l for l in RC19K_DOC.read_text(encoding="utf-8").splitlines() if "`bin\\55u.dll`" in l), "")
+    hashes = re.findall(r"`([0-9a-f]{64})`", row)
+    check(len(hashes) == 2, "bug report: docs/plans/mmh55-rc19k.md still lists the 55u.dll hashes of RC19d and RC19k", row)
+    if len(hashes) == 2:
+        forms = {"bug-report.ps1": '{h}" = "{v}"', "bug-report.sh": '{h}) echo "{v}"'}
+        for script, form in forms.items():
+            text = (pkg / script).read_text(encoding="ascii")
+            check(form.format(h=hashes[0], v="RC19d") in text and form.format(h=hashes[1], v="RC19k") in text,
+                  f"bug report: {script} names 55u.dll {hashes[0][:8]}... RC19d and {hashes[1][:8]}... RC19k")
+
+
+def system_text(files):
+    return files["system.txt"].decode("utf-8-sig").replace("\r\n", "\n")
+
+
+def bug_report_tests(who, pkg, work, run_report, fmt=".zip", home_short=False):
+    """The bug report script against fake game folders.
+
+    run_report(bin_folder, out_folder, *extra) runs the script and returns (exit code, output).
+    fmt: ".zip", or ".tar.gz" when the script is told to make that (a tuple: either).
+    home_short: the game folder is below the script's $HOME, so system.txt writes it as ~/..."""
+    print(f"\nBug report script ({who})")
+    version = package_version(pkg)
+    shutil.rmtree(work, ignore_errors=True)  # (so that a second run in the same --work-dir counts the reports again)
+    out = work / "reports"
+    out.mkdir(parents=True, exist_ok=True)
+    b = make_report_game(pkg, work / "report lib")
+    sources = {n: (b / n).read_bytes() for n in REPORT_FILES}
+
+    code, text = run_report(b, out)
+    made = report_files(out)
+    check(code == 0 and len(made) == 1 and made[0].name.endswith(fmt), f"bug report: exit 0 and one {fmt} file", text)
+    if len(made) != 1:
+        return
+    files = read_report(made[0])
+    check(sorted(files) == sorted(list(REPORT_FILES) + ["system.txt"]),
+          "bug report: holds the log, the older log, the settings, the skins file and system.txt, and nothing else (no save, no map, no .bak)", str(sorted(files)))
+    check(all(files.get(n) == sources[n] for n in REPORT_FILES), "bug report: the four files are copied byte for byte")
+    check(str(made[0]) in text.replace("\r", "") or made[0].name in text, "bug report: says where the file is", text)
+    check("Nothing was sent anywhere" in text and "player names" in text, "bug report: says it sends nothing, and that the log has player names", text)
+    s = system_text(files)
+    check(f"dinput8.dll in the game folder: open-homm5 {version}" in s, "bug report: system.txt names the add-on version in the game folder", s)
+    check(f"the package this script came from: {version}" in s, "bug report: system.txt names the version of the package it came from")
+    check('H55_Version in data' in s and s.split("H55_Version in data", 1)[1].split("\n", 1)[0].strip().endswith("19k"),
+          "bug report: system.txt has MMH5.5's H55_Version (read from the zip MMH55-Index.pak)", s)
+    check(f"55u.dll: a version we have not tested (sha256 {sha(b / '55u.dll')})" in s, "bug report: system.txt names 55u.dll with its hash, and says when it is not a tested version", s)
+    exes_ok = all(re.search(rf"^\s+{re.escape(n)}\s+{(b / n).stat().st_size} bytes\b.*{sha(b / n)}", s, re.M) for n in ("H5_Game.exe", "MMH55_Utility_64.exe"))
+    check(exes_ok, "bug report: system.txt lists the game exes with size and sha256", s)
+    check(re.search(r"^\s+55u\.dll\s+15$", s, re.M) and re.search(r"^\s+other-mod\.asi\s+11$", s, re.M) and re.search(r"^\s+dinput8\.dll\s+\d+$", s, re.M),
+          "bug report: system.txt lists the other .dll and .asi files in bin", s)
+    check("secret.txt" not in s and "game1.sav" not in s, "bug report: system.txt does not mention other files")
+    if home_short:
+        check("game folder: ~/report lib/steamapps/common/" in s, "bug report: system.txt writes the home folder as ~", s)
+    user = os.environ.get("USERNAME") or os.environ.get("USER") or ""
+    check(len(user) < 4 or user not in s, "bug report: system.txt does not carry the user name", s)
+
+    # a second report in the same minute replaces the first; a new one never touches the game folder
+    code, text = run_report(b, out)
+    check(code == 0 and len(report_files(out)) <= 2, "bug report: running it again works", text)
+    check(all((b / n).read_bytes() == sources[n] for n in REPORT_FILES) and (b / "dinput8.dll").exists(),
+          "bug report: the game folder is left as it was")
+
+    # no add-on installed, no log: a report with only the facts, and it says so
+    b2 = make_report_game(pkg, work / "report lib 2", add_on=False)
+    out2 = work / "reports2"
+    code, text = run_report(b2, out2)
+    made = report_files(out2)
+    check(code == 0 and len(made) == 1 and sorted(read_report(made[0])) == ["system.txt"], "bug report: without the add-on or a log: only system.txt", text)
+    check("There is no open-homm5.log" in text, "bug report: without a log it says so", text)
+    if made:
+        s = system_text(read_report(made[0]))
+        check("none (the add-on is not installed here)" in s and "there is no open-homm5.log" in s, "bug report: system.txt says the add-on is not installed", s)
+
+    # another mod's dinput8.dll
+    b3 = make_report_game(pkg, work / "report lib 3", add_on=False)
+    (b3 / "dinput8.dll").write_bytes(b"MZ some other mod")
+    out3 = work / "reports3"
+    code, text = run_report(b3, out3)
+    made = report_files(out3)
+    check(code == 0 and made and "NOT the open-homm5 one" in system_text(read_report(made[0])) and (b3 / "dinput8.dll").read_bytes() == b"MZ some other mod",
+          "bug report: another mod's dinput8.dll is named as such and left alone", text)
+
+    # MMH5.5 not there, or a pak without the version script
+    b4 = make_report_game(pkg, work / "report lib 4", pak_version=None)
+    out4 = work / "reports4"
+    code, text = run_report(b4, out4)
+    made = report_files(out4)
+    check(code == 0 and made and "could not read the version" in system_text(read_report(made[0])), "bug report: a pak without H55-Version.lua: says it could not read the version", text)
+    b5 = make_report_game(pkg, work / "report lib 5")
+    (b5.parent / "data" / "MMH55-Index.pak").unlink()
+    out5 = work / "reports5"
+    code, text = run_report(b5, out5)
+    made = report_files(out5)
+    check(code == 0 and made and "MMH55-Index.pak: not found" in system_text(read_report(made[0])), "bug report: no MMH55-Index.pak: says MMH5.5 was not found", text)
+
+    # not a game folder: nothing is made
+    out6 = work / "reports6"
+    code, text = run_report(work / "nope", out6)
+    check(code == 4 and not report_files(out6), "bug report: not a game folder: exit 4, no file", text)
+
+
+def hold_open_like_the_game(path):
+    """Opens a file the way the game holds its log (for appending, others may read but not write).
+    Returns a function that closes it."""
+    import ctypes
+    from ctypes import wintypes
+    k = ctypes.WinDLL("kernel32", use_last_error=True)
+    k.CreateFileW.restype = wintypes.HANDLE
+    k.CreateFileW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, wintypes.LPVOID,
+                              wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+    k.CloseHandle.argtypes = [wintypes.HANDLE]
+    handle = k.CreateFileW(str(path), 0x4, 0x1, None, 3, 0x80, None)  # FILE_APPEND_DATA, FILE_SHARE_READ, OPEN_EXISTING
+    if handle in (None, wintypes.HANDLE(-1).value):
+        raise OSError(f"cannot open {path} the way the game does (error {ctypes.get_last_error()})")
+    return lambda: k.CloseHandle(handle)
+
+
+def bug_report_windows_extra(pkg, work, run_report):
+    """What only Windows can show: a log in use, the Desktop, an output folder that cannot be made."""
+    print("\nBug report script (Windows only)")
+    shutil.rmtree(work, ignore_errors=True)
+    work.mkdir(parents=True, exist_ok=True)
+    b = make_report_game(pkg, work / "lib")
+
+    # the game is running: its log is open and others may only read it
+    close = hold_open_like_the_game(b / "open-homm5.log")
+    try:
+        out = work / "running"
+        code, text = run_report(b, out)
+    finally:
+        close()
+    made = report_files(out)
+    check(code == 0 and len(made) == 1 and read_report(made[0]).get("open-homm5.log") == (b / "open-homm5.log").read_bytes(),
+          "bug report: a log that the running game holds open is read and packed", text)
+
+    # no -OutDir: on the Desktop (also when OneDrive moved it), else in the home folder
+    code, desktop = run(["powershell", "-NoProfile", "-Command",
+                         "$p = [Environment]::GetFolderPath('Desktop'); if (-not (Test-Path -LiteralPath $p -PathType Container)) { $p = [Environment]::GetFolderPath('UserProfile') }; $p"])
+    desktop = Path(desktop.strip())
+    code, text = run(bat(str(pkg / "bug-report.bat"), "-NoPause", "-GameDir", str(b)))
+    m = re.search(r"this file:\r?\n\s+(.+?\.zip)\s*\r?\n", text)
+    made = Path(m.group(1)) if m else None
+    try:
+        check(code == 0 and made is not None and made.is_file() and made.parent.resolve() == desktop.resolve()
+              and re.fullmatch(r"open-homm5-bug-report-\d{4}-\d\d-\d\d-\d{4}\.zip", made.name) is not None,
+              f"bug report: without -OutDir the file lands on the Desktop ({desktop}), named open-homm5-bug-report-<date>.zip", text)
+    finally:
+        if made is not None and made.parent.resolve() == desktop.resolve() and made.name.startswith("open-homm5-bug-report-"):
+            made.unlink(missing_ok=True)
+
+    # an output folder that cannot be made
+    blocker = work / "blocker"
+    blocker.write_bytes(b"a file, not a folder")
+    code, text = run_report(b, blocker / "sub")
+    check(code == 5 and "Could not use the folder" in text, "bug report: an output folder that cannot be made: exit 5 and a message", text)
+
+
 # ---------------------------------------------------------------- Windows
 
 def windows_tests(pkg, work):
@@ -547,6 +775,13 @@ def windows_tests(pkg, work):
     check(code == 7 and "extract the whole zip" in out and not (tpl_bin / "dinput8.dll").exists() and not (tpl_bin / "open-homm5").exists(),
           "package without the templates folder: exit 7, nothing installed", out)
 
+    # the bug report script
+    def run_report(game_bin, out_dir, *extra):
+        return run(bat(str(pkg / "bug-report.bat"), "-NoPause", "-GameDir", str(game_bin), "-OutDir", str(out_dir), *extra))
+
+    bug_report_tests("Windows", pkg, work / "bug report", run_report)
+    bug_report_windows_extra(pkg, work / "bug report extra", run_report)
+
     # PowerShell 5.1 specifically (the script must run there)
     code, out = run(["powershell", "-NoProfile", "-Command", "$PSVersionTable.PSVersion.ToString()"])
     check(out.strip().startswith("5."), f"tests ran on Windows PowerShell 5.x (found {out.strip()})")
@@ -711,6 +946,37 @@ def linux_tests(pkg, work, bash):
     check(sorted(p.name for p in old.iterdir()) == sorted([first.lower()] + [p.name for p in template_dir(pkg).iterdir() if p.name != first])
           and (old / first.lower()).read_bytes() == (template_dir(pkg) / first).read_bytes(),
           "templates: an existing file of ours under another spelling is overwritten, not duplicated")
+
+    # the bug report script. HOME is the folder above the fake game folders, as a player's
+    # game folder is below their home (the report writes that part of the path as ~)
+    def report_runner(report_work, *always):
+        report_env = dict(os.environ, HOME=posix(report_work))
+
+        def run_report(game_bin, out_dir, *extra):
+            return run([bash, str(pkg / "bug-report.sh"), "--game-dir", posix(game_bin), "--out-dir", posix(out_dir), *always, *extra],
+                       "", env=report_env)
+        return run_report
+
+    run_report = report_runner(work / "bug_report")
+    bug_report_tests("Linux", pkg, work / "bug_report", run_report, fmt=(".zip", ".tar.gz"), home_short=True)
+    bug_report_tests("Linux, --tar", pkg, work / "bug_report_tar", report_runner(work / "bug_report_tar", "--tar"), fmt=".tar.gz", home_short=True)
+
+    print("\nBug report script (Linux only)")
+    extra = work / "bug_report_extra"
+    shutil.rmtree(extra, ignore_errors=True)
+    extra.mkdir(parents=True, exist_ok=True)
+    b = make_report_game(pkg, extra / "lib")
+    here = extra / "run here"
+    here.mkdir()
+    code, out = run([bash, str(pkg / "bug-report.sh"), "--game-dir", posix(b)], "", env=env, cwd=str(here))
+    check(code == 0 and len(report_files(here)) == 1, "bug report: without --out-dir the file is made in the folder you run it from", out)
+    blocker = extra / "blocker"
+    blocker.write_bytes(b"a file, not a folder")
+    code, out = run_report(b, blocker / "sub")
+    check(code == 5 and "Cannot write" in out, "bug report: an output folder that cannot be made: exit 5 and a message", out)
+    check(run([bash, "-n", str(pkg / "bug-report.sh")])[0] == 0, "bash -n bug-report.sh")
+    code, out = run([bash, str(pkg / "bug-report.sh"), "--help"], "", env=env)
+    check(code == 0 and "bug report" in out and "--out-dir" in out, "bug report: --help prints the header", out)
     return results
 
 
@@ -733,6 +999,7 @@ def main():
     pkg = work / "package" / "open-homm5-0.0.0-test"  # the zip's one top folder
     package_checks(pkg, out_dir / "open-homm5-0.0.0-test.zip")
     licence_checks(pkg, out_dir / "open-homm5-0.0.0-test.zip")
+    bug_report_package_checks(pkg, out_dir / "open-homm5-0.0.0-test.zip")
 
     win = lin = None
     if os.name == "nt":
