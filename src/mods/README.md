@@ -10,7 +10,7 @@ Everything here changes how the original game behaves, on purpose. It is kept ap
 - Rules: [game rules from the host](#game-rules-from-the-host-host_rulescpp-on-and-nothing-changes-unless-the-host-changes-something), with [H5 Together's version in the waiting room](#h5-togethers-version-in-the-waiting-room-030)
 - [New version available](#new-version-available-update_checkcpp-off-by-default) (opt-in)
 - [The settings menu](#the-settings-menu-settings_cpp-options-h5-together): the add-on's settings in the game's own Options screen (Options, H5 Together; F3)
-- Camera, sound and visuals: [original music](#original-music-original_musiccpp-off-by-default), [camera zoom and start distance](#farther-camera-zoom-start-distance-cameracpp-off-by-default), [the mouse wheel under Wine](#the-mouse-wheel-under-wine--proton-wheelcpp-wheel_logiccpp-on-under-wine-only), [wider volume range](#wider-volume-range-audio_volumecpp-off-by-default), [black past the map's edge](#black-past-the-maps-edge-edge_skycpp-off-by-default)
+- Camera, sound and visuals: [original music](#original-music-original_musiccpp-off-by-default), [camera zoom and start distance](#farther-camera-zoom-start-distance-cameracpp-off-by-default), [the mouse wheel under Wine](#the-mouse-wheel-under-wine--proton-wheelcpp-wheel_logiccpp-on-under-wine-only), [wider volume range](#wider-volume-range-audio_volumecpp-off-by-default), [black past the map's edge](#black-past-the-maps-edge-edge_skycpp-off-by-default), [the main menu's scene and music](#the-main-menus-scene-and-music-menu_scenecpp-off-by-default)
 - The freeze detector (hang watchdog), the crash reports and chain-loading another `dinput8.dll` mod are part of the DLL itself: [src/hook/README.md](../hook/README.md#the-hang-watchdog-watchdogcpp).
 
 ## LAN link tuning (`net_tuning.cpp`)
@@ -869,6 +869,71 @@ log_volume=0        ; testing: log the first N changes of an audible channel vol
 [camera]
 edge_sky=game            ; game (the game's sky), none (no sky dome on the random maps' dusk light: black)
 edge_sky_test_light=     ; testing: one more light file to show without its sky dome
+```
+
+## The main menu's scene and music (`menu_scene*.cpp`, off by default)
+
+Plan, research and robot checks: [docs/plans/menu-scenes.md](../../docs/plans/menu-scenes.md).
+
+**What it is for:** the main menu is a 3D picture with the buttons over it, and a theme. The game ships two pictures of its own, and which one you see depends on what is installed: plain Tribes of the East (ToE) shows **its** picture (orcs and goblins storming a Haven town wall, with the ToE theme); with MMH5.5 you see the **Heroes V** picture (a cleric, an arch devil, a champion on a horse; MMH5.5's own music). `[menu] scene` lets each player pick one of them, or have one drawn every time the game starts.
+
+| `scene=` | What you get |
+|---|---|
+| `default` (the default) | **Nothing changes**: the menu exactly as installed. The add-on installs nothing for it. |
+| `toe` | The Tribes of the East picture and its theme (`music\a2\Main_Menu.ogg`). |
+| `homm5` | The Heroes V picture and its theme (`music\MainMenu\MainMenu-Theme.ogg`). The picture comes with MMH5.5; on a PC without it the setting falls back to `default` (the log says why). |
+| `random` | One of the pictures this PC can show, drawn once each time the game starts, with its own theme. With MMH5.5 that is `toe` or `homm5`; with plain ToE only `toe`, which is what it shows anyway. |
+
+The logo (MMH5.5's) and the buttons stay as they are, and so does the multiplayer sub-menu's theme. A third picture, Hammers of Fate's, does not exist in the game's files, so there is no `hof`. Restart the game after a change. Nothing is written to disk and nothing from the game is in the repo: it only changes what your screen shows and your speakers play, so each player can choose (it does not matter for co-op games).
+
+**How it works** (plain words): the game reads its menu picture from one small data file (`Arenas/Interface/MainMenu/MainMenu.(ArenaDesc).xdb`, which lists the picture's objects). Tribes of the East's copy stays in `data.pak` even under MMH5.5, which only hides it behind its own copy; the Heroes V picture's pieces are in `MMH55-Data.pak`. At the first menu file the game opens, the mod reads the directories of the game's `.pak` files (about 60 to 80 ms), finds the picture descriptions (it recognises each by the scene file it was made from, not by the pak's name), checks that every file a picture needs is there and that its theme's `.ogg` is in `music\`, and draws the pick. Then the same file hook the other mods use hands the game:
+
+- the chosen picture's description when it asks for `MainMenu.(ArenaDesc).xdb`;
+- the game's root table of music (`UI/UIGameRoot.(UIGameRoot).xdb`, 333 KB) with one change: the item `MAIN_MENU_MUSIC_ID` names `Sounds/_(Music)/MainMenu/OpenHomm5-Menu.xdb`, a name of our own;
+- that name's content: the chosen theme's music definition (a 7-line file from `data.pak`).
+
+**Why our own name for the music, not `a2-MainMenu.xdb`:** the file `a2-MainMenu.xdb` (the ToE theme, which MMH5.5 re-points at its own track) is also played by one ToE campaign dialog (`A2C3/M4/S2`), and serving other content under that name would change that dialog's music too. With a name of our own, only the main menu's item changes: that dialog, `a1-MainMenu.xdb` (Hammers of Fate's, used by a campaign dialog), the multiplayer sub-menu's theme and every other music definition stay as the game has them. (Serving the menu only "while the menu is up" would not do it: the game keeps a music definition once it has read it, so the dialog would play whatever the menu loaded.)
+
+**One fallback:** the game reads the root table about a second after it starts, before our hook goes in on a Steam-wrapped exe (that one is hooked a few seconds later; MMH5.5's exes are hooked at once). In that case, and only then, `a2-MainMenu.xdb` itself is served with the theme, the log says so, and that one dialog changes with it. It cannot matter on plain ToE (nothing to change there: `homm5` is not available and `toe` is what is shown), and the MMH5.5 exes are not wrapped.
+
+**With `[audio] original_music=1`:** `scene` wins whenever it is not `default`. `original_music` sets `a2-MainMenu.xdb` back to the ToE theme; the menu no longer asks for that file when `scene` is set, so the theme comes from `scene`. With `scene=default`, `original_music` does what it always did. (The two hooks wrap the same file system slot: ours is installed after `original_music`'s, so it is the outer one and sees the root table as `original_music` left it.)
+
+**What the log says:**
+
+```
+menu scene: read 16 paks (129415 files) in 62 ms; scenes available: homm5, toe
+menu scene: scene=random picked toe (available: homm5, toe): showing toe: the scene's description from data.pak (5702 bytes), the music ..\Music\a2\Main_Menu.ogg from data.pak, served as /Sounds/_(Music)/MainMenu/OpenHomm5-Menu.xdb
+menu scene: the root table's main menu music /Sounds/_(Music)/MainMenu/a2-MainMenu.xdb -> /Sounds/_(Music)/MainMenu/OpenHomm5-Menu.xdb
+menu scene: arenas/interface/mainmenu/mainmenu.(arenadesc).xdb served (toe's scene)
+menu scene: sounds/_(music)/mainmenu/openhomm5-menu.xdb served (toe's theme)
+```
+
+A scene this PC cannot show says why (`scene=homm5 is not available on this PC (no Heroes V menu scene in the game's data): the menu as installed`).
+
+**Checked with the robot** (2026-11-02, test copy with MMH5.5 RC19k, the menu's screenshot and `log_music=1`, which lists the music files the game starts):
+
+| Setting | Picture | Music file the game started |
+|---|---|---|
+| `default` (or no `[menu]`) | Heroes V (MMH5.5's), as before; the log says nothing is installed | `MMH55\MainMenu_Dynasty_002.ogg` (MMH5.5's, as before) |
+| `toe` | Tribes of the East: a cyclops and a castle wall | `a2\Main_Menu.ogg` |
+| `homm5` | Heroes V: a burning arch devil in front of a bent tree | `MainMenu\MainMenu-Theme.ogg` |
+| `random`, 6 launches | `toe`, `toe`, `homm5`, `toe`, `toe`, `homm5` (each picture with its own theme) | the pick's theme every time |
+| `toe` / `homm5`, a game started, then the game's menu "Main menu" and OK | the same scene as at the start, drawn again | the theme starts again (`music file 4`) |
+| `original_music=1` with `default` | Heroes V | `a2\Main_Menu.ogg`, as `original_music` always did |
+| `original_music=1` with `homm5` / `toe` | the scene's own | `MainMenu-Theme.ogg` / `a2\Main_Menu.ogg`: **`scene` wins**; `original_music` never touches `a2-MainMenu.xdb` (no `[26]` line in the log), because the menu no longer asks for it |
+| hook installed 4 s late instead of at the DLL's load (a test build, `toe`) | the scene is still served (the game reads the picture's file at 4.8 s, when the menu is built) | the root table was read before: the fallback serves `a2-MainMenu.xdb`, and the log says so |
+
+The picture's description is read at about 4.8 s in every run and the root table about 1.2 s after the start, so the hook goes in in time on every exe that is hooked at the DLL's load. Reading the paks' directories took 62 to 79 ms, once.
+
+**Not checked in the game:** a PC without MMH5.5 (the unit tests cover the pick for it: `homm5` falls back, `random` is `toe`), and the campaign dialog `A2C3/M4/S2` itself (the robot cannot start it; the log shows that with `scene` set nobody asks for `a2-MainMenu.xdb` at the menu, so the dialog gets the game's own file).
+
+**LAN game** (host `scene=toe`, client `scene=homm5`, A1M4, 3 AI turns): both joined and played, each copy showed its own picture and theme at the menu, and the 516 world checksums were equal on both copies (no desync): it is only a picture and a tune, so each player can choose.
+
+**Settings** (`h5-together.ini`):
+
+```ini
+[menu]
+scene=default   ; default (as installed) | toe | homm5 | random
 ```
 
 ## Game rules from the host (`host_rules*.cpp`; on, and nothing changes unless the host changes something)

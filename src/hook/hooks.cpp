@@ -20,6 +20,7 @@
 #include "../mods/lan_discovery.h"
 #include "../mods/languages.h"
 #include "../mods/lockstep.h"
+#include "../mods/menu_scene.h"
 #include "../mods/net_tuning.h"
 #include "../mods/notify.h"
 #include "../mods/original_music.h"
@@ -69,6 +70,7 @@ void InstallEarly()
 	crash::Install("from the DLL's load, before the game's own crash filter");  // first: before the game's code runs
 	mods::InstallLanguagesEarly();  // [lang] texts=fr, before the game reads its first text
 	mods::InstallOriginalMusicEarly();
+	mods::InstallMenuSceneEarly();  // [menu] scene: after original_music, so ours is the outer hook
 	mods::InstallPlayerListEarly();  // the Direct3D import, before the game makes its device
 	mods::InstallRmgBuilderEarly();
 	mods::InstallHeroSkinsPanelEarly();  // the overlay's Direct3D import, for the looks' panel
@@ -101,6 +103,7 @@ void InstallAll()
 	mods::ApplyLanguagesFromSettings();
 	mods::ApplyRmgFactionsFromSettings();
 	mods::ApplyOriginalMusicFromSettings();
+	mods::ApplyMenuSceneFromSettings();  // [menu] scene: after original_music, which it must stay outside of
 	mods::ApplyPlayerListFromSettings();  // overlay clients: drawn in this order
 	mods::ApplyRmgBuilderFromSettings();
 	overlay::ApplyTestPanelFromSettings();

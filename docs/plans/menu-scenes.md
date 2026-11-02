@@ -1,6 +1,45 @@
 # Plan: a random main menu scene (and its music) on launch
 
-Status: **research only** (2026-11-02). Done by reading the paks in the Steam copy (read only), the music folder, the reference exes in `ref\` and Ghidra (`H5_Game_31_vanilla.exe`), plus a few web searches. The game and the robot were not run. Nothing in the repo changed except this file. The owner's ask: "Random main menu background on launch (between Heroes V / Hammers of Fate / Tribes of the East) + associated music."
+Status: **built** (2026-11-02, branch `menu-scene`): `[menu] scene=default|toe|homm5|random` is in `src/mods/menu_scene*.cpp`; what was decided and what was built are in "Built" just below. The rest of this page is the research it was built from (written the same day, before building); where the build differs, "Built" says so. The research: Done by reading the paks in the Steam copy (read only), the music folder, the reference exes in `ref\` and Ghidra (`H5_Game_31_vanilla.exe`), plus a few web searches. The game and the robot were not run. Nothing in the repo changed except this file. The owner's ask: "Random main menu background on launch (between Heroes V / Hammers of Fate / Tribes of the East) + associated music."
+
+## Built (2026-11-02)
+
+**The owner's decisions** (2026-11-02), which this build follows:
+
+1. **Scenes: Heroes V and Tribes of the East only.** Hammers of Fate's scene is not in the files, so there is no `hof`. (Question 1: option a.)
+2. **Heroes V on a PC without MMH5.5: unavailable.** `homm5` falls back to `default` with a log line. (Question 2.)
+3. **Logo: MMH5.5's logo stays on every scene.** We do not touch it. (Question 3.)
+4. **Music: each scene gets its own theme** (Heroes V: `music\MainMenu\MainMenu-Theme.ogg`; ToE: `music\a2\Main_Menu.ogg`), and `random` picks both together. The multiplayer sub-menu's theme is left alone. (Question 4.)
+5. **The setting:** `[menu] scene=default|toe|homm5|random`; **`default` is the default and installs nothing**. (Question 5.)
+6. **One pick per game launch** (not a new one when you come back to the menu). (Question 6.)
+
+**What differs from the plan above** (section 3): the music is **not** served as `a2-MainMenu.xdb`. The plan's table did that and noted the side effect on the one ToE campaign dialog that plays that definition (`A2C3/M4/S2`). The owner asked to limit it. Two ways were looked at:
+- *Serve `a2-MainMenu.xdb` only while the main menu is up:* does not work. The game keeps a music definition once it has read it, so the dialog would play whatever the menu loaded. It would also need us to know when the menu is shown.
+- *Point `UIGameRoot`'s `MAIN_MENU_MUSIC_ID` at a name of our own* (chosen, the safest): the game's root table of music (`UI/UIGameRoot.(UIGameRoot).xdb`, 333 KB in MMH5.5's pak) is served with that one item changed to `Sounds/_(Music)/MainMenu/OpenHomm5-Menu.xdb`, and that name (in no pak) is served with the chosen theme's 7-line definition read from `data.pak`. **Nothing else that plays music definitions is touched:** `a2-MainMenu.xdb` (the dialog), `a1-MainMenu.xdb` (a Hammers of Fate campaign dialog), `MP-MainMenu.xdb` (the multiplayer sub-menu) and every other definition stay as the game has them. It also makes `[audio] original_music=1` harmless: that setting sets `a2-MainMenu.xdb` back to the ToE theme, and the menu no longer asks for that file when `scene` is not `default`. **So `[menu] scene` wins over `original_music`** whatever the order; with `scene=default`, `original_music` does what it did. (The two hooks wrap the same file system slot; ours goes in after `original_music`'s so that it is the outer one and sees the root table as `original_music` left it.)
+- *The one case it cannot cover:* the root table is read about 1.1 s after the game starts. Our hook goes in at the DLL's load, before that, on every exe the DLL hooks at load (all MMH5.5 exes). On a Steam-wrapped exe (hooked later, 4 s) the table is already read; then, and only then, `a2-MainMenu.xdb` itself is served with the theme (logged), and that dialog changes with it. A plain Steam ToE has nothing to change anyway (`homm5` is unavailable there and `toe` is what it shows).
+
+**How a scene is judged available** (section 3's "checks before serving", built a bit more generally): at the first menu file the game opens, the directories of all `data\*.pak` are read (16 paks, 129,415 files, 60 to 80 ms). Each arena description found under `Arenas/Interface/MainMenu/MainMenu.(ArenaDesc).xdb` is told apart by the scene file it was exported from (`/H5A2/UI/MainMenu/MainMenu.mb` = ToE, `/models/MainMenu/M_Menu.mb` = Heroes V), not by which pak holds it; every file the description names (objects, effects, light, camera animation) must be in some pak; the theme's definition must be in `data.pak` or `a2p1-data.pak`; and its `.ogg` must be in `music\`. Anything else is "not available", with the reason in the log. For both scenes the description we serve is the one found this way (not "whatever the layering gives"), so the scene shown does not depend on which pak is newest.
+
+**Robot checks** (2026-11-02, `C:\Games\H5_test_k`, MMH5.5 RC19k, `MMH55_Utility_64.exe`):
+
+| Check | Result |
+|---|---|
+| `default` (no `[menu]` section) | The Heroes V picture, MMH5.5's logo, `MMH55\MainMenu_Dynasty_002.ogg`: as today. The log says only `scene=default (the menu as installed: nothing changes)`, no hook installed. |
+| `toe` | The ToE picture (a cyclops at a castle wall; MMH5.5's logo and buttons on top), `a2\Main_Menu.ogg`. **The arena description is read through the file hook** (risk 3 of this plan: tested, it is). |
+| `homm5` | The Heroes V picture (the burning arch devil and the bent tree, same as `default`), `MainMenu\MainMenu-Theme.ogg`. |
+| `random`, 6 launches | `toe`, `toe`, `homm5`, `toe`, `toe`, `homm5`: both come up, and the theme always matches the picture. |
+| Menu after a game (risk 2): `toe` and `homm5`, start A1M4, the game's menu (Esc), "Main menu", OK | The same scene is drawn again, the camera flies in again, and the theme restarts (`music file 4`). Only one pick per launch, as decided. (The robot opens the game's menu with the message `EscMenu`, presses its "main menu" with `ui NUI::CEscMenuScreen main_menu` and confirms with the Enter key, `dik 1c`.) |
+| `[audio] original_music=1` | With `default`: the ToE theme as before. With `homm5` or `toe`: the scene's theme wins; `original_music`'s line for `a2-MainMenu.xdb` (`[26]`) is absent, so that file is not opened by the menu. |
+| The campaign dialog | Not run (no robot way to start `A2C3/M4/S2`). By construction `a2-MainMenu.xdb` is not touched while `scene` is set: no `a2-MainMenu.xdb` line from us in the log; the code logs a line if anything else opens it. |
+| Hooked late (a test build whose hook goes in at 4 s, as on a Steam-wrapped exe), `toe` | The scene is still served (its file is read at 4.8 s, when the menu is built); the root table (read at 1.1 s) was too early, so the fallback served `a2-MainMenu.xdb` with the theme, and the log says so. |
+| LAN game, host `toe`, client `homm5` | Both joined and played 3 AI turns on A1M4; 516 world checksums equal on both copies (no desync). |
+| Cost | Reading 16 paks' directories (129,415 files): 62 to 79 ms, once, at about 1.2 s into the start. No visible delay in the menu. |
+
+Screenshots stay on the test PC (`build\robot\` is not committed).
+
+**Not tested:** a PC without MMH5.5 (plain ToE, where `homm5` falls back and `random` is `toe`): covered by the unit tests of the pick, not run in the game; the Steam-wrapped exe (its late install is run with a test build, see the table); the campaign dialog itself (no robot way to start `A2C3/M4/S2`; the log shows `a2-MainMenu.xdb` is not served by us when `scene` is set).
+
+**Still open:** the Hammers of Fate scene (option b of question 1, "scene packs", if friends find a community menu mod); a settings panel row (the v0.3 settings menu is another branch).
 
 ## Short answer
 

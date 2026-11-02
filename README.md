@@ -50,6 +50,7 @@ H5 Together was called **open-homm5** until version 0.2.7 (the repository was `j
 - **Black map edges:** `[camera] edge_sky=none` replaces the violet sky MMH5.5 put past some random maps' edges.
 - **Quieter volume range:** `[audio] volume_curve=wide` makes the sliders' lowest step about 10 times quieter.
 - **Original Heroes V music** instead of MMH5.5's: `[audio] original_music=1`.
+- **Another picture behind the main menu**, with its own music: `[menu] scene=toe` (Tribes of the East), `homm5` (the Heroes V one, with MMH5.5) or `random` (drawn at each start).
 - **Mouse wheel on Linux:** under Wine / Proton the wheel could zoom in but never out. This one is automatic, on Linux only.
 
 ## Install
