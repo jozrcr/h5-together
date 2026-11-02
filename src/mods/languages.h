@@ -62,5 +62,11 @@ void ReadDirectory(const unsigned char *dir, size_t size, std::vector<ZipEntry> 
 // from the header (30 + name + extra), or 0 when it is not a local header.
 DWORD DataStart(const unsigned char local[30]);
 
+// Reading a .pak opened for reading (languages.cpp; also used for ToE's bonus
+// pictures, host_rules_icons.cpp): its files, and one file's bytes (stored or
+// deflated: inflated with the game's zlib1.dll). Any thread.
+bool ReadPakDirectory(HANDLE file, std::vector<ZipEntry> *out);
+bool ReadPakFile(HANDLE file, const ZipEntry &entry, std::string *out);
+
 }  // namespace lang
 }  // namespace mods
