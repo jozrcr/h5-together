@@ -41,7 +41,7 @@ WHAT IT DOES
 
 NEW IN 0.2.7
 
-- Game rules (host): Tribes of the East start bonuses (each player keeps the bonus picked with the lobby arrows: gold, resources, artifact) and a separate game mode choice (Default, Savage, Nightmare, Random).
+- Game rules (host): Tribes of the East start bonuses (each player keeps the bonus picked with the lobby arrows: gold, resources, artifact, with ToE's own icons) and a separate game mode choice (Default, Savage, Nightmare, Random).
 - Game rules (host): MMH5.5's scripts can also run on random maps straight from the game's generator in multiplayer, so the other rules work there too.
 - Game rules (host): "Skills of each class": MMH5.5's lock, or Unlocked (any skill can be offered, the ones off the class's list at a small chance, as in the original game).
 - The installer updates open-homm5.ini: your values are kept, the new settings are added, and the old file is saved as open-homm5.ini.bak.
