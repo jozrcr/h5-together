@@ -263,6 +263,19 @@ Each copy gets `OPEN_HOMM5_INSTANCE=host` or `client` in its environment; the DL
 
 LAN games are found through UDP broadcasts on the discovery port (`net_lan_match_maker_port`, default 8889): every copy sends a 5-byte "02" packet each second, and a host also sends its game (an 826-byte "03" packet) to the copies it heard from. Two copies cannot both bind port 8889 ("address in use", the second copy's LAN screen never opened), and with a shared port (`SO_REUSEADDR`) they could not tell each other apart. So each copy gets its own discovery port (host 8889, client 8891) and the DLL also sends every discovery broadcast to the other copy's port on 127.0.0.1 (`net_lan_relay_ports`, `robot_net.cpp`). The game ports are 8888 (host) and 8890 (client). `net_log=1` logs the socket calls and the first packets.
 
+**Packets byte by byte, and the virtual LAN** (online play, [docs/plans/online-steam.md](../../docs/plans/online-steam.md)):
+
+```
+python tools\robot\run_lan_test.py --turns 8 --seconds 300 --net-log-bytes 2048 --net-scan          # the game's own LAN
+python tools\robot\run_lan_test.py --turns 8 --seconds 300 --net-log-bytes 2048 --net-scan --vlan   # through the virtual LAN
+python tools\robot\packet_map.py --last 1      # where addresses and ports sit in each kind of packet
+python tools\robot\lan_report.py --last 2      # checksums of both runs
+```
+
+- `--net-log-bytes N` (`net_log_bytes`): each logged packet's first N bytes, 64 per line (`robot: net:   +0040 ...`).
+- `--net-scan` (`net_scan_addresses=1`): looks for this PC's own IPv4 addresses inside **every** packet the game sends or gets; logs the first 3 packets of each kind that hold one, whole, and a count every 10 s (`robot: net: address scan: ... N hold an address of this PC`). Matches in reversed byte order are counted apart: they turn up by chance in acknowledgement bits.
+- `--vlan`: both copies run the virtual LAN with its loopback transport (`[online] mode=loopback`, ports 47101 and 47102, `src/mods/virtual_lan.cpp`), and the DLL's broadcast copies to the other copy's port are off, so the client can find the host only through the virtual LAN. The `vlan:` lines in both logs say what it carried and dropped. With it, the scan's count must be 0.
+
 **Desync check:** the runner sets `mp_check_crc = 1` on both copies (`--no-crc` leaves it off); without it the game computes no world checksums at all. Both copies log every checksum (`trace_crc`), and `lan_report.py` says "all equal on both copies (no desync)" or where they first differ. `--fast-paths on` and `--ai-setting` set the fast pathfinding mod on both copies, as in `run_ai_test.py`. The client never runs the AI (the host does), so its "stuck" exit is off (`stuck_exit=0`). Not handled yet: a battle between the AI and the client's human player can leave the host waiting (the host then exits as stuck).
 
 ## Things learned getting here (2026-10-21)
