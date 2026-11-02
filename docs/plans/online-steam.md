@@ -1,6 +1,6 @@
 # Plan: online play over Steam (a "virtual LAN")
 
-Status: **research and plan only** (2026-11-02). No code yet. The first step is a spike, which needs the Steamworks SDK (the owner puts it at `ref\steamworks_sdk.zip`).
+Status: **solo spike done (2026-11-02): Steam accepts app 15370 from inside the game.** Steam starts in the game's process, the relay network comes up, and a friends-only lobby is created ([results below](#solo-spike-results-2026-11-02)). This held even though the robot, not Steam, started the game. The two-PC part of the spike is next. Code: `src/mods/steam_spike.cpp` (`[online] spike`, off by default). SDK 1.65 is at `ref\steamworks_sdk_165\` (never committed).
 
 Goal: friends join each other's games **from inside the game**, with no GameRanger and no ZeroTier. This is phase 6 of the project ("built-in online play"). This plan picks Steam as the first way to do it. The older idea (our own lobby server plus GameNetworkingSockets) becomes the fallback.
 
@@ -14,6 +14,7 @@ Goal: friends join each other's games **from inside the game**, with no GameRang
   - **The game writes its own IP addresses inside its packets.** The other PC then tries each of those addresses.
   - We can handle both at the Winsock level, the same place `lan_discovery.cpp` already hooks. We answer the game's "what are my addresses?" question with a fake address. No packet has to be rewritten.
 - **The big unknown.** Will Steam accept lobbies and relayed messages under app id **15370**? That is Heroes V ToE's own id, and the game never used Steamworks. Valve's documents don't say. We found no mod that did exactly this; the known mods use Valve's test app 480 (Spacewar). **The spike answers this first.**
+  - **Solo answer (2026-11-02): yes for init, relays and lobbies.** Steam fetched the relay configuration for `appid=15370` and reached its relays in 6 s. A friends-only lobby was created and its data read back. Messages between two PCs are the part still untested.
 - **Effort:** about 10 sessions after a successful spike, plus test evenings with a friend.
 
 ## How a LAN game works today (what the virtual LAN must carry)
@@ -286,13 +287,55 @@ log=1             ; log lobby events and each new peer (fake address <-> SteamID
 
 **If 15370 is refused** (Init, lobby or relay fails): run the same spike with `app_id=480`. That tells us whether the problem is the app id or our code. Then choose a fallback (risks, below).
 
+### What was built
+
+- **`src/mods/steam_spike.cpp`**, setting `[online] spike`. Values: `0` (off, the default), `1` (solo, one PC), `host` / `join` (the two-PC test). Other keys: `app_id` (default 15370), `spike_seconds`, `spike_lobby`, `spike_pings`, `spike_ping_bytes`.
+- **No SDK in the repo.** `src/mods/steam_api_flat.h` declares the ~40 flat C functions and structures we use. The DLL loads `bin\open-homm5\steam_api.dll` with `LoadLibrary` and `GetProcAddress`. Without that file, nothing changes.
+- **The declarations are checked against the SDK.** `src/hook/test/steam_abi_check.cpp` compares every size, offset, callback number and constant with Valve's headers. `build.ps1 -Test` runs it when `ref\steamworks_sdk_*` (or `STEAMWORKS_SDK`) is there, and skips it on GitHub. All checks pass for SDK 1.65.
+- **The pure parts are unit-tested** (`steam_spike_logic.cpp`, `test/steam_spike_test.cpp`): the setting, the log names, the test messages, the round-trip statistics.
+- **Threads:**
+  - `SteamAPI_InitFlat` runs on the game's thread, at the first `DirectInput8Create`.
+  - Everything else runs on a thread of our own, every 20 ms. Callbacks use Steam's manual dispatch, so they never run on a game thread.
+  - We don't use the per-frame hook, because the game shows no frames while a map loads.
+- **The robot:** `run_ai_test.py --online-setting spike=1` writes the `[online]` section.
+
+### Solo spike results (2026-11-02)
+
+The robot started the test copy (`C:\Games\H5_test`, MMH5.5 RC19d, `MMH55_Utility_64.exe`) directly, not through Steam. Steam was open on the owner's account. The run was single player on A1M4 for 150 s, and the spike ran 60 s. (`build\robot\20261102-115932\open-homm5.log`; SteamID and name left out here.)
+
+| Question | Answer | Log line |
+|---|---|---|
+| Does Steam start in the game under 15370 when Steam didn't launch it? | **Yes**: setting `SteamAppId` in the process was enough, with no `steam_appid.txt` | `SteamAPI_InitFlat -> 0 (OK) in 1093 ms` … `Steam says our app id is 15370` |
+| Relay network (SDR) for app 15370? | **Yes, OK after 6 s** | `"Attempt #1 to fetch config … GetSDRConfig/v1?appid=15370"`, then `relay network … OK (current) … "OK.  Relays: 24 valid, 5 great, 10 good+, 16 ok+, 7 ignored"` |
+| Friends-only lobby? | **Yes**: created in 0.3 s; data set and read back | `CreateLobby(friends only) -> OK (EResult 1), lobby 1097…`; `read back oh5_spike="solo" oh5_version="0.2.7"; members 1, owner us` |
+| Lobby list search | 0 lobbies, as expected: friends-only lobbies never show in searches. The two-PC test finds the host through the friends list instead. | `lobby list -> 0 lobbies` |
+| Messages (`ISteamNetworkingMessages`) | **Sending works.** Messages to ourselves (4 unreliable, 1 reliable) all came back in 16–32 ms (the first in 391 ms, while the relays were still being measured). | `message #1 … to ourselves -> OK`, `message #2 came back from ourselves after 32 ms` |
+| ↳ but | A message to ourselves goes through an internal "pipe" (flags 12 = fast + loopback, not relayed). Each message also showed "session request from ourselves" and "session FAILED … closed by peer", which looks harmless. **This proves nothing about the relays between two PCs**: that is the two-PC test. | `session with ourselves: closed by peer (4) … not relayed (flags 12 …) "#… pipe"` |
+| Overlay | `GameOverlayRenderer.dll` loaded at init. "Enabled" came later (no at init, yes at 45 s). Steam's own log: `GameID = 15370, OverlayGameID = 15370`, plus a notification toast for 15370. | `overlay at 45 s: IsOverlayEnabled yes` |
+| "Now playing" | **Yes**: Steam's `content_log.txt` says `AppID 15370 state changed : Fully Installed,App Running` at our init, and `Fully Installed` when the game closed | |
+| Did the game run normally? | **Yes**: 19 AI turns, 180 AI steps in 150 s, ended by the time limit; the player list overlay drew as usual | `robot: time limit of 150 s reached after 19 AI turns` |
+| Init before the Direct3D device? | **No**: `DirectInput8Create` (our init) comes after the game's first device (4.9 s). The game makes three more devices after it, and the overlay worked anyway. | `d3d9: device … hooked` at 4890 ms, `game build` at 4922 ms |
+| Leaving the lobby | `LeaveLobby` at the end of the 60 s. If the game closes earlier, Steam drops the lobby when the process ends. | `left lobby 1097…` |
+
+No need for the 480 retry: 15370 worked.
+
+**Side finding:** Steam has its own "FakeIP" feature (`steamnetworkingfakeip.h`: `ISteamNetworkingSockets::BeginAsyncRequestFakeIP`). It gives a Steam-managed fake IPv4 address and port for porting UDP code. Our own `198.18.x.y` mapping stays simpler, because the game's packets go through our Winsock hooks anyway. But FakeIP is worth a look in step 2.
+
+### What the two-PC test still has to answer
+
+- Whether the relays carry messages **between two PCs** under 15370 (`spike=host` / `spike=join`), the round trip, and whether Steam relays or connects directly.
+- Whether the joiner **finds the host's friends-only lobby through the friends list** (`GetFriendGamePlayed`). If not, the fallback is `spike_lobby=public` and a filtered search.
+- **A game started from the Steam library** (Steam sets the app id itself, and the overlay is injected at start), compared with this solo run's direct start.
+- **Linux under Proton:** does our Windows `steam_api.dll` reach the Linux Steam client?
+- The test package: `open-homm5-steam-spike-test1.zip` (our DLL and instructions; prepared in the scratchpad, not sent). `steam_api.dll` is not inside: the owner gives it to the friend from his SDK. The SDK licence would allow shipping it with our software (plan, research 3), but for a one-off test, handing it over separately keeps the zip ours only.
+
 ## Steps and effort
 
 A session is one focused working block of a few hours.
 
 | Step | What | Sessions |
 |---|---|---|
-| 0 | The spike (above), then reading the logs | 1 + 0.5 |
+| 0 | The spike (above), then reading the logs. **Solo part done 2026-11-02**; the two-PC part waits for a second player | 1 + 0.5 |
 | 1 | Packet map: the robot's `net_log` logs whole packets; find the address lists inside `01` and `03`; write it up in [multiplayer-sync.md](../subsystems/multiplayer-sync.md) | 0.5 |
 | 2 | Virtual LAN core with the loopback transport: Winsock hooks (stacked with `lan_discovery`), fake addresses, `gethostbyname` answer, hosting detection, unit tests, robot LAN game (checksums, no real IP in packets) | 2 |
 | 3 | Steam transport: lazy loading, init, our callback thread, lobbies, known hosts, sessions, version data; logs | 2 |

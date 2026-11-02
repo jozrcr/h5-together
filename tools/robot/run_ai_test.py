@@ -139,6 +139,10 @@ def write_mod_settings(game, args, instance):
     skins = getattr(args, "skins_setting", None) or []  # e.g. trace=1, show_others=0
     if skins:
         lines += ["[skins]"] + skins
+    # [online] = the Steam spike (src/mods/steam_spike.cpp), off by default
+    online = getattr(args, "online_setting", None) or []  # e.g. spike=1, app_id=480
+    if online:
+        lines += ["[online]"] + online
     mod_settings_file(game, instance).write_text("\n".join(lines) + "\n", encoding="ascii")
     choices = skins_file(game, instance)
     choices.unlink(missing_ok=True)
@@ -454,6 +458,9 @@ def main():
                    help="[rules] setting, e.g. governance=0 or trace=1 (repeatable; src/mods/host_rules.cpp)")
     p.add_argument("--debug-setting", action="append", default=[], metavar="KEY=VALUE",
                    help="[debug] setting, e.g. hang_test_at=60 or hang_seconds=10 (repeatable; src/hook/watchdog.cpp)")
+    p.add_argument("--online-setting", action="append", default=[], metavar="KEY=VALUE",
+                   help="[online] setting, e.g. spike=1 or app_id=480 (repeatable; src/mods/steam_spike.cpp; "
+                        "needs bin\\open-homm5\\steam_api.dll in the test copy)")
     p.add_argument("--resolution", default="1024x768", metavar="WxH",
                    help="the game window's size (windowed), e.g. 1920x1080 (default 1024x768)")
     p.add_argument("--trace-moves", action="store_true", help="log what the start-move command calls (robot_trace.cpp)")
