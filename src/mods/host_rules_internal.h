@@ -66,8 +66,19 @@ struct BonusTips {
 BonusTips TipsFor(const Values &values);
 // From the lobby logic's update (host or client, the main thread): each row's
 // four bonus tooltips (its own copies of the texts) set to `tips`, and the shown
-// one refreshed; logs each row's bonus when it changes.
+// one refreshed; each row's bonus pictures set to ToE's when tips.toe (when
+// they were served, below), else to the game's (MMH5.5's); logs each row's
+// bonus when it changes.
 void SyncBonusTips(void *logic, const BonusTips &tips);
+
+// --- ToE's bonus pictures for the lobby (host_rules_icons.cpp) ---
+// From host_rules.cpp's wrap of the game's "open file" (any thread), for a .xdb
+// or .dds path: the stream to give the game. `opened` is what the game opened
+// (deleted when another one is given); our files and the bonus icon's texture
+// list (with our four pictures added) are served, everything else is `opened`.
+void *ServeBonusPicture(const char *begin, const char *end, void *opened);
+// Was the icon's texture list served with ToE's pictures (their names are in it)?
+bool ToePicturesServed();
 
 // --- the class skill lock (host_rules_classes.cpp) ---
 // This PC's class table, read from memory the first time it is asked for (the

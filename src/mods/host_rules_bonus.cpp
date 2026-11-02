@@ -1,5 +1,5 @@
-// Host rules: the waiting room's bonus tooltips (docs/plans/host-rules.md, "Game
-// mode and start bonuses"). MMH5.5 gave the bonus arrows its game modes, so its
+// Host rules: the waiting room's bonus tooltips and icons (docs/plans/host-rules.md,
+// "Game mode and start bonuses"). MMH5.5 gave the bonus arrows its game modes, so its
 // four tooltips (UI/MPWait/PlayersList/Item/bonus_tooltip_*.txt) describe
 // Default, Savage and Nightmare. With the host's start rules, the arrows choose
 // ToE's start bonuses again (or nothing, when MMH5.5 still takes the bonus back
@@ -24,8 +24,24 @@
 // The texts are ours (English and French, the panel's language): ToE's bonuses,
 // and the game mode. MMH5.5's own texts come back when the rules go back to
 // MMH5.5's way (we keep them from the first row we saw).
-// Not changed: the icons (MMH5.5 repainted them for its modes: a fist and a
-// burning town for Savage...). The game loads them once too; see the plan.
+//
+// The icons: MMH5.5 repainted the four pictures for its modes (a fist and a
+// burning town for Savage...). With ToE's start bonuses (tips.toe) each row shows
+// ToE's own pictures, which host_rules_icons.cpp adds to the icon's list of
+// related textures as "oh_toe_bonus0".."3"; otherwise the game's "bonus0".."3"
+// (MMH5.5's). The same way as the texts, in each row's own data:
+//   - a row keeps at +0x6c its pictures by bonus number, a hash_map<int,
+//     CDBPtr<NDb::STexture>> (a node is {next, key, object, resolved}), set when
+//     the row is made (0x00715cd0) from the icon's slot 0x110 (0x00a50a10: the
+//     related texture of a name), one more reference (+8) to each picture;
+//   - its refresh (0x007148e0, on every change: bonus arrows, players...) shows
+//     the one of its bonus through the icon's slot 0xa4 (0x00a4e290: the
+//     background's texture), after CDBPtr::Get (0x006710a0).
+// We set the four entries as the row's making does (the old picture's
+// reference back: the icon's list keeps it alive, so nothing is ever freed
+// here) and show the row's one at once; the game's own refresh then shows ours
+// by itself. The icon is a CWindowTextView held by its IWindow part (vftable
+// 0x00e81aa4, checked, with the two slots); nothing else changes.
 #include <windows.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,15 +65,39 @@ const DWORD kBonusTable = 0x48;             // the fourth: the bonus tooltips
 const DWORD kRowBonus = 0x84;               // the row's bonus (0..3)
 const DWORD kRowBonusIcon = 0x9c;           // the bonus icon (a window)
 const DWORD kSetTooltipSlot = 0x68;         // the window's vtable: thiscall(const wstring *, const DWORD format[5])
+// the icon's pictures (below, "the icons")
+const DWORD kRowPictures = 0x6c;            // hash_map<int, CDBPtr<NDb::STexture>>: the bonus pictures by bonus
+const DWORD kIconVftable = 0x00e81aa4;      // CWindowTextView, its IWindow part (how a row holds the icon)
+const DWORD kRelatedTextureSlot = 0x110;    // thiscall(const nstl::string *name) -> NDb::STexture *, ret 4
+const DWORD kRelatedTexture = 0x0088f810;   //   (a vtordisp thunk to 0x00a50a10)
+const DWORD kSetTextureSlot = 0xa4;         // thiscall(NDb::STexture *), ret 4: the background's picture
+const DWORD kSetTexture = 0x0088f6a0;       //   (a vtordisp thunk to 0x00a4e290)
+const DWORD kDbPtrGet = 0x006710a0;         // CDBPtr<NDb::STexture>::Get: thiscall, returns the object
+const BYTE kDbPtrGetCode[] = {0x56, 0x8b, 0xf1, 0x80, 0x7e, 0x04, 0x00, 0x8b, 0x0d, 0x84, 0x12, 0xf9, 0x00};
+const DWORD kReleaseObject = 0x008c6150;    // CObjectBase: destroyed when no reference is left (ecx = the object)
+const BYTE kReleaseObjectCode[] = {0x51, 0x83, 0x79, 0x08, 0x00};  // push ecx; cmp dword [ecx+8], 0
 
 struct WString {  // nstl::wstring
 	wchar_t *begin;
 	wchar_t *end;
 	wchar_t *cap;
 };
+struct GameString {  // nstl::string
+	const char *begin;
+	const char *end;
+	const char *cap;
+};
+struct DbPtr {  // CDBPtr<NDb::STexture>: the object (its references at +8), and whether Get resolved it
+	BYTE *object;
+	BYTE resolved;
+};
 
 typedef void *(__fastcall *AssignFn)(WString *self, void *edx, const wchar_t *first, const wchar_t *last);
 typedef void(__fastcall *SetTooltipFn)(void *window, void *edx, const WString *text, const DWORD *format);
+typedef BYTE *(__fastcall *RelatedTextureFn)(void *window, void *edx, const GameString *name);
+typedef void(__fastcall *SetTextureFn)(void *window, void *edx, BYTE *texture);
+typedef BYTE *(__fastcall *DbPtrGetFn)(DbPtr *self, void *edx);
+typedef void(__fastcall *ReleaseFn)(BYTE *object);
 
 bool Readable(const void *p, size_t n)
 {
@@ -95,17 +135,17 @@ const Words kEnglish = {
 };
 
 const Words kFrench = {
-	{L"<color=yellow>Bonus de départ : aléatoire<color_default><br>De l'or, des ressources ou un artefact mineur, comme "
+	{L"<color=yellow>Bonus de d\u00e9part : al\u00e9atoire<color_default><br>De l'or, des ressources ou un artefact mineur, comme "
 	 L"dans Tribes of the East.",
-	 L"<color=yellow>Bonus de départ : artefact mineur<color_default><br>Votre premier héros commence avec un artefact "
-	 L"mineur aléatoire.",
-	 L"<color=yellow>Bonus de départ : or<color_default><br>500 à 1000 pièces d'or de plus au départ.",
-	 L"<color=yellow>Bonus de départ : ressources<color_default><br>3 à 6 unités d'une ressource "
-	 L"aléatoire de plus au départ."},
-	L"<color=yellow>Pas de bonus de départ à choisir<color_default><br>MMH5.5 donne au premier héros de chaque "
-	L"joueur humain un artefact mineur aléatoire.",
-	L"<br><br>Mode de jeu : %ls (règles de la partie choisies par l'hôte).",
-	{L"", L"Par défaut", L"Sauvage", L"Cauchemar", L"Aléatoire (Par défaut, Sauvage ou Cauchemar, tiré au début)"},
+	 L"<color=yellow>Bonus de d\u00e9part : artefact mineur<color_default><br>Votre premier h\u00e9ros commence avec un artefact "
+	 L"mineur al\u00e9atoire.",
+	 L"<color=yellow>Bonus de d\u00e9part : or<color_default><br>500 \u00e0 1000 pi\u00e8ces d'or de plus au d\u00e9part.",
+	 L"<color=yellow>Bonus de d\u00e9part : ressources<color_default><br>3 \u00e0 6 unit\u00e9s d'une ressource "
+	 L"al\u00e9atoire de plus au d\u00e9part."},
+	L"<color=yellow>Pas de bonus de d\u00e9part \u00e0 choisir<color_default><br>MMH5.5 donne au premier h\u00e9ros de chaque "
+	L"joueur humain un artefact mineur al\u00e9atoire.",
+	L"<br><br>Mode de jeu : %ls (r\u00e8gles de la partie choisies par l'h\u00f4te).",
+	{L"", L"Par d\u00e9faut", L"Sauvage", L"Cauchemar", L"Al\u00e9atoire (Par d\u00e9faut, Sauvage ou Cauchemar, tir\u00e9 au d\u00e9but)"},
 	{"random", "minor artifact", "gold", "resources"},
 };
 
@@ -200,6 +240,98 @@ std::string Narrow(const std::wstring &w)
 	return s;
 }
 
+// --- the icons: the game's side --------------------------------------------------------------------
+// Is the icon the window we know (its vtable, and the two slots we call)?
+bool IconAsExpected(void *icon, DWORD *vtable)
+{
+	*vtable = Read(icon, 0);
+	return *vtable == kIconVftable && Read(reinterpret_cast<void *>(*vtable), kRelatedTextureSlot) == kRelatedTexture &&
+	       Read(reinterpret_cast<void *>(*vtable), kSetTextureSlot) == kSetTexture &&
+	       Readable(reinterpret_cast<const void *>(kDbPtrGet), sizeof(kDbPtrGetCode)) &&
+	       memcmp(reinterpret_cast<const void *>(kDbPtrGet), kDbPtrGetCode, sizeof(kDbPtrGetCode)) == 0 &&
+	       Readable(reinterpret_cast<const void *>(kReleaseObject), sizeof(kReleaseObjectCode)) &&
+	       memcmp(reinterpret_cast<const void *>(kReleaseObject), kReleaseObjectCode, sizeof(kReleaseObjectCode)) == 0;
+}
+
+// The row's four picture entries (bonus 0..3), found as 0x00717f80 finds them (a
+// node is {next, key, object, resolved}); each names a picture.
+bool RowPictures(BYTE *full, DbPtr *entries[4])
+{
+	__try {
+		const BYTE *map = full + kRowPictures;
+		const DWORD b = Read(map, 4), e = Read(map, 8);
+		const DWORD buckets = e > b ? (e - b) / 4 : 0;
+		if (buckets == 0 || buckets > 4096 || !Readable(reinterpret_cast<const void *>(b), buckets * 4))
+			return false;
+		for (DWORD key = 0; key < 4; ++key) {
+			entries[key] = nullptr;
+			BYTE *node = reinterpret_cast<BYTE *>(Read(reinterpret_cast<const void *>(b), (key % buckets) * 4));
+			for (int steps = 0; node && steps < 64; ++steps) {
+				if (!Readable(node, 0x10))
+					return false;
+				if (Read(node, 4) == key) {
+					entries[key] = reinterpret_cast<DbPtr *>(node + 8);
+					break;
+				}
+				node = reinterpret_cast<BYTE *>(Read(node, 0));
+			}
+			if (!entries[key] || !entries[key]->object || !Readable(entries[key]->object, 0x30))
+				return false;
+		}
+		return true;
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER) {
+		return false;
+	}
+}
+
+// The icon's related texture of this name (as the row's making asks for "bonus0".."bonus3").
+BYTE *RelatedTexture(void *icon, const char *name)
+{
+	__try {
+		const size_t n = strlen(name);
+		const GameString s = {name, name + n, name + n};
+		BYTE *t = reinterpret_cast<RelatedTextureFn>(Read(reinterpret_cast<void *>(Read(icon, 0)), kRelatedTextureSlot))(icon, nullptr, &s);
+		return t && Readable(t, 0x30) ? t : nullptr;
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER) {
+		return nullptr;
+	}
+}
+
+// An entry gets this picture, as the row's making (0x00715cd0) sets it: one more
+// reference to the new picture (+8), one less to the old one (released at none,
+// as the game does; it does not happen here: the icon's list keeps its
+// pictures), and "not resolved" for Get.
+bool SetPicture(DbPtr *entry, BYTE *texture)
+{
+	__try {
+		BYTE *old = entry->object;
+		entry->object = texture;
+		++*reinterpret_cast<int *>(texture + 8);
+		if (old && --*reinterpret_cast<int *>(old + 8) == 0)
+			reinterpret_cast<ReleaseFn>(kReleaseObject)(old);
+		entry->resolved = 0;
+		return true;
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER) {
+		return false;
+	}
+}
+
+// The icon shows the entry's picture, as the row's refresh (0x007148e0) does.
+bool ShowPicture(void *icon, DbPtr *entry)
+{
+	__try {
+		BYTE *t = reinterpret_cast<DbPtrGetFn>(kDbPtrGet)(entry, nullptr);
+		reinterpret_cast<SetTextureFn>(Read(reinterpret_cast<void *>(Read(icon, 0)), kSetTextureSlot))(icon, nullptr, t);
+		return true;
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER) {
+		return false;
+	}
+}
+
 // --- the state (main thread only) ---------------------------------------------------------------
 std::wstring g_original[4];  // MMH5.5's texts (the first row's, before we changed any)
 bool g_have_original = false;
@@ -215,6 +347,74 @@ bool Ours(const std::wstring &text)
 		if (w == text)
 			return true;
 	return false;
+}
+
+bool g_icons_failed = false;
+int g_icons_logged = -1;  // the pictures last logged: 0 the game's, 1 ToE's
+
+// A row's four bonus pictures: ToE's (when the icon's list has them) or the
+// game's own (MMH5.5's); the shown one at once when it changed.
+void SyncIcon(int row, BYTE *full, void *icon, int bonus, bool toe)
+{
+	if (g_icons_failed)
+		return;
+	DWORD vtable = 0;
+	if (!IconAsExpected(icon, &vtable)) {
+		g_icons_failed = true;
+		hooklog::Write("rules: the lobby's bonus icon is not the window we know (vtable 0x%08x, or the code it uses): its "
+		               "pictures are left alone from now on",
+		               vtable);
+		return;
+	}
+	if (toe && !rules::ToePicturesServed()) {
+		static bool told = false;
+		if (!told)
+			hooklog::Write("rules: ToE's bonus pictures were not served (see above): the lobby's bonus icons stay MMH5.5's");
+		told = true;
+		toe = false;
+	}
+	if ((toe ? 1 : 0) != g_icons_logged) {
+		g_icons_logged = toe ? 1 : 0;
+		hooklog::Write(toe ? "rules: the lobby's bonus icons: ToE's pictures (\"%s\"...)"
+		                   : "rules: the lobby's bonus icons: the game's own (MMH5.5's pictures, \"%s\"...)",
+		               rules::BonusTextureName(0, toe).c_str());
+	}
+	DbPtr *entries[4];
+	BYTE *want[4];
+	bool found = RowPictures(full, entries);
+	for (int k = 0; found && k < 4; ++k) {
+		want[k] = RelatedTexture(icon, rules::BonusTextureName(k, toe).c_str());
+		found = want[k] != nullptr;
+	}
+	if (!found) {
+		static int told = 0;
+		if (told++ < 3)
+			hooklog::Write("rules: the lobby's row %d: its bonus pictures (or the icon's \"%s\"...) are not as expected: left alone",
+			               row, rules::BonusTextureName(0, toe).c_str());
+		return;
+	}
+	int changed = 0;
+	bool shown = false;
+	for (int k = 0; k < 4; ++k) {
+		if (entries[k]->object == want[k])
+			continue;
+		if (!SetPicture(entries[k], want[k])) {
+			g_icons_failed = true;
+			hooklog::Write("rules: the lobby's bonus pictures could not be changed (row %d): left as they are from now on", row);
+			return;
+		}
+		++changed;
+		shown = shown || k == bonus;
+	}
+	if (shown && !ShowPicture(icon, entries[bonus])) {
+		g_icons_failed = true;
+		hooklog::Write("rules: the lobby's bonus icon could not show its new picture (row %d): left alone from now on", row);
+		return;
+	}
+	static int logged = 0;
+	if (changed && logged++ < 40)
+		hooklog::Write("rules: the lobby's row %d: %s bonus pictures (%d changed, its bonus %d shown)", row,
+		               toe ? "ToE's" : "the game's", changed, bonus);
 }
 
 }  // namespace
@@ -280,6 +480,7 @@ void SyncBonusTips(void *logic, const BonusTips &tips)
 			g_last_bonus[i] = bonus;
 			hooklog::Write("rules: the lobby's row %d: start bonus %d (%s)", i, bonus, kEnglish.names[bonus]);
 		}
+		SyncIcon(i, full, icon, bonus, tips.toe);
 		if (!g_have_original) {
 			bool mmh = true;
 			for (int k = 0; k < 4; ++k)

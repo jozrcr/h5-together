@@ -541,6 +541,93 @@ bool PatchStartScript(const std::string &lua, int game_mode, bool toe_bonuses, b
 	return true;
 }
 
+// --- the waiting room's bonus icons ---------------------------------------------------------------
+const char *const kBonusPictures[4] = {"Random", "RandomArtifact", "Gold", "Resource"};
+
+namespace {
+
+const char kPictureFolder[] = "textures/interface/mpwait/playerslist/item/bonuses/";
+const char kOurPicture[] = "OpenHomm5-ToE-";  // our records and pictures: OpenHomm5-ToE-Gold.(Texture).xdb / .dds
+
+std::string Lower(std::string s)
+{
+	for (char &c : s)
+		c = c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c;
+	return s;
+}
+
+}  // namespace
+
+std::string BonusTextureName(int bonus, bool toe)
+{
+	return std::string(toe ? "oh_toe_bonus" : "bonus") + static_cast<char>('0' + bonus);
+}
+
+std::string BonusPicturePath(int bonus, bool ours, bool dds)
+{
+	return kPictureFolder + Lower(std::string(ours ? kOurPicture : "") + kBonusPictures[bonus]) +
+	       (dds ? ".(texture).dds" : ".(texture).xdb");
+}
+
+int OurBonusPicture(const std::string &key, bool *dds)
+{
+	const std::string ours = kPictureFolder + Lower(kOurPicture);
+	if (key.compare(0, ours.size(), ours) != 0)
+		return -1;
+	for (int b = 0; b < 4; ++b)
+		for (int d = 0; d < 2; ++d)
+			if (key == BonusPicturePath(b, true, d == 1)) {
+				*dds = d == 1;
+				return b;
+			}
+	return -1;
+}
+
+bool BonusTexturesWithToe(const std::string &xdb, std::string *out)
+{
+	if (xdb.find("<TextureName>oh_toe_bonus") != std::string::npos)
+		return false;
+	for (int b = 0; b < 4; ++b) {
+		const std::string name = "<TextureName>" + BonusTextureName(b, false) + "</TextureName>";
+		if (FindOnce(xdb, name.c_str(), 0, xdb.size()) == std::string::npos)
+			return false;
+	}
+	const size_t close = FindOnce(xdb, "</textures>", 0, xdb.size());
+	if (close == std::string::npos || xdb.rfind("<TextureName>") > close)
+		return false;
+	const size_t line = LineStart(xdb, close);
+	if (xdb.find_first_not_of(" \t", line) != close)
+		return false;  // something else before it on its line
+	const std::string indent = Indent(xdb, line) + "\t", nl = LineEnd(xdb, close);
+	std::string items;
+	for (int b = 0; b < 4; ++b)
+		items += indent + "<Item>" + nl + indent + "\t<TextureName>" + BonusTextureName(b, true) + "</TextureName>" + nl +
+		         indent + "\t<Texture href=\"/Textures/Interface/MPWait/PlayersList/Item/Bonuses/" + kOurPicture +
+		         kBonusPictures[b] + ".(Texture).xdb#xpointer(/Texture)\"/>" + nl + indent + "</Item>" + nl;
+	*out = xdb.substr(0, line) + items + xdb.substr(line);
+	return true;
+}
+
+bool ToeTextureRecord(const std::string &xdb, int bonus, std::string *out)
+{
+	const char kDest[] = "<DestName href=\"";
+	const size_t at = FindOnce(xdb, kDest, 0, xdb.size());
+	if (at == std::string::npos || xdb.find("<Texture") == std::string::npos)
+		return false;
+	const size_t value = at + strlen(kDest);
+	const size_t quote = xdb.find('"', value);
+	const std::string picture = std::string(kBonusPictures[bonus]) + ".(Texture).dds";
+	if (quote == std::string::npos || Lower(xdb.substr(value, quote - value)) != Lower(picture))
+		return false;
+	*out = xdb.substr(0, value) + kOurPicture + picture + xdb.substr(quote);
+	return true;
+}
+
+bool IsDds(const std::string &bytes)
+{
+	return bytes.size() >= 128 && bytes.compare(0, 4, "DDS ") == 0;
+}
+
 bool IsLobbyRow(uint32_t row)
 {
 	return (row & 0xffff0000u) == kLobbyRowBase;
