@@ -1,6 +1,6 @@
 # Plan: online play over Steam (a "virtual LAN")
 
-Status: **the spike passed (2026-11-02): two Steam accounts' games talk through Steam under app 15370.** Solo: Steam starts in the game's process, the relay network comes up, and a friends-only lobby is created ([results](#solo-spike-results-2026-11-02)), even when the robot, not Steam, started the game. Two PCs: a Linux laptop under Proton, on a phone's 4G connection, found the Windows host's friends-only lobby through the friends list, joined it, and 100 of 100 messages came back (median round trip 82 ms) ([results](#two-pc-test-results-2026-11-02)). **Steps 1 and 2 done too (2026-11-02):** the packet map shows every address in the game's packets comes from one Winsock call, and the virtual LAN core carried a whole robot LAN game (two copies on one PC, through a local stand-in for Steam) with all checksums equal and no real address in any packet ([results](#steps-1-and-2-the-packet-map-and-the-virtual-lan-core-2026-11-02)). Next: step 3, the Steam transport. Code: `src/mods/steam_spike.cpp` (`[online] spike`, off by default). SDK 1.65 is at `ref\steamworks_sdk_165\` (never committed).
+Status: **the spike passed (2026-11-02): two Steam accounts' games talk through Steam under app 15370.** Solo: Steam starts in the game's process, the relay network comes up, and a friends-only lobby is created ([results](#solo-spike-results-2026-11-02)), even when the robot, not Steam, started the game. Two PCs: a Linux laptop under Proton, on a phone's 4G connection, found the Windows host's friends-only lobby through the friends list, joined it, and 100 of 100 messages came back (median round trip 82 ms) ([results](#two-pc-test-results-2026-11-02)). **Steps 1 and 2 done too (2026-11-02):** the packet map shows every address in the game's packets comes from one Winsock call, and the virtual LAN core carried a whole robot LAN game (two copies on one PC, through a local stand-in for Steam) with all checksums equal and no real address in any packet ([results](#steps-1-and-2-the-packet-map-and-the-virtual-lan-core-2026-11-02)). **Step 3 built (2026-11-02):** the Steam transport (`[online] mode=steam`): on one PC, Steam starts in the game, the relays come up, a friends-only lobby is made when the game hosts, and a loopback robot LAN game still has all checksums equal ([results](#step-3-the-steam-transport-2026-11-02)). Next: the two-PC test of the real game over Steam ([online-steam-test2.md](online-steam-test2.md)), then step 4, the UI. Code: `src/mods/virtual_lan*.cpp`, `src/mods/steam_runtime.cpp`; the spike `src/mods/steam_spike.cpp` (`[online] spike`, off by default). SDK 1.65 is at `ref\steamworks_sdk_165\` (never committed).
 
 Goal: friends join each other's games **from inside the game**, with no GameRanger and no ZeroTier. This is phase 6 of the project ("built-in online play"). This plan picks Steam as the first way to do it. The older idea (our own lobby server plus GameNetworkingSockets) becomes the fallback.
 
@@ -226,7 +226,7 @@ keep_lan=0        ; later: also accept plain LAN/ZeroTier players in a Steam gam
 log=1             ; log lobby events and each new peer (fake address <-> SteamID)
 ```
 
-Built so far (step 2): `mode=off|loopback` (`steam` is read but says "not built yet" and stays off), and for the loopback `loopback_port` / `loopback_peers`. The shipped `h5-together.ini` has only `;mode=off`, in an `[online]` section of its own. The peer log is always on (a few lines per game), so `log` is not needed yet.
+Built so far (steps 2 and 3): `mode=off|steam|loopback`, `app_id` (a hidden key, shared with the spike), and for the loopback `loopback_port` / `loopback_peers`. Lobbies are always friends only (`lobby=` comes with the UI if ever needed). The shipped `h5-together.ini` has only `;mode=off`, in an `[online]` section of its own. The peer log is always on (a few lines per game), so `log` is not needed yet.
 
 - **Off by default** at first. It changes no gameplay (only gameplay changes must default to the original), so it can be turned on by default once it has proven itself.
 - **Picking Steam or LAN:** a small ImGui box on the game's LAN screen: "Play over: Steam / LAN", with Steam's status ("Steam: 3 friends online with H5 Together"). It applies the next time the LAN screen opens, because the game creates its sockets then.
@@ -394,6 +394,38 @@ What this settles:
 
 **Not covered yet:** three or more PCs (the runner starts two copies; the unit test checks that three PCs agree on the addresses, and the transport's member list gives every PC every address before a first packet), a saved game loaded in multiplayer, other maps, and a real network between two PCs (step 5).
 
+## Step 3: the Steam transport (2026-11-02)
+
+**What was built** (`[online] mode=steam`; `mode=off`, the default, still hooks and loads nothing):
+
+- `src/mods/virtual_lan_steam.cpp`: the second `vlan::Transport`, on `ISteamNetworkingMessages`:
+  - **our id** is our SteamID; Steam starts at the game's first DirectInput call (`StartVirtualLan` in `InstallAll`), long before the LAN screen. If it cannot (no `steam_api.dll`, Steam not running), the hooks stand aside and the game plays its own LAN, with a log line;
+  - **messages**: `SendMessageToUser` on channel = the game's port, `UnreliableNoNagle | AutoRestartBrokenSession`; `ReceiveMessagesOnChannel` when the game reads that socket; a message's age comes from Steam's own clock, so the core's 3-second staleness rule still works; a message to ourselves stays in this PC;
+  - **the host's lobby**: friends only, made when the core says the game hosts, kept while it hosts and **a minute after** (the step 2 runs showed the host's answers have short gaps), then left. Its data: `h5t_vlan` (protocol 1), `h5t_version`, `h5t_game` (the game build and a hash of MMH5.5's `55u.dll`: `mmh55/276f239a` for RC19k), `h5t_host` (the host's SteamID), `h5t_port` (discovery port), `h5t_ip` (its fake address), `h5t_ips` (the fake addresses in its game). Every member also puts its own fake address in its member data (`h5t_ip`);
+  - **known hosts**: every 2 s, the Steam friends playing app 15370 in a lobby (`GetFriendGamePlayed`); the lobby's data is asked for (`RequestLobbyData`, every 10 s) and read without joining. A host is a friend whose lobby says that friend hosts the same protocol and game. Other cases are logged once (another game build, another protocol, the friend in somebody else's game, no longer hosting). **If the data never comes** (Steam's documents say friends can read it; untested), the friend's game is tried anyway on the usual port 8889 after 6 s;
+  - **joining**: when the game sends a known host more than queries (its join request), the add-on joins that host's lobby, keeps it while packets go either way and a minute after, and leaves when the host leaves. `Members` = the lobby's members in the lobby's order, with their declared addresses;
+  - **sessions**: accepted only from Steam friends and members of our lobby; others are ignored (logged once each);
+  - **one thread of ours** runs Steam's callbacks (manual dispatch) every 20 ms under the core's lock, as every hook does;
+  - **logs** `vlan steam: …`, with no SteamID or name: players and lobbies are short hashes (`#3f2a`).
+- `src/mods/steam_runtime.cpp`: loading `steam_api.dll` and starting Steam, now shared by the spike and the transport (the spike stays off with `mode=steam`).
+- The core (`virtual_lan.cpp`) changed in two ways:
+  - **Declared addresses.** The header grew from 2 to 6 bytes: the source port and the **sender's own fake address**. A receiver takes the address a peer says its game uses; a computed address gives way to a declared one. Our own address moves off an address a known host's game uses (`h5t_ips`) or that a peer declares, but only until our game has told it to anybody (its first packet to a peer, or when it starts hosting); after that it is final. Before, each PC put itself first in its table, so two players whose ids hash to the same address (about 1 in 20,000 for 4 players, but then always for that pair) would have disagreed.
+  - Short ids in the log instead of whole ids.
+- The steps table's order for the lobby ("members in the lobby's order") is kept, but the declared addresses make the order matter only for computed (undeclared) peers.
+- Tests: `src/hook/test/virtual_lan_test.cpp` has **161 checks** (87 before): declared addresses, moves and clashes, the 6-byte header, lobby data in and out, the host checks, the lobby plan (create, keep a minute, leave; join, keep, leave; retry after a refusal; GetTickCount wrapping). `steam_abi_check.cpp` now also compares the **shape of every flat function** we call (return and argument sizes) with Valve's declarations, plus the new constants and offsets: all pass with SDK 1.65.
+- The robot: `run_ai_test.py --online-setting mode=steam`, and `--trace-crc`, `--net-log`, `--net-scan` for a single copy (the two-PC test's host).
+
+**Robot runs** (test copy `C:\Games\H5_test_k`, MMH5.5 RC19k; results in the branch worktree's `build/robot/`):
+
+| Run | What | Result |
+|---|---|---|
+| `20261102-225858-lan`, loopback (`--vlan --net-scan`), two copies, A1M4, 8 AI turns | nothing regressed with the 6-byte header and declared addresses | client found and joined the host through the virtual LAN; 9 AI turns, 105 AI steps; **1,568 world checksums, all equal**; median wait before an AI step 199 ms (p90 620); **0 of 22,722 packets** (host 6,241 sent + 4,830 received, client 5,486 + 6,165) hold an address of this PC; 0 messages that could not be sent, 0 stale, 0 to unknown addresses |
+| `20261102-230235`, `mode=steam`, one copy, the robot hosts a LAN game | Steam in the game, the lobby, the LAN screen | `SteamAPI_InitFlat` OK in 94 ms (app 15370, the robot started the game, not Steam); relay network OK after 6.4 s (25 relays); the friends list read (0 of 85 friends playing); the LAN list opened, queries went nowhere (no friend hosting) and nothing went to the real network; when the game created its game, **the lobby was made in 0.3 s** and its data set (protocol 1, discovery port 8889, our fake address); the host answered 169 of 180 hosting probes and the lobby stayed for the whole run. (The game itself cannot start a LAN game with one human: "can start 0", the game's rule.) |
+| `20261102-231509`, single player A1M4, `mode=steam` **without** `steam_api.dll` | the fallback | `cannot load …steam_api.dll (error 126)`, then `the steam transport cannot carry the game's packets: the game's own LAN play instead`; the game ran as usual: 3 AI turns, 22 AI steps, no crash |
+| `20261102-231537`, single player A1M4, `mode=steam` with `steam_api.dll` | a normal game with Steam on | Steam OK in 109 ms, relays OK at 6.2 s; 3 AI turns, 25 AI steps, as without the add-on's online part |
+
+**Not covered yet:** the two-PC test (the real game between two Steam accounts: [online-steam-test2.md](online-steam-test2.md)); whether Steam shows a friends-only lobby's data to a friend outside it (else the fallback above); three PCs; a relayed path.
+
 ## Steps and effort
 
 A session is one focused working block of a few hours.
@@ -403,7 +435,7 @@ A session is one focused working block of a few hours.
 | 0 | The spike (above), then reading the logs. **Done 2026-11-02** (solo and two PCs) | 1 + 0.5 |
 | 1 | Packet map: the robot's `net_log` logs whole packets; find the address lists inside `01` and `03`; write it up in [multiplayer-sync.md](../subsystems/multiplayer-sync.md). **Done 2026-11-02** ([results](#steps-1-and-2-the-packet-map-and-the-virtual-lan-core-2026-11-02)) | 0.5 |
 | 2 | Virtual LAN core with the loopback transport: Winsock hooks (stacked with `lan_discovery`), fake addresses, `gethostbyname` answer, hosting detection, unit tests, robot LAN game (checksums, no real IP in packets). **Done 2026-11-02** ([results](#steps-1-and-2-the-packet-map-and-the-virtual-lan-core-2026-11-02)) | 2 |
-| 3 | Steam transport: lazy loading, init, our callback thread, lobbies, known hosts, sessions, version data; logs | 2 |
+| 3 | Steam transport: lazy loading, init, our callback thread, lobbies, known hosts, sessions, version data; logs. **Built 2026-11-02** ([results](#step-3-the-steam-transport-2026-11-02)); the two-PC test of the real game is [online-steam-test2.md](online-steam-test2.md) | 2 |
 | 4 | UI: the box on the LAN screen (Steam/LAN choice, status, games with problems), "Invite friends...", invite toast, French texts | 2 |
 | 5 | Real tests with the owner and friends (Windows, Linux, 3 PCs) and fixes | 1–2 |
 | 6 | Package: `steam_api.dll` in `bin\h5-together\`, install guide, release notes | 0.5 |
