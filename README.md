@@ -2,6 +2,8 @@
 
 ![H5 Together's page in the game's Options screen](docs/images/settings-page.png)
 
+*H5 Together's own page in the game's Options screen. (The test game in this picture is in French, so the game's own buttons are too.)*
+
 An unofficial add-on for **Heroes of Might and Magic V: Tribes of the East** with the **MMH5.5** mod. Free and open source. It is made for a small group of friends who play co-op games against the computer, and anyone is welcome to use it.
 
 ## What it does
@@ -46,6 +48,8 @@ Co-op works best when **every player installs the same version of H5 Together**,
 
 If a player has another version, or none, the game still runs, but the parts that need everyone (the host's game rules, the shorter co-op steps, other players' hero looks) stay off.
 
+![The waiting room, with the Rules button and the version line at the bottom](docs/images/lobby-versions.png)
+
 Over the internet, use what your group uses today (GameRanger, or ZeroTier for a friend on Linux). Built-in online play without GameRanger is being built; it is not in this version.
 
 ## What works with what
@@ -68,7 +72,7 @@ Over the internet, use what your group uses today (GameRanger, or ZeroTier for a
 
 In the game: **Options, H5 Together** (or press **F3**, in the main menu or on the map). The page is part of the game's own Options screen: change a setting, then **Apply**. **Default** puts them all back.
 
-![The H5 Together page, first part](docs/images/settings-page.png)
+![The end of the H5 Together page: the Help part, and the update check](docs/images/settings-page-end.png)
 
 It has two pages side by side. **On this PC:** interface, camera and visuals, sound, language, random maps. **Co-op games:** the host's options, advanced options, and help. A name that ends in `*` applies after you restart the game, `**` from the next game; the others apply at once. During a multiplayer game, the host's and the advanced settings are read only.
 
