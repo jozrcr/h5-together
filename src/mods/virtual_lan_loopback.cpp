@@ -84,6 +84,7 @@ public:
 				++bad_;
 				continue;
 			}
+			Heard(d.from);
 			if (d.kind == LoopbackKind::kAnnounce) {
 				const uint16_t port = d.payload_size >= 2 ? static_cast<uint16_t>(d.payload[0] << 8 | d.payload[1]) : 0;
 				if (hosts_.Update(d.from, port, now_ms)) {
@@ -133,6 +134,14 @@ public:
 
 	const KnownHosts &Hosts() const override { return hosts_; }
 
+	int Members(uint64_t *out, int max) const override
+	{
+		int n = 0;
+		for (; n < member_count_ && n < max; ++n)
+			out[n] = members_[n];
+		return n;
+	}
+
 	void Describe(char *out, size_t size) const override
 	{
 		char peers[128] = "";
@@ -161,6 +170,18 @@ private:
 		to.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 		return sendto(socket_, reinterpret_cast<const char *>(buf), static_cast<int>(n), 0,
 		              reinterpret_cast<const sockaddr *>(&to), sizeof(to)) == static_cast<int>(n);
+	}
+
+	// The copies heard from, in the order first heard (our "lobby").
+	void Heard(uint64_t id)
+	{
+		if (id == SelfId())
+			return;
+		for (int i = 0; i < member_count_; ++i)
+			if (members_[i] == id)
+				return;
+		if (member_count_ < kMaxPeers)
+			members_[member_count_++] = id;
 	}
 
 	// Into the queue; when it is full the oldest message goes (as a full UDP buffer drops).
@@ -194,6 +215,8 @@ private:
 	int peer_count_ = 0;
 	SOCKET socket_ = INVALID_SOCKET;
 	KnownHosts hosts_;
+	uint64_t members_[kMaxPeers] = {};
+	int member_count_ = 0;
 	uint16_t hosting_port_ = 0;
 	bool announced_ = false;
 	uint32_t announced_at_ = 0;

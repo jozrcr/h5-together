@@ -154,6 +154,25 @@ void LogStats(uint32_t now, bool force)
 	               static_cast<long>(g_stats.dropped_received), g_stats.stale, g_stats.send_failed, g_peers.Count() - 1);
 }
 
+// Everybody the transport knows (lobby members) gets an address now, before a first
+// packet: in a game of 3 or more, the host passes the clients' addresses to each
+// other, and a client must know who is behind one it never heard from.
+void AddMembers()
+{
+	uint64_t members[vlan::PeerTable::kMax];
+	const int n = g_transport->Members(members, vlan::PeerTable::kMax);
+	for (int i = 0; i < n; ++i) {
+		bool added = false;
+		const uint32_t address = g_peers.AddressOf(members[i], &added);
+		if (added) {
+			char ip[20];
+			Ip(address, ip, sizeof(ip));
+			hooklog::Write("vlan: new peer %s (id %016llx), from the %s transport's member list", ip, members[i],
+			               g_transport->Name());
+		}
+	}
+}
+
 void UpdateHosting(uint32_t now)
 {
 	const bool hosting = g_hosting.Hosting(now);
@@ -182,6 +201,7 @@ int WINAPI VlanSendTo(SOCKET s, const char *buf, int len, int flags, const socka
 	EnterCriticalSection(&g_lock);
 	if (Ready()) {
 		g_transport->Poll(now);
+		AddMembers();
 		if (vlan::IsGameInfo(packet, size)) {  // only a game that hosts sends its description
 			g_hosting.OnGameInfoSent(now);
 			g_discovery = s;
@@ -262,9 +282,13 @@ int WINAPI VlanRecvFrom(SOCKET s, char *buf, int len, int flags, sockaddr *from,
 	EnterCriticalSection(&g_lock);
 	if (Ready()) {
 		g_transport->Poll(now);
+		AddMembers();
 		UpdateHosting(now);
 		LogStats(now, false);
-		if (s == g_discovery && g_hosting.ProbeDue(now) && buf && len >= static_cast<int>(g_hosting.QuerySize())) {
+		const uint16_t port = LocalPort(s);
+		// (the port too: Windows gives a closed socket's number to the next new socket)
+		if (s == g_discovery && port == g_discovery_port && g_hosting.ProbeDue(now) && buf &&
+		    len >= static_cast<int>(g_hosting.QuerySize())) {
 			// the hosting probe: the game's own last query, from an address nobody has
 			g_hosting.OnProbeSent(now);
 			++g_stats.probes;
@@ -274,7 +298,6 @@ int WINAPI VlanRecvFrom(SOCKET s, char *buf, int len, int flags, sockaddr *from,
 			LeaveCriticalSection(&g_lock);
 			return n;
 		}
-		const uint16_t port = LocalPort(s);
 		while (port && g_transport->Receive(port, &g_received)) {
 			if (now - g_received.at_ms > kStaleMs) {
 				++g_stats.stale;

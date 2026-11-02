@@ -125,9 +125,9 @@ void Bytes(const char *buf, int len, char *out, size_t size)
 // net_log_bytes: the packet's first N bytes, 64 per line ("+offset hex").
 int g_log_bytes = 0;
 
-void Dump(const char *buf, int len)
+void Dump(const char *buf, int len, int limit)
 {
-	const int n = len < g_log_bytes ? len : g_log_bytes;
+	const int n = len < limit ? len : limit;
 	for (int offset = 0; buf && offset < n; offset += 64) {
 		char hex[160];
 		int used = 0;
@@ -150,11 +150,11 @@ OwnAddress g_own[kMaxOwn];
 int g_own_count = 0;
 DWORD g_own_at = 0;
 struct ScanCount {
-	long packets, with_address;
-	long by_type[256];  // packets with an address, by their first byte
+	long packets, with_address, only_reversed;
+	long by_type[256];  // packets with an address (in network order), by their first byte
 };
 ScanCount g_scan_sent = {}, g_scan_received = {};
-int g_hits_logged = 0;
+int g_dumped_by_type[256];  // packets with an address logged whole, by their first byte
 DWORD g_scan_logged_at = 0;
 long g_scan_logged_packets = 0;
 
@@ -224,12 +224,16 @@ void LogScanCounts(bool force)
 		_snprintf_s(one, sizeof(one), _TRUNCATE, "%s%02x x%ld", types[0] ? ", " : "", t, n);
 		strncat_s(types, sizeof(types), one, _TRUNCATE);
 	}
-	hooklog::Write("robot: net: address scan: %ld packets sent, %ld received; %ld hold an address of this PC%s%s%s",
+	hooklog::Write("robot: net: address scan: %ld packets sent, %ld received; %ld hold an address of this PC%s%s%s; %ld "
+	               "more only in reversed byte order",
 	               g_scan_sent.packets, g_scan_received.packets, g_scan_sent.with_address + g_scan_received.with_address,
-	               types[0] ? " (by first byte: " : "", types, types[0] ? ")" : "");
+	               types[0] ? " (by first byte: " : "", types, types[0] ? ")" : "",
+	               g_scan_sent.only_reversed + g_scan_received.only_reversed);
 }
 
-// Looks for each address of this PC in the packet, in network byte order and reversed.
+// Looks for each address of this PC in the packet, in network byte order (as the
+// game writes them) and reversed. The first 3 packets of each kind (first byte)
+// that hold one are logged whole, with where each address sits.
 void Scan(const char *buf, int len, bool sent, SOCKET s, const sockaddr *peer)
 {
 	if (!g_scan || !buf || len <= 0)
@@ -239,7 +243,8 @@ void Scan(const char *buf, int len, bool sent, SOCKET s, const sockaddr *peer)
 		RefreshOwnAddresses();
 	ScanCount &count = sent ? g_scan_sent : g_scan_received;
 	++count.packets;
-	bool found = false;
+	bool straight_found = false, reversed_found = false;
+	char hits[700] = "";
 	for (int i = 0; i < g_own_count; ++i) {
 		const BYTE *ip = reinterpret_cast<const BYTE *>(&g_own[i].ip);
 		const BYTE reversed[4] = {ip[3], ip[2], ip[1], ip[0]};
@@ -247,22 +252,27 @@ void Scan(const char *buf, int len, bool sent, SOCKET s, const sockaddr *peer)
 			const bool straight = memcmp(buf + at, ip, 4) == 0;
 			if (!straight && memcmp(buf + at, reversed, 4) != 0)
 				continue;
-			found = true;
-			if (g_hits_logged < 40) {
-				++g_hits_logged;
-				char where[32];
-				Address(peer, where, sizeof(where));
-				hooklog::Write("robot: net: address scan: this PC's %u.%u.%u.%u (%s)%s at byte %d of a %d-byte %02x packet "
-				               "%s %s (socket %u)",
-				               ip[0], ip[1], ip[2], ip[3], g_own[i].name, straight ? "" : ", reversed", at, len,
-				               static_cast<BYTE>(buf[0]), sent ? "sent to" : "received from", where,
-				               static_cast<unsigned>(s));
-			}
+			(straight ? straight_found : reversed_found) = true;
+			char one[96];
+			_snprintf_s(one, sizeof(one), _TRUNCATE, "%s%u.%u.%u.%u (%s)%s at byte %d", hits[0] ? "; " : "", ip[0], ip[1],
+			            ip[2], ip[3], g_own[i].name, straight ? "" : " reversed", at);
+			strncat_s(hits, sizeof(hits), one, _TRUNCATE);
 		}
 	}
-	if (found) {
+	const BYTE type = static_cast<BYTE>(buf[0]);
+	if (straight_found) {
 		++count.with_address;
-		++count.by_type[static_cast<BYTE>(buf[0])];
+		++count.by_type[type];
+	} else if (reversed_found) {
+		++count.only_reversed;
+	}
+	if ((straight_found || reversed_found) && g_dumped_by_type[type] < 3) {
+		++g_dumped_by_type[type];
+		char where[32];
+		Address(peer, where, sizeof(where));
+		hooklog::Write("robot: net: address scan: a %d-byte %02x packet %s %s (socket %u) holds %s", len, type,
+		               sent ? "sent to" : "received from", where, static_cast<unsigned>(s), hits);
+		Dump(buf, len, 2048);
 	}
 	LogScanCounts(false);
 	LeaveCriticalSection(&g_scan_lock);
@@ -354,7 +364,7 @@ int WINAPI RobotSendTo(SOCKET s, const char *buf, int len, int flags, const sock
 		}
 		hooklog::Write("robot: net: sendto(%u, %d bytes %s, %s) -> %d (error %d) from %p%s%s", static_cast<unsigned>(s),
 		               len, bytes, where, r, r < 0 ? Error() : 0, _ReturnAddress(), stack[0] ? ", stack" : "", stack);
-		Dump(buf, len);
+		Dump(buf, len, g_log_bytes);
 	}
 	Scan(buf, len, true, s, to);
 	return r;
@@ -369,7 +379,7 @@ int WINAPI RobotRecvFrom(SOCKET s, char *buf, int len, int flags, sockaddr *from
 		Bytes(buf, r, bytes, sizeof(bytes));
 		hooklog::Write("robot: net: recvfrom(%u) -> %d bytes %s from %s, called from %p", static_cast<unsigned>(s), r, bytes,
 		               where, _ReturnAddress());
-		Dump(buf, r);
+		Dump(buf, r, g_log_bytes);
 	}
 	if (r > 0)
 		Scan(buf, r, false, s, from);

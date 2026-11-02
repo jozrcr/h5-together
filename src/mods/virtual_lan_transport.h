@@ -47,6 +47,9 @@ public:
 	virtual void SetHosting(uint16_t discovery_port) = 0;
 	// The hosts that get this PC's queries.
 	virtual const KnownHosts &Hosts() const = 0;
+	// Everybody in the game's "lobby" (Steam: our lobby's members; the loopback:
+	// every copy heard from), not us, in the order they joined; their count.
+	virtual int Members(uint64_t *out, int max) const = 0;
 	// For the log: "127.0.0.1:47101, other copies at 47102".
 	virtual void Describe(char *out, size_t size) const = 0;
 };

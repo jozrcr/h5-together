@@ -31,12 +31,22 @@ import run_ai_test as robot  # noqa: E402
 # (net_lan_match_maker_port; the game's default is 8889). The DLL copies every
 # discovery broadcast to the other copy's port on 127.0.0.1 (src/hook/robot_net.cpp).
 PORTS = {"host": (8888, 8889), "client": (8890, 8891)}
+# --vlan: the virtual LAN (src/mods/virtual_lan.cpp, [online] mode=loopback) carries
+# the game's packets instead: each copy's transport listens on its own 127.0.0.1 port
+# below, and the DLL's broadcast copies to the other copy's port are left out, so the
+# client finds the host through the virtual LAN only.
+VLAN_PORTS = {"host": 47101, "client": 47102}
 
 
 def instance_args(args, name, steps):
     """The settings run_ai_test.prepare() expects, for one copy of the game."""
     _game_port, discovery = PORTS[name]
     others = ",".join(str(d) for n, (_g, d) in PORTS.items() if n != name)
+    online = []
+    if args.vlan:
+        others = ""
+        online = ["mode=loopback", "loopback_port=%d" % VLAN_PORTS[name],
+                  "loopback_peers=" + ",".join(str(p) for n, p in VLAN_PORTS.items() if n != name)]
     return argparse.Namespace(
         map=args.map, difficulty="1", no_map=True, command=None,
         # mp_check_crc: without it the game computes no world checksums at all
@@ -66,6 +76,7 @@ def instance_args(args, name, steps):
         skins_setting=args.skins_setting + (args.host_skins if name == "host" else args.client_skins),
         skins_file=args.host_skins_file if name == "host" else args.client_skins_file,
         rules_setting=args.rules_setting + (args.host_rules if name == "host" else args.client_rules),
+        online_setting=online,
         setting=args.setting + (args.host_setting if name == "host" else args.client_setting),
         resolution=args.resolution,
         fast_paths=args.fast_paths, ai_setting=args.ai_setting,
@@ -168,6 +179,9 @@ def main():
     p.add_argument("--net-scan", action="store_true",
                    help="look for this PC's own IPv4 addresses inside every packet (robot_net.cpp; the packet map "
                         "of docs/plans/online-steam.md)")
+    p.add_argument("--vlan", action="store_true",
+                   help="the virtual LAN with its loopback transport ([online] mode=loopback, src/mods/virtual_lan.cpp) "
+                        "carries every game packet; the DLL's broadcast copies to the other copy are off")
     p.add_argument("--net-tuning", choices=["on", "off"], default="on",
                    help="the LAN link tuning mod (src/mods/net_tuning.cpp) on both copies; off = the game's timings")
     p.add_argument("--net-keepalive-ms", type=int, help="mod setting: idle links send every N ms (mod default 50)")
