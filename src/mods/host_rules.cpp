@@ -66,6 +66,11 @@
 //      PC points the class table's skill lists at unlocked copies, and puts
 //      MMH5.5's back at the next start, in a lobby, or when a save without the
 //      rule is read.
+// The add-on's version (0.3.0 on): the same hello carries each client's H5 Together
+// version and build ('V', 'B'), and the host sends every client that said its own the
+// list of every player's (itself first; host_rules_logic.h). The panel's line in the
+// waiting room says when they differ, or when a player (or the host) has an older
+// H5 Together or none. A PC with [rules] enabled=0 says nothing, so it shows as "none".
 // Saves: the scripts' variables are part of the save (docs/plans/host-rules.md,
 // "Saves"), so a loaded game keeps the rules it started with (and its scripts);
 // class_skills is kept in one more chunk of the saved world (step 7).
@@ -87,6 +92,8 @@
 //                  and class_chance (testing saves; the other rules stay the file's)
 //   class_chance=  the chance of the skills a class does not list, with
 //                  class_skills=1 (empty = 2, vanilla's; testing; travels with the rules)
+//   test_version=  testing: this PC says it has that H5 Together version in the lobby
+//                  ("0.2.9"), or "old" = it says none, as a PC before 0.3.0
 #include "host_rules.h"
 #include "host_rules_internal.h"
 
@@ -101,6 +108,9 @@
 #include "../hook/log.h"
 #include "../hook/overlay.h"
 #include "../hook/patch.h"
+#include "../hook/version.h"
+
+extern "C" IMAGE_DOS_HEADER __ImageBase;
 
 namespace mods {
 namespace {
@@ -260,6 +270,9 @@ struct Pc {
 	BYTE seq;          // of the last text's pieces
 	DWORD hello_at;    // when its last hello came (a client says it every ~4 s)
 	std::string name;  // its player's name then (another PC may get its number later)
+	bool has_addon_version = false, has_addon_build = false;  // its H5 Together (0.3.0 on: 'V', 'B')
+	uint32_t addon_version = 0, addon_build = 0;
+	std::string sent_versions;  // the last version list sent to it
 };
 std::vector<Pc> g_pcs;
 const void *g_pcs_logic = nullptr;  // the host lobby they belong to
@@ -282,6 +295,19 @@ bool g_lobby_known = false;  // client: what the host sent in the lobby
 Values g_lobby_values = rules::NoValues();
 int g_lobby_flags = 0;
 rules::LobbyAssembler g_assembler;  // the host's lobby text, piece by piece
+
+// H5 Together's versions in the lobby
+rules::Peer g_mine;                 // this PC's version and build (or [rules] test_version's)
+bool g_say_version = true;          // false with [rules] test_version=old (as a PC before 0.3.0)
+std::vector<rules::Peer> g_peers;   // host: every player's, itself first
+std::vector<std::pair<std::string, DWORD>> g_seen;  // host: when each player was first seen in this lobby
+std::vector<rules::Peer> g_host_list;  // client: the host's list
+bool g_host_list_known = false;     // client: it came
+bool g_host_list_unreadable = false;  // client: a list of a later format came
+DWORD g_client_lobby_at = 0;        // client: when this lobby was first seen
+std::string g_versions_logged;      // the differences logged last
+std::string VersionList(const std::vector<rules::Peer> &peers);
+void LogVersions(const std::vector<rules::Peer> &differ, int players);
 
 std::string g_start_text;  // host: the chunk of its start message ("" = none)
 bool g_armed = false;      // this PC's next multiplayer game gets these rules
@@ -711,6 +737,8 @@ void HostLobby(const void *logic)
 		return;
 	g_pcs_logic = logic;
 	g_pcs.clear();
+	g_peers.clear();
+	g_seen.clear();
 	g_start_text.clear();
 	g_in_game = false;
 }
@@ -846,6 +874,10 @@ void __fastcall ClientUpdateHook(void *logic, void *edx)
 			g_in_game = false;
 			g_lobby_known = false;
 			g_assembler = rules::LobbyAssembler();
+			g_host_list_known = false;
+			g_host_list_unreadable = false;
+			g_host_list.clear();
+			g_client_lobby_at = GetTickCount();
 		}
 	}
 	static int step = 0;
@@ -882,6 +914,14 @@ void __fastcall ClientUpdateHook(void *logic, void *edx)
 				const rules::ClassInfo classes = rules::ClassTableInfo();
 				rules::HashRequest(rules::kMarkClassTable, classes.editable ? classes.hash : 0, &type, &byte);
 			}
+			else if (step == 6) {  // H5 Together's version and build (0.3.0 on; a host before ignores them)
+				rules::HashRequest(rules::kMarkVersion, rules::PackVersion(g_mine.version.c_str()), &type, &byte);
+				send = g_say_version;
+			}
+			else if (step == 7) {
+				rules::HashRequest(rules::kMarkBuild, g_mine.build, &type, &byte);
+				send = g_say_version;
+			}
 			if (send) {
 				*reinterpret_cast<DWORD *>(full + 0xc4) = type;
 				full[0xc8] = byte;
@@ -889,7 +929,7 @@ void __fastcall ClientUpdateHook(void *logic, void *edx)
 			static int logged = 0;
 			if (step == 0 && logged++ < 1)
 				hooklog::Write("rules: hello to the host (this PC applies the host's rules, version %u)", rules::kProtocol);
-			step = (step + 1) % 6;
+			step = (step + 1) % 8;
 			if (step == 0)
 				next_at = now + 4000;
 		}
@@ -914,7 +954,27 @@ int __fastcall ClientMessageHook(void *logic, void *edx, int sender, BYTE *messa
 {
 	if (message && Read(message, 0) == kLockCommandVftable && rules::IsLobbyRow(Read(message, 0xc))) {
 		std::string text;
-		if (g_assembler.Add(Read(message, 0xc), Read(message, 0x10), &text)) {
+		if (g_assembler.Add(Read(message, 0xc), Read(message, 0x10), &text) && rules::IsVersionsText(text)) {
+			std::vector<rules::Peer> peers;
+			const bool read = rules::ReadVersionsText(text, &peers);
+			Lock lock;
+			if (!g_say_version) {
+				// [rules] test_version=old: as a PC before 0.3.0, which never gets one
+			}
+			else if (read) {
+				if (!g_host_list_known || peers != g_host_list)
+					hooklog::Write("rules: versions: the host's list: %s", VersionList(peers).c_str());
+				g_host_list = peers;
+				g_host_list_known = true;
+			}
+			else if (!g_host_list_unreadable) {
+				g_host_list_unreadable = true;
+				hooklog::Write("rules: versions: the host sent a list this PC cannot read (\"%.40s...\"): it has another "
+				               "(newer) H5 Together",
+				               text.c_str());
+			}
+		}
+		else if (!text.empty()) {
 			Values values;
 			int flags = 0;
 			if (rules::ReadLobbyText(text, &flags, &values)) {
@@ -961,6 +1021,16 @@ int __fastcall HostRequestHook(void *logic, void *edx, int sender, BYTE *message
 				p->hello_at = GetTickCount();
 				p->name = PcName(reinterpret_cast<const BYTE *>(Read(logic, 0x74)), sender);
 			}
+			else if (mark == rules::kMarkVersion) {
+				if (!p->has_addon_version || p->addon_version != hash)
+					hooklog::Write("rules: versions: PC %d has H5 Together %s", sender, rules::UnpackVersion(hash).c_str());
+				p->has_addon_version = true;
+				p->addon_version = hash;
+			}
+			else if (mark == rules::kMarkBuild) {
+				p->has_addon_build = true;
+				p->addon_build = hash;
+			}
 			else {
 				const int k = mark == rules::kMarkSettingsRest    ? 0
 				              : mark == rules::kMarkSettingsWhole ? 1
@@ -975,6 +1045,71 @@ int __fastcall HostRequestHook(void *logic, void *edx, int sender, BYTE *message
 		}
 	}
 	return g_host_request_next(logic, edx, sender, message);  // the game ignores these types
+}
+
+// Host, under the lock: every player's H5 Together, the host first. A player who
+// joined less than 12 s ago and said nothing yet is "waiting" (its hello comes every 4 s).
+std::vector<rules::Peer> VersionPeers(const void *logic, const BYTE *info)
+{
+	const DWORD now = GetTickCount();
+	std::vector<rules::Peer> peers;
+	rules::Peer host = g_mine;
+	host.name = PcName(info, static_cast<int>(Read(logic, 0x34)));
+	peers.push_back(host);
+	std::vector<std::pair<std::string, DWORD>> seen;
+	for (int pc : HumanClients(logic, info)) {
+		rules::Peer peer;
+		peer.name = PcName(info, pc);
+		DWORD since = now;
+		for (const auto &s : g_seen)
+			if (s.first == peer.name)
+				since = s.second;
+		seen.push_back({peer.name, since});
+		const Pc *p = FindPc(pc);
+		const bool fresh = p && p->version != 0 && now - p->hello_at <= 15000 && p->name == peer.name;
+		if (fresh && p->has_addon_version) {
+			peer.kind = rules::Peer::kKnown;
+			peer.version = rules::UnpackVersion(p->addon_version);
+			peer.build = p->has_addon_build ? p->addon_build : 0;
+		}
+		else if (now - since < 12000)
+			peer.kind = rules::Peer::kWaiting;
+		else
+			peer.kind = fresh ? rules::Peer::kOlder : rules::Peer::kNone;
+		peers.push_back(peer);
+	}
+	g_seen = seen;
+	return peers;
+}
+
+// "Bob 0.2.7 (build 6900a1b2), Ann: older, Eve: none"
+std::string VersionList(const std::vector<rules::Peer> &peers)
+{
+	std::string s;
+	for (const rules::Peer &p : peers) {
+		char build[16];
+		_snprintf_s(build, sizeof(build), _TRUNCATE, "%08x", p.build);
+		s += (s.empty() ? "" : ", ") + p.name +
+		     (p.kind == rules::Peer::kKnown    ? " " + p.version + " (build " + build + ")"
+		      : p.kind == rules::Peer::kOlder  ? ": older than 0.3.0"
+		      : p.kind == rules::Peer::kWaiting ? ": not known yet"
+		                                        : ": none (or its game rules are off)");
+	}
+	return s.empty() ? "(nobody)" : s;
+}
+
+// Logs the differences when they change (host and client).
+void LogVersions(const std::vector<rules::Peer> &differ, int players)
+{
+	const std::string now = differ.empty() ? std::string() : VersionList(differ);
+	if (now == g_versions_logged)
+		return;
+	g_versions_logged = now;
+	if (differ.empty())
+		hooklog::Write("rules: versions: every player (%d) has this H5 Together, %s", players, g_mine.version.c_str());
+	else
+		hooklog::Write("rules: versions: NOT THE SAME H5 TOGETHER on every PC (this one: %s): %s", g_mine.version.c_str(),
+		               now.c_str());
 }
 
 // Sends a client our lobby text, in pieces: "lock buttons" commands for rows
@@ -1057,6 +1192,16 @@ void __fastcall HostUpdateHook(void *logic, void *edx)
 			const Values values = Effective();
 			if (g_will_apply && g_start_ok)
 				tips = rules::TipsFor(values);
+			g_peers = VersionPeers(logic, info);
+			const std::string versions = rules::VersionsText(g_peers);
+			if (g_peers.size() > 1 && g_say_version) {
+				bool waiting = false;
+				for (const rules::Peer &peer : g_peers)
+					waiting = waiting || peer.kind == rules::Peer::kWaiting;
+				if (!waiting)
+					LogVersions(rules::Differing(std::vector<rules::Peer>(g_peers.begin() + 1, g_peers.end()), g_mine),
+					            static_cast<int>(g_peers.size()));
+			}
 			for (Pc &p : g_pcs) {
 				if (p.version != rules::kProtocol)
 					continue;
@@ -1074,6 +1219,11 @@ void __fastcall HostUpdateHook(void *logic, void *edx)
 				if (text != p.sent) {
 					p.sent = text;
 					sends.push_back({p.sender, text, ++p.seq});
+				}
+				// the version list, to a client that said its own (one before 0.3.0 never gets it)
+				if (g_say_version && p.has_addon_version && versions != p.sent_versions) {
+					p.sent_versions = versions;
+					sends.push_back({p.sender, versions, ++p.seq});
 				}
 			}
 		}
@@ -1374,6 +1524,47 @@ View GetView(View::Role role)
 	return v;
 }
 
+VersionsView GetVersions(View::Role role)
+{
+	VersionsView v;
+	Lock lock;
+	v.mine = g_mine.version;
+	if (role == View::kHost && g_say_version) {
+		v.players = static_cast<int>(g_peers.size());
+		bool waiting = false;
+		for (const Peer &p : g_peers)
+			waiting = waiting || p.kind == Peer::kWaiting;
+		if (g_peers.size() > 1)
+			v.differ = Differing(std::vector<Peer>(g_peers.begin() + 1, g_peers.end()), g_mine);
+		v.state = !v.differ.empty() ? VersionsView::kDiffer : g_peers.size() > 1 && !waiting ? VersionsView::kSame : VersionsView::kNothing;
+	}
+	else if (role == View::kClient && g_say_version) {
+		if (g_host_list_known) {
+			v.players = static_cast<int>(g_host_list.size());
+			v.differ = Differing(g_host_list, g_mine);
+			bool waiting = false;
+			for (const Peer &p : g_host_list)
+				waiting = waiting || p.kind == Peer::kWaiting;
+			v.state = !v.differ.empty() ? VersionsView::kDiffer : !waiting ? VersionsView::kSame : VersionsView::kNothing;
+		}
+		else if (g_host_list_unreadable)
+			v.state = VersionsView::kHostNewer;
+		else if (g_client_lobby_at && GetTickCount() - g_client_lobby_at > 15000)
+			v.state = g_lobby_known ? VersionsView::kHostOlder : VersionsView::kHostNone;
+		if (v.state == VersionsView::kDiffer)
+			LogVersions(v.differ, v.players);
+		else if (v.state == VersionsView::kSame)
+			LogVersions(v.differ, v.players);
+		else if ((v.state == VersionsView::kHostOlder || v.state == VersionsView::kHostNone) && g_versions_logged != "host") {
+			g_versions_logged = "host";
+			hooklog::Write("rules: versions: no list from the host after 15 s: %s", v.state == VersionsView::kHostOlder
+			                                                                            ? "it has an H5 Together older than 0.3.0"
+			                                                                            : "it has no H5 Together (or its game rules are off)");
+		}
+	}
+	return v;
+}
+
 void SetChoices(const Values &chosen)
 {
 	Values clean = NoValues();
@@ -1424,6 +1615,24 @@ void ApplyHostRulesFromSettings()
 	g_trace = GetPrivateProfileIntW(L"rules", L"trace", 0, ini.c_str()) != 0;
 	g_class_single = GetPrivateProfileIntW(L"rules", L"class_skills_single", 0, ini.c_str()) != 0;
 	g_button = GetPrivateProfileIntW(L"rules", L"button", 1, ini.c_str()) != 0;
+	{
+		g_mine.kind = rules::Peer::kKnown;
+		g_mine.version = rules::UnpackVersion(rules::PackVersion(OPEN_HOMM5_VERSION));
+		const IMAGE_NT_HEADERS32 *nt = reinterpret_cast<const IMAGE_NT_HEADERS32 *>(
+			reinterpret_cast<const BYTE *>(&__ImageBase) + __ImageBase.e_lfanew);
+		g_mine.build = nt->FileHeader.TimeDateStamp;
+		wchar_t test[32] = L"";
+		GetPrivateProfileStringW(L"rules", L"test_version", L"", test, 32, ini.c_str());
+		const std::string fake = Narrow(test);
+		if (fake == "old") {
+			g_say_version = false;
+			hooklog::Write("rules: versions: test: this PC says no version in the lobby, as one before 0.3.0 ([rules] test_version=old)");
+		}
+		else if (!fake.empty() && rules::PackVersion(fake.c_str())) {
+			g_mine.version = rules::UnpackVersion(rules::PackVersion(fake.c_str()));
+			hooklog::Write("rules: versions: test: this PC says it has H5 Together %s ([rules] test_version)", g_mine.version.c_str());
+		}
+	}
 	wchar_t key[16];
 	GetPrivateProfileStringW(L"rules", L"key", L"F2", key, 16, ini.c_str());
 	g_key = 0;

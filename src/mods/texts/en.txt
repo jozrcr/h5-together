@@ -260,3 +260,18 @@ msg.rich_zones = Some zones hold more treasure ({value}) than any shipped templa
 [update]
 available = H5 Together {new} is out (you have {ours}).
 where = Get it from {page}
+
+# The line at the bottom of the waiting room about H5 Together's version on each PC.
+# {ours}: this PC's version; {players}: a list of item* texts, with ", " between them;
+# {player}: a player's name; {version}: a version number.
+[versions]
+same = Every player has H5 Together {ours}.
+differ = Not the same H5 Together on every PC (yours: {ours}): {players}.
+item = {player} {version}
+item_build = {player} {version} (another build)
+item_older = {player}: older than 0.3.0
+item_none = {player}: none
+needed = For co-op, every PC needs the same H5 Together version: update before you start.
+host_older = The host has an older H5 Together than yours ({ours}).
+host_none = The host has no H5 Together (or its game rules are off).
+host_newer = The host has another, newer H5 Together than yours ({ours}).

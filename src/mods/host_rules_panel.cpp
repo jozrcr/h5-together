@@ -10,6 +10,8 @@
 // owner's sketch places a button) and, in the waiting room, with our "Rules..."
 // button over the title row ([rules] button=1). The button reads the mouse
 // itself (the game behind gets the click too: there is nothing to click there).
+// In the waiting room it also draws a line at the bottom, under the game's frame,
+// when the players' H5 Together versions differ (or are all the same).
 //
 // Robot steps (it cannot click): "panel|rules open", "panel|rules set <key>
 // <value>", "panel|rules file" (MMH5.5's values), "panel|rules ok",
@@ -61,6 +63,9 @@ const float kBackgroundTexW = 1024.0f, kBackgroundTexH = 512.0f;
 // a click does nothing in the game.
 const float kScreenW = 1024.0f;
 const float kLobbyButtonX = 500.0f, kLobbyButtonY = 56.0f;
+// The versions line: under the game's frame, between MMH5.5's "Version" text (bottom
+// left) and the "Start the game" scroll (bottom right), where the screen is empty.
+const float kVersionsX = 172.0f, kVersionsY = 694.0f, kVersionsW = 512.0f, kVersionsFont = 13.0f;
 
 struct Layout {
 	float k, x0, y0;
@@ -300,6 +305,25 @@ void RobotCommand(const char *text, const char *top)
 		hooklog::Write("rules panel: robot command \"%s\" not known", text);
 }
 
+// --- the waiting room's versions line -------------------------------------------------------------
+rules::VersionsView g_versions;  // this frame's (in the waiting room)
+bool g_versions_shown = false;
+
+// "Bob 0.2.7", "Ann 0.3.0 (another build)", "Eve: older (before 0.3.0)", "Max: none"
+std::string VersionItems(const rules::VersionsView &v)
+{
+	std::string s;
+	for (const rules::Peer &p : v.differ) {
+		std::string item;
+		if (p.kind == rules::Peer::kKnown)
+			item = texts::Format(p.version == v.mine ? "versions.item_build" : "versions.item", {{"player", p.name}, {"version", p.version}});
+		else
+			item = texts::Format(p.kind == rules::Peer::kOlder ? "versions.item_older" : "versions.item_none", {{"player", p.name}});
+		s += (s.empty() ? "" : ", ") + item;
+	}
+	return s;
+}
+
 // --- the waiting room's button ---------------------------------------------------------------------
 bool g_button_shown = false, g_button_down = false, g_button_hovered = false, g_button_warn = false;
 float g_back_w = 1024.0f, g_back_h = 768.0f;
@@ -351,6 +375,11 @@ bool Wanted()
 			g.edit = edit;
 		else
 			g.edit = g.view.shown;
+		{
+			const View::Role role = strcmp(top, kWaitScreen) == 0 ? rules::LobbyRole() : View::kNoGame;
+			g_versions = rules::GetVersions(role);
+			g_versions_shown = (role == View::kHost || role == View::kClient) && g_versions.state != rules::VersionsView::kNothing;
+		}
 		if (g.pending == 1) {
 			g.pending = 0;
 			DoOk();
@@ -366,6 +395,8 @@ bool Wanted()
 		return overlay::ModalOpen(kName);
 	}
 	const View::Role role = strcmp(top, kWaitScreen) == 0 ? rules::LobbyRole() : View::kNoGame;
+	g_versions = rules::GetVersions(role);
+	g_versions_shown = (role == View::kHost || role == View::kClient) && g_versions.state != rules::VersionsView::kNothing;
 	g_button_shown = g_button && (role == View::kHost || role == View::kClient);
 	if (g_button_shown) {
 		ButtonInput(top);
@@ -380,14 +411,14 @@ bool Wanted()
 	}
 	else
 		g_button_down = false;
-	return g_button_shown;
+	return g_button_shown || g_versions_shown;
 }
 
 void Prepare(const overlay::Frame &frame)
 {
 	ui::LoadPictures(frame.device);
 	const float k = frame.height / kRefHeight;
-	for (float size : {kTitleFont, kButtonFont, kBodyFont, kSmallFont})
+	for (float size : {kTitleFont, kButtonFont, kBodyFont, kSmallFont, kVersionsFont})
 		overlay::WantFont(Px(size, k));
 }
 
@@ -721,6 +752,55 @@ void DrawButton(const overlay::Frame &frame)
 	}
 }
 
+// The versions line, at the bottom of the waiting room (on top of the panel too).
+void DrawVersions(const overlay::Frame &frame)
+{
+	using rules::VersionsView;
+	const VersionsView &v = g_versions;
+	const float k = frame.height / kRefHeight;
+	const float x0 = floorf((frame.width - kScreenW * k) / 2 + 0.5f) + kVersionsX * k, w = kVersionsW * k;
+	const float px = Px(kVersionsFont, k);
+	ImFont *font = overlay::Font(px);
+	ImDrawList *draw = ImGui::GetForegroundDrawList();
+	std::string first, second;
+	ImU32 colour = ui::kWarn;
+	switch (v.state) {
+	case VersionsView::kSame:
+		first = texts::Format("versions.same", {{"ours", v.mine}});
+		colour = ui::kDim;
+		break;
+	case VersionsView::kDiffer:
+		first = texts::Format("versions.differ", {{"ours", v.mine}, {"players", VersionItems(v)}});
+		second = texts::Get("versions.needed");
+		break;
+	case VersionsView::kHostOlder:
+		first = texts::Format("versions.host_older", {{"ours", v.mine}});
+		second = texts::Get("versions.needed");
+		break;
+	case VersionsView::kHostNone:
+		first = texts::Get("versions.host_none");
+		break;
+	case VersionsView::kHostNewer:
+		first = texts::Format("versions.host_newer", {{"ours", v.mine}});
+		second = texts::Get("versions.needed");
+		break;
+	default:
+		return;
+	}
+	const float y0 = kVersionsY * k;
+	if (colour != ui::kDim)  // a warning: on a dark field, so it reads over the picture
+		draw->AddRectFilled(ImVec2(x0 - 6 * k, y0 - 4 * k), ImVec2(x0 + w + 6 * k, (kRefHeight - 8) * k), IM_COL32(20, 14, 8, 200), 4 * k);
+	float y = Wrapped(draw, font, px, x0, y0, w, colour, first.c_str());
+	if (!second.empty())
+		Wrapped(draw, font, px, x0, y, w, ui::kParchment, second.c_str());
+	static std::string told;
+	if (first != told) {
+		told = first;
+		hooklog::Write("rules panel: versions line in the waiting room: \"%s\"%s%s", first.c_str(), second.empty() ? "" : " / ",
+		               second.c_str());
+	}
+}
+
 void Draw(const overlay::Frame &frame)
 {
 	g_back_w = frame.width;
@@ -729,6 +809,8 @@ void Draw(const overlay::Frame &frame)
 		DrawPanel(frame);
 	else if (g_button_shown)
 		DrawButton(frame);
+	if (g_versions_shown)
+		DrawVersions(frame);
 }
 
 }  // namespace

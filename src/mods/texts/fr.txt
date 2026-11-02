@@ -227,3 +227,18 @@ msg.rich_zones = Des zones ont plus de trésor ({value}) que tout modèle livré
 [update]
 available = H5 Together {new} est disponible (vous avez la version {ours}).
 where = À télécharger sur {page}
+
+# The line at the bottom of the waiting room about H5 Together's version on each PC.
+# {ours}: this PC's version; {players}: a list of item* texts, with ", " between them;
+# {player}: a player's name; {version}: a version number.
+[versions]
+same = Tous les joueurs ont H5 Together {ours}.
+differ = H5 Together n'est pas le même sur tous les PC (le vôtre : {ours}) : {players}.
+item = {player} {version}
+item_build = {player} {version} (autre compilation)
+item_older = {player} : antérieur à 0.3.0
+item_none = {player} : aucun
+needed = En coopération, chaque PC doit avoir la même version d'H5 Together : mettez-la à jour avant de commencer.
+host_older = L'hôte a un H5 Together plus ancien que le vôtre ({ours}).
+host_none = L'hôte n'a pas H5 Together (ou ses règles de partie sont désactivées).
+host_newer = L'hôte a un autre H5 Together, plus récent que le vôtre ({ours}).
