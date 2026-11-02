@@ -5,7 +5,8 @@
 // Step 2: the start rules, the game mode (Default / Savage / Nightmare / Random)
 // and ToE's start bonuses (each player keeps the bonus picked with the lobby's
 // arrows), served in MMH5.5's start script scripts/H55-AdvMap.lua; the lobby's
-// bonus tooltips then describe ToE's bonuses (host_rules_bonus.cpp).
+// bonus tooltips then describe ToE's bonuses (host_rules_bonus.cpp), and its
+// bonus icons show ToE's pictures (host_rules_icons.cpp serves them).
 // Step 3: the class skill lock (class_skills): the game's class table, edited in
 // memory when the game starts (host_rules_classes.cpp), kept in saves.
 //
@@ -606,6 +607,9 @@ GameStream *__fastcall OpenFileHook(void *vfs, void *edx, const GameString *path
 	if (!path || !path->begin || path->end <= path->begin)
 		return s;
 	const size_t length = static_cast<size_t>(path->end - path->begin);
+	if (g_enabled && length >= 8 && length <= 300 &&
+	    (_strnicmp(path->end - 4, ".xdb", 4) == 0 || _strnicmp(path->end - 4, ".dds", 4) == 0))
+		return static_cast<GameStream *>(rules::ServeBonusPicture(path->begin, path->end, s));  // the lobby's bonus icons
 	if (length < 8 || length > 300 || _strnicmp(path->end - 4, ".lua", 4) != 0)
 		return s;  // (cheap test first: the game opens thousands of files)
 	const std::string key = NormalizePath(path->begin, path->end);

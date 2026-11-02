@@ -327,11 +327,9 @@ bool Ready()
 	return g_state == 1;
 }
 
-// One text of a pack, as the game reads texts.
-bool ReadText(const Text &t, std::string *out)
+// One file of a zip archive, as it was before it was packed.
+bool ReadEntry(HANDLE file, const lang::ZipEntry &e, std::string *raw)
 {
-	const lang::ZipEntry &e = t.entry;
-	HANDLE file = g_packs[t.pack].file;
 	unsigned char local[30];
 	if (!ReadAt(file, e.header, local, sizeof(local)))
 		return false;
@@ -341,15 +339,20 @@ bool ReadText(const Text &t, std::string *out)
 	std::string packed(e.packed_size, '\0');
 	if (e.packed_size && !ReadAt(file, static_cast<unsigned long long>(e.header) + data, &packed[0], e.packed_size))
 		return false;
-	std::string raw;
 	if (e.method == 0) {
 		if (packed.size() != e.size)
 			return false;
-		raw.swap(packed);
-	} else if (!Inflate(packed, e.size, &raw)) {
-		return false;
+		raw->swap(packed);
+		return true;
 	}
-	return lang::ToGameText(raw, out);
+	return e.method == 8 && Inflate(packed, e.size, raw);
+}
+
+// One text of a pack, as the game reads texts.
+bool ReadText(const Text &t, std::string *out)
+{
+	std::string raw;
+	return ReadEntry(g_packs[t.pack].file, t.entry, &raw) && lang::ToGameText(raw, out);
 }
 
 // A new memory stream of the game with these bytes (the game deletes it).
@@ -509,4 +512,19 @@ void ApplyLanguagesFromSettings()
 	               g_early ? "" : " (installed late: texts read before now stay as they were)");
 }
 
+namespace lang {
+
+bool ReadPakDirectory(HANDLE file, std::vector<ZipEntry> *out)
+{
+	return ReadDirectoryOf(file, out);
+}
+
+bool ReadPakFile(HANDLE file, const ZipEntry &entry, std::string *out)
+{
+	if (!g_inflate_init && !LoadZlib())
+		return false;
+	return ReadEntry(file, entry, out);
+}
+
+}  // namespace lang
 }  // namespace mods
