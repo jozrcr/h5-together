@@ -6,18 +6,22 @@
 // and ToE's start bonuses (each player keeps the bonus picked with the lobby's
 // arrows), served in MMH5.5's start script scripts/H55-AdvMap.lua; the lobby's
 // bonus tooltips then describe ToE's bonuses (host_rules_bonus.cpp).
+// Step 3: the class skill lock (class_skills): the game's class table, edited in
+// memory when the game starts (host_rules_classes.cpp), kept in saves.
 //
 // How a game gets its rules:
 //   1. Lobby hello (every PC with this mod, any map). Each client's DLL sends the
 //      host, now and then, waiting-room requests the game ignores (as the faction
 //      mod's hello, rmg_factions.cpp: CMPWaitChangeRequest, type unknown to the
-//      host's handler 0x0071f3d0): "I apply the host's rules, version 3" (type
-//      'OR'), and four hashes of its MMH5.5 files (types 'N', 'S', 'X', 'A' in the
-//      top byte: H55-Settings.lua without the rules' values, the whole of it,
-//      MMH5.5's stats paks, which 55u.dll reads itself, and the "StartingBonus"
-//      part of H55-AdvMap.lua). The host logs (and the panel shows) a player
-//      whose files differ from its own; the start rules are used only when every
-//      PC has the same "StartingBonus" part as the host, which our edits know.
+//      host's handler 0x0071f3d0): "I apply the host's rules, version 4" (type
+//      'OR'), and five hashes (types 'N', 'S', 'X', 'A', 'C' in the top byte:
+//      H55-Settings.lua without the rules' values, the whole of it, MMH5.5's
+//      stats paks, which 55u.dll reads itself, the "StartingBonus" part of
+//      H55-AdvMap.lua, and the class table in memory). The host logs (and the
+//      panel shows) a player whose files differ from its own; the start rules
+//      are used only when every PC has the same "StartingBonus" part as the
+//      host, which our edits know, and class_skills only when every PC has the
+//      host's class table and can edit it.
 //   2. Lobby display (host -> clients). The host sends each client that said
 //      hello its rules (a short text, "L3|1|0,1,..."), 4 bytes at a time, as the
 //      game's "lock buttons" commands (CMPWaitLockButtonsUICommand, 0x007111d0,
@@ -57,8 +61,13 @@
 //      game (RC19k's 55u.dll would run them: its change of the jump at
 //      0x00992d2a). The default (the host's "file" value) is what this PC's
 //      MMH5.5 does by itself: that jump's bytes. Logged.
+//   7. class_skills (host_rules_classes.cpp): when the game starts (4.), each
+//      PC points the class table's skill lists at unlocked copies, and puts
+//      MMH5.5's back at the next start, in a lobby, or when a save without the
+//      rule is read.
 // Saves: the scripts' variables are part of the save (docs/plans/host-rules.md,
-// "Saves"), so a loaded game keeps the rules it started with (and its scripts).
+// "Saves"), so a loaded game keeps the rules it started with (and its scripts);
+// class_skills is kept in one more chunk of the saved world (step 7).
 //
 // The panel (host_rules_panel.cpp): the host chooses in the waiting room; the
 // clients see the host's rules read-only; in a game, everyone sees this game's.
@@ -72,6 +81,11 @@
 //   trace=0        1 = log every script file the game opens (research), and print
 //                  each player's start resources and minor artifacts to the
 //                  game's console (a line added to H55-AdvMap.lua; testing)
+//   trace_skills=0 1 = log every new skill a level-up offers (testing)
+//   class_skills_single=0  1 = a single-player game uses this PC's class_skills
+//                  and class_chance (testing saves; the other rules stay the file's)
+//   class_chance=  the chance of the skills a class does not list, with
+//                  class_skills=1 (empty = 2, vanilla's; testing; travels with the rules)
 #include "host_rules.h"
 #include "host_rules_internal.h"
 
@@ -211,6 +225,7 @@ WorldScriptsFn g_world_scripts_next = nullptr;  // null: map_scripts cannot be a
 
 bool g_enabled = true;
 bool g_trace = false;
+bool g_class_single = false;  // testing: single player uses this PC's class_skills
 int g_key = VK_F2;
 bool g_button = true;
 
@@ -232,12 +247,13 @@ bool g_start_patchable = false;  // our edits fit it
 std::string g_start_problem;     // why not
 Values g_chosen = rules::NoValues();  // host: [rules] <key>= (valid values only)
 
+const int kHashes = 5;  // rest, whole, stats, start script, class table
 struct Pc {
 	int sender;
 	BYTE version;  // 0 = no hello yet
-	bool has[4];   // rest, whole, stats, start script
-	uint32_t hash[4];
-	bool told[4];  // the difference was logged
+	bool has[kHashes];
+	uint32_t hash[kHashes];
+	bool told[kHashes];  // the difference was logged
 	std::string sent;  // the last lobby text sent to it
 	BYTE seq;          // of the last text's pieces
 	DWORD hello_at;    // when its last hello came (a client says it every ~4 s)
@@ -249,6 +265,8 @@ DWORD g_host_seen = 0, g_client_seen = 0;  // the last update of each lobby logi
 bool g_will_apply = false;
 bool g_start_ok = false;   // host: every PC can take the start rules (the same start script, our edits fit)
 std::string g_start_why;   // host: why not
+bool g_class_ok = false;   // host: every PC can take class_skills (the host's class table, editable)
+std::string g_class_why;   // host: why not
 std::string g_map_path;   // host: the lobby's map
 int g_map_script = -1;    // host: does it have a map script (-1 unknown)
 std::vector<std::string> g_missing, g_differ;
@@ -510,6 +528,10 @@ void LoadFiles()
 	const int own = OwnMapScripts();
 	if (own >= 0)
 		values[rules::kMapScripts] = own ? "1" : "0";
+	// nor the class rules: MMH5.5's lock, and vanilla's rare-skill chance (the table is read and logged here)
+	values[rules::kClassSkills] = rules::kClassLocked;
+	values[rules::kClassChance] = rules::kClassChanceVanilla;
+	rules::ClassTableInfo();
 	const uint32_t rest = rules::HashWithoutRuleValues(file);
 	const uint32_t whole = rules::Fnv1a(file.data(), file.size());
 	const uint32_t stats = StatsHash();
@@ -705,8 +727,14 @@ bool StartRulesChanged(const Values &v)
 	return false;
 }
 
+// Do these values unlock the class skills (class_skills other than MMH5.5's lock)?
+bool ClassRuleChanged(const Values &v)
+{
+	return !v[rules::kClassSkills].empty() && v[rules::kClassSkills] != rules::kClassLocked;
+}
+
 // Host, under the lock: who lacks the mod, whose files differ, can every PC take
-// the start rules (for the log, the panel and the start).
+// the start rules and class_skills (for the log, the panel and the start).
 void CheckPlayers(const void *logic, const BYTE *info, bool log)
 {
 	g_missing.clear();
@@ -715,6 +743,9 @@ void CheckPlayers(const void *logic, const BYTE *info, bool log)
 	g_start_why = !g_start_known ? "this PC's H55-AdvMap.lua was not read yet"
 	              : !g_start_patchable ? "the host's H55-AdvMap.lua: " + g_start_problem
 	                                   : std::string();
+	const rules::ClassInfo classes = rules::ClassTableInfo();
+	g_class_ok = classes.editable;
+	g_class_why = classes.editable ? std::string() : "the host's class table cannot be edited (" + classes.why + ")";
 	static const char *const kWhat[3] = {"H55-Settings.lua (besides the rules)", "H55-Settings.lua", "MMH5.5's stats files"};
 	for (int pc : HumanClients(logic, info)) {
 		Pc *p = FindPc(pc);
@@ -737,6 +768,20 @@ void CheckPlayers(const void *logic, const BYTE *info, bool log)
 				               name.c_str(), pc, p->hash[3], g_start_hash);
 			}
 		}
+		// the class table: the host's, and editable there (a PC that cannot edit its table sends 0)
+		if (!p->has[4] || p->hash[4] == 0 || p->hash[4] != classes.hash) {
+			if (g_class_ok)
+				g_class_why = name + (!p->has[4]        ? " has not sent its class table's hash yet"
+				                      : p->hash[4] == 0 ? "'s class table cannot be edited"
+				                                        : "'s class table is not the host's (another MMH5.5 version?)");
+			g_class_ok = false;
+			if (log && p->has[4] && !p->told[4]) {
+				p->told[4] = true;
+				hooklog::Write("rules: CHECK: %s (PC %d) has another class table than the host (%08x, host %08x): the class "
+				               "skills stay MMH5.5's lock",
+				               name.c_str(), pc, p->hash[4], classes.hash);
+			}
+		}
 		const uint32_t mine[3] = {g_hash_rest, g_hash_whole, g_hash_stats};
 		for (int k = 0; k < 3; ++k) {
 			if (!g_file_known || !p->has[k] || p->hash[k] == mine[k])
@@ -756,8 +801,18 @@ void CheckPlayers(const void *logic, const BYTE *info, bool log)
 }
 
 // --- 1. the hello: clients ------------------------------------------------------------------
+// In a lobby (host or client), the last game is over: MMH5.5's class lists back,
+// unless a save's world was just read (a game being loaded from the lobby).
+void ClassSkillsInLobby()
+{
+	if (rules::ClassSkillsNow().mode != rules::kClassLocked && !rules::WorldReadRecently(60000))
+		rules::SetClassSkills(rules::kClassLocked, std::string(), false, "back in a lobby");
+}
+
 void __fastcall ClientUpdateHook(void *logic, void *edx)
 {
+	if (g_enabled)
+		ClassSkillsInLobby();
 	{
 		Lock lock;
 		g_client_seen = GetTickCount();
@@ -800,6 +855,10 @@ void __fastcall ClientUpdateHook(void *logic, void *edx)
 				rules::HashRequest(rules::kMarkStartScript, start, &type, &byte);
 				send = start_known;
 			}
+			else if (step == 5) {
+				const rules::ClassInfo classes = rules::ClassTableInfo();
+				rules::HashRequest(rules::kMarkClassTable, classes.editable ? classes.hash : 0, &type, &byte);
+			}
 			if (send) {
 				*reinterpret_cast<DWORD *>(full + 0xc4) = type;
 				full[0xc8] = byte;
@@ -807,7 +866,7 @@ void __fastcall ClientUpdateHook(void *logic, void *edx)
 			static int logged = 0;
 			if (step == 0 && logged++ < 1)
 				hooklog::Write("rules: hello to the host (this PC applies the host's rules, version %u)", rules::kProtocol);
-			step = (step + 1) % 5;
+			step = (step + 1) % 6;
 			if (step == 0)
 				next_at = now + 4000;
 		}
@@ -883,7 +942,8 @@ int __fastcall HostRequestHook(void *logic, void *edx, int sender, BYTE *message
 				const int k = mark == rules::kMarkSettingsRest    ? 0
 				              : mark == rules::kMarkSettingsWhole ? 1
 				              : mark == rules::kMarkStats         ? 2
-				                                                  : 3;
+				              : mark == rules::kMarkStartScript   ? 3
+				                                                  : 4;
 				if (!p->has[k] || p->hash[k] != hash)
 					p->told[k] = false;
 				p->has[k] = true;
@@ -949,6 +1009,8 @@ void __fastcall HostUpdateHook(void *logic, void *edx)
 {
 	const DWORD now = GetTickCount();
 	static DWORD last = 0;
+	if (g_enabled)
+		ClassSkillsInLobby();
 	if (g_enabled && now - last >= 500) {
 		last = now;
 		LoadFiles();
@@ -980,6 +1042,8 @@ void __fastcall HostUpdateHook(void *logic, void *edx)
 					flags |= rules::kNoScript;
 				if (StartRulesChanged(values) && !g_start_ok)
 					flags |= rules::kNoStart;
+				if (ClassRuleChanged(values) && !g_class_ok)
+					flags |= rules::kNoClasses;
 				const uint32_t mine[3] = {g_hash_rest, g_hash_whole, g_hash_stats};
 				if (g_file_known && ((p.has[0] && p.hash[0] != mine[0]) || (p.has[2] && p.hash[2] != mine[2])))
 					flags |= rules::kDiffers;
@@ -1020,6 +1084,10 @@ void __fastcall HostStartHook(void *logic, void *edx)
 			for (int r = 0; r < kRuleCount; ++r)
 				if (rules::IsStartRule(r))
 					values[r] = rules::kStartRuleOff;
+		}
+		if (g_will_apply && ClassRuleChanged(values) && !g_class_ok) {
+			hooklog::Write("rules: START: the class skills stay MMH5.5's lock: %s", g_class_why.c_str());
+			values[rules::kClassSkills] = rules::kClassLocked;
 		}
 		if (!g_will_apply) {
 			std::string names;
@@ -1092,6 +1160,7 @@ int __fastcall StartSerializeHook(BYTE *message, void *edx, void *saver)
 // --- 4. a game starts -------------------------------------------------------------------------
 void __fastcall RunMpHook(void *self, void *edx)
 {
+	std::string classes, chance;
 	{
 		Lock lock;
 		g_serving = g_armed;
@@ -1101,6 +1170,17 @@ void __fastcall RunMpHook(void *self, void *edx)
 		g_served = 0;
 		hooklog::Write("rules: a multiplayer game starts: %s",
 		               g_serving ? ("the host's rules, " + ValueList(g_serving_values)).c_str() : "the file's rules");
+		if (g_serving) {
+			classes = g_serving_values[rules::kClassSkills];
+			chance = g_serving_values[rules::kClassChance];
+		}
+	}
+	// the class table before the world is made (a hero's level-ups may come with it). This is
+	// always a new game: a multiplayer load goes through NMP::CMPLoad, not CRunMPGame (and a
+	// save's world, when it is read, sets the class skills itself)
+	if (g_enabled) {
+		rules::SetClassSkills(classes, chance, false, "a multiplayer game starts");
+		rules::ForgetWorldRead();
 	}
 	InterlockedExchange(&g_mp_world, 1);  // the world is made inside (0x00820830 -> 0x00c9fa80)
 	g_run_mp_next(self, edx);
@@ -1158,6 +1238,7 @@ void __fastcall WorldScriptsHook(void *world, void *edx, const void *map_script)
 
 void __fastcall RunSingleHook(void *self, void *edx)
 {
+	std::string classes, chance;
 	{
 		Lock lock;
 		if (g_serving || g_armed)
@@ -1166,6 +1247,17 @@ void __fastcall RunSingleHook(void *self, void *edx)
 		g_armed = false;
 		g_start_text.clear();
 		g_in_game = true;
+		if (g_class_single) {  // testing: this PC's choices for the class rules
+			classes = g_chosen[rules::kClassSkills];
+			chance = g_chosen[rules::kClassChance];
+		}
+	}
+	// a new game (a single-player load does not come here: robot run 20261102-011559)
+	if (g_enabled) {
+		rules::SetClassSkills(classes, chance, false,
+		                      g_class_single ? "a single-player game starts (class_skills_single=1: this PC's choice)"
+		                                     : "a single-player game starts");
+		rules::ForgetWorldRead();
 	}
 	g_run_single_next(self, edx);
 }
@@ -1226,10 +1318,15 @@ View GetView(View::Role role)
 			v.differ = g_differ;
 			v.start_ok = g_start_ok;
 			v.start_why = g_start_why;
+			v.class_ok = g_class_ok;
+			v.class_why = g_class_why;
 		}
-		else {  // the setup screen: only this PC's own start script is known
+		else {  // the setup screen: only this PC's own start script and class table are known
 			v.start_ok = !g_start_known || g_start_patchable;
 			v.start_why = g_start_problem;
+			const rules::ClassInfo classes = rules::ClassTableInfo();
+			v.class_ok = !classes.read || classes.editable;
+			v.class_why = classes.why;
 		}
 	}
 	else if (role == View::kClient) {
@@ -1239,11 +1336,17 @@ View GetView(View::Role role)
 		v.this_differs = g_lobby_known && (g_lobby_flags & rules::kDiffers);
 		v.map_script = !g_lobby_known ? -1 : (g_lobby_flags & rules::kNoScript) ? 0 : 1;
 		v.start_ok = !(g_lobby_known && (g_lobby_flags & rules::kNoStart));
+		v.class_ok = !(g_lobby_known && (g_lobby_flags & rules::kNoClasses));
 	}
 	else if (role == View::kInGame) {
 		v.in_game_rules = g_serving;
 		v.shown_known = true;
 		v.shown = g_serving ? g_serving_values : g_file_values;
+		// the class skills as the table is now (a loaded save sets them itself)
+		const rules::ClassState classes = rules::ClassSkillsNow();
+		v.shown[rules::kClassSkills] = classes.mode;
+		v.shown[rules::kClassChance] = classes.mode == rules::kClassLocked ? v.shown[rules::kClassChance] : classes.chance;
+		v.class_from_save = classes.from_save;
 	}
 	return v;
 }
@@ -1296,6 +1399,7 @@ void ApplyHostRulesFromSettings()
 	const std::wstring ini = IniPath();
 	g_enabled = GetPrivateProfileIntW(L"rules", L"enabled", 1, ini.c_str()) != 0;
 	g_trace = GetPrivateProfileIntW(L"rules", L"trace", 0, ini.c_str()) != 0;
+	g_class_single = GetPrivateProfileIntW(L"rules", L"class_skills_single", 0, ini.c_str()) != 0;
 	g_button = GetPrivateProfileIntW(L"rules", L"button", 1, ini.c_str()) != 0;
 	wchar_t key[16];
 	GetPrivateProfileStringW(L"rules", L"key", L"F2", key, 16, ini.c_str());
@@ -1307,6 +1411,8 @@ void ApplyHostRulesFromSettings()
 		return;
 	}
 	ReadChoices();
+	// class_skills: the world's serializer (saves keep the rule) and the testing trace
+	rules::InstallClassSkills(GetPrivateProfileIntW(L"rules", L"trace_skills", 0, ini.c_str()) != 0);
 	g_open_next = reinterpret_cast<OpenFn>(
 		hookpatch::PatchPointer(kWinVfsOpenSlot, kWinVfsOpen, reinterpret_cast<const void *>(&OpenFileHook)));
 	g_host_update_next = reinterpret_cast<LogicFn>(hookpatch::PatchPointer(kHostUpdateSlot, kHostUpdate, &HostUpdateHook));

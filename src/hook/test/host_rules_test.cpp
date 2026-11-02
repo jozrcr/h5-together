@@ -1,7 +1,8 @@
 // Test of the host rules' pure work (src/mods/host_rules_logic.h; no game
 // needed): reading MMH5.5's settings file, serving it with other values (only
 // the numbers change), the hash without the rules' values, the text carried in
-// the start message and the lobby, and the lobby hello's number codes.
+// the start message and the lobby, the lobby hello's number codes, and the
+// class table's edit for class_skills (and what a save keeps of it).
 //
 // The settings text below is ours, written in the file's format (MMH5.5's own
 // file is never copied into the repo).
@@ -71,16 +72,30 @@ void TestTable()
 	Check(unique, "every rule has its own key and variable");
 	bool start = Index("game_mode") == kGameModeRule && Index("toe_bonuses") == kToeBonusRule;
 	for (int r = 0; r < kRuleCount; ++r)
-		start = start && (IsStartRule(r) || r == kMapScripts) == (kRules[r].var == nullptr) &&
+		start = start && (IsStartRule(r) || r == kMapScripts || IsClassRule(r)) == (kRules[r].var == nullptr) &&
 		        (IsStartRule(r) == (kRules[r].group == kStart)) && (!IsStartRule(r) || ValidValue(kRules[r], kStartRuleOff));
 	Check(start, "the start rules: no settings variable, their own group, \"0\" = MMH5.5's way");
 	Check(ValidValue(kRules[kGameModeRule], "4") && !ValidValue(kRules[kGameModeRule], "5") &&
 	          ValidValue(kRules[kToeBonusRule], "1") && !ValidValue(kRules[kToeBonusRule], "2"),
 	      "game mode 0 to 4, ToE bonuses 0 or 1");
-	Check(kMapScripts == Index("map_scripts") && kMapScripts == kRuleCount - 1 && !kRules[kMapScripts].var &&
+	Check(kMapScripts == Index("map_scripts") && kMapScripts == kToeBonusRule + 1 && !kRules[kMapScripts].var &&
 	          kRules[kMapScripts].kind == kBool && kRules[kMapScripts].group == kRandomMaps && !IsStartRule(kMapScripts),
-	      "map_scripts: the table's last, no settings variable (the add-on applies it), on/off, with the random maps");
-	Check(kProtocol == 3, "protocol 3 (map_scripts after the start rules): a PC with version 1 or 2 gets no rules");
+	      "map_scripts: after the start rules, no settings variable (the add-on applies it), on/off, with the random maps");
+	Check(kClassSkills == Index("class_skills") && kClassChance == Index("class_chance") && kClassChance == kRuleCount - 1 &&
+	          kClassSkills == kMapScripts + 1 && !kRules[kClassSkills].var && !kRules[kClassChance].var &&
+	          kRules[kClassSkills].group == kHeroes && kRules[kClassChance].group == kHeroes && !kRules[kClassSkills].hidden &&
+	          kRules[kClassChance].hidden && IsClassRule(kClassSkills) && IsClassRule(kClassChance) && !IsClassRule(kMapScripts),
+	      "class_skills and class_chance: the table's last two, no settings variable, heroes; the chance is hidden");
+	Check(ValidValue(kRules[kClassSkills], kClassLocked) && ValidValue(kRules[kClassSkills], kClassUnlocked) &&
+	          !ValidValue(kRules[kClassSkills], "2") && ValidValue(kRules[kClassChance], kClassChanceVanilla) &&
+	          ValidValue(kRules[kClassChance], "30") && ValidValue(kRules[kClassChance], "50") &&
+	          !ValidValue(kRules[kClassChance], "0") && !ValidValue(kRules[kClassChance], "51"),
+	      "class_skills 0 or 1 (vanilla classes, a later 2, is refused today), class_chance 1 to 50");
+	bool hidden = true;
+	for (int r = 0; r < kRuleCount; ++r)
+		hidden = hidden && kRules[r].hidden == (r == kClassChance);
+	Check(hidden, "only class_chance is hidden from the panel");
+	Check(kProtocol == 4, "protocol 4 (class_skills): a PC with version 1 to 3 gets no rules");
 	bool plain = true;
 	for (int r = 0; r < kRuleCount; ++r)
 		for (const char *c = kRules[r].key; *c; ++c)
@@ -235,12 +250,12 @@ void TestHash()
 void TestText()
 {
 	Values v = NoValues();
-	Check(Encode(v) == "OHR3", "no values: \"OHR3\"");
+	Check(Encode(v) == "OHR4", "no values: \"OHR4\"");
 	v[Index("governance")] = "0";
 	v[Index("ai_cheat")] = "0";
 	v[Index("neutral_stack_size")] = "1.25";
 	const std::string text = Encode(v);
-	Check(text == "OHR3;governance=0;ai_cheat=0;neutral_stack_size=1.25", "values in the table's order");
+	Check(text == "OHR4;governance=0;ai_cheat=0;neutral_stack_size=1.25", "values in the table's order");
 	Values back;
 	Check(Decode(text, &back) && back == v, "decoded back to the same values");
 	Values with_start = v;
@@ -248,15 +263,16 @@ void TestText()
 	with_start[kToeBonusRule] = "1";
 	Check(Encode(with_start) == text + ";game_mode=3;toe_bonuses=1" && Decode(Encode(with_start), &back) && back == with_start,
 	      "the start rules travel too");
-	Check(!Decode("OHR1;governance=0", &back) && !Decode("OHR2;governance=0", &back), "another version (1, 2) is refused");
-	Check(!Decode("OHR3;governance=2", &back) && !Decode("OHR3;game_mode=5", &back), "a bad value is refused");
-	Check(!Decode("OHR3;governance=0;governance=1", &back), "a key twice is refused");
-	Check(!Decode("OHR3;new_rule=1", &back), "an unknown key is refused (a newer host: nothing is used)");
-	Check(!Decode("OHR3;governance", &back) && !Decode("OHR3governance=0", &back) && !Decode("OHR3;", &back),
+	Check(!Decode("OHR1;governance=0", &back) && !Decode("OHR2;governance=0", &back) && !Decode("OHR3;governance=0", &back),
+	      "another version (1, 2, 3) is refused");
+	Check(!Decode("OHR4;governance=2", &back) && !Decode("OHR4;game_mode=5", &back), "a bad value is refused");
+	Check(!Decode("OHR4;governance=0;governance=1", &back), "a key twice is refused");
+	Check(!Decode("OHR4;new_rule=1", &back), "an unknown key is refused (a newer host: nothing is used)");
+	Check(!Decode("OHR4;governance", &back) && !Decode("OHR4governance=0", &back) && !Decode("OHR4;", &back),
 	      "broken texts are refused");
 	Values bad = NoValues();
 	bad[Index("governance")] = "7";
-	Check(Encode(bad) == "OHR3", "invalid values are never sent");
+	Check(Encode(bad) == "OHR4", "invalid values are never sent");
 	// the longest text: every rule with an 8-character value
 	Values longest = NoValues();
 	for (int r = 0; r < kRuleCount; ++r)
@@ -276,25 +292,35 @@ void TestText()
 	Check(Encode(all_three) == text + ";game_mode=3;toe_bonuses=1;map_scripts=0" && Decode(Encode(all_three), &back) &&
 	          back == all_three,
 	      "the start rules and map_scripts travel together");
-	Check(!Decode("OHR3;map_scripts=2", &back), "map_scripts takes 0 or 1 only");
-	Check(!Decode("OHR2;governance=0;game_mode=3", &back), "a version 2 text (no map_scripts) is refused");
+	Check(!Decode("OHR4;map_scripts=2", &back), "map_scripts takes 0 or 1 only");
+	Values classes = v;
+	classes[kClassSkills] = kClassUnlocked;
+	classes[kClassChance] = "30";
+	Check(Encode(classes) == text + ";class_skills=1;class_chance=30" && Decode(Encode(classes), &back) && back == classes,
+	      "class_skills and its chance travel in the start message, last");
+	Check(!Decode("OHR4;class_skills=2", &back) && !Decode("OHR4;class_chance=0", &back) && !Decode("OHR4;class_chance=51", &back),
+	      "class_skills 2 (a later version's vanilla classes) and a chance out of 1..50 are refused");
+	Check(!Decode("OHR3;governance=0;class_skills=1", &back), "a version 3 text (no class rules) is refused");
 
 	const std::string lobby = LobbyText(kWillApply | kDiffers, v);
 	int flags = 0;
-	Check(lobby == "L3|3|0,,,,,,0,,1.25,,,,,,,,," && ReadLobbyText(lobby, &flags, &back) && flags == 3 && back == v,
-	      "the lobby text: L3|flags|every value in the table's order");
-	Check(LobbyText(kWillApply | kNoStart, with_start) == "L3|9|0,,,,,,0,,1.25,,,,,,,3,1," &&
+	Check(lobby == "L4|3|0,,,,,,0,,1.25,,,,,,,,,,," && ReadLobbyText(lobby, &flags, &back) && flags == 3 && back == v,
+	      "the lobby text: L4|flags|every value in the table's order");
+	Check(LobbyText(kWillApply | kNoStart, with_start) == "L4|9|0,,,,,,0,,1.25,,,,,,,3,1,,," &&
 	          ReadLobbyText(LobbyText(kWillApply | kNoStart, with_start), &flags, &back) && flags == 9 && back == with_start,
 	      "the start rules and their flag in the lobby text");
-	Check(LobbyText(kNoScript, scripts) == "L3|4|0,,,,,,0,,1.25,,,,,,,,,1" && ReadLobbyText(LobbyText(kNoScript, scripts), &flags, &back) &&
+	Check(LobbyText(kNoScript, scripts) == "L4|4|0,,,,,,0,,1.25,,,,,,,,,1,," && ReadLobbyText(LobbyText(kNoScript, scripts), &flags, &back) &&
 	          flags == 4 && back == scripts,
-	      "map_scripts in the lobby text (the last value)");
-	Check(!ReadLobbyText(text, &flags, &back) && !ReadLobbyText("L3|x|0,,,,,,0,,1.25,,,,,,,,,", &flags, &back) &&
-	          !ReadLobbyText("L3||0,,,,,,0,,1.25,,,,,,,,,", &flags, &back) && !ReadLobbyText("L2|3|0,,,,,,0,,1.25,,,,,,,,", &flags, &back),
+	      "map_scripts in the lobby text");
+	Check(LobbyText(kWillApply | kNoClasses, classes) == "L4|17|0,,,,,,0,,1.25,,,,,,,,,,1,30" &&
+	          ReadLobbyText(LobbyText(kWillApply | kNoClasses, classes), &flags, &back) && flags == 17 && back == classes,
+	      "the class rules (the last two values) and their flag kNoClasses (16) in the lobby text");
+	Check(!ReadLobbyText(text, &flags, &back) && !ReadLobbyText("L4|x|0,,,,,,0,,1.25,,,,,,,,,,,", &flags, &back) &&
+	          !ReadLobbyText("L4||0,,,,,,0,,1.25,,,,,,,,,,,", &flags, &back) && !ReadLobbyText("L3|3|0,,,,,,0,,1.25,,,,,,,,,", &flags, &back),
 	      "a lobby text without flags, or of another version, is refused");
-	Check(!ReadLobbyText("L3|1|0,,,,,,0,,1.25,,,,,,,,", &flags, &back) && !ReadLobbyText("L3|1|0,,,,,,0,,1.25,,,,,,,,,,", &flags, &back) &&
-	          !ReadLobbyText("L3|1|7,,,,,,0,,1.25,,,,,,,,,", &flags, &back),
-	      "too few or too many values (a version 2 text has 17), or a bad one, is refused");
+	Check(!ReadLobbyText("L4|1|0,,,,,,0,,1.25,,,,,,,,,,", &flags, &back) && !ReadLobbyText("L4|1|0,,,,,,0,,1.25,,,,,,,,,,,,", &flags, &back) &&
+	          !ReadLobbyText("L4|1|7,,,,,,0,,1.25,,,,,,,,,,,", &flags, &back),
+	      "too few or too many values (a version 3 text has 18), or a bad one, is refused");
 	Check(LobbyText(kWillApply, longest).size() < 100, "the lobby text stays short (it travels 4 bytes at a time)");
 }
 
@@ -530,9 +556,126 @@ void TestHello()
 	HashRequest(kMarkStartScript, 0x00345678u, &type, &byte);
 	Check(ReadHashRequest(type, byte, &mark, &hash) && mark == kMarkStartScript && hash == 0x00345678u && type >= 0x41000000u,
 	      "the start script's hash ('A') too, also far above the game's types");
+	HashRequest(kMarkClassTable, 0x9abcdef0u, &type, &byte);
+	Check(ReadHashRequest(type, byte, &mark, &hash) && mark == kMarkClassTable && hash == 0x9abcdef0u && type >= 0x43000000u,
+	      "the class table's hash ('C')");
+	HashRequest(kMarkClassTable, 0, &type, &byte);
+	Check(ReadHashRequest(type, byte, &mark, &hash) && mark == kMarkClassTable && hash == 0,
+	      "a class table that cannot be edited is sent as hash 0");
 	Check(!ReadHashRequest(kHelloType, kProtocol, &mark, &hash) && !ReadHashRequest(0x4f48, 1, &mark, &hash) &&
 	          !ReadHashRequest(2, 0, &mark, &hash),
 	      "the hellos (ours, the faction mod's) and the game's types are not hashes");
+}
+
+// A class table in MMH5.5's shape (our own numbers, not MMH5.5's): three
+// classes of 4 skills each, the chances adding up to 100.
+ClassTable SampleClasses()
+{
+	const uint32_t head = 0x00e7aa00u;
+	ClassTable t;
+	t.push_back(ClassSkillList{1, {{head, 4, 40}, {head, 6, 30}, {head, 7, 20}, {head, 11, 10}}});
+	t.push_back(ClassSkillList{3, {{head, 1, 25}, {head, 8, 25}, {head, 9, 25}, {head, 10, 25}}});
+	t.push_back(ClassSkillList{9, {{head, 6, 50}, {head, 191, 20}, {head, 13, 20}, {head, 4, 10}}});
+	return t;
+}
+
+void TestClassTable()
+{
+	const ClassTable t = SampleClasses();
+	Check(CheckClassTable(t).empty(), "a plain table passes the check");
+	ClassTable bad = t;
+	bad[1].probs[2].skill = bad[1].probs[0].skill;
+	Check(!CheckClassTable(bad).empty(), "a skill twice in a list is refused");
+	bad = t;
+	bad[0].probs[0].prob = -1;
+	Check(!CheckClassTable(bad).empty(), "a chance below 0 is refused");
+	bad = t;
+	bad[2].probs[1].skill = 0;
+	Check(!CheckClassTable(bad).empty(), "skill 0 (none) is refused");
+	bad = t;
+	for (SkillProb &p : bad[1].probs)
+		p.prob = 0;
+	Check(!CheckClassTable(bad).empty(), "a class whose chances add up to 0 is refused");
+	bad = t;
+	std::swap(bad[0], bad[1]);
+	Check(!CheckClassTable(bad).empty() && !CheckClassTable(ClassTable()).empty(), "classes out of order, or none, are refused");
+	bad = t;
+	bad[0].probs.clear();
+	Check(!CheckClassTable(bad).empty(), "an empty list is refused (the reader skips classes without one)");
+
+	const std::vector<int> skills = OfferedSkills(t);
+	Check(skills == std::vector<int>({1, 4, 6, 7, 8, 9, 10, 11, 13, 191}),
+	      "the skills some class is offered: each once, from low to high");
+	Check(ClassTableHash(t) == ClassTableHash(SampleClasses()), "the same table, the same hash");
+	bad = t;
+	bad[2].probs[3].prob = 11;
+	Check(ClassTableHash(bad) != ClassTableHash(t), "another chance, another hash");
+	bad = t;
+	bad[2].id = 10;
+	Check(ClassTableHash(bad) != ClassTableHash(t), "another class number, another hash");
+	bad = t;
+	for (ClassSkillList &c : bad)
+		for (SkillProb &p : c.probs)
+			p.head = 0x1234u;
+	Check(ClassTableHash(bad) == ClassTableHash(t), "the items' first word is not in the hash (a pointer may differ between PCs)");
+
+	const std::vector<SkillProb> list = UnlockedList(t[0].probs, skills, 2);
+	bool own_first = list.size() == 10;
+	for (size_t i = 0; own_first && i < t[0].probs.size(); ++i)
+		own_first = list[i].head == t[0].probs[i].head && list[i].skill == t[0].probs[i].skill && list[i].prob == t[0].probs[i].prob;
+	Check(own_first, "unlocked: the class's own items first, unchanged and in their order (4 + 6 others = 10)");
+	bool added = true;
+	const int expect[] = {1, 8, 9, 10, 13, 191};
+	for (size_t i = 0; added && i < 6; ++i)
+		added = list[4 + i].skill == expect[i] && list[4 + i].prob == 2 && list[4 + i].head == t[0].probs[0].head;
+	Check(added, "then each skill it lacks, at the chance, with the list's head");
+	long sum = 0;
+	for (const SkillProb &p : list)
+		sum += p.prob;
+	Check(sum == 112, "the chances add up to 100 + 6 x 2 (the draw is in [0, sum - 1]: MMH5.5's skills keep their weights)");
+
+	ClassTable out;
+	std::string why;
+	Check(!ClassTableFor(t, kClassLocked, "", &out, &why) && !ClassTableFor(t, "", "", &out, &why) && why.empty(),
+	      "MMH5.5's lock (0 or no value): nothing to change, no error");
+	Check(ClassTableFor(t, kClassUnlocked, "", &out, &why) && out.size() == 3 && out[0].probs.size() == 10 &&
+	          out[1].probs.size() == 10 && out[2].probs.size() == 10 && out[1].probs[4].prob == 2,
+	      "unlocked: every class gets the other skills, at vanilla's 2 when the chance has no value");
+	Check(ClassTableFor(t, kClassUnlocked, "30", &out, &why) && out[2].probs[9].prob == 30 && out[2].probs[3].prob == 10,
+	      "the testing chance (30) for the added skills only");
+	Check(ClassChance("") == 2 && ClassChance("30") == 30 && ClassChance("0") == 2 && ClassChance("99") == 2,
+	      "the chance used: the rule's value, else vanilla's 2");
+	bool unique = true;
+	for (const ClassSkillList &c : out)
+		for (size_t i = 0; i < c.probs.size(); ++i)
+			for (size_t j = 0; j < i; ++j)
+				unique = unique && c.probs[i].skill != c.probs[j].skill;
+	Check(unique && CheckClassTable(out).empty(), "the unlocked table has no skill twice and passes the check itself");
+	why.clear();
+	Check(!ClassTableFor(t, "2", "", &out, &why) && !why.empty(), "class_skills=2 (vanilla classes) is not built: refused, with why");
+	why.clear();
+	bad = t;
+	bad[0].probs[1].skill = bad[0].probs[0].skill;
+	Check(!ClassTableFor(bad, kClassUnlocked, "", &out, &why) && !why.empty(), "a bad table is not unlocked");
+
+	// what a save keeps
+	Values v = NoValues();
+	Check(EncodeWorld(v) == "OHW1", "no class rules: \"OHW1\"");
+	v[kClassSkills] = kClassUnlocked;
+	v[kClassChance] = "2";
+	v[Index("governance")] = "0";
+	const std::string world = EncodeWorld(v);
+	Check(world == "OHW1;class_skills=1;class_chance=2", "a save keeps only the rules the add-on applies in memory");
+	Values back;
+	Values expect_back = NoValues();
+	expect_back[kClassSkills] = kClassUnlocked;
+	expect_back[kClassChance] = "2";
+	Check(DecodeWorld(world, &back) && back == expect_back, "and reads them back");
+	Check(world.size() < 64, "it fits the world's chunk (64 bytes with its zero)");
+	Check(!DecodeWorld("OHW1;governance=0", &back) && !DecodeWorld("OHW1;class_skills=3", &back) &&
+	          !DecodeWorld("OHW2;class_skills=1", &back) && !DecodeWorld("OHR4;class_skills=1", &back) &&
+	          !DecodeWorld("OHW1;class_skills=1;class_skills=1", &back) && !DecodeWorld("", &back),
+	      "another key, a bad value, another version, a key twice or nothing is refused");
 }
 
 }  // namespace
@@ -549,6 +692,7 @@ int main()
 	TestMapScript();
 	TestStartScript();
 	TestHello();
+	TestClassTable();
 	printf(g_failures ? "%d FAILED\n" : "all host rules tests passed\n", g_failures);
 	return g_failures ? 1 : 0;
 }

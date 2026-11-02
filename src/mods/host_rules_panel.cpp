@@ -106,6 +106,11 @@ struct Words {
 	const char *mode_with_toe;  // its help when the ToE bonuses are on and it says "the arrows"
 	const char *start_no;       // %s = why
 	const char *client_start_no;
+	const char *class_modes[2];  // class_skills' values
+	const char *class_note;      // with class_skills unlocked: what still follows MMH5.5's classes
+	const char *class_no;        // %s = why
+	const char *client_class_no;
+	const char *class_save;      // in game: the class skills came from the loaded save
 };
 
 const Words kEnglish = {
@@ -114,11 +119,12 @@ const Words kEnglish = {
 	"Chosen by the host (read only).",
 	"The rules of this game (read only).",
 	"MMH5.5's settings file on this PC (read only).",
-	{"Game mode and start bonuses", "Towns and heroes", "Computer players and neutral armies", "Artifacts and items", "Random maps"},
+	{"Game mode and start bonuses", "Heroes and skills", "Towns and heroes", "Computer players and neutral armies",
+	 "Artifacts and items", "Random maps"},
 	{"Governors", "Town and dwelling conversion", "Extra conversions", "Town gate", "Mine guards",
 	 "Dimension doors visit towns", "Computer bonus", "Mixed neutral armies", "Neutral army size", "Battle site guards",
 	 "Prank artifacts", "Potions for sale", "Mage guild in every town", "Mana at observatories", "Moon disc quest",
-	 "Game mode", "ToE start bonuses", "MMH5.5 scripts on random maps"},
+	 "Game mode", "ToE start bonuses", "MMH5.5 scripts on random maps", "Skills of each class", "Rare skill chance"},
 	{"A hero can govern a town and give it bonuses.",
 	 "Captured towns and dwellings can change to your faction.",
 	 "How many more towns and dwellings may convert (1 = MMH5.5's balance).",
@@ -136,13 +142,15 @@ const Words kEnglish = {
 	 "The moon disc artifact quest on random maps.",
 	 "Default, Savage or Nightmare for everyone (MMH5.5: the bonus arrows).",
 	 "Each player keeps the start bonus picked with the arrows: gold, resources, artifact.",
-	 "In multiplayer, MMH5.5's scripts also run on maps without a script (from the generator)."},
+	 "In multiplayer, MMH5.5's scripts also run on maps without a script (from the generator).",
+	 "Unlocked: any skill, those off the class's list at chance 2 (as in ToE).",
+	 "The chance of the skills a class does not list (testing)."},
 	{"Off", "40%", "60%", "80%", "100% (MMH5.5)", "120%", "140%"},
 	"On", "Off",
 	"your file: %s",
 	"MMH5.5 alone: %s",
 	"Every player has open-homm5: these rules will be used.",
-	"Without open-homm5: %s. Then every PC uses its own MMH5.5 file.",
+	"Without open-homm5 (or with an older one): %s. Then every PC uses its own MMH5.5 file.",
 	"MMH5.5 files differ: %s. The game may not stay in step.",
 	"The players will see these rules in the waiting room.",
 	"The host sent no rules (no open-homm5 there, or another version): every PC uses its own MMH5.5 file.",
@@ -162,6 +170,12 @@ const Words kEnglish = {
 	"Game mode and ToE start bonuses stay MMH5.5's way: %s.",
 	"Game mode and ToE start bonuses stay MMH5.5's way: MMH5.5's start script (H55-AdvMap.lua) is not the same on "
 	"every PC.",
+	{"MMH5.5 (locked)", "Unlocked"},
+	"Skills unlocked: MMH5.5's skill wheel (hero screen) still shows each class's own tree, and the witch huts keep "
+	"MMH5.5's lists.",
+	"The class skills stay MMH5.5's lock: %s.",
+	"The class skills stay MMH5.5's lock: a PC's class table is not the host's (another MMH5.5 version?).",
+	"The class skills come from the loaded save.",
 };
 
 const Words kFrench = {
@@ -171,13 +185,14 @@ const Words kFrench = {
 	"Choisies par l'h" O_CIRC "te (lecture seule).",
 	"Les r" E_GRAVE "gles de cette partie (lecture seule).",
 	"Le fichier de r" E_ACUTE "glages MMH5.5 de ce PC (lecture seule).",
-	{"Mode de jeu et bonus de d" E_ACUTE "part", "Villes et h" E_ACUTE "ros", "Ordinateur et arm" E_ACUTE "es neutres",
-	 "Artefacts et objets", "Cartes al" E_ACUTE "atoires"},
+	{"Mode de jeu et bonus de d" E_ACUTE "part", "H" E_ACUTE "ros et comp" E_ACUTE "tences", "Villes et h" E_ACUTE "ros",
+	 "Ordinateur et arm" E_ACUTE "es neutres", "Artefacts et objets", "Cartes al" E_ACUTE "atoires"},
 	{"Gouverneurs", "Conversion des villes et habitations", "Conversions en plus", "Portail des villes", "Gardes des mines",
 	 "Portes dimensionnelles", "Bonus de l'ordinateur", "Arm" E_ACUTE "es neutres m" E_ACUTE "lang" E_ACUTE "es",
 	 "Taille des arm" E_ACUTE "es neutres", "Gardes des sites de combat", "Artefacts farceurs", "Potions en vente",
 	 "Guilde des mages dans chaque ville", "Mana aux observatoires", "Qu" E_CIRC "te du disque lunaire", "Mode de jeu",
-	 "Bonus de d" E_ACUTE "part de ToE", "Scripts MMH5.5 sur les cartes al" E_ACUTE "atoires"},
+	 "Bonus de d" E_ACUTE "part de ToE", "Scripts MMH5.5 sur les cartes al" E_ACUTE "atoires",
+	 "Comp" E_ACUTE "tences de chaque classe", "Chance des comp" E_ACUTE "tences rares"},
 	{"Un h" E_ACUTE "ros peut gouverner une ville et lui donner des bonus.",
 	 "Les villes et habitations prises peuvent passer " A_GRAVE " votre faction.",
 	 "Combien de conversions en plus (1 = l'" E_ACUTE "quilibre de MMH5.5).",
@@ -195,13 +210,16 @@ const Words kFrench = {
 	 "La qu" E_CIRC "te de l'artefact du disque lunaire sur les cartes al" E_ACUTE "atoires.",
 	 "Par d" E_ACUTE "faut, Sauvage ou Cauchemar pour tous (MMH5.5" NBSP ": les fl" E_GRAVE "ches de bonus).",
 	 "Chacun garde le bonus de d" E_ACUTE "part choisi avec les fl" E_GRAVE "ches" NBSP ": or, ressources, artefact.",
-	 "En multijoueur, les scripts MMH5.5 tournent aussi sur les cartes sans script (du g" E_ACUTE "n" E_ACUTE "rateur)."},
+	 "En multijoueur, les scripts MMH5.5 tournent aussi sur les cartes sans script (du g" E_ACUTE "n" E_ACUTE "rateur).",
+	 "D" E_ACUTE "bloqu" E_ACUTE "es" NBSP ": toute comp" E_ACUTE "tence, hors liste de la classe " A_GRAVE
+	 " chance 2 (comme ToE).",
+	 "La chance des comp" E_ACUTE "tences hors de la liste d'une classe (tests)."},
 	{"Aucun", "40" NBSP "%", "60" NBSP "%", "80" NBSP "%", "100" NBSP "% (MMH5.5)", "120" NBSP "%", "140" NBSP "%"},
 	"Oui", "Non",
 	"votre fichier" NBSP ": %s",
 	"MMH5.5 seul" NBSP ": %s",
 	"Tous les joueurs ont open-homm5" NBSP ": ces r" E_GRAVE "gles seront utilis" E_ACUTE "es.",
-	"Sans open-homm5" NBSP ": %s. Chaque PC utilise alors son propre fichier MMH5.5.",
+	"Sans open-homm5 (ou avec une version plus ancienne)" NBSP ": %s. Chaque PC utilise alors son propre fichier MMH5.5.",
 	"Fichiers MMH5.5 diff" E_ACUTE "rents" NBSP ": %s. La partie risque de se d" E_ACUTE "synchroniser.",
 	"Les joueurs verront ces r" E_GRAVE "gles dans la salle d'attente.",
 	"L'h" O_CIRC "te n'a pas envoy" E_ACUTE " de r" E_GRAVE "gles (pas d'open-homm5 chez lui, ou une autre version)" NBSP
@@ -225,6 +243,14 @@ const Words kFrench = {
 	"Le mode de jeu et les bonus de ToE restent ceux de MMH5.5" NBSP ": %s.",
 	"Le mode de jeu et les bonus de ToE restent ceux de MMH5.5" NBSP ": le script de d" E_ACUTE "part de MMH5.5 "
 	"(H55-AdvMap.lua) n'est pas le m" E_CIRC "me sur tous les PC.",
+	{"MMH5.5 (verrouill" E_ACUTE "es)", "D" E_ACUTE "bloqu" E_ACUTE "es"},
+	"Comp" E_ACUTE "tences d" E_ACUTE "bloqu" E_ACUTE "es" NBSP ": la roue des comp" E_ACUTE "tences de MMH5.5 (" E_ACUTE
+	"cran du h" E_ACUTE "ros) montre toujours l'arbre d'origine de la classe, et les huttes de sorci" E_GRAVE "re gardent "
+	"les listes de MMH5.5.",
+	"Les comp" E_ACUTE "tences des classes restent verrouill" E_ACUTE "es comme dans MMH5.5" NBSP ": %s.",
+	"Les comp" E_ACUTE "tences des classes restent verrouill" E_ACUTE "es comme dans MMH5.5" NBSP ": la table des classes "
+	"d'un PC n'est pas celle de l'h" O_CIRC "te (une autre version de MMH5.5" NBSP "?).",
+	"Les comp" E_ACUTE "tences des classes viennent de la sauvegarde charg" E_ACUTE "e.",
 };
 
 const Words &WordsNow()
@@ -254,6 +280,12 @@ bool StartChanged(const Values &v)
 		if (rules::IsStartRule(r) && !v[r].empty() && v[r] != rules::kStartRuleOff)
 			return true;
 	return false;
+}
+
+// Do these values unlock the class skills?
+bool ClassChanged(const Values &v)
+{
+	return !v[rules::kClassSkills].empty() && v[rules::kClassSkills] != rules::kClassLocked;
 }
 
 bool Editable()
@@ -424,7 +456,7 @@ bool Wanted()
 	if (g_button_shown) {
 		ButtonInput(top);
 		const View v = rules::GetView(role);
-		g_button_warn = (v.map_script == 0 && v.shown[rules::kMapScripts] != "1") ||
+		g_button_warn = (v.map_script == 0 && v.shown[rules::kMapScripts] != "1") || (ClassChanged(v.shown) && !v.class_ok) ||
 		                (role == View::kHost ? (!v.missing.empty() || !v.differ.empty()) : (v.this_differs || (v.shown_known && !v.will_apply)));
 		static bool told = false;
 		if (!told) {
@@ -498,6 +530,8 @@ std::string Shown(const rules::RuleDef &rule, const std::string &value, const Wo
 		const int v = atoi(value.c_str());
 		if (&rule == &kRules[rules::kGameModeRule])
 			return v >= 0 && v < 5 ? w.modes[v] : value;
+		if (&rule == &kRules[rules::kClassSkills])
+			return v >= 0 && v < 2 ? w.class_modes[v] : value;
 		return v >= 0 && v < 7 ? w.ai[v] : value;
 	}
 	if (rule.kind == rules::kMultiplier)
@@ -525,7 +559,7 @@ void RuleRow(ImDrawList *draw, ImVec2 origin, float k, float width, float y, int
 	std::string help = w.help[r];
 	if (r == rules::kGameModeRule && (value.empty() || value == rules::kStartRuleOff) && g.edit[rules::kToeBonusRule] == "1")
 		help = w.mode_with_toe;
-	if (changed && !rules::IsStartRule(r)) {  // (the start rules are not in the file: gold says "not MMH5.5's way")
+	if (changed && !rules::IsStartRule(r) && !rules::IsClassRule(r)) {  // (not in the file: gold says "not MMH5.5's way")
 		char note[64];
 		_snprintf_s(note, sizeof(note), _TRUNCATE, rule.var ? w.file_value : w.own_value, Shown(rule, file, w).c_str());
 		help += std::string(" (") + note + ")";
@@ -650,7 +684,7 @@ void DrawPanel(const overlay::Frame &frame)
 			// whether MMH5.5's scripts, and so the group's other rules, run on a generated map
 			for (int i = -1; i < kRuleCount; ++i) {
 				const int r = i < 0 ? rules::kMapScripts : i;
-				if (kRules[r].group != group || (i >= 0 && r == rules::kMapScripts))
+				if (kRules[r].group != group || (i >= 0 && r == rules::kMapScripts) || kRules[r].hidden)
 					continue;
 				RuleRow(list, origin, l.k, width, y, r, w);
 				y += 34.0f;
@@ -692,6 +726,12 @@ void DrawPanel(const overlay::Frame &frame)
 			_snprintf_s(line, sizeof(line), _TRUNCATE, w.start_no, g.view.start_why.c_str());
 			sy = Wrapped(draw, small, small_px, sx, sy, sw, ui::kWarn, line);
 		}
+		if (ClassChanged(g.edit) && !g.view.class_ok && g.view.missing.empty()) {
+			_snprintf_s(line, sizeof(line), _TRUNCATE, w.class_no, g.view.class_why.c_str());
+			sy = Wrapped(draw, small, small_px, sx, sy, sw, ui::kWarn, line);
+		}
+		else if (ClassChanged(g.edit))
+			sy = Wrapped(draw, small, small_px, sx, sy, sw, ui::kDim, w.class_note);
 	}
 	else if (g.role == View::kSetup) {
 		sy = Wrapped(draw, small, small_px, sx, sy, sw, ui::kDim, w.setup);
@@ -699,10 +739,19 @@ void DrawPanel(const overlay::Frame &frame)
 			_snprintf_s(line, sizeof(line), _TRUNCATE, w.start_no, g.view.start_why.c_str());
 			sy = Wrapped(draw, small, small_px, sx, sy, sw, ui::kWarn, line);
 		}
+		if (ClassChanged(g.edit) && !g.view.class_ok) {
+			_snprintf_s(line, sizeof(line), _TRUNCATE, w.class_no, g.view.class_why.c_str());
+			sy = Wrapped(draw, small, small_px, sx, sy, sw, ui::kWarn, line);
+		}
+		else if (ClassChanged(g.edit))
+			sy = Wrapped(draw, small, small_px, sx, sy, sw, ui::kDim, w.class_note);
 	}
 	else if (g.role == View::kClient) {
 		if (g.view.shown_known && g.view.will_apply && !g.view.start_ok)
 			sy = Wrapped(draw, small, small_px, sx, sy, sw, ui::kWarn, w.client_start_no);
+		if (g.view.shown_known && g.view.will_apply && ClassChanged(g.edit))
+			sy = Wrapped(draw, small, small_px, sx, sy, sw, g.view.class_ok ? ui::kDim : ui::kWarn,
+			             g.view.class_ok ? w.class_note : w.client_class_no);
 		if (!g.view.shown_known)
 			sy = Wrapped(draw, small, small_px, sx, sy, sw, ui::kWarn, w.client_wait);
 		else
@@ -713,8 +762,11 @@ void DrawPanel(const overlay::Frame &frame)
 		if (g.view.map_script == 0)
 			sy = ScriptLine(draw, small, small_px, sx, sy, sw, w, g.view.shown_known && g.view.will_apply);
 	}
-	else if (g.role == View::kInGame)
+	else if (g.role == View::kInGame) {
 		sy = Wrapped(draw, small, small_px, sx, sy, sw, ui::kDim, g.view.in_game_rules ? w.game_host : w.game_file);
+		if (ClassChanged(g.edit))
+			sy = Wrapped(draw, small, small_px, sx, sy, sw, ui::kDim, g.view.class_from_save ? w.class_save : w.class_note);
+	}
 
 	// the buttons, on the game's button row
 	ImFont *button_font = overlay::Font(Px(kButtonFont, l.k));

@@ -4,11 +4,14 @@
 //   - the rules: MMH5.5's switches of scripts/H55-Settings.lua that the host
 //     may choose (docs/plans/mmh55-vs-vanilla.md, B.5), two rules of the
 //     start (the game mode, ToE's start bonuses) that change MMH5.5's start
-//     script scripts/H55-AdvMap.lua instead, and one the add-on applies itself:
-//     MMH5.5's scripts on maps without a map script ("map_scripts");
+//     script scripts/H55-AdvMap.lua instead, and three the add-on applies itself:
+//     MMH5.5's scripts on maps without a map script ("map_scripts"), and the
+//     class skill lock ("class_skills", with its testing chance "class_chance":
+//     the game's class table, edited in memory);
 //   - reading their values from that file, and the file with other values;
 //   - the start script with the start rules (checked text edits);
-//   - the text that carries a set of values between PCs ("OHR3;governance=0;...");
+//   - the text that carries a set of values between PCs ("OHR4;governance=0;...");
+//   - the class table's edit for class_skills, and the text a save keeps ("OHW1;...");
 //   - the lobby hello's number codes (the type and byte of a waiting-room request).
 #pragma once
 
@@ -29,23 +32,40 @@ enum Kind {
 	kMultiplier,  // a decimal number above 0 (1 = MMH5.5's), offered from kMultipliers
 };
 
-enum Group { kStart, kTowns, kComputer, kItems, kRandomMaps, kGroupCount };
+enum Group { kStart, kHeroes, kTowns, kComputer, kItems, kRandomMaps, kGroupCount };
 
 struct RuleDef {
 	const char *key;  // open-homm5.ini [rules] and the carried text: "governance"
 	const char *var;  // the variable in H55-Settings.lua: "H55_GovernanceEnabled";
 	                  // nullptr = not in that file: a start rule (kStartRuleOff is MMH5.5's way)
-	                  // or map_scripts (the add-on applies it itself)
+	                  // or one the add-on applies itself (map_scripts, class_skills, class_chance)
 	Kind kind;
 	int low, high;  // kInt, kChoice
 	Group group;
+	bool hidden;    // not in the panel (a testing value, set in open-homm5.ini only)
 };
 
-const int kRuleCount = 18;
+const int kRuleCount = 20;
 extern const RuleDef kRules[kRuleCount];
 int RuleIndex(const std::string &key);  // -1 when unknown
-// map_scripts: the last of the table (the panel shows it first of its group, "Random maps")
+// map_scripts: after the start rules (the panel shows it first of its group, "Random maps")
 const int kMapScripts = 17;
+
+// The class skill lock (docs/plans/host-rules.md, "Step 3"): the last two of the table.
+//   class_skills: 0 = MMH5.5's way (each class is offered only the skills of
+//                 its list in GameMechanics/RefTables/HeroClass.xdb), 1 = unlocked
+//                 (MMH5.5's classes and chances, and every other skill MMH5.5
+//                 offers to some class at class_chance); a later 2 = vanilla classes;
+//   class_chance: the chance of those other skills, as the class table counts
+//                 (MMH5.5's lists add up to 100): 2 = vanilla ToE's rare skills.
+//                 Hidden: only open-homm5.ini sets another one (testing).
+const int kClassSkills = 18, kClassChance = 19;
+const char kClassLocked[] = "0", kClassUnlocked[] = "1";
+const char kClassChanceVanilla[] = "2";
+inline bool IsClassRule(int r)
+{
+	return r == kClassSkills || r == kClassChance;
+}
 
 // The start rules (scripts/H55-AdvMap.lua, docs/plans/host-rules.md "Game mode and
 // start bonuses"): the two before map_scripts.
@@ -93,7 +113,7 @@ uint32_t Fnv1a(const void *data, size_t size, uint32_t hash = 2166136261u);
 // them on every PC, so only the rest must be the same everywhere).
 uint32_t HashWithoutRuleValues(const std::string &lua);
 
-// The text that carries a set of values: "OHR3" then ";key=value" for each
+// The text that carries a set of values: "OHR4" then ";key=value" for each
 // rule that has one, in the table's order. At most kTextMax characters.
 const int kTextMax = 480;
 std::string Encode(const Values &values);
@@ -102,13 +122,15 @@ std::string Encode(const Values &values);
 bool Decode(const std::string &text, Values *values);
 
 // The host's lobby message to a client, short (it travels in 4-byte pieces):
-// "L3|<flags>|" then every rule's value in the table's order, separated by ","
+// "L4|<flags>|" then every rule's value in the table's order, separated by ","
 // (empty = none). Flags: kWillApply = every player has the mod (the rules will
 // be used), kDiffers = this client's MMH5.5 files differ from the host's,
 // kNoScript = the map has no map script (MMH5.5's scripts run on it only with
 // map_scripts on), kNoStart = the start rules cannot be used (MMH5.5's start
-// script is not the same on every PC, or not as expected): MMH5.5's way for them.
-const int kWillApply = 1, kDiffers = 2, kNoScript = 4, kNoStart = 8;
+// script is not the same on every PC, or not as expected): MMH5.5's way for them,
+// kNoClasses = class_skills cannot be used (a PC's class table is not the host's,
+// or cannot be edited): MMH5.5's lock for everyone.
+const int kWillApply = 1, kDiffers = 2, kNoScript = 4, kNoStart = 8, kNoClasses = 16;
 std::string LobbyText(int flags, const Values &values);
 bool ReadLobbyText(const std::string &text, int *flags, Values *values);
 
@@ -181,17 +203,64 @@ int ModeUsed(int game_mode, bool toe_bonuses);
 // the expected text is not found exactly once: then nothing may change.
 bool PatchStartScript(const std::string &lua, int game_mode, bool toe_bonuses, bool trace, std::string *out, std::string *why);
 
+// --- the class table (class_skills; host_rules_classes.cpp reads and edits it in memory) ---
+// The game reads GameMechanics/RefTables/HeroClass.xdb once, at start-up, with
+// the rest of its reference tables. Each class's SkillsProbs is a vector of
+// 12-byte items (0x00875ba0 reads them): a word we leave alone, the skill, its
+// chance. A new skill on level-up is drawn among the skills the hero lacks,
+// weighted by these chances (0x00b50be0 -> 0x00b509b0: one draw of the world's
+// shared random numbers in [0, sum - 1]); a skill the class does not list
+// weighs 0, so it is never offered.
+struct SkillProb {
+	uint32_t head;  // the item's first word (the same in every item; copied into ours)
+	int32_t skill;
+	int32_t prob;
+};
+struct ClassSkillList {
+	int id;  // the class's number (its place in the table)
+	std::vector<SkillProb> probs;
+};
+typedef std::vector<ClassSkillList> ClassTable;  // the classes with a list, by number
+// Plausible as the game's table? Every list 1..64 items, skills 1..1000, chances
+// 0..1000 adding up to more than 0, no skill twice in a list, at least one class.
+// "" = fine, else why not.
+std::string CheckClassTable(const ClassTable &table);
+// FNV-1a of the numbers, skills and chances (not the heads): every PC must have
+// the same table for class_skills.
+uint32_t ClassTableHash(const ClassTable &table);
+// The skills some class can be offered (MMH5.5: 24; never the ones no class
+// lists, such as vanilla's Barbarian Learning and Voice), from low to high.
+std::vector<int> OfferedSkills(const ClassTable &table);
+// A list with the rule: its own items, unchanged and in their order, then each
+// skill of `skills` it lacks, at `chance` (head: the list's first item's).
+std::vector<SkillProb> UnlockedList(const std::vector<SkillProb> &own, const std::vector<int> &skills, int chance);
+// The table for these values of class_skills and class_chance: MMH5.5's for
+// "0" or "" (false: nothing to change), every list unlocked for "1". False and
+// why for a value it does not know (a later "2", vanilla classes) or a bad table.
+bool ClassTableFor(const ClassTable &mmh55, const std::string &mode, const std::string &chance, ClassTable *out, std::string *why);
+// The chance used: class_chance's value, or vanilla's 2 when it has none.
+int ClassChance(const std::string &chance);
+
+// --- what a save keeps: the rules the add-on applies in memory (class_skills) ---
+// The world's own serializer (saves, and the multiplayer checksums) gets one more
+// chunk when this game's class skills are unlocked: "OHW1;class_skills=1;
+// class_chance=2" (the class rules that have a value). A save without it is
+// MMH5.5's way. False when the text is not ours or has another key or a bad value.
+std::string EncodeWorld(const Values &values);
+bool DecodeWorld(const std::string &text, Values *values);
+
 // --- the lobby hello (a waiting-room request the game ignores: rmg_factions.cpp) ---
 // "This PC applies the host's rules, version N": type kHelloType, byte N.
 const uint32_t kHelloType = 0x4f52;  // 'OR'
-// 2: the start rules (game mode, ToE bonuses); 3: map_scripts. A PC with an older
-// version gets no rules (as a PC without the add-on).
-const uint8_t kProtocol = 3;
+// 2: the start rules (game mode, ToE bonuses); 3: map_scripts; 4: class_skills.
+// A PC with an older version gets no rules (as a PC without the add-on).
+const uint8_t kProtocol = 4;
 // A hash: the mark in the type's top byte, its low 24 bits in the rest, its top
 // 8 bits in the byte. Marks: 'N' the settings file without the rules' values,
 // 'S' the whole settings file, 'X' MMH5.5's stats files, 'A' the start script's
-// "StartingBonus" part (StartBlockHash).
-const char kMarkSettingsRest = 'N', kMarkSettingsWhole = 'S', kMarkStats = 'X', kMarkStartScript = 'A';
+// "StartingBonus" part (StartBlockHash), 'C' the class table (ClassTableHash; 0 =
+// this PC cannot edit its table).
+const char kMarkSettingsRest = 'N', kMarkSettingsWhole = 'S', kMarkStats = 'X', kMarkStartScript = 'A', kMarkClassTable = 'C';
 void HashRequest(char mark, uint32_t hash, uint32_t *type, uint8_t *byte);
 // True (and the mark and hash) when the type is one of those marks.
 bool ReadHashRequest(uint32_t type, uint8_t byte, char *mark, uint32_t *hash);
