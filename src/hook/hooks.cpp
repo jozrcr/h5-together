@@ -30,6 +30,7 @@
 #include "../mods/rmg_templates.h"
 #include "../mods/steam_spike.h"
 #include "../mods/update_check.h"
+#include "../mods/virtual_lan.h"
 #include "../mods/wheel.h"
 
 namespace hooks {
@@ -57,6 +58,17 @@ bool NoHooks()
 }
 
 }  // namespace
+
+void InstallNetEarly()
+{
+	// [online] mode (off by default): the virtual LAN's Winsock hooks go in before the
+	// robot's network log (robot::Init), so they sit under it and that log shows the
+	// game's packets as the game sends and gets them. Only in a build we know now (an
+	// unwrapped exe); the Steam-wrapped one gets them from InstallAll().
+	if (NoHooks() || !IsHookable(DetectGameBuild()))
+		return;
+	mods::InstallVirtualLan();
+}
 
 void InstallEarly()
 {
@@ -88,6 +100,7 @@ void InstallAll()
 	InstallAiTrace();
 	mods::ApplyNetTuningFromSettings();
 	mods::ApplyFastPathsFromSettings();
+	mods::InstallVirtualLan();  // [online] mode (off by default); done already at the DLL's load in an unwrapped exe
 	mods::ApplyLanDiscoveryFromSettings();
 	mods::ApplyCoopGuardFromSettings();
 	mods::ApplyLockstepFromSettings();
