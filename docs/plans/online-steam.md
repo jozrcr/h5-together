@@ -365,25 +365,25 @@ What this settles:
 - Details that differ from or add to the design: the probe is a copy of the game's **own** last query (so we never build a `02` ourselves), and any `03` the game sends also counts as "hosting"; packets from the real network are read and dropped (as `keep_lan=0`); a message older than 3 s when the game asks for it is dropped; the game's two copies of each query (classful broadcast and 255.255.255.255) go out once; until the transport knows our id, the game's own-address question gets no answer rather than a real address.
 - The robot: `run_lan_test.py --net-log-bytes 2048 --net-scan --vlan`, and `tools/robot/packet_map.py` ([tools/robot/README.md](../../tools/robot/README.md)).
 
-**The robot's proof.** Two copies of the game on this PC (test copy `C:\Games\H5_test`, MMH5.5 RC19d), A1M4, 8 AI turns, link tuning on, same settings both times; the only difference is `--vlan`. Runs in `build/robot/` of the branch's worktree.
+**The robot's proof.** Two copies of the game on this PC (test copy `C:\Games\H5_test`, MMH5.5 RC19d), A1M4, 8 AI turns, link tuning on, same settings both times; the only difference is `--vlan`. The virtual LAN ran twice. Runs in `build/robot/` of the branch's worktree.
 
-| | Game's own LAN (`20261102-192943-lan`) | Virtual LAN (`20261102-202355-lan`) |
-|---|---|---|
-| Client finds the host's game | yes, at 127.0.0.1:8889 (the robot's broadcast copies) | **yes, at 198.18.161.134:8889**: the host was detected as hosting 1 s after creating its game (the next probe), its announcement reached the client, the client's queries went to it (10 queries, one per second, each sent once) |
-| Joins, game starts | yes | **yes** |
-| AI turns, AI steps (host) | 8, 94 | 8, 99 |
-| World checksums | 1,461 checks, all equal | **1,359 checks, all equal (no desync)** |
-| Wait before an AI step | median 204 ms (p90 402) | median 200 ms (p90 839) |
-| AI hero move | median 154 ms | median 174 ms |
-| Host's packets (sent + received) | 6,012 + 4,780 | 5,775 + 4,393 |
-| **Packets holding an address of this PC** (scan of every packet, both copies) | host 119, client 119 | **0 and 0** |
-| Virtual LAN counters (client, end) | | 4,476 packets to the host, 5,568 from it; 0 that could not be sent, 0 stale, 0 to unknown addresses; 144 real broadcasts (`lan_discovery`'s copies) dropped |
+| | Game's own LAN (`20261102-192943-lan`) | Virtual LAN (`20261102-202355-lan`) | Virtual LAN again (`20261102-203056-lan`) |
+|---|---|---|---|
+| Client finds the host's game | yes, at 127.0.0.1:8889 (the robot's broadcast copies) | **yes, at 198.18.161.134:8889**: the host was detected as hosting 1 s after creating its game (the next probe), its announcement reached the client, the client's queries went to it (10 queries, one per second, each sent once) | yes, the same way |
+| Joins, game starts | yes | **yes** | **yes** |
+| AI turns, AI steps (host) | 8, 94 | 8, 99 | 8, 87 |
+| World checksums | 1,461 checks, all equal | **1,359 checks, all equal (no desync)** | **1,362 checks, all equal** |
+| Wait before an AI step | median 204 ms (p90 402) | median 200 ms (p90 839) | median 206 ms (p90 433) |
+| AI hero move | median 154 ms | median 174 ms | median 153 ms |
+| Host's packets (sent + received) | 6,012 + 4,780 | 5,775 + 4,393 | 5,786 + 4,392 |
+| **Packets holding an address of this PC** (scan of every packet, both copies) | host 119, client 119 | **0 and 0** | **0 and 0** |
+| Virtual LAN counters (client, end) | | 4,476 packets to the host, 5,568 from it; 0 that could not be sent, 0 stale, 0 to unknown addresses; 144 real broadcasts (`lan_discovery`'s copies) dropped | 4,470 to the host, 5,579 from it; the same zeros |
 
-- **No real address in any packet**: the address scan looked at all 20,513 packets of the two copies for the PC's 10 addresses. None held one in network byte order. Three per copy held `01 00 00 7f` (127.0.0.1 backwards) by chance, inside acknowledgement bits and AI command data; the robot logs those packets whole. The packets show the fake addresses exactly where the packet map has the real ones (`03` bytes 355, 375, 772, 792; `01` and `04` byte 13; the lobby's records).
+- **No real address in any packet**: the address scan looked at all 20,513 packets of the two copies (20,934 in the second run) for the PC's 10 addresses. None held one in network byte order. A few per copy (3, then 7) held `01 00 00 7f` (127.0.0.1 backwards) by chance, as without the virtual LAN, inside acknowledgement bits and AI command data; the robot logs those packets whole. The packets show the fake addresses exactly where the packet map has the real ones (`03` bytes 355, 375, 772, 792; `01` and `04` byte 13; the lobby's records).
 - **The game sent no `07` address probes at all** (24 in the run without it). It seems to probe only when the address its partner's packets come from is not in that partner's list; with the virtual LAN, it always is. One less thing to carry.
 - **The host keeps answering queries during the game** (80 of 90 probes answered by the end), so "hosting" lasts as long as the game: the Steam lobby (step 3) can follow it.
 - Once the client joined, the host's game description grew to **984 bytes** (it then lists the client too). Still under one Steam packet (~1,200 bytes).
-- Timing: the medians are the same. The p90 and the slowest AI turn differ between any two runs (the AI does not play the same game twice; an earlier run without the virtual LAN had a p90 of 638 ms), so one pair of runs does not show a difference either way. Each message adds one hop through a local socket, read every time the game polls (every few ms).
+- Timing: **no difference**. The second virtual LAN run matches the run without it (median wait 206 vs 204 ms, p90 433 vs 402, AI hero move 153 vs 154 ms, 0.21 vs 0.20 s per AI step). The first run's higher p90 was one slow AI turn: the AI does not play the same game twice (an earlier run without the virtual LAN had a p90 of 638 ms). Each message adds one hop through a local socket, read every time the game polls (every few ms).
 
 **What step 3 (the Steam transport) needs from this:**
 
