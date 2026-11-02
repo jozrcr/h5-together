@@ -33,14 +33,22 @@ New-Item -ItemType Directory -Force $imgui_out | Out-Null
 $imgui_sources = "third_party\imgui\imgui.cpp", "third_party\imgui\imgui_draw.cpp", "third_party\imgui\imgui_tables.cpp", "third_party\imgui\imgui_widgets.cpp", "third_party\imgui\backends\imgui_impl_dx9.cpp"
 $imgui_objs = ($imgui_sources | ForEach-Object { "`"$imgui_out\" + [IO.Path]::GetFileNameWithoutExtension($_) + ".obj`"" }) -join ' '
 $imgui = "cl /nologo /O2 /MT /W3 /EHsc /std:c++17 /utf-8 $imgui_defs /c $($imgui_sources -join ' ') /Fo`"$imgui_out\\`""
+# The DLL's version information (dinput8.rc, linked in as dinput8.res). The text comes
+# from version.h through the rc file's #include; rc.exe (found by vcvarsall, like cl)
+# gets the three numbers cut from that same string.
+$version_h = Get-Content -Raw (Join-Path $src "version.h")
+$ver = [regex]::Match($version_h, '#define\s+OPEN_HOMM5_VERSION\s+"(\d+)\.(\d+)\.(\d+)')
+if (-not $ver.Success) { throw "src\hook\version.h: OPEN_HOMM5_VERSION must start with major.minor.patch numbers, like ""0.3.0""" }
+$res = "$out\dinput8.res"
+$rc = "rc /nologo /DOH_VER_MAJOR=$($ver.Groups[1].Value) /DOH_VER_MINOR=$($ver.Groups[2].Value) /DOH_VER_PATCH=$($ver.Groups[3].Value) /Fo`"$res`" dinput8.rc"
 # /GL + /LTCG: whole-program optimization of our own code (the AI pathfinding
 # mod calls small helpers across files thousands of times per search)
 # The DLL's long argument list goes in a response file: with every mod and its
 # tests on one cmd line, the line grew past cmd's 8191 characters.
 $dll_rsp = Join-Path $out "dinput8.rsp"
-Set-Content -Encoding ascii $dll_rsp "$flags /GL /LD $($sources -join ' ') $imgui_objs /Fo`"$out\\`" /Fe`"$out\dinput8.dll`" /link /LTCG /DEF:dinput8.def /MAP:`"$out\dinput8.map`" user32.lib dxguid.lib iphlpapi.lib winmm.lib shell32.lib advapi32.lib"
+Set-Content -Encoding ascii $dll_rsp "$flags /GL /LD $($sources -join ' ') $imgui_objs `"$res`" /Fo`"$out\\`" /Fe`"$out\dinput8.dll`" /link /LTCG /DEF:dinput8.def /MAP:`"$out\dinput8.map`" user32.lib dxguid.lib iphlpapi.lib winmm.lib shell32.lib advapi32.lib"
 $dll = "cl @`"$dll_rsp`""
-$cmd = "call `"$vcvars`" x86 >nul 2>&1 && cd /d `"$src`" && $imgui && $dll"
+$cmd = "call `"$vcvars`" x86 >nul 2>&1 && cd /d `"$src`" && $imgui && $rc && $dll"
 if ($Test) {
     $cmd += " && cl $flags test\proxy_test.cpp /Fo`"$out\\`" /Fe`"$out\proxy_test.exe`" dxguid.lib"
     # calling-convention test of the AI hook: debug build with runtime stack checks (/RTCs)

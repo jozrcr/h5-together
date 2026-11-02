@@ -112,7 +112,7 @@ Needs Visual Studio 2019 or 2022 (C++ build tools, x86). Already on the owner's 
 powershell -File src\hook\build.ps1 -Test
 ```
 
-This builds `build\hook\dinput8.dll` and runs these tests outside the game:
+This builds `build\hook\dinput8.dll` (with its version information: `dinput8.rc`, compiled by `rc.exe` from the Windows SDK that Visual Studio's C++ tools bring; check it with `(Get-Item build\hook\dinput8.dll).VersionInfo`) and runs these tests outside the game:
 
 - `test/proxy_test.cpp`: loads the DLL, calls `DirectInput8Create`, and checks that a real DirectInput object comes back.
 - `test/ai_trace_test.cpp`: calls the AI hook exactly the way the game calls the AI (`__thiscall`, command list then flag) on a fake AI object, built with the compiler's runtime stack check (`/RTCs`). It checks that the arguments reach the original function unchanged and that the log line is right. A calling-convention mistake here would crash the game, so this test matters.
@@ -153,7 +153,8 @@ On **Linux** (Wine/Proton) Wine prefers its own built-in `dinput8.dll`. Tell it 
 | `ai_trace.cpp` | the AI turn trace |
 | `log.cpp/.h` | `open-homm5.log` writer. At start-up a log over 5 MB becomes `open-homm5.old.log` (one older log is kept) and a new one starts; a log that goes on from earlier runs gets a `---- new run ----` line before the new run's first line |
 | `d3d9_hook.cpp/.h` | the shared Direct3D 9 hooks (overlay, robot screenshots) |
-| `version.h` | the version number (log's first line, install package) |
+| `version.h` | the version number, the one place that holds it (log's first line, install package, the DLL's version information) |
+| `dinput8.rc` | the DLL's version information (file properties > Details: product name, description, version, copyright). `build.ps1` compiles it with `rc.exe` (found through `vcvarsall`, like `cl`) and links it in; the version text comes from `version.h`, the numbers are cut from it by the build script |
 | `patch.cpp/.h` | redirecting the game's `call` instructions to our code (several hooks may stack on one call) |
 | `watchdog.cpp/.h` | the hang watchdog (freeze detector) |
 | `dinput_hook.cpp/.h` | the shared DirectInput 8 hooks (the mouse wheel fix under Wine, `mods/wheel.cpp`; the robot's keyboard; the modal panels' mute). With none of them on (Windows, no modal panel installed, no robot, no `trace_wheel`), DirectInput is not hooked at all. |

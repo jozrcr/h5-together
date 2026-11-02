@@ -1,0 +1,41 @@
+// Version information of dinput8.dll (what Windows shows under Properties > Details).
+// Without it a DLL looks anonymous, and antivirus tools are more suspicious of that.
+//
+// The version comes from version.h, the one place that holds it. The text is the
+// string there (OPEN_HOMM5_VERSION). The numbers are cut from that string by build.ps1,
+// which passes them as OH_VER_MAJOR / OH_VER_MINOR / OH_VER_PATCH when it runs rc.exe.
+//
+// Keep this file plain ASCII.
+#include <winver.h>
+#include "version.h"
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION OH_VER_MAJOR, OH_VER_MINOR, OH_VER_PATCH, 0
+ PRODUCTVERSION OH_VER_MAJOR, OH_VER_MINOR, OH_VER_PATCH, 0
+ FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+ FILEFLAGS 0
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE VFT_DLL
+ FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"  // English (US), Unicode
+        BEGIN
+            VALUE "CompanyName", "jozrcr and open-homm5 contributors"
+            VALUE "FileDescription", "open-homm5: Heroes V add-on"
+            VALUE "FileVersion", OPEN_HOMM5_VERSION
+            VALUE "InternalName", "dinput8"
+            VALUE "LegalCopyright", "Copyright (c) 2026 jozrcr and open-homm5 contributors. MIT License."
+            VALUE "LegalTrademarks", "Heroes of Might and Magic is a trademark of Ubisoft. This is an unofficial fan project."
+            VALUE "OriginalFilename", "dinput8.dll"
+            VALUE "ProductName", "open-homm5"
+            VALUE "ProductVersion", OPEN_HOMM5_VERSION
+            VALUE "Comments", "Unofficial add-on for Heroes of Might and Magic V: Tribes of the East with MMH5.5. https://github.com/jozrcr/open-homm5"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END
