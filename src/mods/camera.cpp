@@ -218,7 +218,7 @@ float Factor(const wchar_t *ini, const wchar_t *key, const char *name)
 void ApplyCameraFromSettings()
 {
 	wchar_t ini[MAX_PATH];
-	hooklog::PathNextToExe(L"open-homm5", L".ini", ini, MAX_PATH);  // open-homm5-<instance>.ini for the robot
+	hooklog::PathNextToExe(L"h5-together", L".ini", ini, MAX_PATH);  // h5-together-<instance>.ini for the robot
 	g_map_scale = Factor(ini, L"zoom_out", "zoom_out");
 	g_combat_scale = Factor(ini, L"combat_zoom_out", "combat_zoom_out");
 	const int start = static_cast<int>(GetPrivateProfileIntW(L"camera", L"start_zoom", 0, ini));

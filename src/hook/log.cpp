@@ -51,8 +51,8 @@ void Open(HMODULE)
 	g_start = GetTickCount();
 	// The log goes next to the game exe (the current directory may differ).
 	wchar_t path[MAX_PATH], old_path[MAX_PATH];
-	PathNextToExe(L"open-homm5", L".log", path, MAX_PATH);
-	PathNextToExe(L"open-homm5", L".old.log", old_path, MAX_PATH);
+	PathNextToExe(L"h5-together", L".log", path, MAX_PATH);
+	PathNextToExe(L"h5-together", L".old.log", old_path, MAX_PATH);
 	RotateIfLarge(path, old_path, kMaxLogBytes);
 	const bool appending = FileSize(path) > 0;
 	// shared for reading, so the log can be watched while the game runs

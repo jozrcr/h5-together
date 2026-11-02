@@ -242,7 +242,7 @@ std::string Substitute(const std::string &lua, const Values &values, std::vector
 		out += kRules[r].var;
 		out += " = ";
 		out += values[r];
-		out += "; -- open-homm5: the host's rules";
+		out += "; -- H5 Together: the host's rules";
 		out += eol;
 	}
 	if (changes)
@@ -511,10 +511,10 @@ bool PatchStartScript(const std::string &lua, int game_mode, bool toe_bonuses, b
 			"if h ~= nil and h[0] ~= nil then if HasArtefact(h[0],ARTIFACT_WAND_OF_X) == 1 then a = a..\" wand\" end; "
 			"if HasArtefact(h[0],ARTIFACT_SCROLL_OF_SPELL_X) == 1 then a = a..\" scroll\" end; "
 			"for j,m in H55_MinorArtifacts do if HasArtefact(h[0],m) == 1 then a = a..\" \"..m end end end; "
-			"print(\"open-homm5: start of player \"..i..\" (computer \"..H55_IsThisAIPlayer(i)..\"): gold \"..GetPlayerResource(i,6)"
+			"print(\"H5 Together: start of player \"..i..\" (computer \"..H55_IsThisAIPlayer(i)..\"): gold \"..GetPlayerResource(i,6)"
 			"..\" wood \"..GetPlayerResource(i,0)..\" ore \"..GetPlayerResource(i,1)..\" mercury \"..GetPlayerResource(i,2)"
 			"..\" crystal \"..GetPlayerResource(i,3)..\" sulfur \"..GetPlayerResource(i,4)..\" gems \"..GetPlayerResource(i,5)"
-			"..\"; minor artifacts:\"..a..\"; game mode \"..H55_GameMode) end end; -- open-homm5: [rules] trace=1" +
+			"..\"; minor artifacts:\"..a..\"; game mode \"..H55_GameMode) end end; -- H5 Together: [rules] trace=1" +
 			LineEnd(s, e);
 		s.insert(line, text);
 	}
@@ -525,14 +525,14 @@ bool PatchStartScript(const std::string &lua, int game_mode, bool toe_bonuses, b
 			"if OH55_Mode ~= 0 then if OH55_Mode == 4 then OH55_Mode = random(3)+1 end; "
 			"somebodyartifact = 0; somebodygold = 0; somebodyres = 0; "
 			"if OH55_Mode == 1 then somebodyartifact = 1 elseif OH55_Mode == 2 then somebodygold = 1 else somebodyres = 1 end; "
-			"end; -- open-homm5: the game mode is the host's rule, not the bonus arrows" +
+			"end; -- H5 Together: the game mode is the host's rule, not the bonus arrows" +
 			LineEnd(s, decision);
 		s.insert(line, decide);
 		s.replace(loop, strlen(kHumansLoop), "if H55_MapType ~= \"Campaign\" and OH55_KeepToEBonus ~= 1 then");
 		const std::string values =
 			Indent(s, LineStart(s, amount)) + "local OH55_KeepToEBonus, OH55_Mode = " + (toe_bonuses ? "1" : "0") + ", " +
 			std::to_string(mode) +
-			"; -- open-homm5: the host's rules (1 = each human keeps the ToE start bonus; mode 1 Default, 2 Savage, "
+			"; -- H5 Together: the host's rules (1 = each human keeps the ToE start bonus; mode 1 Default, 2 Savage, "
 			"3 Nightmare, 4 Random, 0 = the bonus arrows)" +
 			LineEnd(s, amount);
 		s.insert(s.find('\n', amount) + 1, values);

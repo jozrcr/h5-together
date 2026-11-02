@@ -110,12 +110,12 @@ void ApplyNetTuning(DWORD keepalive_ms, DWORD send_interval_ms, int batched_segm
 
 void ApplyNetTuningFromSettings()
 {
-	// open-homm5.ini next to the game exe (open-homm5-<instance>.ini for the
+	// h5-together.ini next to the game exe (h5-together-<instance>.ini for the
 	// robot's copies, see hooklog::PathNextToExe), section [net]; all optional.
 	wchar_t path[MAX_PATH];
-	hooklog::PathNextToExe(L"open-homm5", L".ini", path, MAX_PATH);
+	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
 	if (!GetPrivateProfileIntW(L"net", L"tuning", 1, path)) {
-		hooklog::Write("net tuning: off (open-homm5.ini)");
+		hooklog::Write("net tuning: off (h5-together.ini)");
 		return;
 	}
 	ApplyNetTuning(GetPrivateProfileIntW(L"net", L"keepalive_ms", 50, path),

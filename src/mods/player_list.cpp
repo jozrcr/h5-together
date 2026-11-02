@@ -20,7 +20,7 @@
 // GetAsyncKeyState while the game's window is in front, so the game still gets
 // every key and click.
 //
-// Settings (open-homm5.ini):
+// Settings (h5-together.ini):
 //   [ui]
 //   player_list=1          1 = the overlay, 0 = nothing is installed
 //   player_list_key=F9     the key that hides / shows it (F1..F12, or none)
@@ -73,7 +73,7 @@ float Percent(const wchar_t *path, const wchar_t *key, float fallback, float low
 void ReadSettings()
 {
 	wchar_t path[MAX_PATH];
-	hooklog::PathNextToExe(L"open-homm5", L".ini", path, MAX_PATH);
+	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
 	g_enabled = GetPrivateProfileIntW(L"ui", L"player_list", 1, path) != 0;
 	g_trace = static_cast<int>(GetPrivateProfileIntW(L"ui", L"trace_players", 0, path));
 	g_test_rows = static_cast<int>(GetPrivateProfileIntW(L"ui", L"player_list_test_rows", 0, path));

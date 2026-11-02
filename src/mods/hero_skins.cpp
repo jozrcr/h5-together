@@ -1,7 +1,7 @@
 // Mod: choose your hero's look ("skins"). Plan and findings: docs/plans/hero-skins.md.
 //
 // A player picks, for a hero, the look of another hero of the same faction
-// (open-homm5-skins.ini: Godric=Freyda). The hero then shows that hero's
+// (h5-together-skins.ini: Godric=Freyda). The hero then shows that hero's
 // figures: on the adventure map, in battle and on the hero screen. Its
 // portrait, class, skills and everything the rules use stay its own.
 //
@@ -61,14 +61,14 @@
 // human: in single player and hot seat this PC's file for every human; in
 // multiplayer each player's own file. Computer players' heroes keep their looks.
 //
-// Settings, open-homm5.ini [skins]:
+// Settings, h5-together.ini [skins]:
 //   skins=1           0 = nothing is installed
 //   show_others=1     0 = no looks in multiplayer games (this PC takes no part,
 //                     so nobody's looks show there; single player is unchanged)
 //   trace=0           1 = log each figure built and each caller of the two slots
 //   test_ai_heroes=0  testing: computer players' heroes take this PC's looks
 //   live_hero_screen=1  0 = an open hero screen shows a new look only when opened again
-// Choices: open-homm5-skins.ini, [skins] section, hero=look by InternalName.
+// Choices: h5-together-skins.ini, [skins] section, hero=look by InternalName.
 #include "hero_skins.h"
 
 #include <windows.h>
@@ -268,7 +268,7 @@ bool g_disabled = false;  // part of the hooks could not go in: every hook only 
 bool g_test_ai = false;   // testing ([skins] test_ai_heroes=1): computer players' heroes take this PC's looks too
 bool g_show_others = true;
 int g_trace = 0;
-std::vector<std::pair<std::string, std::string>> g_entries;  // open-homm5-skins.ini [skins]
+std::vector<std::pair<std::string, std::string>> g_entries;  // h5-together-skins.ini [skins]
 
 // ---- state (g_lock) ----
 CRITICAL_SECTION g_lock;
@@ -475,7 +475,7 @@ bool EnsureCatalog()
 	g_applied.resize(g_catalog.size());
 	std::vector<std::string> notes;
 	g_local = skins::ParseChoices(g_entries, g_catalog, &notes);
-	hooklog::Write("hero skins: %d heroes in the game's list (fingerprint %04x%s); %d look(s) chosen in open-homm5-skins.ini",
+	hooklog::Write("hero skins: %d heroes in the game's list (fingerprint %04x%s); %d look(s) chosen in h5-together-skins.ini",
 	               static_cast<int>(g_catalog.size()), g_fingerprint, others ? ", other entries skipped" : "",
 	               static_cast<int>(g_local.size()));
 	for (const std::string &n : notes)
@@ -923,7 +923,7 @@ void __fastcall SegmentHook(void *transceiver8, void *edx, DWORD time)
 			else if (!g_sent)
 				hooklog::Write("hero skins: no looks in this game: this PC sent none (show_others=0, or too late)");
 			else
-				hooklog::Write("hero skins: no looks in this game: PC %d sent none in time (no open-homm5 DLL, an old "
+				hooklog::Write("hero skins: no looks in this game: PC %d sent none in time (no H5 Together DLL, an old "
 				               "one, other game data, or show_others=0)", missing);
 			if (g_agreed && g_kind == kMulti)
 				rebuild = FiguresToRebuild(kMaxFigures);
@@ -1338,11 +1338,11 @@ Applied ApplyLook(int hero, int look, std::string *note)
 	if (look == hero)
 		look = -1;
 	wchar_t path[MAX_PATH];
-	hooklog::PathNextToExe(L"open-homm5-skins", L".ini", path, MAX_PATH);
+	hooklog::PathNextToExe(L"h5-together-skins", L".ini", path, MAX_PATH);
 	const std::wstring key(g_catalog[hero].name.begin(), g_catalog[hero].name.end());
 	const std::wstring value = look >= 0 ? std::wstring(g_catalog[look].name.begin(), g_catalog[look].name.end()) : L"";
 	if (!WritePrivateProfileStringW(L"skins", key.c_str(), look >= 0 ? value.c_str() : nullptr, path))
-		hooklog::Write("hero skins: open-homm5-skins.ini could not be written (error %lu)", GetLastError());
+		hooklog::Write("hero skins: h5-together-skins.ini could not be written (error %lu)", GetLastError());
 	if (look >= 0)
 		g_local[hero] = look;
 	else
@@ -1365,7 +1365,7 @@ namespace {
 void ReadChoices()
 {
 	wchar_t path[MAX_PATH];
-	hooklog::PathNextToExe(L"open-homm5-skins", L".ini", path, MAX_PATH);
+	hooklog::PathNextToExe(L"h5-together-skins", L".ini", path, MAX_PATH);
 	std::vector<wchar_t> buffer(32768);
 	const DWORD n = GetPrivateProfileSectionW(L"skins", buffer.data(), static_cast<DWORD>(buffer.size()), path);
 	for (DWORD i = 0; i < n;) {
@@ -1397,7 +1397,7 @@ bool CodeAsExpected()
 void ApplyHeroSkinsFromSettings()
 {
 	wchar_t path[MAX_PATH];
-	hooklog::PathNextToExe(L"open-homm5", L".ini", path, MAX_PATH);
+	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
 	if (!GetPrivateProfileIntW(L"skins", L"skins", 1, path)) {
 		hooklog::Write("hero skins: off ([skins] skins=0)");
 		return;
@@ -1444,7 +1444,7 @@ void ApplyHeroSkinsFromSettings()
 		return;
 	}
 	InstallHeroSkinsPanel();
-	hooklog::Write("hero skins: on; %d line(s) in open-homm5-skins.ini (read when the game's hero list is); multiplayer "
+	hooklog::Write("hero skins: on; %d line(s) in h5-together-skins.ini (read when the game's hero list is); multiplayer "
 	               "looks %s; an open hero screen %s%s%s",
 	               static_cast<int>(g_entries.size()), g_show_others ? "when every PC takes part" : "off (show_others=0)",
 	               g_live_screen ? "opens again with a new look" : "keeps its figure (live_hero_screen=0)", g_trace ? "; trace" : "", g_test_ai ? "; TESTING: computer players' heroes take this PC's looks" : "");

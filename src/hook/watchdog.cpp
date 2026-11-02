@@ -246,7 +246,7 @@ const Module *ModuleAt(DWORD base)
 		lstrcpynA(m.name, g_exe_name, sizeof(m.name));
 	}
 	else if (base == g_dll_base) {
-		lstrcpynA(m.name, "dinput8.dll (open-homm5)", sizeof(m.name));
+		lstrcpynA(m.name, "dinput8.dll (H5 Together)", sizeof(m.name));
 	}
 	else {
 		char name[48] = "";
@@ -290,7 +290,7 @@ const char *NearestExport(const Module &m, DWORD rva, DWORD *offset, char *buffe
 }
 
 // "MMH55_Utility_64.exe+0x46e9d0 (0x0086e9d0, AI turn driver+0x90)", "KERNELBASE.dll+0x1234
-// (SleepEx+0x5d)", "dinput8.dll (open-homm5)+0x4321 (after PumpHook+0x21)".
+// (SleepEx+0x5d)", "dinput8.dll (H5 Together)+0x4321 (after PumpHook+0x21)".
 void Where(DWORD a, char *out, int size)
 {
 	const Code *c = CodeAt(a);
@@ -874,7 +874,7 @@ void NameFunction(const void *function, const char *name)
 void Install()
 {
 	wchar_t path[MAX_PATH];
-	hooklog::PathNextToExe(L"open-homm5", L".ini", path, MAX_PATH);
+	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
 	if (!GetPrivateProfileIntW(L"debug", L"hang_watchdog", 1, path)) {
 		hooklog::Write("watchdog: off ([debug] hang_watchdog=0)");
 		return;
@@ -910,7 +910,7 @@ void Install()
 		hooklog::Write("watchdog: cannot start its thread (error %lu): off", GetLastError());
 		return;
 	}
-	hooklog::Write("watchdog: on: if the game stops taking its window messages for %lu s, open-homm5.log gets where it "
+	hooklog::Write("watchdog: on: if the game stops taking its window messages for %lu s, h5-together.log gets where it "
 	               "is stuck (once per freeze; it only looks)%s%s",
 	               g_stall_ms / 1000, g_hang_test ? "; hang test on: F12 freezes the game on purpose" : "",
 	               g_hang_test_at_ms ? "; hang test on: the game freezes on purpose once (hang_test_at)" : "");

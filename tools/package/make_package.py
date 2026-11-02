@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Build the easy-install package: build/package/open-homm5-<version>.zip
+"""Build the easy-install package: build/package/h5-together-<version>.zip
 
 The zip holds the hook DLL (build/hook/dinput8.dll), the settings template, the
 install and uninstall scripts and the bug report script for Windows and Linux, a short
 README.txt, the licence notices (LICENSE.txt is the repo's LICENSE; THIRD-PARTY-NOTICES.txt
 carries Dear ImGui's licence file), and the ready random map templates
-(src/mods/rmg/templates/*.xdb, packed byte for byte as open-homm5/templates/).
+(src/mods/rmg/templates/*.xdb, packed byte for byte as h5-together/templates/).
 The scripts and text templates live in tools/package/files/.
 
     python tools/package/make_package.py                    # the version in src/hook/version.h
@@ -32,7 +32,7 @@ OUT_DIR = REPO / "build" / "package"
 
 # The install scripts tell our dinput8.dll from somebody else's by this text,
 # which the DLL carries in its log message (src/hook/dllmain.cpp).
-MARKER = b"open-homm5 hook DLL"
+MARKER = b"H5 Together hook DLL"
 VERSION_H = REPO / "src" / "hook" / "version.h"
 
 # The licence notices: our LICENSE, and Dear ImGui's (the one third-party code in the DLL).
@@ -54,7 +54,7 @@ CONTENTS = [
     ("LICENSE.txt", "LICENSE"),
     ("THIRD-PARTY-NOTICES.txt", "THIRD-PARTY-NOTICES.txt"),
     ("dinput8.dll", None),
-    ("open-homm5.ini", "open-homm5.ini"),
+    ("h5-together.ini", "h5-together.ini"),
     ("install.bat", "install.bat"),
     ("install.ps1", "install.ps1"),
     ("uninstall.bat", "uninstall.bat"),
@@ -67,13 +67,13 @@ CONTENTS = [
 ]
 
 # The ready random map templates (tools/rmg/make_templates.js writes them) go in
-# the zip as open-homm5/templates/*.xdb, the same layout as in the game's bin
+# the zip as h5-together/templates/*.xdb, the same layout as in the game's bin
 # folder, and are copied byte for byte (UTF-8 with BOM and CRLF: .gitattributes
 # has "*.xdb -text"). The install scripts copy exactly these names, and the
 # uninstall scripts remove exactly these names, so they must be plain names that
 # no shell or glob treats specially.
 TEMPLATES_SRC = REPO / "src" / "mods" / "rmg" / "templates"
-TEMPLATES_IN_ZIP = "open-homm5/templates"
+TEMPLATES_IN_ZIP = "h5-together/templates"
 TEMPLATE_NAME = re.compile(r"OH-[A-Za-z0-9.-]+\.xdb")
 
 # Line endings inside the zip: Windows files get CRLF (Notepad, cmd.exe), shell
@@ -216,14 +216,14 @@ def main():
         fail(f"{args.dll} does not exist")
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
-    zip_path = args.out_dir / f"open-homm5-{args.version}.zip"
+    zip_path = args.out_dir / f"h5-together-{args.version}.zip"
     tmp_path = zip_path.with_suffix(".zip.tmp")
     stamp = zip_time()
     entries = [(name, file_bytes(name, source, args.dll, args.version)) for name, source in CONTENTS]
     entries += [(f"{TEMPLATES_IN_ZIP}/{n}", data) for n, data in template_files()]
     with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
         for name, data in entries:
-            info = zipfile.ZipInfo(f"open-homm5-{args.version}/{name}", stamp)  # one top folder
+            info = zipfile.ZipInfo(f"h5-together-{args.version}/{name}", stamp)  # one top folder
             info.compress_type = zipfile.ZIP_DEFLATED
             info.create_system = 3  # Unix, so that unzip on Linux honours the mode below
             mode = 0o755 if Path(name).suffix in EXECUTABLE_SUFFIXES else 0o644

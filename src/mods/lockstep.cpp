@@ -685,7 +685,7 @@ void LockstepCoopTiming(bool on, DWORD segment_ms)
 void ApplyLockstepFromSettings()
 {
 	wchar_t path[MAX_PATH];
-	hooklog::PathNextToExe(L"open-homm5", L".ini", path, MAX_PATH);
+	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
 	g_drain = GetPrivateProfileIntW(L"net", L"drain_reports", 1, path) != 0;
 	g_trace = GetPrivateProfileIntW(L"net", L"trace_lockstep", 1, path) != 0;
 	const DWORD view = GetPrivateProfileIntW(L"net", L"view_delay_ms", 100, path);

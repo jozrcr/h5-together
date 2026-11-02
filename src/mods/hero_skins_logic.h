@@ -28,7 +28,7 @@ int FindHero(const Catalog &catalog, const std::string &name);
 // owner's rule, 2026-11-01: same faction only).
 bool LookAllowed(const Catalog &catalog, int hero, int look);
 
-// The choices of open-homm5-skins.ini ([skins] section: hero=look, by
+// The choices of h5-together-skins.ini ([skins] section: hero=look, by
 // InternalName). Unknown names, other factions and "original" / empty values
 // are left out; `notes` gets one line for each entry (for the log).
 Choices ParseChoices(const std::vector<std::pair<std::string, std::string>> &entries, const Catalog &catalog,

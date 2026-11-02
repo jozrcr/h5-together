@@ -19,7 +19,7 @@ struct View {
 	// client: what the host sent in the lobby; in game: the rules of this game
 	bool shown_known = false;
 	Values shown;
-	bool will_apply = false;  // host and client: every player has open-homm5's rules (else the files' rules)
+	bool will_apply = false;  // host and client: every player has H5 Together's rules (else the files' rules)
 	int map_script = -1;      // host and client: the lobby's map has a map script (1), none (0: MMH5.5's scripts will not run), unknown (-1)
 	std::vector<std::string> missing;  // host: the players without it (names)
 	std::vector<std::string> differ;   // host: players whose MMH5.5 files differ ("Name: settings"...)
@@ -38,7 +38,7 @@ struct View {
 // The view for this role (the panel decides it from the screen on top and LobbyRole()).
 View GetView(View::Role role);
 
-// Host: new choices (empty = the file's). Written to open-homm5.ini [rules] and
+// Host: new choices (empty = the file's). Written to h5-together.ini [rules] and
 // sent to the players in the lobby.
 void SetChoices(const Values &chosen);
 

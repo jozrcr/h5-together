@@ -1,10 +1,10 @@
-open-homm5: third-party notices
+H5 Together: third-party notices
 
-open-homm5 itself is under the MIT licence (see LICENSE.txt in this folder).
+H5 Together itself is under the MIT licence (see LICENSE.txt in this folder).
 
 dinput8.dll also contains the code and data below, which belong to other people and
 come under their own licences. Their notices must go along with copies of it, so here
-they are. open-homm5 contains no other third-party code. The game's own files, and
+they are. H5 Together contains no other third-party code. The game's own files, and
 MMH5.5's, are not in this package: the add-on only reads the ones on your PC.
 
 

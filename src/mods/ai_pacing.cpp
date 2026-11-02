@@ -198,7 +198,7 @@ void AiPacingAfterStep(int commands, unsigned long stage_before, unsigned long s
 void ApplyAiPacingFromSettings()
 {
 	wchar_t path[MAX_PATH];
-	hooklog::PathNextToExe(L"open-homm5", L".ini", path, MAX_PATH);
+	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
 	if (!GetPrivateProfileIntW(L"ai", L"one_decision_per_frame", 1, path)) {
 		hooklog::Write("ai pacing: off: the AI may decide several times per frame in multiplayer games "
 		               "([ai] one_decision_per_frame=0)");

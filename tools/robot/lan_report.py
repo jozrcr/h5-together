@@ -20,7 +20,7 @@ REPO = pathlib.Path(__file__).resolve().parents[2]
 def settings(run):
     """The network settings the host's DLL reported (mod or older experiments)."""
     found = []
-    for line in (run / "host" / "open-homm5.log").read_text(encoding="utf-8", errors="replace").splitlines():
+    for line in (run / "host" / "h5-together.log").read_text(encoding="utf-8", errors="replace").splitlines():
         if "EXPERIMENT" in line:
             found.append(line.split("EXPERIMENT", 1)[1].strip())
         elif "net tuning:" in line:
@@ -33,7 +33,7 @@ def crc_check(run):
     computes one per check number; they must all be equal (no desync)."""
     by_check = {}
     for copy in ("host", "client"):
-        path = run / copy / "open-homm5.log"
+        path = run / copy / "h5-together.log"
         if not path.exists():
             continue
         for m in re.finditer(r"crc player=(\d+) check=(-?\d+) crc=([0-9a-f]+)", path.read_text(encoding="utf-8", errors="replace")):
@@ -47,7 +47,7 @@ def crc_check(run):
 
 
 def report(run):
-    log = (run / "host" / "open-homm5.log").read_text(encoding="utf-8", errors="replace").splitlines()
+    log = (run / "host" / "h5-together.log").read_text(encoding="utf-8", errors="replace").splitlines()
     steps = [l for l in log if "ai-step" in l]
     gaps = [float(m.group(1)) for m in (re.search(r"gap=(-?[\d.]+)ms", l) for l in steps) if m and float(m.group(1)) >= 0]
     turns = [i for i, l in enumerate(log) if "AI turn" in l and "started" in l]

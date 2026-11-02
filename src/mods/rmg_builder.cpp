@@ -31,7 +31,7 @@
 // panel of the overlay (src/hook/overlay.h): while it is open the game gets no
 // mouse or keyboard input; Esc closes it.
 //
-// Settings (open-homm5.ini):
+// Settings (h5-together.ini):
 //   [rmg]
 //   builder=1           0 = no panel and no button (nothing is installed)
 //   builder_key=F11     the panel's key on the random map screen (none = no key)
@@ -133,7 +133,7 @@ State g;
 std::wstring IniPath()
 {
 	wchar_t path[MAX_PATH];
-	hooklog::PathNextToExe(L"open-homm5", L".ini", path, MAX_PATH);
+	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
 	return path;
 }
 
@@ -261,7 +261,7 @@ void DoUse()
 	overlay::CloseModal(kName);
 }
 
-// "Save as file": the maker's template, as the web page gives it, in open-homm5\templates.
+// "Save as file": the maker's template, as the web page gives it, in h5-together\templates.
 void DoSave()
 {
 	const data::Words &w = data::WordsFor(overlay::PanelLanguage());
@@ -271,7 +271,7 @@ void DoSave()
 	DWORD n = GetModuleFileNameW(nullptr, dir, MAX_PATH);
 	while (n > 0 && dir[n - 1] != L'\\')
 		--n;
-	lstrcpynW(dir + n, L"open-homm5", MAX_PATH - n);
+	lstrcpynW(dir + n, L"h5-together", MAX_PATH - n);
 	CreateDirectoryW(dir, nullptr);
 	std::wstring folder = std::wstring(dir) + L"\\templates";
 	CreateDirectoryW(folder.c_str(), nullptr);
@@ -310,7 +310,7 @@ void DoSave()
 	const DWORD error_code = GetLastError();
 	if (f != INVALID_HANDLE_VALUE)
 		CloseHandle(f);
-	const std::string shown = "open-homm5\\templates\\" + t.file_name;
+	const std::string shown = "h5-together\\templates\\" + t.file_name;
 	if (ok) {
 		hooklog::Write("rmg builder: saved %s (%u bytes; %s): listed by the game from its next start", shown.c_str(),
 		               static_cast<unsigned>(t.xml.size()), g.recipe.c_str());

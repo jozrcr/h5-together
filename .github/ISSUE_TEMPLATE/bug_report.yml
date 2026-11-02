@@ -1,5 +1,5 @@
 name: Bug report
-description: Something does not work with the open-homm5 add-on (a freeze, a crash, an "out of sync", a wrong panel...)
+description: Something does not work with the H5 Together add-on (a freeze, a crash, an "out of sync", a wrong panel...)
 title: "[Bug] "
 labels: ["bug"]
 body:
@@ -8,15 +8,15 @@ body:
       value: |
         Thank you for taking the time! A few answers and one file are all we need.
 
-        **The file:** run `bug-report.bat` (Windows) or `bash bug-report.sh` (Linux) from the add-on's folder, the one you installed from. It makes `open-homm5-bug-report-<date>.zip` on your Desktop (on Linux: in the folder you run it from). It sends nothing anywhere: you attach the zip below yourself.
+        **The file:** run `bug-report.bat` (Windows) or `bash bug-report.sh` (Linux) from the add-on's folder, the one you installed from. It makes `h5-together-bug-report-<date>.zip` on your Desktop (on Linux: in the folder you run it from). It sends nothing anywhere: you attach the zip below yourself.
 
         Problems of MMH5.5 itself (its scripts, its balance, its installer) are best told to the MMH5.5 team.
 
   - type: input
     id: addon-version
     attributes:
-      label: open-homm5 version
-      description: The first line of `open-homm5.log` (in the game's `bin` folder) says it, like `open-homm5 hook DLL 0.2.7 loaded`.
+      label: H5 Together version
+      description: The first line of `h5-together.log` (in the game's `bin` folder) says it, like `H5 Together hook DLL 0.2.7 loaded`.
       placeholder: "0.2.7"
     validations:
       required: true
@@ -59,7 +59,7 @@ body:
   - type: input
     id: players
     attributes:
-      label: How many players, and did everyone have the same open-homm5 version?
+      label: How many players, and did everyone have the same H5 Together version?
       description: In a multiplayer game, everyone needs the same version. Write "alone" if you were playing alone.
       placeholder: "3 humans + 2 computer players, same version: yes"
     validations:
@@ -84,7 +84,7 @@ body:
     attributes:
       label: The bug report
       description: |
-        Drag `open-homm5-bug-report-<date>.zip` here. If you cannot make it (for example the game folder is not found), attach `open-homm5.log` from the game's `bin` folder instead, and `open-homm5.old.log` if there is one.
+        Drag `h5-together-bug-report-<date>.zip` here. If you cannot make it (for example the game folder is not found), attach `h5-together.log` from the game's `bin` folder instead, and `h5-together.old.log` if there is one.
 
         The log holds player names and LAN addresses. If you would rather not share them, say so and we will find another way.
     validations:

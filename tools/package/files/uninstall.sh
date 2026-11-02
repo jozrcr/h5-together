@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# open-homm5 uninstaller for Linux (Steam / Proton).
+# H5 Together uninstaller for Linux (Steam / Proton).
 #
 # Removes only what install.sh put in the game's bin folder:
-#   dinput8.dll (only if it is ours), open-homm5.log (and open-homm5.old.log), open-homm5.ini (after asking),
+#   dinput8.dll (only if it is ours), h5-together.log (and h5-together.old.log), h5-together.ini (after asking),
 #   and the random map templates of this package (the OH-*.xdb files whose names are in
-#   this package's open-homm5/templates folder), then the folders if they are empty.
+#   this package's h5-together/templates folder), then the folders if they are empty.
 # Nothing else is touched: a template of your own stays. Steam's launch options are
 # yours to clear by hand.
 #
@@ -17,7 +17,7 @@
 
 [ -n "${BASH_VERSION:-}" ] || { echo "Please run this with bash:  bash uninstall.sh"; exit 2; }
 
-MARKER='open-homm5 hook DLL'
+MARKER='H5 Together hook DLL'
 GAME_FOLDER='Heroes of Might and Magic 5 Tribes of the East'
 
 game_dir_arg=""
@@ -34,7 +34,7 @@ done
 
 # ---- shared with uninstall.sh and bug-report.sh: finding the game (keep all copies identical) ----
 
-# True if the file is the dinput8.dll of open-homm5 (it contains our marker text).
+# True if the file is the dinput8.dll of H5 Together (it contains our marker text).
 is_ours() { grep -q -a -F -- "$MARKER" "$1" 2>/dev/null; }
 
 # Prints the first file or folder called $2 (ignoring upper/lower case) inside $1.
@@ -146,7 +146,7 @@ choose_game_bin() {
 # ---- end of the shared block ----
 
 echo
-echo "open-homm5 uninstaller"
+echo "H5 Together uninstaller"
 echo "----------------------"
 
 if ! choose_game_bin; then
@@ -163,7 +163,7 @@ dll="$(find_ci "$bin" dinput8.dll)"
 if [ -z "$dll" ]; then
     echo "  - no dinput8.dll here, nothing to remove"
 elif ! is_ours "$dll"; then
-    echo "  - dinput8.dll is NOT the open-homm5 one, so I left it alone"
+    echo "  - dinput8.dll is NOT the H5 Together one, so I left it alone"
 elif rm -f "$dll"; then
     echo "  - removed dinput8.dll"
 else
@@ -171,43 +171,43 @@ else
     failed=1
 fi
 
-log="$(find_ci "$bin" open-homm5.log)"
+log="$(find_ci "$bin" h5-together.log)"
 if [ -z "$log" ]; then
-    echo "  - no open-homm5.log here"
+    echo "  - no h5-together.log here"
 elif rm -f "$log"; then
-    echo "  - removed open-homm5.log"
+    echo "  - removed h5-together.log"
 else
-    echo "  - could not remove open-homm5.log"
+    echo "  - could not remove h5-together.log"
     failed=1
 fi
-# The log is kept to 5 MB: when it got bigger, the game kept the last full one as open-homm5.old.log.
-old_log="$(find_ci "$bin" open-homm5.old.log)"
+# The log is kept to 5 MB: when it got bigger, the game kept the last full one as h5-together.old.log.
+old_log="$(find_ci "$bin" h5-together.old.log)"
 if [ -n "$old_log" ]; then
     if rm -f "$old_log"; then
-        echo "  - removed open-homm5.old.log"
+        echo "  - removed h5-together.old.log"
     else
-        echo "  - could not remove open-homm5.old.log"
+        echo "  - could not remove h5-together.old.log"
         failed=1
     fi
 fi
 
 # The settings file, and the copies of it that the installer keeps when it adds new
 # settings (.bak, .bak2, .bak3). One question for all of them; no other name.
-ini="$(find_ci "$bin" open-homm5.ini)"
+ini="$(find_ci "$bin" h5-together.ini)"
 backups=()
 for ext in bak bak2 bak3; do
-    f="$(find_ci "$bin" "open-homm5.ini.$ext")"
+    f="$(find_ci "$bin" "h5-together.ini.$ext")"
     [ -n "$f" ] && [ -f "$f" ] && backups+=("$f")
 done
 if [ -z "$ini" ] && [ "${#backups[@]}" -eq 0 ]; then
-    echo "  - no open-homm5.ini here"
+    echo "  - no h5-together.ini here"
 else
     if [ -z "$ini" ]; then
-        question="Also delete the old copies of your settings (open-homm5.ini.bak)? [y/N] "; what="the old copies of open-homm5.ini"
+        question="Also delete the old copies of your settings (h5-together.ini.bak)? [y/N] "; what="the old copies of h5-together.ini"
     elif [ "${#backups[@]}" -gt 0 ]; then
-        question="Also delete your settings file open-homm5.ini and its old copies (.bak)? [y/N] "; what="open-homm5.ini and its old copies"
+        question="Also delete your settings file h5-together.ini and its old copies (.bak)? [y/N] "; what="h5-together.ini and its old copies"
     else
-        question="Also delete your settings file open-homm5.ini? [y/N] "; what="open-homm5.ini"
+        question="Also delete your settings file h5-together.ini? [y/N] "; what="h5-together.ini"
     fi
     answer=""
     read -r -p "$question" answer || answer=""
@@ -231,16 +231,16 @@ fi
 # The random map templates: only the names this package holds, never another file.
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 tpl_names=()
-for f in "$here/open-homm5/templates"/*.xdb; do
+for f in "$here/h5-together/templates"/*.xdb; do
     [ -f "$f" ] && tpl_names+=("$(basename "$f")")
 done
-tpl_dir="$(find_ci "$bin" open-homm5)"
+tpl_dir="$(find_ci "$bin" h5-together)"
 tpl_sub=""
 [ -n "$tpl_dir" ] && [ -d "$tpl_dir" ] && tpl_sub="$(find_ci "$tpl_dir" templates)"
 if [ -z "$tpl_sub" ] || [ ! -d "$tpl_sub" ]; then
     echo "  - no random map templates here"
 elif [ "${#tpl_names[@]}" -eq 0 ]; then
-    echo "  - this folder has no list of our templates, so I left open-homm5/templates alone"
+    echo "  - this folder has no list of our templates, so I left h5-together/templates alone"
 else
     removed=0
     for name in "${tpl_names[@]}"; do
@@ -255,12 +255,12 @@ else
     done
     echo "  - removed $removed random map templates"
     if [ -n "$(ls -A "$tpl_sub")" ]; then
-        echo "  - kept the other file(s) in open-homm5/templates (not ours)"
+        echo "  - kept the other file(s) in h5-together/templates (not ours)"
     elif rmdir "$tpl_sub"; then
         rmdir "$tpl_dir" 2>/dev/null   # only if nothing else is in it
-        echo "  - removed the empty folder open-homm5/templates"
+        echo "  - removed the empty folder h5-together/templates"
     else
-        echo "  - could not remove the empty folder open-homm5/templates"
+        echo "  - could not remove the empty folder h5-together/templates"
         failed=1
     fi
 fi

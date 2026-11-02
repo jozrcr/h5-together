@@ -1,5 +1,5 @@
 @echo off
-rem open-homm5 bug report helper for Windows: runs bug-report.ps1 (nothing else happens here).
+rem H5 Together bug report helper for Windows: runs bug-report.ps1 (nothing else happens here).
 rem This file must keep Windows (CRLF) line endings.
 setlocal
 

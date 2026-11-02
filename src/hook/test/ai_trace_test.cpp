@@ -61,7 +61,7 @@ int main()
 
 	FILE *f = nullptr;
 	char line[512] = {};
-	if (fopen_s(&f, "open-homm5.log", "r") == 0 && f) {
+	if (fopen_s(&f, "h5-together.log", "r") == 0 && f) {
 		while (fgets(line, sizeof(line), f)) {
 			if (strstr(line, "ai-step"))
 				break;

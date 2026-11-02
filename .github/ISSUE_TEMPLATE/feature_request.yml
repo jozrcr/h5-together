@@ -1,5 +1,5 @@
 name: Feature request
-description: An idea for the open-homm5 add-on
+description: An idea for the H5 Together add-on
 title: "[Idea] "
 labels: ["enhancement"]
 body:
@@ -26,5 +26,5 @@ body:
   - type: input
     id: addon-version
     attributes:
-      label: open-homm5 version (if you use it)
+      label: H5 Together version (if you use it)
       placeholder: "0.2.7"

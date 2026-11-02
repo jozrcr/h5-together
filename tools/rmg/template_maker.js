@@ -1,4 +1,4 @@
-// open-homm5 template maker: builds random map templates (NDb::SRMGTemplate XML)
+// H5 Together template maker: builds random map templates (NDb::SRMGTemplate XML)
 // for the game's own generator from a few choices. Used by the page
 // (template-maker.html) and by make_templates.js (the ready templates).
 // See docs/plans/map-generator.md and docs/subsystems/rmg.md.
@@ -242,7 +242,9 @@
     return String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 
-  // The template's XML, laid out like the game's own files (UTF-8 with BOM).
+  // The template's XML, laid out like the game's own files (UTF-8 with BOM). The Editor
+  // line keeps the add-on's old name (open-homm5, until 0.2.7): every PC must build the
+  // same bytes from a template's name, the C++ maker (rmg_maker.cpp) included.
   function toXml(t) {
     var out = ["\ufeff<?xml version=\"1.0\" encoding=\"UTF-8\"?>", "<RMGTemplate>",
       "  <Editor name=\"open-homm5 template maker\" version=\"1\" />",

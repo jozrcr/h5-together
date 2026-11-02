@@ -6,7 +6,7 @@ Usage:
 
 What it does:
   1. installs build/hook/dinput8.dll (build it with src/hook/build.ps1) into the
-     test copy's bin/ folder, plus open-homm5-robot.ini (turns on robot mode);
+     test copy's bin/ folder, plus h5-together-robot.ini (turns on robot mode);
   2. prepares a robot profile (windowed, muted) in <game>/robot_home. The DLL
      redirects "My Documents" there, so the player's real profile is untouched;
   3. starts the game straight into the map with the game's own "advmap" option,
@@ -36,7 +36,7 @@ PROFILE_DIR = pathlib.Path("My Games") / "Heroes of Might and Magic V - Tribes o
 
 # Robot profile settings, appended after the game's default profile.
 ROBOT_SETTINGS = """
-// ---- open-homm5 robot overrides ----
+// ---- H5 Together robot overrides ----
 setvar gfx_fullscreen = 0
 setvar gfx_resolution = {resolution}
 setvar gfx_window_size = {resolution}
@@ -69,12 +69,12 @@ def instance_files(game, instance):
     once from the same folder: the DLL adds OPEN_HOMM5_INSTANCE to the names."""
     suffix = "-" + instance if instance else ""
     bin_dir = game / "bin"
-    return bin_dir / ("open-homm5-robot%s.ini" % suffix), bin_dir / ("open-homm5%s.log" % suffix)
+    return bin_dir / ("h5-together-robot%s.ini" % suffix), bin_dir / ("h5-together%s.log" % suffix)
 
 
 def mod_settings_file(game, instance):
     """The DLL's settings for the mods (src/mods/), per copy like the log."""
-    return game / "bin" / ("open-homm5%s.ini" % ("-" + instance if instance else ""))
+    return game / "bin" / ("h5-together%s.ini" % ("-" + instance if instance else ""))
 
 
 def write_mod_settings(game, args, instance):
@@ -118,7 +118,7 @@ def write_mod_settings(game, args, instance):
     if ui:
         lines += ["[ui]"] + ui
     # [lang] = French texts (src/mods/languages.cpp), off by default; the packs go in
-    # the test copy's bin\open-homm5\lang\fr
+    # the test copy's bin\h5-together\lang\fr
     lang = getattr(args, "lang_setting", None) or []  # e.g. texts=fr, log_texts=300
     if lang:
         lines += ["[lang]"] + lang
@@ -135,7 +135,7 @@ def write_mod_settings(game, args, instance):
     if debug:
         lines += ["[debug]"] + debug
     # [skins] = the hero looks (src/mods/hero_skins.cpp); the choices themselves
-    # come from a file of open-homm5-skins.ini's format (--skins-file)
+    # come from a file of h5-together-skins.ini's format (--skins-file)
     skins = getattr(args, "skins_setting", None) or []  # e.g. trace=1, show_others=0
     if skins:
         lines += ["[skins]"] + skins
@@ -170,8 +170,8 @@ def put_back_player_file(path):
 
 
 def skins_file(game, instance):
-    """The hero looks' choices (open-homm5-skins.ini), per copy like the log."""
-    return game / "bin" / ("open-homm5-skins%s.ini" % ("-" + instance if instance else ""))
+    """The hero looks' choices (h5-together-skins.ini), per copy like the log."""
+    return game / "bin" / ("h5-together-skins%s.ini" % ("-" + instance if instance else ""))
 
 
 def prepare(game, args, out, instance="", net_port=None):
@@ -398,11 +398,11 @@ def collect(game, out, instance, exit_code, elapsed):
     ini.unlink(missing_ok=True)
     put_back_player_file(mod_settings_file(game, instance))
     put_back_player_file(skins_file(game, instance))
-    profile = game / "bin" / ("open-homm5-profile%s.txt" % ("-" + instance if instance else ""))
+    profile = game / "bin" / ("h5-together-profile%s.txt" % ("-" + instance if instance else ""))
     if profile.exists():  # AI profiler samples (profile_ai), see tools/robot/profile_report.py
         shutil.move(str(profile), str(out / "ai-profile.txt"))
     text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
-    (out / "open-homm5.log").write_text(text, encoding="utf-8")
+    (out / "h5-together.log").write_text(text, encoding="utf-8")
     # the game's own console output (game_writelog = 1 writes it to console.txt, UTF-16)
     console = game / "bin" / "console.txt"
     if console.exists():
@@ -472,14 +472,14 @@ def main():
     p.add_argument("--skins-setting", action="append", default=[], metavar="KEY=VALUE",
                    help="[skins] setting, e.g. trace=1 (repeatable; src/mods/hero_skins.cpp)")
     p.add_argument("--skins-file", metavar="PATH",
-                   help="hero looks to choose: a file in open-homm5-skins.ini's format, copied into bin for the run")
+                   help="hero looks to choose: a file in h5-together-skins.ini's format, copied into bin for the run")
     p.add_argument("--rules-setting", action="append", default=[], metavar="KEY=VALUE",
                    help="[rules] setting, e.g. governance=0 or trace=1 (repeatable; src/mods/host_rules.cpp)")
     p.add_argument("--debug-setting", action="append", default=[], metavar="KEY=VALUE",
                    help="[debug] setting, e.g. hang_test_at=60 or hang_seconds=10 (repeatable; src/hook/watchdog.cpp)")
     p.add_argument("--online-setting", action="append", default=[], metavar="KEY=VALUE",
                    help="[online] setting, e.g. spike=1 or app_id=480 (repeatable; src/mods/steam_spike.cpp; "
-                        "needs bin\\open-homm5\\steam_api.dll in the test copy)")
+                        "needs bin\\h5-together\\steam_api.dll in the test copy)")
     p.add_argument("--resolution", default="1024x768", metavar="WxH",
                    help="the game window's size (windowed), e.g. 1920x1080 (default 1024x768)")
     p.add_argument("--trace-moves", action="store_true", help="log what the start-move command calls (robot_trace.cpp)")

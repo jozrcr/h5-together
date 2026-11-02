@@ -1,4 +1,4 @@
-"""Write a hero looks file (open-homm5-skins.ini format) for robot runs: every
+"""Write a hero looks file (h5-together-skins.ini format) for robot runs: every
 hero of a faction gets the look of one hero of that faction, so whatever heroes
 a map gives the robot's players, they show a look that stands out.
 

@@ -3,7 +3,7 @@
 // wrapper zeroed both in our reference exe, so Ghidra records the compiler as
 // "unknown" and refuses its MSVC-only analysis (RTTI recovery among them).
 // Use as -preScript on import, or -postScript before RunRtti.java.
-//@category open-homm5
+//@category H5 Together
 
 import ghidra.app.script.GhidraScript;
 import ghidra.app.util.opinion.PeLoader.CompilerOpinion.CompilerEnum;

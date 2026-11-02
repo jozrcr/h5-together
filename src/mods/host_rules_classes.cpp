@@ -31,7 +31,7 @@
 // a missing one (a save without it: MMH5.5's lock). When a save is read, the
 // rule comes from it.
 //
-// Testing ([rules] in open-homm5.ini):
+// Testing ([rules] in h5-together.ini):
 //   trace_skills=1         log every "new skill" a level-up offers (0x00b50db0, called at
 //                          0x00b52885 and 0x00b52909), with the hero's class and whether the
 //                          skill is on the class's MMH5.5 list; a summary every 20 offers

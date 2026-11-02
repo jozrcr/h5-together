@@ -23,7 +23,7 @@
 // then stays as cleared: black (every light's BackColor is black), like
 // unexplored land. Drawn, not simulated: each player may choose.
 //
-// Settings, open-homm5.ini [camera]:
+// Settings, h5-together.ini [camera]:
 //   edge_sky=game          the game's sky (nothing installed)
 //   edge_sky=none          no sky dome on the random maps' dusk light: black
 //   edge_sky_test_light=   testing: one more light file served without its
@@ -134,7 +134,7 @@ GameStream *__fastcall OpenFileHook(void *vfs, void *edx, const GameString *path
 void ApplyEdgeSkyFromSettings()
 {
 	wchar_t ini[MAX_PATH];
-	hooklog::PathNextToExe(L"open-homm5", L".ini", ini, MAX_PATH);  // open-homm5-<instance>.ini for the robot
+	hooklog::PathNextToExe(L"h5-together", L".ini", ini, MAX_PATH);  // h5-together-<instance>.ini for the robot
 	wchar_t choice[16] = L"";
 	GetPrivateProfileStringW(L"camera", L"edge_sky", L"game", choice, 16, ini);
 	if (lstrcmpiW(choice, L"none") != 0) {

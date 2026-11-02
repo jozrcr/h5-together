@@ -107,11 +107,11 @@ Write-Host "built $out\dinput8.dll"
 if ($Test) {
     Push-Location $out
     try {
-        Remove-Item -ErrorAction SilentlyContinue open-homm5.log
+        Remove-Item -ErrorAction SilentlyContinue h5-together.log
         & (Join-Path $out "proxy_test.exe") (Join-Path $out "dinput8.dll")
         if ($LASTEXITCODE -ne 0) { throw "smoke test failed" }
-        Get-Content open-homm5.log
-        Remove-Item -ErrorAction SilentlyContinue open-homm5.log
+        Get-Content h5-together.log
+        Remove-Item -ErrorAction SilentlyContinue h5-together.log
         & (Join-Path $out "ai_trace_test.exe")
         if ($LASTEXITCODE -ne 0) { throw "AI trace test failed" }
         & (Join-Path $out "original_music_test.exe")
@@ -148,9 +148,9 @@ if ($Test) {
             & (Join-Path $out "steam_abi_check.exe")
             if ($LASTEXITCODE -ne 0) { throw "Steam declarations check failed" }
         } else { Write-Host "Steam declarations check skipped: no ref\steamworks_sdk_* here" }
-        Remove-Item -ErrorAction SilentlyContinue open-homm5.log
+        Remove-Item -ErrorAction SilentlyContinue h5-together.log
         & (Join-Path $out "watchdog_test.exe")
-        if ($LASTEXITCODE -ne 0) { Get-Content open-homm5.log; throw "watchdog test failed" }
-        Remove-Item -ErrorAction SilentlyContinue open-homm5.log
+        if ($LASTEXITCODE -ne 0) { Get-Content h5-together.log; throw "watchdog test failed" }
+        Remove-Item -ErrorAction SilentlyContinue h5-together.log
     } finally { Pop-Location }
 }

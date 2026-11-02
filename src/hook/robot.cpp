@@ -106,7 +106,7 @@ bool RunConsoleCommand(const wchar_t *line)
 
 // --- copying the game's own text output into our log ----------------------------
 // The game prints console/debug messages through these imports. In robot mode we
-// copy their text into open-homm5.log (and still pass every call through).
+// copy their text into h5-together.log (and still pass every call through).
 typedef void(WINAPI *OutputDebugStringAFn)(LPCSTR);
 OutputDebugStringAFn g_real_OutputDebugStringA = nullptr;
 typedef int(__cdecl *VfprintfFn)(FILE *, const char *, va_list);
@@ -788,7 +788,7 @@ bool ReadConfig(const wchar_t *path)
 void Init()
 {
 	wchar_t path[MAX_PATH];
-	hooklog::PathNextToExe(L"open-homm5-robot", L".ini", path, MAX_PATH);
+	hooklog::PathNextToExe(L"h5-together-robot", L".ini", path, MAX_PATH);
 	if (!ReadConfig(path))
 		return;
 	g_active = true;

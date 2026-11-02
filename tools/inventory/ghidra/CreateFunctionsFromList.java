@@ -4,7 +4,7 @@
 // Use as -preScript so the following auto-analysis also follows their calls:
 //   analyzeHeadless <projdir> <proj> -process <exe>
 //       -scriptPath tools/inventory/ghidra -preScript CreateFunctionsFromList.java <list.txt>
-//@category open-homm5
+//@category H5 Together
 
 import java.nio.file.Files;
 import java.nio.file.Path;

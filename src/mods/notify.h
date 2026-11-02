@@ -3,7 +3,7 @@
 
 namespace mods {
 
-// With the settings of open-homm5.ini, section [notify]: turn=1, sound=1,
+// With the settings of h5-together.ini, section [notify]: turn=1, sound=1,
 // popup=1 (the defaults), trace=0. Only after DetectGameBuild() said the build
 // is hookable.
 void ApplyNotifyFromSettings();

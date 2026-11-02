@@ -51,7 +51,7 @@ bool RecipeOfReference(const std::string &reference, std::string *recipe);
 // start zone for.
 int RecipeTeamOf(const Choices &choices, int player);
 
-// A list of recipe names as in open-homm5.ini's [rmg] recipes=: separated by
+// A list of recipe names as in h5-together.ini's [rmg] recipes=: separated by
 // commas, spaces ignored, ".xdb" or not, and ";" starts a comment. Each name
 // goes once into *names, as CanonicalRecipe gives it; anything else goes into
 // *bad as written.

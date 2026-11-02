@@ -5,7 +5,7 @@
 // (NVFS::CWinVFS, vftable 0x00e66500) for the files in RMG/Templates matching
 // "*.xdb" (slot 10, List), then opens each one (slot 7, Open) and keeps the
 // ones that read as a template; the list shows each template's Name field.
-// This mod reads the .xdb files of the folder open-homm5\templates next to the
+// This mod reads the .xdb files of the folder h5-together\templates next to the
 // exe once, adds them to that listing as RMG\Templates\<file>, and serves their
 // bytes when the game opens them. Nothing on disk changes.
 //
@@ -22,7 +22,7 @@
 // Joining someone else's random map game, and the guard against a missing
 // template: rmg_join.cpp (step 3).
 //
-// Settings, open-homm5.ini [rmg]:
+// Settings, h5-together.ini [rmg]:
 //   templates=1  (default; 0 = off: neither the folder's files nor recipes;
 //                the guard against a missing template stays on)
 //   recipes=     recipe names to offer in the game's list, separated by commas
@@ -172,12 +172,12 @@ bool Matches(const char *mask, const char *name)
 
 void LoadTemplates()
 {
-	// <exe folder>\open-homm5 (the same for every copy the robot runs)
+	// <exe folder>\h5-together (the same for every copy the robot runs)
 	wchar_t dir[MAX_PATH];
 	DWORD n = GetModuleFileNameW(nullptr, dir, MAX_PATH);
 	while (n > 0 && dir[n - 1] != L'\\')
 		--n;
-	lstrcpynW(dir + n, L"open-homm5", MAX_PATH - n);
+	lstrcpynW(dir + n, L"h5-together", MAX_PATH - n);
 	std::wstring pattern = std::wstring(dir) + L"\\templates\\*.xdb";
 	WIN32_FIND_DATAW fd;
 	HANDLE find = FindFirstFileW(pattern.c_str(), &fd);
@@ -193,7 +193,7 @@ void LoadTemplates()
 			continue;
 		std::string recipe;
 		if (mods::rmg::CanonicalRecipe(name, &recipe)) {  // the name decides, the same on every PC
-			hooklog::Write("rmg templates: open-homm5\\templates\\%s skipped: a recipe name, built from the name itself", name);
+			hooklog::Write("rmg templates: h5-together\\templates\\%s skipped: a recipe name, built from the name itself", name);
 			continue;
 		}
 		const std::wstring path = std::wstring(dir) + L"\\templates\\" + fd.cFileName;
@@ -409,7 +409,7 @@ bool ServeTemplates(const wchar_t *path)
 	std::string names;
 	for (size_t i = 0; i < g_templates.size() && i < 12; ++i)
 		names += (i ? ", " : "") + g_templates[i].file;
-	hooklog::Write("rmg templates: %u template(s) from open-homm5\\templates%s%s%s", static_cast<unsigned>(g_templates.size()),
+	hooklog::Write("rmg templates: %u template(s) from h5-together\\templates%s%s%s", static_cast<unsigned>(g_templates.size()),
 	               names.empty() ? "" : ": ", names.c_str(), g_templates.size() > 12 ? ", ..." : "");
 	if (!g_recipes_on)
 		return false;
@@ -442,7 +442,7 @@ void *NewGameStream(const std::string &data)
 void ApplyRmgTemplatesFromSettings()
 {
 	wchar_t path[MAX_PATH];
-	hooklog::PathNextToExe(L"open-homm5", L".ini", path, MAX_PATH);
+	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
 	// Joining random map games: the guard against a missing template goes in
 	// even with templates=0; the recipe part only when recipes are served.
 	ApplyRmgJoin(ServeTemplates(path));

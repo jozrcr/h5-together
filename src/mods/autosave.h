@@ -3,7 +3,7 @@
 
 namespace mods {
 
-// With the settings of open-homm5.ini, section [save]: trace_autosave=1,
+// With the settings of h5-together.ini, section [save]: trace_autosave=1,
 // compression=1 (-1 = the game's level 6), autosave_every=1, fast_save_list=1
 // (the defaults). Only after DetectGameBuild() said the build is hookable.
 void ApplyAutosaveFromSettings();

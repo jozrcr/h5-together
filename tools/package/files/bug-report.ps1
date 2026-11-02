@@ -1,9 +1,9 @@
-# open-homm5 bug report helper for Windows. Runs on Windows PowerShell 5.1.
+# H5 Together bug report helper for Windows. Runs on Windows PowerShell 5.1.
 #
-# Makes open-homm5-bug-report-<date>.zip on your Desktop, to attach to a bug report on
+# Makes h5-together-bug-report-<date>.zip on your Desktop, to attach to a bug report on
 # GitHub. It holds what we need to look into a problem and nothing else:
-#   open-homm5.log and open-homm5.old.log   what the add-on wrote
-#   open-homm5.ini, open-homm5-skins.ini    your settings
+#   h5-together.log and h5-together.old.log   what the add-on wrote
+#   h5-together.ini, h5-together-skins.ini    your settings
 #   system.txt                              the add-on, MMH5.5 and Windows versions, a few file
 #                                           sizes and hashes, the other DLLs in the game folder
 # No saves, no maps, no game files. It sends nothing anywhere: the zip is yours to look at
@@ -39,10 +39,10 @@ function Wait-AndExit([int]$Code) {
 }
 
 # ---- shared with uninstall.ps1 and bug-report.ps1: finding the game (keep all copies identical) ----
-$Marker = "open-homm5 hook DLL"
+$Marker = "H5 Together hook DLL"
 $GameFolderName = "Heroes of Might and Magic 5 Tribes of the East"
 
-# True if the file is the dinput8.dll of open-homm5 (it contains our marker text).
+# True if the file is the dinput8.dll of H5 Together (it contains our marker text).
 function Test-IsOurs([string]$Path) {
     $bytes = [System.IO.File]::ReadAllBytes($Path)
     $text = [System.Text.Encoding]::GetEncoding(28591).GetString($bytes)
@@ -186,11 +186,11 @@ function Get-Sha256Hex([string]$Path) {
     }
 }
 
-# The version a dinput8.dll of ours says in its text ("open-homm5 hook DLL 0.2.7 loaded"), or $null.
+# The version a dinput8.dll of ours says in its text ("H5 Together hook DLL 0.2.7 loaded"), or $null.
 function Get-AddonVersion([string]$Path) {
     try {
         $text = $Latin1.GetString([System.IO.File]::ReadAllBytes($Path))
-        $m = [regex]::Match($text, 'open-homm5 hook DLL (\S+) loaded')
+        $m = [regex]::Match($text, 'H5 Together hook DLL (\S+) loaded')
         if ($m.Success) { return $m.Groups[1].Value }
     } catch { }
     return $null
@@ -244,7 +244,7 @@ function Get-OutFolder {
 
 try {
     Write-Host ""
-    Write-Host "open-homm5 bug report"
+    Write-Host "H5 Together bug report"
     Write-Host "---------------------"
 
     $bin = Select-GameBin
@@ -258,16 +258,16 @@ try {
 
     # The files that go in the zip: only these, and only the ones that exist.
     $pack = New-Object System.Collections.ArrayList
-    foreach ($name in @("open-homm5.log", "open-homm5.old.log", "open-homm5.ini", "open-homm5-skins.ini")) {
+    foreach ($name in @("h5-together.log", "h5-together.old.log", "h5-together.ini", "h5-together-skins.ini")) {
         $p = Join-Path $bin $name
         if (Test-Path -LiteralPath $p -PathType Leaf) { [void]$pack.Add(@($name, $p)) }
     }
     $hasLog = $false
-    foreach ($item in $pack) { if ($item[0] -eq "open-homm5.log") { $hasLog = $true } }
+    foreach ($item in $pack) { if ($item[0] -eq "h5-together.log") { $hasLog = $true } }
 
     # system.txt
     $t = New-Object System.Collections.Generic.List[string]
-    $t.Add("open-homm5 bug report")
+    $t.Add("H5 Together bug report")
     $t.Add("Made by bug-report.ps1 on " + [DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss", [Globalization.CultureInfo]::InvariantCulture) + ". Nothing was sent anywhere.")
     $t.Add("")
     $t.Add("Add-on")
@@ -275,12 +275,12 @@ try {
     if (-not (Test-Path -LiteralPath $dll -PathType Leaf)) {
         $t.Add("  dinput8.dll in the game folder: none (the add-on is not installed here)")
     } elseif (-not (Test-IsOurs $dll)) {
-        $t.Add("  dinput8.dll in the game folder: NOT the open-homm5 one (another add-on uses that name)")
+        $t.Add("  dinput8.dll in the game folder: NOT the H5 Together one (another add-on uses that name)")
     } else {
         $v = Get-AddonVersion $dll
         if (-not $v) { $v = "an older build, version not written in it" }
         $props = (Get-Item -LiteralPath $dll).VersionInfo
-        $t.Add("  dinput8.dll in the game folder: open-homm5 " + $v + " (file properties: " + $(if ($props.ProductVersion) { $props.ProductVersion } else { "no version information" }) + ")")
+        $t.Add("  dinput8.dll in the game folder: H5 Together " + $v + " (file properties: " + $(if ($props.ProductVersion) { $props.ProductVersion } else { "no version information" }) + ")")
     }
     $mine = Join-Path $PSScriptRoot "dinput8.dll"
     if (Test-Path -LiteralPath $mine -PathType Leaf) {
@@ -288,7 +288,7 @@ try {
         if (-not $v) { $v = "unknown" }
         $t.Add("  the package this script came from: " + $v)
     }
-    $t.Add("  open-homm5.nohooks (switches the hooks off): " + $(if (Test-Path -LiteralPath (Join-Path $bin "open-homm5.nohooks")) { "present" } else { "not there" }))
+    $t.Add("  h5-together.nohooks (switches the hooks off): " + $(if (Test-Path -LiteralPath (Join-Path $bin "h5-together.nohooks")) { "present" } else { "not there" }))
     $t.Add("")
     $t.Add("System")
     try {
@@ -348,7 +348,7 @@ try {
     $t.Add("")
     $t.Add("Files in this zip")
     foreach ($item in $pack) { $t.Add("  " + $item[0] + "  " + (Get-Item -LiteralPath $item[1]).Length + " bytes") }
-    if (-not $hasLog) { $t.Add("  (there is no open-homm5.log in the game folder: the game was not started since the add-on was installed, or the add-on is not installed)") }
+    if (-not $hasLog) { $t.Add("  (there is no h5-together.log in the game folder: the game was not started since the add-on was installed, or the add-on is not installed)") }
     $t.Add("  system.txt  (this file)")
     $systemText = ($t -join "`r`n") + "`r`n"
 
@@ -363,7 +363,7 @@ try {
         Write-Host "You can run it again with -OutDir <a folder you can write in>." -ForegroundColor Red
         Wait-AndExit 5
     }
-    $zipPath = Join-Path $outFolder ("open-homm5-bug-report-" + $stamp + ".zip")
+    $zipPath = Join-Path $outFolder ("h5-together-bug-report-" + $stamp + ".zip")
     $zipFile = $null
     $zip = $null
     try {
@@ -393,7 +393,7 @@ try {
         Write-Host ""
         Write-Host "Could not write the bug report:" -ForegroundColor Red
         Write-Host ("  " + $problem) -ForegroundColor Red
-        Write-Host "You can run it again with -OutDir <folder>, or just attach open-homm5.log from the bin folder." -ForegroundColor Red
+        Write-Host "You can run it again with -OutDir <folder>, or just attach h5-together.log from the bin folder." -ForegroundColor Red
         Wait-AndExit 5
     }
 
@@ -403,11 +403,11 @@ try {
     Write-Host ("  ({0}; it holds: {1}, system.txt)" -f (Format-Size (Get-Item -LiteralPath $zipPath).Length), (($pack | ForEach-Object { $_[0] }) -join ", "))
     if (-not $hasLog) {
         Write-Host ""
-        Write-Host "There is no open-homm5.log in the game folder, so the report only tells about your installation." -ForegroundColor Yellow
+        Write-Host "There is no h5-together.log in the game folder, so the report only tells about your installation." -ForegroundColor Yellow
         Write-Host "(Either the add-on is not installed here, or the game was not started since.)" -ForegroundColor Yellow
     }
     Write-Host ""
-    Write-Host "Attach that file to your report on GitHub: https://github.com/jozrcr/open-homm5/issues/new/choose"
+    Write-Host "Attach that file to your report on GitHub: https://github.com/jozrcr/h5-together/issues/new/choose"
     Write-Host "Nothing was sent anywhere. The log lists player names and LAN addresses; the zip is a normal"
     Write-Host "zip file, so you can open it and look before you send it."
     if (-not $NoPause) {

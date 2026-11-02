@@ -29,7 +29,7 @@
 // their values: turning the setting off gives back exactly the game's sound.
 // Sound is not part of the game world: each player may choose.
 //
-// Settings, open-homm5.ini [audio]:
+// Settings, h5-together.ini [audio]:
 //   volume_curve=game   game: the game's straight sliders (nothing installed)
 //                       wide: each slider step about the same number of
 //                       decibels; the lowest step is 10 times quieter
@@ -102,7 +102,7 @@ void __fastcall MusicVolumeHook(void *channel, void *edx, float volume)
 void ApplyAudioVolumeFromSettings()
 {
 	wchar_t ini[MAX_PATH];
-	hooklog::PathNextToExe(L"open-homm5", L".ini", ini, MAX_PATH);  // open-homm5-<instance>.ini for the robot
+	hooklog::PathNextToExe(L"h5-together", L".ini", ini, MAX_PATH);  // h5-together-<instance>.ini for the robot
 	wchar_t curve[16] = L"";
 	GetPrivateProfileStringW(L"audio", L"volume_curve", L"game", curve, 16, ini);
 	g_log_volume = static_cast<LONG>(GetPrivateProfileIntW(L"audio", L"log_volume", 0, ini));

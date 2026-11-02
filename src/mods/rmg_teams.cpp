@@ -13,7 +13,7 @@
 // changing the teams in the host's setup just before that is enough: every PC
 // gets the same teams, players without our DLL too, and nothing has to agree.
 //
-// Settings, open-homm5.ini [rmg] (only the host's count):
+// Settings, h5-together.ini [rmg] (only the host's count):
 //   teams=              empty: the map's own teams (the game's behaviour)
 //   teams=humans_vs_ai  all humans on one team, all computer players on the other
 //   teams=pairs         players 1+2, 3+4, 5+6, 7+8 (our team templates put
@@ -460,7 +460,7 @@ bool ParseList(const wchar_t *text)
 void ApplyRmgTeamsFromSettings()
 {
 	wchar_t path[MAX_PATH];
-	hooklog::PathNextToExe(L"open-homm5", L".ini", path, MAX_PATH);
+	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
 	wchar_t text[64];
 	GetPrivateProfileStringW(L"rmg", L"teams", L"", text, 64, path);
 	g_trace = GetPrivateProfileIntW(L"rmg", L"trace_teams", 1, path) != 0;

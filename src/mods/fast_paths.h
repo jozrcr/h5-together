@@ -4,7 +4,7 @@
 
 namespace mods {
 
-// Installs the mod unless open-homm5.ini says [ai] fast_paths=0 (default 1).
+// Installs the mod unless h5-together.ini says [ai] fast_paths=0 (default 1).
 // Only after DetectGameBuild() said the build is hookable.
 void ApplyFastPathsFromSettings();
 

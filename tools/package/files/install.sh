@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# open-homm5 installer for Linux (Steam / Proton).
+# H5 Together installer for Linux (Steam / Proton).
 #
 # Normal use, from the folder where you extracted the zip:   bash install.sh
 # Options, for tests and odd setups:
@@ -9,19 +9,19 @@
 # It looks for Steam in ~/.steam/steam, ~/.local/share/Steam and the Flatpak
 # folder, so a fake $HOME works for tests.
 #
-# It also copies the random map templates of this package (open-homm5/templates/*.xdb)
-# into <game bin>/open-homm5/templates. It overwrites its own files there and
+# It also copies the random map templates of this package (h5-together/templates/*.xdb)
+# into <game bin>/h5-together/templates. It overwrites its own files there and
 # never touches another file.
 #
-# An existing open-homm5.ini is refreshed: it becomes this package's file with the
-# player's values in it (the old one is kept as open-homm5.ini.bak; see merge_ini).
+# An existing h5-together.ini is refreshed: it becomes this package's file with the
+# player's values in it (the old one is kept as h5-together.ini.bak; see merge_ini).
 #
 # Exit codes: 0 done, 3 refused (a dinput8.dll that is not ours is there),
 # 4 game not found, 5 copy failed, 7 package incomplete.
 
 [ -n "${BASH_VERSION:-}" ] || { echo "Please run this with bash:  bash install.sh"; exit 2; }
 
-MARKER='open-homm5 hook DLL'
+MARKER='H5 Together hook DLL'
 GAME_FOLDER='Heroes of Might and Magic 5 Tribes of the East'
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -39,7 +39,7 @@ done
 
 # ---- shared with uninstall.sh and bug-report.sh: finding the game (keep all copies identical) ----
 
-# True if the file is the dinput8.dll of open-homm5 (it contains our marker text).
+# True if the file is the dinput8.dll of H5 Together (it contains our marker text).
 is_ours() { grep -q -a -F -- "$MARKER" "$1" 2>/dev/null; }
 
 # Prints the first file or folder called $2 (ignoring upper/lower case) inside $1.
@@ -150,7 +150,7 @@ choose_game_bin() {
 }
 # ---- end of the shared block ----
 
-# ---- the settings file: refresh it from this package's open-homm5.ini ----
+# ---- the settings file: refresh it from this package's h5-together.ini ----
 # install.ps1 does exactly the same (Merge-Settings, where the rules are written out);
 # test_scripts.py checks that both give the same bytes. In short: the result is this
 # package's file; each "key=value" of the player's file fills the ";key=" line of the
@@ -286,7 +286,7 @@ refresh_ini() {
         ini_was="unreadable"
         return
     fi
-    tmp="$(mktemp "${TMPDIR:-/tmp}/open-homm5-ini.XXXXXX")" || return
+    tmp="$(mktemp "${TMPDIR:-/tmp}/h5-together-ini.XXXXXX")" || return
     if counts="$(merge_ini "$1" "$2" "$tmp")" && read -r ini_settings ini_new ini_unknown <<< "$counts" && [ -n "$ini_unknown" ]; then
         if cmp -s "$tmp" "$1"; then
             ini_was="current"
@@ -301,24 +301,24 @@ refresh_ini() {
 count_text() { if [ "$1" -eq 1 ]; then echo "1 $2"; else echo "$1 $3"; fi; }
 
 echo
-echo "open-homm5 installer"
+echo "H5 Together installer"
 echo "--------------------"
 
 src_dll="$here/dinput8.dll"
-src_ini="$here/open-homm5.ini"
-src_tpl="$here/open-homm5/templates"
+src_ini="$here/h5-together.ini"
+src_tpl="$here/h5-together/templates"
 tpl_files=()
 for f in "$src_tpl"/*.xdb; do
     [ -f "$f" ] && tpl_files+=("$f")
 done
 if [ ! -f "$src_dll" ] || [ ! -f "$src_ini" ] || [ "${#tpl_files[@]}" -eq 0 ]; then
-    echo "dinput8.dll, open-homm5.ini and the folder open-homm5/templates must be next to this script."
+    echo "dinput8.dll, h5-together.ini and the folder h5-together/templates must be next to this script."
     echo "Please extract the whole zip first, then run install.sh from the new folder."
     echo "Nothing was installed."
     exit 7
 fi
 if ! is_ours "$src_dll"; then
-    echo "The dinput8.dll in this package is not the open-homm5 one. The download may be damaged."
+    echo "The dinput8.dll in this package is not the H5 Together one. The download may be damaged."
     echo "Nothing was installed."
     exit 7
 fi
@@ -338,8 +338,8 @@ if [ -n "$existing" ]; then
     if ! is_ours "$existing"; then
         echo
         echo "Stopped. There is already a file called dinput8.dll in the game folder,"
-        echo "and it is not the open-homm5 one (another add-on may use it)."
-        echo "I did not change anything. If you want open-homm5, move that file away"
+        echo "and it is not the H5 Together one (another add-on may use it)."
+        echo "I did not change anything. If you want H5 Together, move that file away"
         echo "yourself and run this installer again."
         exit 3
     fi
@@ -347,7 +347,7 @@ if [ -n "$existing" ]; then
     if cmp -s "$src_dll" "$dst_dll"; then dll_was="same"; else dll_was="older"; fi
 fi
 
-dst_ini="$(find_ci "$bin" open-homm5.ini)"
+dst_ini="$(find_ci "$bin" h5-together.ini)"
 ini_was="old"
 if ! cp -f "$src_dll" "$dst_dll"; then
     echo
@@ -356,10 +356,10 @@ if ! cp -f "$src_dll" "$dst_dll"; then
     exit 5
 fi
 if [ -z "$dst_ini" ]; then
-    if cp "$src_ini" "$bin/open-homm5.ini"; then
+    if cp "$src_ini" "$bin/h5-together.ini"; then
         ini_was="new"
     else
-        echo "Could not copy open-homm5.ini (see the message above)."
+        echo "Could not copy h5-together.ini (see the message above)."
         exit 5
     fi
 else
@@ -368,8 +368,8 @@ else
 fi
 
 # Our random map templates: overwrite our own OH-*.xdb files, leave every other file alone.
-tpl_dir="$(find_ci "$bin" open-homm5)"
-[ -n "$tpl_dir" ] && [ -d "$tpl_dir" ] || tpl_dir="$bin/open-homm5"
+tpl_dir="$(find_ci "$bin" h5-together)"
+[ -n "$tpl_dir" ] && [ -d "$tpl_dir" ] || tpl_dir="$bin/h5-together"
 tpl_sub="$(find_ci "$tpl_dir" templates)"
 [ -n "$tpl_sub" ] && [ -d "$tpl_sub" ] || tpl_sub="$tpl_dir/templates"
 if ! mkdir -p "$tpl_sub"; then
@@ -394,13 +394,13 @@ echo "Done. What I did:"
 case "$dll_was" in
     new)   echo "  - added dinput8.dll (the add-on)" ;;
     same)  echo "  - dinput8.dll was already installed and up to date" ;;
-    older) echo "  - replaced the older open-homm5 dinput8.dll with this version" ;;
+    older) echo "  - replaced the older H5 Together dinput8.dll with this version" ;;
 esac
 case "$ini_was" in
-    new) echo "  - added open-homm5.ini (settings, all at their defaults)" ;;
+    new) echo "  - added h5-together.ini (settings, all at their defaults)" ;;
     refreshed)
         echo "  - settings file refreshed: $ini_settings of your settings kept, $(count_text "$ini_new" "new setting" "new settings") available (see the comments)"
-        echo "    (your previous file is saved as open-homm5.ini.bak)"
+        echo "    (your previous file is saved as h5-together.ini.bak)"
         [ "$ini_unknown" -gt 0 ] && echo "    ($(count_text "$ini_unknown" setting settings) not listed in this version: kept at the end of their section, under \"kept from your previous file\")"
         ;;
     current)
@@ -410,13 +410,13 @@ case "$ini_was" in
             echo "  - settings file already up to date (every setting at its default)"
         fi
         ;;
-    unreadable) echo "  - kept open-homm5.ini as it is: it is not a plain text file, so I could not add the new settings" ;;
+    unreadable) echo "  - kept h5-together.ini as it is: it is not a plain text file, so I could not add the new settings" ;;
     *)
-        echo "  - could not refresh open-homm5.ini (see the message above)"
+        echo "  - could not refresh h5-together.ini (see the message above)"
         echo "    If the game is running, close it and run the installer again."
         ;;
 esac
-echo "  - installed ${#tpl_files[@]} random map templates in open-homm5/templates (they are in the game's random map list)"
+echo "  - installed ${#tpl_files[@]} random map templates in h5-together/templates (they are in the game's random map list)"
 [ "$tpl_replaced" -gt 0 ] && echo "    ($tpl_replaced of them replaced our files from an earlier install)"
 [ "$tpl_others" -gt 0 ] && echo "    (left the $tpl_others other file(s) in that folder alone)"
 echo "    Everyone in a multiplayer game needs the same templates: install the same version."
@@ -444,9 +444,9 @@ that exe, paste this line instead of the one above:
     WINEDLLOVERRIDES="dinput8=n,b" bash -c 'exec "${@/H5_Game.exe/MMH55_Utility_64.exe}"' -- %command%
 
 If it does not work, docs/linux.md (step 3) has another way: swap the two exe
-files. https://github.com/jozrcr/open-homm5/blob/main/docs/linux.md
+files. https://github.com/jozrcr/h5-together/blob/main/docs/linux.md
 
-How to check: start the game from Steam. A file named open-homm5.log then appears in:
+How to check: start the game from Steam. A file named h5-together.log then appears in:
 EOF
 echo "  $bin"
 echo "If you see it, the add-on is running. Everyone in the same co-op game should install it."

@@ -4,7 +4,7 @@
 
 namespace mods {
 
-// With the settings of open-homm5.ini: [camera] wheel_fix=auto (under Wine only,
+// With the settings of h5-together.ini: [camera] wheel_fix=auto (under Wine only,
 // once a check showed it is needed; 1 = from the first wheel event; 0 = off) and
 // [debug] trace_wheel=0. Installs nothing on Windows unless trace_wheel=1. Only
 // after DetectGameBuild() said the build is hookable, before the game makes its

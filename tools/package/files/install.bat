@@ -1,5 +1,5 @@
 @echo off
-rem open-homm5 installer for Windows: runs install.ps1 (nothing else happens here).
+rem H5 Together installer for Windows: runs install.ps1 (nothing else happens here).
 rem This file must keep Windows (CRLF) line endings.
 setlocal
 

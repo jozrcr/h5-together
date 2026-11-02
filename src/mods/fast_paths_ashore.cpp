@@ -305,7 +305,7 @@ bool FastGoAshoreInit()
 		t.generation = 0;
 	}
 	wchar_t path[MAX_PATH];
-	hooklog::PathNextToExe(L"open-homm5", L".ini", path, MAX_PATH);
+	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
 	g_self_check = GetPrivateProfileIntW(L"ai", L"ashore_check", 0, path) != 0;
 	if (g_self_check)
 		hooklog::Write("fast paths: go-ashore self-check on (every call also asks the game)");

@@ -29,7 +29,7 @@ THINK = re.compile(r"ai-step .* think=([\d.]+)ms")
 
 
 def read(run):
-    text = (pathlib.Path(run) / "open-homm5.log").read_text(encoding="utf-8", errors="replace")
+    text = (pathlib.Path(run) / "h5-together.log").read_text(encoding="utf-8", errors="replace")
     searches = [m.groups() for m in DETAIL.finditer(text)]
     steps = [m.groups() for m in STEP.finditer(text)]
     think = sum(float(m.group(1)) for m in THINK.finditer(text))

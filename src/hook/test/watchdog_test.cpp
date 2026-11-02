@@ -65,7 +65,7 @@ int CountInLog(const char *text)
 	FILE *f = nullptr;
 	int n = 0;
 	char line[1200];
-	if (fopen_s(&f, "open-homm5.log", "r") != 0 || !f)
+	if (fopen_s(&f, "h5-together.log", "r") != 0 || !f)
 		return 0;
 	while (fgets(line, sizeof(line), f))
 		n += strstr(line, text) != nullptr;
@@ -77,7 +77,7 @@ int CountInLog(const char *text)
 
 int main()
 {
-	DeleteFileW(L"open-homm5.log");
+	DeleteFileW(L"h5-together.log");
 	hooklog::Open(nullptr);
 	const DWORD spin = reinterpret_cast<DWORD>(&Spin);
 	watchdog::ExpectEipForTest(spin, spin + 0x100);

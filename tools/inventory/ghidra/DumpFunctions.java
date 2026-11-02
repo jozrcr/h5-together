@@ -5,7 +5,7 @@
 // An argument starting with @ is a file with one hex address per line.
 // Writes <outdir>/<address>.txt per function. Output contains game code:
 // keep it in gitignored folders (analysis/export/).
-//@category open-homm5
+//@category H5 Together
 
 import java.io.File;
 import java.io.PrintWriter;

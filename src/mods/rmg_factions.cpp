@@ -20,7 +20,7 @@
 //     map's description was loaded in the lobby and stays cached by path; its
 //     ground files are read again at the start.
 //
-// What this mod does (open-homm5.ini [rmg] faction_terrain=1 on the host):
+// What this mod does (h5-together.ini [rmg] faction_terrain=1 on the host):
 //   1. Lobby (host only): on random maps, every start slot may pick any of the 8
 //      factions (the host's start info decides the arrows of every PC: its lock
 //      commands, 0x0071e7b0).
@@ -43,7 +43,7 @@
 //      such a game needs its map), but the game's map lists do not show them:
 //      only the map they were rebuilt from shows.
 //
-// Settings, open-homm5.ini [rmg]:
+// Settings, h5-together.ini [rmg]:
 //   faction_terrain=0   1 = as the host, offer it (see above); off by default
 //   trace_factions=0    research: log the lobby setups, the start data, the
 //                       generator's calls and the map files opened
@@ -974,7 +974,7 @@ bool CodeAsExpected()
 void ApplyRmgFactionsFromSettings()
 {
 	wchar_t path[MAX_PATH];
-	hooklog::PathNextToExe(L"open-homm5", L".ini", path, MAX_PATH);
+	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
 	g_host = GetPrivateProfileIntW(L"rmg", L"faction_terrain", 0, path) != 0;
 	g_trace = GetPrivateProfileIntW(L"rmg", L"trace_factions", 0, path) != 0;
 	// Every PC, whatever happens below: a rebuilt map of an earlier game never

@@ -22,16 +22,16 @@ BEGIN
     BEGIN
         BLOCK "040904b0"  // English (US), Unicode
         BEGIN
-            VALUE "CompanyName", "jozrcr and open-homm5 contributors"
-            VALUE "FileDescription", "open-homm5: Heroes V add-on"
+            VALUE "CompanyName", "jozrcr and H5 Together contributors"
+            VALUE "FileDescription", "H5 Together: Heroes V add-on"
             VALUE "FileVersion", OPEN_HOMM5_VERSION
             VALUE "InternalName", "dinput8"
-            VALUE "LegalCopyright", "Copyright (c) 2026 jozrcr and open-homm5 contributors. MIT License."
+            VALUE "LegalCopyright", "Copyright (c) 2026 jozrcr and H5 Together contributors. MIT License."
             VALUE "LegalTrademarks", "Heroes of Might and Magic is a trademark of Ubisoft. This is an unofficial fan project."
             VALUE "OriginalFilename", "dinput8.dll"
-            VALUE "ProductName", "open-homm5"
+            VALUE "ProductName", "H5 Together"
             VALUE "ProductVersion", OPEN_HOMM5_VERSION
-            VALUE "Comments", "Unofficial add-on for Heroes of Might and Magic V: Tribes of the East with MMH5.5. https://github.com/jozrcr/open-homm5"
+            VALUE "Comments", "Unofficial add-on for Heroes of Might and Magic V: Tribes of the East with MMH5.5. https://github.com/jozrcr/h5-together"
         END
     END
     BLOCK "VarFileInfo"
