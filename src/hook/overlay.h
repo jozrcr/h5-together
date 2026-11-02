@@ -88,7 +88,9 @@ bool TopScreen(char *class_name, int size);
 // The screen object on top (the one TopScreen names; the whole object, where
 // its main vftable is), or nullptr.
 void *TopScreenObject();
-// The words of our panels: [ui] language=auto (the game's language), en or fr.
+// The panels' language as English or French: kFrench when the texts in use
+// are French (texts.h chooses the language, any language with a texts file;
+// the panels take their words from there).
 enum Language { kEnglish, kFrench };
 Language PanelLanguage();
 // The mouse in back buffer pixels (Windows' cursor), or false when it is not over the game.

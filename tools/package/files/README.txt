@@ -18,13 +18,19 @@ Check that it works: start the game. A file named h5-together.log appears in the
 
 UNINSTALL
 
-Double-click uninstall.bat (Windows) or run: bash uninstall.sh (Linux). Only our own files are removed (dinput8.dll, the logs, our templates, and your settings file and its .bak copies if you say yes). Templates you added yourself stay.
+Double-click uninstall.bat (Windows) or run: bash uninstall.sh (Linux). Only our own files are removed (dinput8.dll, the logs, our templates, our language files, and your settings file and its .bak copies if you say yes). Templates and translations you added yourself stay.
 
 
 SETTINGS (you can skip this)
 
 h5-together.ini in the game's bin folder. Every line is commented out and shows the default. The defaults keep the original game: the speed-ups, fixes and panels are on, and anything that changes how the game plays, looks or sounds is off until you turn it on. Restart the game after a change.
 Your hero look choices are kept in h5-together-skins.ini, next to it.
+
+
+LANGUAGES
+
+The add-on's panels and messages are in English or French: one file per language in the game's bin\h5-together\texts folder (en.txt, fr.txt). The add-on uses the game's language by itself (Steam's language for the game, else the game's own texts, else Windows'). To choose, set [ui] language=en or fr in h5-together.ini. Any text a file lacks shows in English.
+Translations are welcome: copy en.txt to the code of your language (de.txt, ru.txt, pl.txt...), translate the text right of each "=" (the top of en.txt says how), put it in the same folder, set [ui] language=de, and send it to us: https://github.com/jozrcr/h5-together/issues/new/choose
 
 
 WHAT IT DOES

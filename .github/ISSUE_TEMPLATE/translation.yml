@@ -1,0 +1,48 @@
+name: Translation
+description: The add-on's panels in your language (a new language file, or a fix to one)
+title: "[Translation] "
+labels: ["translation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you! The add-on's own words (about 200 short texts: its panels and messages) are in one text file per language. How to make one: [TRANSLATING.md](https://github.com/jozrcr/h5-together/blob/main/src/mods/texts/TRANSLATING.md). In short: copy `en.txt` (in the game's `bin\h5-together\texts` folder) to `de.txt` (your language's code), translate the text right of each `=`, keep every `{name}`.
+
+        These are only the add-on's words. The game's own texts and MMH5.5's translations are looked after by the MMH5.5 team.
+
+  - type: input
+    id: language
+    attributes:
+      label: Language
+      placeholder: "German (de)"
+    validations:
+      required: true
+
+  - type: input
+    id: addon-version
+    attributes:
+      label: H5 Together version the file is for
+      description: The first line of `h5-together.log` (in the game's `bin` folder), like `H5 Together hook DLL <version> loaded`.
+      placeholder: "0.3.0"
+
+  - type: textarea
+    id: file
+    attributes:
+      label: The file
+      description: Attach the `.txt` file here (drag it into this box). For a few fixes, the lines are enough.
+    validations:
+      required: true
+
+  - type: textarea
+    id: checked
+    attributes:
+      label: What you checked in the game
+      description: Which panels you looked at, and anything that did not fit (a text cut with "..."). `h5-together.log` lists the lines the add-on did not use; paste those lines if there are any.
+
+  - type: checkboxes
+    id: licence
+    attributes:
+      label: Licence
+      options:
+        - label: The add-on may ship this translation under its MIT licence, with my name in the file.
+          required: true

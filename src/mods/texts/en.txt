@@ -1,0 +1,256 @@
+# H5 Together texts: English
+#
+# The words of H5 Together's panels and messages. The add-on has English built
+# in: this file is the copy translators start from.
+#
+# To translate (more in TRANSLATING.md, on the add-on's GitHub page,
+# https://github.com/jozrcr/h5-together/blob/main/src/mods/texts/TRANSLATING.md):
+#   1. Copy this file to <code>.txt, the code of your language: de.txt, ru.txt,
+#      pl.txt... Save it as UTF-8 (Notepad: "Save as", Encoding: UTF-8).
+#   2. Change the lines at the top (language, translated by, version).
+#   3. Translate the text right of each "=". Keep the key on the left as it is.
+#   4. Keep each {name} (a number or a name goes there): you may move it in the
+#      sentence, but leave none out and add none. Keep the game's tags too:
+#      <color=yellow>, <color_default>, <br>.
+#   5. "\n" starts a new line. A line that starts with # is a comment.
+#   6. Keep the texts about as short as the English ones: the panels have a
+#      fixed size and cut what does not fit with "...".
+#   7. Put the file in the game's bin\h5-together\texts\ folder. The add-on uses
+#      it when the game is in that language, or when h5-together.ini says
+#      [ui] language=<code>.
+# A line you leave out, or whose {names} differ from English, shows in English;
+# h5-together.log (next to the game's exe) lists those lines.
+#
+# language: en
+# translated by: H5 Together
+# for H5 Together: 0.3.0
+
+# This language: its own name (for a future settings menu), and the game's own
+# name of the red player in this language (Text/Game/Player/Colors/red_player.txt),
+# by which the add-on recognises a game in this language.
+[language]
+name = English
+red_player = Red player
+
+# The player list on the adventure map. {n}: a number.
+[players]
+day = Day {n}
+ready = ready
+computer = Computer {n}
+player = Player {n}
+
+# The Windows pop-up when it is your turn and the game is in the background. {day}: a number.
+[notify]
+tip = Heroes V: your turn
+title = Heroes of Might and Magic V
+info = Your turn (day {day}).
+
+# The game rules panel (F2, or the "Rules..." button in the waiting room).
+# name.*: the rules; help.*: one line under each. {players}: player names; {why}: one of the why.* lines;
+# {value}: a value of the rule; {player}: a player's name; {files}: one of the differ.* lines.
+[rules]
+title = Game rules
+sub.host = Chosen by you, the host, for every player. Gold = changed from your MMH5.5 file.
+sub.client = Chosen by the host (read only).
+sub.game = The rules of this game (read only).
+sub.none = MMH5.5's settings file on this PC (read only).
+group.start = Game mode and start bonuses
+group.heroes = Heroes and skills
+group.towns = Towns and heroes
+group.computer = Computer players and neutral armies
+group.items = Artifacts and items
+group.random_maps = Random maps
+name.governance = Governors
+name.town_conversion = Town and dwelling conversion
+name.extra_conversions = Extra conversions
+name.town_gate = Town gate
+name.mine_control = Mine guards
+name.dimension_doors = Dimension doors visit towns
+name.ai_cheat = Computer bonus
+name.mixed_stacks = Mixed neutral armies
+name.neutral_stack_size = Neutral army size
+name.bank_difficulty = Battle site guards
+name.negative_artifacts = Prank artifacts
+name.rpg_potions = Potions for sale
+name.competitive_towns = Mage guild in every town
+name.mana_observatories = Mana at observatories
+name.moon_disc = Moon disc quest
+name.game_mode = Game mode
+name.toe_bonuses = ToE start bonuses
+name.map_scripts = MMH5.5 scripts on random maps
+name.class_skills = Skills of each class
+name.class_chance = Rare skill chance
+help.governance = A hero can govern a town and give it bonuses.
+help.town_conversion = Captured towns and dwellings can change to your faction.
+help.extra_conversions = How many more towns and dwellings may convert (1 = MMH5.5's balance).
+help.town_gate = Heroes can travel between their own towns.
+help.mine_control = Mines can be guarded by armies that keep themselves.
+help.dimension_doors = On random maps, a dimension door can visit a town from afar.
+help.ai_cheat = Extra gold and creatures each week for the computer players.
+help.mixed_stacks = Neutral armies mix several kinds of creatures (multiplayer maps).
+help.neutral_stack_size = Multiplier for the neutral armies (the start may lag a while).
+help.bank_difficulty = Multiplier for the guards of banks and battle sites.
+help.negative_artifacts = Hidden harmful artifacts (from Heroes II) can be found.
+help.rpg_potions = Trading posts sell potions on multiplayer and random maps.
+help.competitive_towns = Random map towns start with a level 1 mage guild.
+help.mana_observatories = Redwood observatories also restore mana (random maps).
+help.moon_disc = The moon disc artifact quest on random maps.
+help.game_mode = Default, Savage or Nightmare for everyone (MMH5.5: the bonus arrows).
+help.toe_bonuses = Each player keeps the start bonus picked with the arrows: gold, resources, artifact.
+help.map_scripts = In multiplayer, MMH5.5's scripts also run on maps without a script (from the generator).
+help.class_skills = Unlocked: any skill, those off the class's list at chance 2 (as in ToE).
+help.class_chance = The chance of the skills a class does not list (testing).
+ai_bonus.0 = Off
+ai_bonus.40 = 40%
+ai_bonus.60 = 60%
+ai_bonus.80 = 80%
+ai_bonus.100 = 100% (MMH5.5)
+ai_bonus.120 = 120%
+ai_bonus.140 = 140%
+on = On
+off = Off
+file_value = your file: {value}
+own_value = MMH5.5 alone: {value}
+apply = Every player has H5 Together: these rules will be used.
+missing = Without H5 Together (or with an older one): {players}. Then every PC uses its own MMH5.5 file.
+differ = MMH5.5 files differ: {players}. The game may not stay in step.
+setup = The players will see these rules in the waiting room.
+client_wait = The host sent no rules (no H5 Together there, or another version): every PC uses its own MMH5.5 file.
+client_apply = They will be used: every player has H5 Together.
+client_no = A player lacks H5 Together: every PC will use its own MMH5.5 file.
+client_differ = Your MMH5.5 files differ from the host's: the game may not stay in step.
+game_host = This game uses the host's rules.
+game_file = This game uses this PC's MMH5.5 file.
+no_file = MMH5.5's settings file (scripts/H55-Settings.lua) was not found: nothing to choose.
+no_script = This map has no map script (a random map straight from the generator): with "MMH5.5 scripts on random maps" off, MMH5.5's scripts do not run on it in multiplayer, so these rules change nothing there.
+script_added = This map has no map script: MMH5.5's scripts will run on it all the same ("MMH5.5 scripts on random maps").
+ok = OK
+file = MMH5.5's file
+cancel = Cancel
+close = Close
+button = Rules...
+mode.arrows = Bonus arrows (MMH5.5)
+mode.default = Default
+mode.savage = Savage
+mode.nightmare = Nightmare
+mode.random = Random
+mode_with_toe = With ToE start bonuses the arrows choose a bonus, so the mode is Default.
+start_no = Game mode and ToE start bonuses stay MMH5.5's way: {why}.
+client_start_no = Game mode and ToE start bonuses stay MMH5.5's way: MMH5.5's start script (H55-AdvMap.lua) is not the same on every PC.
+class.locked = MMH5.5 (locked)
+class.unlocked = Unlocked
+class_note = Skills unlocked: MMH5.5's skill wheel (hero screen) still shows each class's own tree, and the witch huts keep MMH5.5's lists.
+class_no = The class skills stay MMH5.5's lock: {why}.
+client_class_no = The class skills stay MMH5.5's lock: a PC's class table is not the host's (another MMH5.5 version?).
+class_save = The class skills come from the loaded save.
+why.start_not_read = this PC's H55-AdvMap.lua was not read yet
+why.start_missing = this PC has no scripts/H55-AdvMap.lua
+why.start_this_pc = this PC's H55-AdvMap.lua is not one H5 Together can change
+why.start_host = the host's H55-AdvMap.lua is not one H5 Together can change
+why.start_differs = {player}'s H55-AdvMap.lua is not the host's (its StartingBonus part differs)
+why.start_waiting = {player} has not sent its H55-AdvMap.lua's hash yet
+why.class_this_pc = this PC's class table cannot be edited
+why.class_host = the host's class table cannot be edited
+why.class_waiting = {player} has not sent its class table's hash yet
+why.class_cannot = {player}'s class table cannot be edited
+why.class_differs = {player}'s class table is not the host's (another MMH5.5 version?)
+differ.item = {player}: {files}
+differ.settings_rest = H55-Settings.lua (besides the rules)
+differ.settings = H55-Settings.lua
+differ.stats = MMH5.5's stats files
+
+# The waiting room's start bonus tooltips (they replace the game's own). Keep the game's tags
+# <color=yellow>, <color_default> and <br>. {mode}: one of the mode.* lines.
+[bonus]
+random = <color=yellow>Start bonus: random<color_default><br>Gold, resources or a minor artifact, as in Tribes of the East.
+artifact = <color=yellow>Start bonus: minor artifact<color_default><br>Your first hero starts with a random minor artifact.
+gold = <color=yellow>Start bonus: gold<color_default><br>500 to 1000 more gold at the start.
+resources = <color=yellow>Start bonus: resources<color_default><br>3 to 6 more of one random resource at the start.
+none = <color=yellow>No start bonus to choose<color_default><br>MMH5.5 gives every human player's first hero a random minor artifact.
+mode = <br><br>Game mode: {mode} (the host's game rules).
+mode.default = Default
+mode.savage = Savage
+mode.nightmare = Nightmare
+mode.random = Random (Default, Savage or Nightmare, drawn at the start)
+
+# The hero looks panel (F7, or the "Look" button on the hero screen). {hero}: a hero's name;
+# {heroes}: hero names.
+[looks]
+title = {hero}'s look
+own = its own look
+also = Also worn by: {heroes}
+apply = Apply
+cancel = Cancel
+single = Pick a look of its faction: its figures on the map, in battle and on the hero screen. Its portrait stays its own.
+multi_soon = Multiplayer: the choice counts for every player a few seconds into the game.
+multi_on = Multiplayer: the choice counts for every player a few seconds after Apply.
+multi_off = In this game the looks are off (a PC lacks H5 Together, or another version): the choice is kept for your next games.
+button_tip = Look
+
+# The template builder (F11, or the "Template..." button on the random map screen).
+# {size}: one of the size.* lines; {file}: a file name; {code}: Windows' error number;
+# {players}, {zones}, {neutral}, {tiles}, {value}, {shipped}: numbers.
+[builder]
+title = Template builder
+start_from = Start from
+custom = (custom)
+section.teams = Teams
+teams = Number of teams
+per_team = Players per team
+ally_path = Teammates' path
+ally.weak = Weak guard
+ally.open = Open
+mines = Start zone mines
+mines.all = All six
+mines.woodore = Wood and ore
+section.neutral = Neutral zones
+team_zones = Per team
+border_zones = Between teams
+centre_zones = In the centre
+border_towns = Towns between teams
+team_towns = Extra town per team
+section.loot = Loot and guards
+loot = Loot
+loot.poor = Poor
+loot.normal = Normal
+loot.rich = Rich
+loot.veryrich = Very rich
+guards = Guards
+guards.weak = Weak
+guards.normal = Normal
+guards.strong = Strong
+by_distance = By distance from the bases
+same = Same
+ring.start = Start
+ring.next = Next
+ring.two = 2 steps
+ring.further = Further
+section.map = Map
+size = Size
+auto_size = Auto: {size}
+size.tiny = Tiny (72×72)
+size.small = Small (96×96)
+size.medium = Medium (136×136)
+size.large = Large (176×176)
+size.extra_large = Extra large (216×216)
+size.huge = Huge (256×256)
+size.impossible = Impossible (320×320)
+underground = Underground
+legend = colours = teams · grey = neutral · gold = centre
+stats = {players} players · {zones} zones ({neutral} neutral)
+size_line = {size}
+size_line_ug = {size} · underground
+use = Use
+save = Save as file
+cancel = Cancel
+saved = Saved: {file}
+not_saved = Not saved: error {code}
+use_failed = The game's screen was not set (see h5-together.log)
+native_button = Template...
+native_tooltip = The template builder (H5 Together)
+auto = Auto
+msg.too_few_teams = need at least 2 teams (1 player per team = free-for-all)
+msg.too_many_players = the game allows at most 8 players ({players} asked)
+msg.small_zones = Zones are small ({tiles} tiles each): pick a bigger map or fewer zones.
+msg.big_zones = Zones are very big ({tiles} tiles each): the generator may leave them empty; pick a smaller map or more zones.
+msg.rich_zones = Some zones hold more treasure ({value}) than any shipped template ({shipped}); not tested in the game yet.

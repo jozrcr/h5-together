@@ -4,9 +4,10 @@
 # Removes only what install.sh put in the game's bin folder:
 #   dinput8.dll (only if it is ours), h5-together.log (and h5-together.old.log), h5-together.ini (after asking),
 #   and the random map templates of this package (the OH-*.xdb files whose names are in
-#   this package's h5-together/templates folder), then the folders if they are empty.
+#   this package's h5-together/templates folder), the language files of this package
+#   (h5-together/texts, the same names as in the package), then the folders if they are empty.
 # The same files under the add-on's old name (open-homm5, until 0.2.7) go too.
-# Nothing else is touched: a template of your own stays. Steam's launch options are
+# Nothing else is touched: a template or a translation of your own stays. Steam's launch options are
 # yours to clear by hand.
 #
 # Normal use:   bash uninstall.sh
@@ -236,9 +237,48 @@ else
     esac
 fi
 
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# The language files: only the names this package holds; a translation of the player's
+# own (another name) stays. Before the templates, so that the folder h5-together can go
+# once both are empty.
+txt_names=()
+for f in "$here/h5-together/texts"/*.txt; do
+    [ -f "$f" ] && txt_names+=("$(basename "$f")")
+done
+our_dir="$(find_ci "$bin" h5-together)"
+txt_sub=""
+[ -n "$our_dir" ] && [ -d "$our_dir" ] && txt_sub="$(find_ci "$our_dir" texts)"
+if [ -n "$txt_sub" ] && [ -d "$txt_sub" ]; then
+    if [ "${#txt_names[@]}" -eq 0 ]; then
+        echo "  - this folder has no list of our language files, so I left h5-together/texts alone"
+    else
+        removed=0
+        for name in "${txt_names[@]}"; do
+            p="$(find_ci "$txt_sub" "$name")"
+            [ -n "$p" ] && [ -f "$p" ] || continue
+            if rm -f "$p"; then
+                removed=$((removed + 1))
+            else
+                echo "  - could not remove $name"
+                failed=1
+            fi
+        done
+        echo "  - removed $removed language files (h5-together/texts)"
+        if [ -n "$(ls -A "$txt_sub")" ]; then
+            echo "  - kept the other file(s) in h5-together/texts (not ours)"
+        elif rmdir "$txt_sub"; then
+            rmdir "$our_dir" 2>/dev/null   # only if nothing else is in it
+            echo "  - removed the empty folder h5-together/texts"
+        else
+            echo "  - could not remove the empty folder h5-together/texts"
+            failed=1
+        fi
+    fi
+fi
+
 # The random map templates: only the names this package holds, never another file. In
 # our folder, and in its old name (open-homm5, until 0.2.7) if that is still there.
-here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 tpl_names=()
 for f in "$here/h5-together/templates"/*.xdb; do
     [ -f "$f" ] && tpl_names+=("$(basename "$f")")

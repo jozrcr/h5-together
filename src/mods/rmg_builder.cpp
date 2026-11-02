@@ -58,6 +58,7 @@
 #include "../hook/old_names.h"
 #include "../hook/overlay.h"
 #include "../hook/robot.h"
+#include "../hook/texts.h"
 #include "../hook/third_party/imgui/imgui.h"
 
 namespace mods {
@@ -117,6 +118,7 @@ struct State {
 	bool valid = false;
 	rmg::Template t;
 	std::string error;   // the maker's refusal (then nothing can be used)
+	rmg::Message error_id;
 	std::string recipe;  // OH-X1-... of the choices
 	std::vector<data::Point> pos;
 	int preset = -1;
@@ -125,7 +127,7 @@ struct State {
 	std::string status;
 	bool status_bad = false;
 	DWORD status_until = 0;
-	std::string hint;  // why an arrow is greyed (the maker's words)
+	std::string hint;  // why an arrow is greyed (the maker's message, in the player's words)
 	DWORD hint_until = 0;
 	int pending = 0;  // an action for the next frame: 1 use, 2 save
 };
@@ -140,7 +142,7 @@ std::wstring IniPath()
 
 void Rebuild()
 {
-	g.valid = rmg::MakeTemplate(g.choices, &g.t, &g.error);
+	g.valid = rmg::MakeTemplate(g.choices, &g.t, &g.error, &g.error_id);
 	g.recipe.clear();
 	g.pos.clear();
 	if (g.valid) {
@@ -197,11 +199,16 @@ void Status(const std::string &text, bool bad)
 	g.status_until = GetTickCount() + 6000;
 }
 
-std::string Format(const char *format, const char *text)
+// A message of the maker in the player's words (its English words when it has no id).
+std::string Said(const std::string &english, const rmg::Message &m)
 {
-	char line[512];
-	_snprintf_s(line, sizeof(line), _TRUNCATE, format, text);
-	return line;
+	const char *key = data::MessageKey(m.id);
+	return data::MessageText(m, key ? texts::Get(key) : nullptr, english);
+}
+
+const data::Words &WordsNow()
+{
+	return texts::Table(data::kKeys);
 }
 
 void OpenPanel(const char *why)
@@ -234,7 +241,7 @@ int SizeIndex(const rmg::Template &t)
 // "Use": the game's own screen gets our template, then the panel closes.
 void DoUse()
 {
-	const data::Words &w = data::WordsFor(overlay::PanelLanguage());
+	const data::Words &w = WordsNow();
 	if (!g.valid || g.recipe.empty())
 		return;
 	char top[96];
@@ -266,7 +273,7 @@ void DoUse()
 // (or open-homm5\templates, the folder's name until 0.2.7, while only that one is there).
 void DoSave()
 {
-	const data::Words &w = data::WordsFor(overlay::PanelLanguage());
+	const data::Words &w = WordsNow();
 	if (!g.valid)
 		return;
 	wchar_t dir[MAX_PATH];
@@ -316,14 +323,14 @@ void DoSave()
 	if (ok) {
 		hooklog::Write("rmg builder: saved %s (%u bytes; %s): listed by the game from its next start", shown.c_str(),
 		               static_cast<unsigned>(t.xml.size()), g.recipe.c_str());
-		Status(Format(w.saved, t.file_name.c_str()), false);
+		Status(texts::Fill(w.saved, {{"file", t.file_name}}), false);
 		SaveLast();
 	}
 	else {
 		char why[64];
 		_snprintf_s(why, sizeof(why), _TRUNCATE, "error %lu", error_code);
 		hooklog::Write("rmg builder: %s NOT saved (%s)", shown.c_str(), why);
-		Status(Format(w.not_saved, why), true);
+		Status(texts::Fill(w.not_saved, {{"code", std::to_string(error_code)}}), true);
 	}
 }
 
@@ -561,7 +568,10 @@ void DrawSummary(ImDrawList *draw, const Layout &l, const data::Words &w)
 	const float x0 = l.At(kNameX - 4, 0).x, x1 = l.At(kNameX + kNameW + 4, 0).x;
 	char line[256];
 	if (g.valid) {
-		_snprintf_s(line, sizeof(line), _TRUNCATE, w.stats, g.t.stats.players, g.t.stats.zones, g.t.stats.neutral_zones);
+		_snprintf_s(line, sizeof(line), _TRUNCATE, "%s",
+		            texts::Fill(w.stats, {{"players", std::to_string(g.t.stats.players)}, {"zones", std::to_string(g.t.stats.zones)},
+		                                  {"neutral", std::to_string(g.t.stats.neutral_zones)}})
+		                .c_str());
 		CentredLine(draw, small, small_px, x0, x1, l.At(0, kStatsY).y, ui::kDim, line);
 		const std::string name = g.t.name + "*";
 		const std::string shown = ui::Fit(body, body_px, name.c_str(), (kNameW - 8) * l.k);
@@ -573,11 +583,12 @@ void DrawSummary(ImDrawList *draw, const Layout &l, const data::Words &w)
 		CentredLine(draw, small, small_px, x0, x1, l.At(0, kSizeY).y, g.status_bad ? ui::kError : ui::kGold, g.status.c_str());
 	else if (g.valid) {
 		const int i = SizeIndex(g.t);
-		_snprintf_s(line, sizeof(line), _TRUNCATE, g.choices.underground ? w.size_line_ug : w.size_line, i >= 0 ? w.sizes[i] : "?");
+		_snprintf_s(line, sizeof(line), _TRUNCATE, "%s",
+		            texts::Fill(g.choices.underground ? w.size_line_ug : w.size_line, {{"size", i >= 0 ? w.sizes[i] : "?"}}).c_str());
 		CentredLine(draw, small, small_px, x0, x1, l.At(0, kSizeY).y, ui::kDim, line);
 	}
 	else
-		CentredLine(draw, small, small_px, x0, x1, l.At(0, kSizeY).y, ui::kError, data::Localize(g.error, overlay::PanelLanguage()).c_str());
+		CentredLine(draw, small, small_px, x0, x1, l.At(0, kSizeY).y, ui::kError, Said(g.error, g.error_id).c_str());
 }
 
 // The choices, in the scrolling box. y and sizes in layout units inside the box.
@@ -625,6 +636,7 @@ bool StepperRow(ImDrawList *draw, ListLayout &ll, const char *id, const char *la
 	ui::ShadowText(draw, font, px, ll.At(1, ll.y + (h - kBodyFont) / 2 - 1), ui::kParchment,
 	               ui::Fit(font, px, label, (ll.width - 70) * ll.k).c_str());
 	std::string why;
+	rmg::Message why_id;
 	auto allowed = [&](int v) {
 		if (v < low || v > high)
 			return false;
@@ -633,21 +645,25 @@ bool StepperRow(ImDrawList *draw, ListLayout &ll, const char *id, const char *la
 		const rmg::Choices c = g.choices;
 		*value = old;
 		std::string error;
-		if (rmg::CheckChoices(c, &error))
+		rmg::Message id;
+		if (rmg::CheckChoices(c, &error, &id))
 			return true;
 		why = error;
+		why_id = id;
 		return false;
 	};
 	const bool can_down = allowed(*value - 1);
 	const std::string why_down = why;
+	const rmg::Message why_down_id = why_id;
 	why.clear();
+	why_id = rmg::Message();
 	const bool can_up = allowed(*value + 1);
 	int blocked = 0;
 	const int d = ui::Stepper(id, ll.At(ll.width, ll.y), h * ll.k, *value, can_down, can_up, &blocked, font, px, ll.k);
 	ll.y += h + 5;
 	const std::string &reason = blocked < 0 ? why_down : why;
 	if (blocked && !reason.empty()) {
-		g.hint = data::Localize(reason, overlay::PanelLanguage());
+		g.hint = Said(reason, blocked < 0 ? why_down_id : why_id);
 		g.hint_until = GetTickCount() + 5000;
 	}
 	if (!d)
@@ -800,14 +816,14 @@ void DrawChoices(ImDrawList *draw, ListLayout &ll, const data::Words &w)
 	{
 		char auto_text[96];
 		const int best = g.valid && c.size == "auto" ? SizeIndex(g.t) : -1;
-		_snprintf_s(auto_text, sizeof(auto_text), _TRUNCATE, w.auto_size, best >= 0 ? w.sizes[best] : "");
+		_snprintf_s(auto_text, sizeof(auto_text), _TRUNCATE, "%s", texts::Fill(w.auto_size, {{"size", best >= 0 ? w.sizes[best] : ""}}).c_str());
 		const char *items[8] = {auto_text, w.sizes[0], w.sizes[1], w.sizes[2], w.sizes[3], w.sizes[4], w.sizes[5], w.sizes[6]};
 		int i = 0;
 		for (int s = 0; s < 7; ++s)
 			if (c.size == rmg::kSizes[s].key)
 				i = s + 1;
 		if (best < 0 && i == 0)
-			lstrcpynA(auto_text, "Auto", sizeof(auto_text));
+			lstrcpynA(auto_text, texts::Get("builder.auto"), sizeof(auto_text));
 		if (ComboRow(ll, "##size", items, 8, &i)) {
 			c.size = i ? rmg::kSizes[i - 1].key : "auto";
 			changed = true;
@@ -817,12 +833,11 @@ void DrawChoices(ImDrawList *draw, ListLayout &ll, const data::Words &w)
 	changed |= CheckRow(ll, "##underground", w.underground, &c.underground);
 	// the maker's warnings, or why it refuses the choices
 	ll.y += 2;
-	const int language = overlay::PanelLanguage();
 	if (!g.valid)
-		WrappedText(draw, ll, data::Localize(g.error, language), ui::kError);
+		WrappedText(draw, ll, Said(g.error, g.error_id), ui::kError);
 	else
-		for (const std::string &warning : g.t.warnings)
-			WrappedText(draw, ll, data::Localize(warning, language), ui::kWarn);
+		for (size_t i = 0; i < g.t.warnings.size(); ++i)
+			WrappedText(draw, ll, Said(g.t.warnings[i], i < g.t.warning_ids.size() ? g.t.warning_ids[i] : rmg::Message()), ui::kWarn);
 	ll.y += 4;
 	ImGui::SetCursorScreenPos(ll.At(0, ll.y));
 	ImGui::Dummy(ImVec2(1, 1));
@@ -861,7 +876,7 @@ void DrawScrollThumb(ImDrawList *draw, const Layout &l)
 void DrawPanel(const overlay::Frame &frame)
 {
 	const Layout l = LayoutFor(frame.width, frame.height);
-	const data::Words &w = data::WordsFor(overlay::PanelLanguage());
+	const data::Words &w = WordsNow();
 	// The game behind, dimmed: it gets no input while the panel is open.
 	ImGui::GetBackgroundDrawList()->AddRectFilled(ImVec2(0, 0), ImVec2(frame.width, frame.height), IM_COL32(0, 0, 0, 115));
 	const ImVec2 p0 = l.At(0, 0), p1 = l.At(kPanelW, kPanelH);
@@ -934,7 +949,7 @@ void DrawPanel(const overlay::Frame &frame)
 void DrawFallbackButton(const overlay::Frame &frame)
 {
 	const Layout l = LayoutFor(frame.width, frame.height);
-	const data::Words &w = data::WordsFor(overlay::PanelLanguage());
+	const data::Words &w = WordsNow();
 	ImDrawList *draw = ImGui::GetForegroundDrawList();
 	const ImVec2 p0 = l.At(static_cast<float>(data::kButtonX), static_cast<float>(data::kButtonY));
 	const ImVec2 p1 = l.At(data::kButtonX + kButtonW, data::kButtonY + kButtonH);

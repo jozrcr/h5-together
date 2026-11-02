@@ -1,0 +1,223 @@
+# H5 Together texts: Français
+#
+# Les mots des panneaux et des messages de H5 Together, en français.
+# How to translate: see en.txt and TRANSLATING.md.
+#
+# language: fr
+# translated by: H5 Together
+# for H5 Together: 0.3.0
+
+[language]
+name = Français
+red_player = Joueur rouge
+
+[players]
+day = Jour {n}
+ready = Prêts
+computer = Ordinateur {n}
+player = Joueur {n}
+
+[notify]
+tip = Heroes V : à vous de jouer
+title = Heroes of Might and Magic V
+info = À vous de jouer (jour {day}).
+
+[rules]
+title = Règles de la partie
+sub.host = Choisies par vous, l'hôte, pour tous les joueurs. En or : changé par rapport à votre fichier MMH5.5.
+sub.client = Choisies par l'hôte (lecture seule).
+sub.game = Les règles de cette partie (lecture seule).
+sub.none = Le fichier de réglages MMH5.5 de ce PC (lecture seule).
+group.start = Mode de jeu et bonus de départ
+group.heroes = Héros et compétences
+group.towns = Villes et héros
+group.computer = Ordinateur et armées neutres
+group.items = Artefacts et objets
+group.random_maps = Cartes aléatoires
+name.governance = Gouverneurs
+name.town_conversion = Conversion des villes et habitations
+name.extra_conversions = Conversions en plus
+name.town_gate = Portail des villes
+name.mine_control = Gardes des mines
+name.dimension_doors = Portes dimensionnelles
+name.ai_cheat = Bonus de l'ordinateur
+name.mixed_stacks = Armées neutres mélangées
+name.neutral_stack_size = Taille des armées neutres
+name.bank_difficulty = Gardes des sites de combat
+name.negative_artifacts = Artefacts farceurs
+name.rpg_potions = Potions en vente
+name.competitive_towns = Guilde des mages dans chaque ville
+name.mana_observatories = Mana aux observatoires
+name.moon_disc = Quête du disque lunaire
+name.game_mode = Mode de jeu
+name.toe_bonuses = Bonus de départ de ToE
+name.map_scripts = Scripts MMH5.5 sur les cartes aléatoires
+name.class_skills = Compétences de chaque classe
+name.class_chance = Chance des compétences rares
+help.governance = Un héros peut gouverner une ville et lui donner des bonus.
+help.town_conversion = Les villes et habitations prises peuvent passer à votre faction.
+help.extra_conversions = Combien de conversions en plus (1 = l'équilibre de MMH5.5).
+help.town_gate = Les héros peuvent voyager entre leurs villes.
+help.mine_control = Des armées qui s'entretiennent seules peuvent garder les mines.
+help.dimension_doors = Sur les cartes aléatoires, une porte peut visiter une ville à distance.
+help.ai_cheat = Or et créatures en plus chaque semaine pour les joueurs ordinateur.
+help.mixed_stacks = Les armées neutres mêlent plusieurs sortes de créatures (cartes multijoueur).
+help.neutral_stack_size = Multiplie les armées neutres (le début peut ramer un moment).
+help.bank_difficulty = Multiplie les gardes des banques et des sites de combat.
+help.negative_artifacts = Des artefacts néfastes cachés (de Heroes II) peuvent être trouvés.
+help.rpg_potions = Les comptoirs vendent des potions (cartes multijoueur et aléatoires).
+help.competitive_towns = Sur les cartes aléatoires, chaque ville a une guilde des mages niveau 1.
+help.mana_observatories = Les observatoires rendent aussi le mana (cartes aléatoires).
+help.moon_disc = La quête de l'artefact du disque lunaire sur les cartes aléatoires.
+help.game_mode = Par défaut, Sauvage ou Cauchemar pour tous (MMH5.5 : les flèches de bonus).
+help.toe_bonuses = Chacun garde le bonus de départ choisi avec les flèches : or, ressources, artefact.
+help.map_scripts = En multijoueur, les scripts MMH5.5 tournent aussi sur les cartes sans script (du générateur).
+help.class_skills = Débloquées : toute compétence, hors liste de la classe à chance 2 (comme ToE).
+help.class_chance = La chance des compétences hors de la liste d'une classe (tests).
+ai_bonus.0 = Aucun
+ai_bonus.40 = 40 %
+ai_bonus.60 = 60 %
+ai_bonus.80 = 80 %
+ai_bonus.100 = 100 % (MMH5.5)
+ai_bonus.120 = 120 %
+ai_bonus.140 = 140 %
+on = Oui
+off = Non
+file_value = votre fichier : {value}
+own_value = MMH5.5 seul : {value}
+apply = Tous les joueurs ont H5 Together : ces règles seront utilisées.
+missing = Sans H5 Together (ou avec une version plus ancienne) : {players}. Chaque PC utilise alors son propre fichier MMH5.5.
+differ = Fichiers MMH5.5 différents : {players}. La partie risque de se désynchroniser.
+setup = Les joueurs verront ces règles dans la salle d'attente.
+client_wait = L'hôte n'a pas envoyé de règles (pas de H5 Together chez lui, ou une autre version) : chaque PC utilise son propre fichier MMH5.5.
+client_apply = Elles seront utilisées : tous les joueurs ont H5 Together.
+client_no = Un joueur n'a pas H5 Together : chaque PC utilisera son propre fichier MMH5.5.
+client_differ = Vos fichiers MMH5.5 diffèrent de ceux de l'hôte : la partie risque de se désynchroniser.
+game_host = Cette partie utilise les règles de l'hôte.
+game_file = Cette partie utilise le fichier MMH5.5 de ce PC.
+no_file = Le fichier de réglages de MMH5.5 (scripts/H55-Settings.lua) est introuvable : rien à choisir.
+no_script = Cette carte n'a pas de script (carte aléatoire sortie du générateur) : sans "Scripts MMH5.5 sur les cartes aléatoires", les scripts de MMH5.5 n'y tournent pas en multijoueur, ces règles n'y changent donc rien.
+script_added = Cette carte n'a pas de script : les scripts de MMH5.5 y tourneront quand même ("Scripts MMH5.5 sur les cartes aléatoires").
+ok = OK
+file = Fichier MMH5.5
+cancel = Annuler
+close = Fermer
+button = Règles...
+mode.arrows = Flèches (MMH5.5)
+mode.default = Par défaut
+mode.savage = Sauvage
+mode.nightmare = Cauchemar
+mode.random = Aléatoire
+mode_with_toe = Avec les bonus de ToE, les flèches choisissent un bonus : le mode est Par défaut.
+start_no = Le mode de jeu et les bonus de ToE restent ceux de MMH5.5 : {why}.
+client_start_no = Le mode de jeu et les bonus de ToE restent ceux de MMH5.5 : le script de départ de MMH5.5 (H55-AdvMap.lua) n'est pas le même sur tous les PC.
+class.locked = MMH5.5 (verrouillées)
+class.unlocked = Débloquées
+class_note = Compétences débloquées : la roue des compétences de MMH5.5 (écran du héros) montre toujours l'arbre d'origine de la classe, et les huttes de sorcière gardent les listes de MMH5.5.
+class_no = Les compétences des classes restent verrouillées comme dans MMH5.5 : {why}.
+client_class_no = Les compétences des classes restent verrouillées comme dans MMH5.5 : la table des classes d'un PC n'est pas celle de l'hôte (une autre version de MMH5.5 ?).
+class_save = Les compétences des classes viennent de la sauvegarde chargée.
+why.start_not_read = le H55-AdvMap.lua de ce PC n'a pas encore été lu
+why.start_missing = ce PC n'a pas de scripts/H55-AdvMap.lua
+why.start_this_pc = le H55-AdvMap.lua de ce PC n'est pas un de ceux que H5 Together sait modifier
+why.start_host = le H55-AdvMap.lua de l'hôte n'est pas un de ceux que H5 Together sait modifier
+why.start_differs = le H55-AdvMap.lua de {player} n'est pas celui de l'hôte (sa partie StartingBonus diffère)
+why.start_waiting = {player} n'a pas encore envoyé l'empreinte de son H55-AdvMap.lua
+why.class_this_pc = la table des classes de ce PC ne peut pas être modifiée
+why.class_host = la table des classes de l'hôte ne peut pas être modifiée
+why.class_waiting = {player} n'a pas encore envoyé l'empreinte de sa table des classes
+why.class_cannot = la table des classes de {player} ne peut pas être modifiée
+why.class_differs = la table des classes de {player} n'est pas celle de l'hôte (une autre version de MMH5.5 ?)
+differ.item = {player} : {files}
+differ.settings_rest = H55-Settings.lua (hors règles)
+differ.settings = H55-Settings.lua
+differ.stats = fichiers de stats de MMH5.5
+
+[bonus]
+random = <color=yellow>Bonus de départ : aléatoire<color_default><br>De l'or, des ressources ou un artefact mineur, comme dans Tribes of the East.
+artifact = <color=yellow>Bonus de départ : artefact mineur<color_default><br>Votre premier héros commence avec un artefact mineur aléatoire.
+gold = <color=yellow>Bonus de départ : or<color_default><br>500 à 1000 pièces d'or de plus au départ.
+resources = <color=yellow>Bonus de départ : ressources<color_default><br>3 à 6 unités d'une ressource aléatoire de plus au départ.
+none = <color=yellow>Pas de bonus de départ à choisir<color_default><br>MMH5.5 donne au premier héros de chaque joueur humain un artefact mineur aléatoire.
+mode = <br><br>Mode de jeu : {mode} (règles de la partie choisies par l'hôte).
+mode.default = Par défaut
+mode.savage = Sauvage
+mode.nightmare = Cauchemar
+mode.random = Aléatoire (Par défaut, Sauvage ou Cauchemar, tiré au début)
+
+[looks]
+title = Apparence : {hero}
+own = son apparence
+also = Aussi portée par : {heroes}
+apply = Appliquer
+cancel = Annuler
+single = Choisissez une apparence de sa faction : ses figures sur la carte, en combat et dans l'écran du héros. Son portrait reste le sien.
+multi_soon = Partie à plusieurs : le choix compte pour tous quelques secondes après le début.
+multi_on = Partie à plusieurs : le choix compte pour tous quelques secondes après « Appliquer ».
+multi_off = Dans cette partie, les apparences sont désactivées (un PC n'a pas H5 Together, ou une autre version) : le choix servira aux prochaines parties.
+button_tip = Apparence
+
+[builder]
+title = Créateur de modèles
+start_from = Partir d'un modèle
+custom = (personnalisé)
+section.teams = Équipes
+teams = Nombre d'équipes
+per_team = Joueurs par équipe
+ally_path = Passage entre alliés
+ally.weak = Gardé (faible)
+ally.open = Ouvert
+mines = Mines de départ
+mines.all = Les six
+mines.woodore = Bois et minerai
+section.neutral = Zones neutres
+team_zones = Par équipe
+border_zones = Entre les équipes
+centre_zones = Au centre
+border_towns = Villes entre les équipes
+team_towns = Ville en plus par équipe
+section.loot = Butin et gardes
+loot = Butin
+loot.poor = Pauvre
+loot.normal = Normal
+loot.rich = Riche
+loot.veryrich = Très riche
+guards = Gardes
+guards.weak = Faibles
+guards.normal = Normales
+guards.strong = Fortes
+by_distance = Selon la distance des bases
+same = Idem
+ring.start = Départ
+ring.next = Voisines
+ring.two = À 2 pas
+ring.further = Plus loin
+section.map = Carte
+size = Taille
+auto_size = Auto : {size}
+size.tiny = Minuscule (72×72)
+size.small = Petite (96×96)
+size.medium = Moyenne (136×136)
+size.large = Grande (176×176)
+size.extra_large = Très grande (216×216)
+size.huge = Immense (256×256)
+size.impossible = Impossible (320×320)
+underground = Souterrain
+legend = couleurs = équipes · gris = neutre · or = centre
+stats = {players} joueurs · {zones} zones ({neutral} neutres)
+size_line = {size}
+size_line_ug = {size} · souterrain
+use = Utiliser
+save = Enregistrer
+cancel = Annuler
+saved = Enregistré : {file}
+not_saved = Non enregistré : erreur {code}
+use_failed = L'écran du jeu n'a pas été réglé (voir h5-together.log)
+native_button = Modèles...
+native_tooltip = Le créateur de modèles (H5 Together)
+auto = Auto
+msg.too_few_teams = Il faut au moins 2 équipes (1 joueur par équipe = chacun pour soi).
+msg.too_many_players = Le jeu permet 8 joueurs au plus ({players} demandés).
+msg.small_zones = Zones petites ({tiles} cases chacune) : carte plus grande ou moins de zones.
+msg.big_zones = Zones très grandes ({tiles} cases chacune) : le générateur peut les laisser vides ; carte plus petite ou plus de zones.
+msg.rich_zones = Des zones ont plus de trésor ({value}) que tout modèle livré ({shipped}) : pas encore testé en jeu.

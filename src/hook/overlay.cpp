@@ -20,6 +20,7 @@
 #include "log.h"
 #include "overlay_internal.h"
 #include "robot.h"
+#include "texts.h"
 #include "third_party/imgui/imgui.h"
 #include "third_party/imgui/backends/imgui_impl_dx9.h"
 #include "../mods/languages.h"
@@ -447,38 +448,8 @@ void *TopScreenObject()
 
 Language PanelLanguage()
 {
-	static int language = -1;  // found once
-	if (language >= 0)
-		return static_cast<Language>(language);
-	wchar_t path[MAX_PATH], text[32];
-	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
-	GetPrivateProfileStringW(L"ui", L"language", L"auto", text, 32, path);
-	if (_wcsicmp(text, L"en") == 0 || _wcsicmp(text, L"fr") == 0) {
-		language = _wcsicmp(text, L"fr") == 0 ? kFrench : kEnglish;
-		return static_cast<Language>(language);
-	}
-	// The game's language: French when the languages mod gives the game French
-	// texts ([lang] texts=fr); else a text of the original game, the red
-	// player's name ("Joueur rouge" / "Red player"); else the language of Windows.
-	if (mods::TextsChoice() == mods::Texts::French) {
-		hooklog::Write("overlay: French words, as the game's texts ([lang] texts=fr)");
-		language = kFrench;
-		return static_cast<Language>(language);
-	}
-	std::string data;
-	if (ReadGameFile("Text/Game/Player/Colors/red_player.txt", &data) && data.size() >= 4) {
-		const wchar_t *w = reinterpret_cast<const wchar_t *>(data.data());
-		const std::wstring words(w, data.size() / 2);
-		const bool french = words.find(L"Joueur") != std::wstring::npos;
-		hooklog::Write("overlay: the game's texts are %s", french ? "French" : "not French: English");
-		language = french ? kFrench : kEnglish;
-	}
-	else {
-		const bool french = PRIMARYLANGID(GetUserDefaultUILanguage()) == LANG_FRENCH;
-		hooklog::Write("overlay: the game's language is unknown: %s, as Windows", french ? "French" : "English");
-		language = french ? kFrench : kEnglish;
-	}
-	return static_cast<Language>(language);
+	// the texts choose the language (texts.cpp: [ui] language, the game's, Windows'...)
+	return strcmp(texts::Language(), "fr") == 0 ? kFrench : kEnglish;
 }
 
 bool MouseInBackBuffer(float w, float h, float *x, float *y)

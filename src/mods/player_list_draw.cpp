@@ -29,6 +29,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "../hook/texts.h"
 #include "../hook/third_party/imgui/imgui.h"
 
 namespace mods {
@@ -40,17 +41,14 @@ const char kFramePicture[] = "Textures/AdventureScreen-FPP-2/ResourceBar-heavy.d
 
 namespace {
 
-// --- words ------------------------------------------------------------------------------
+// --- words: the [players] texts (src/hook/texts.h) ----------------------------------------
 struct Words {
-	const char *day;       // "Day 34"
+	const char *day;       // "Day {n}"
 	const char *ready;     // "3/4 ready"
-	const char *computer;  // a computer player without a name
-	const char *player;    // a human without a name
+	const char *computer;  // a computer player without a name: {n}
+	const char *player;    // a human without a name: {n}
 };
-const Words kWords[] = {
-	{"Day", "ready", "Computer %d", "Player %d"},                 // kEnglish
-	{"Jour", "Pr\xc3\xaa" "ts", "Ordinateur %d", "Joueur %d"},  // kFrench (UTF-8)
-};
+const Words kKeys = {"players.day", "players.ready", "players.computer", "players.player"};
 
 // --- sizes, in pixels on a screen 820 lines high ----------------------------------------------
 const float kRefHeight = 820.0f;
@@ -211,13 +209,14 @@ void StatusMark(ImDrawList *draw, Status status, ImVec2 c, float k, float alpha)
 	}
 }
 
-void NameOf(const Row &r, const Look &look, char *out, int size)
+void NameOf(const Row &r, char *out, int size)
 {
-	const Words &words = kWords[look.language];
+	const Words &words = texts::Table(kKeys);
 	if (r.name[0])
 		lstrcpynA(out, r.name, size);
 	else
-		_snprintf_s(out, size, _TRUNCATE, r.human ? words.player : words.computer, r.human ? r.id : r.computer);
+		_snprintf_s(out, size, _TRUNCATE, "%s",
+		            texts::Fill(r.human ? words.player : words.computer, {{"n", std::to_string(r.human ? r.id : r.computer)}}).c_str());
 }
 
 // The pill's end cap (the frame picture's, or the capsule's round end).
@@ -273,7 +272,7 @@ void Pill(ImDrawList *draw, const Row &r, const Look &look, ImVec2 p, float w, f
 	}
 	// the name, a little muted once the turn is ended
 	char name[96], fitted[96];
-	NameOf(r, look, name, sizeof(name));
+	NameOf(r, name, sizeof(name));
 	const float size = kNameFont * k;
 	const float x = c.x + kFace * k / 2 + kFaceToName * k;
 	const float mark_x = p.x + w - PillCap(look, h) - kMarkToCap * k - kMark * k / 2;
@@ -354,14 +353,14 @@ void DrawPanel(const Snapshot &s, const Look &look, float rect[4])
 	float right = left;
 
 	// The header: "Jour 34 - 3/4 Prêts"; N/M = humans done / humans.
-	const Words &words = kWords[look.language];
+	const Words &words = texts::Table(kKeys);
 	int humans = 0, humans_done = 0;
 	for (int i = 0; i < s.count; ++i) {
 		humans += s.rows[i].human;
 		humans_done += s.rows[i].human && s.rows[i].status == kEnded;
 	}
 	char day[32], counts[16];
-	_snprintf_s(day, sizeof(day), _TRUNCATE, "%s %d", words.day, s.day);
+	_snprintf_s(day, sizeof(day), _TRUNCATE, "%s", texts::Fill(words.day, {{"n", std::to_string(s.day)}}).c_str());
 	_snprintf_s(counts, sizeof(counts), _TRUNCATE, " - %d/%d ", humans_done, humans);
 	const float hsize = kHeaderFont * k, nsize = kNameFont * k;
 	const float w_day = TextSize(bold, hsize, day).x;
@@ -385,7 +384,7 @@ void DrawPanel(const Snapshot &s, const Look &look, float rect[4])
 	float pw = kPillMinWidth * k;
 	for (int i = 0; i < count; ++i) {
 		char name[96];
-		NameOf(s.rows[order[i]], look, name, sizeof(name));
+		NameOf(s.rows[order[i]], name, sizeof(name));
 		const float need = TextSize(font, kNameFont * k, name).x + PillExtras(look, ph, k);
 		if (need > pw)
 			pw = need;

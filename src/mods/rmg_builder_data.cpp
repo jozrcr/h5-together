@@ -9,15 +9,7 @@
 
 #include "rmg_recipe.h"
 
-// UTF-8 letters for the French words (the sources are compiled as plain bytes).
-#define A_GRAVE "\xc3\xa0"
-#define A_GRAVE_CAP "\xc3\x80"
-#define E_ACUTE "\xc3\xa9"
-#define E_ACUTE_CAP "\xc3\x89"
-#define E_GRAVE "\xc3\xa8"
-#define C_CEDIL "\xc3\xa7"
-#define MIDDOT "\xc2\xb7"
-#define TIMES "\xc3\x97"
+#include "../hook/texts_logic.h"
 
 namespace mods {
 namespace rmg {
@@ -68,97 +60,65 @@ int PresetOf(const Choices &choices)
 const char *const kLootKeys[4] = {"poor", "normal", "rich", "veryrich"};
 const char *const kGuardKeys[3] = {"weak", "normal", "strong"};
 
-namespace {
-
 // Short words: they must fit the game's 1024x768 layout (the panel measures
 // them and cuts with "..." only as a last resort).
-const Words kEnglishWords = {
-	"Template builder",
-	"Start from", "(custom)",
-	"Teams", "Number of teams", "Players per team", "Teammates' path", {"Weak guard", "Open"},
-	"Start zone mines", {"All six", "Wood and ore"},
-	"Neutral zones", "Per team", "Between teams", "In the centre", "Towns between teams", "Extra town per team",
-	"Loot and guards", "Loot", {"Poor", "Normal", "Rich", "Very rich"}, "Guards", {"Weak", "Normal", "Strong"},
-	"By distance from the bases", "Same", {"Start", "Next", "2 steps", "Further"},
-	"Map", "Size", "Auto: %s",
-	{"Tiny (72" TIMES "72)", "Small (96" TIMES "96)", "Medium (136" TIMES "136)", "Large (176" TIMES "176)",
-	 "Extra large (216" TIMES "216)", "Huge (256" TIMES "256)", "Impossible (320" TIMES "320)"},
-	"Underground",
-	"colours = teams " MIDDOT " grey = neutral " MIDDOT " gold = centre",
-	"%d players " MIDDOT " %d zones (%d neutral)",
-	"%s",
-	"%s " MIDDOT " underground",
-	"Use", "Save as file", "Cancel",
-	"Saved: %s", "Not saved: %s", "The game's screen was not set (see h5-together.log)",
-	"Template...", "The template builder (H5 Together)",
+const Words kKeys = {
+	"builder.title",
+	"builder.start_from", "builder.custom",
+	"builder.section.teams", "builder.teams", "builder.per_team", "builder.ally_path", {"builder.ally.weak", "builder.ally.open"},
+	"builder.mines", {"builder.mines.all", "builder.mines.woodore"},
+	"builder.section.neutral", "builder.team_zones", "builder.border_zones", "builder.centre_zones", "builder.border_towns",
+	"builder.team_towns",
+	"builder.section.loot", "builder.loot", {"builder.loot.poor", "builder.loot.normal", "builder.loot.rich", "builder.loot.veryrich"},
+	"builder.guards", {"builder.guards.weak", "builder.guards.normal", "builder.guards.strong"},
+	"builder.by_distance", "builder.same", {"builder.ring.start", "builder.ring.next", "builder.ring.two", "builder.ring.further"},
+	"builder.section.map", "builder.size", "builder.auto_size",
+	{"builder.size.tiny", "builder.size.small", "builder.size.medium", "builder.size.large", "builder.size.extra_large",
+	 "builder.size.huge", "builder.size.impossible"},
+	"builder.underground",
+	"builder.legend",
+	"builder.stats",
+	"builder.size_line",
+	"builder.size_line_ug",
+	"builder.use", "builder.save", "builder.cancel",
+	"builder.saved", "builder.not_saved", "builder.use_failed",
+	"builder.native_button", "builder.native_tooltip",
 };
 
-const Words kFrenchWords = {
-	"Cr" E_ACUTE "ateur de mod" E_GRAVE "les",
-	"Partir d'un mod" E_GRAVE "le", "(personnalis" E_ACUTE ")",
-	E_ACUTE_CAP "quipes", "Nombre d'" E_ACUTE "quipes", "Joueurs par " E_ACUTE "quipe", "Passage entre alli" E_ACUTE "s",
-	{"Gard" E_ACUTE " (faible)", "Ouvert"},
-	"Mines de d" E_ACUTE "part", {"Les six", "Bois et minerai"},
-	"Zones neutres", "Par " E_ACUTE "quipe", "Entre les " E_ACUTE "quipes", "Au centre", "Villes entre les " E_ACUTE "quipes",
-	"Ville en plus par " E_ACUTE "quipe",
-	"Butin et gardes", "Butin", {"Pauvre", "Normal", "Riche", "Tr" E_GRAVE "s riche"}, "Gardes",
-	{"Faibles", "Normales", "Fortes"},
-	"Selon la distance des bases", "Idem", {"D" E_ACUTE "part", "Voisines", A_GRAVE_CAP " 2 pas", "Plus loin"},
-	"Carte", "Taille", "Auto : %s",
-	{"Minuscule (72" TIMES "72)", "Petite (96" TIMES "96)", "Moyenne (136" TIMES "136)", "Grande (176" TIMES "176)",
-	 "Tr" E_GRAVE "s grande (216" TIMES "216)", "Immense (256" TIMES "256)", "Impossible (320" TIMES "320)"},
-	"Souterrain",
-	"couleurs = " E_ACUTE "quipes " MIDDOT " gris = neutre " MIDDOT " or = centre",
-	"%d joueurs " MIDDOT " %d zones (%d neutres)",
-	"%s",
-	"%s " MIDDOT " souterrain",
-	"Utiliser", "Enregistrer", "Annuler",
-	"Enregistr" E_ACUTE " : %s", "Non enregistr" E_ACUTE " : %s",
-	"L'" E_ACUTE "cran du jeu n'a pas " E_ACUTE "t" E_ACUTE " r" E_ACUTE "gl" E_ACUTE " (voir h5-together.log)",
-	"Mod" E_GRAVE "les...", "Le cr" E_ACUTE "ateur de mod" E_GRAVE "les (H5 Together)",
-};
-
-bool StartsWith(const std::string &s, const char *prefix)
+const char *MessageKey(MessageId id)
 {
-	return s.compare(0, strlen(prefix), prefix) == 0;
+	switch (id) {
+	case MessageId::kTooFewTeams:
+		return "builder.msg.too_few_teams";
+	case MessageId::kTooManyPlayers:
+		return "builder.msg.too_many_players";
+	case MessageId::kSmallZones:
+		return "builder.msg.small_zones";
+	case MessageId::kBigZones:
+		return "builder.msg.big_zones";
+	case MessageId::kRichZones:
+		return "builder.msg.rich_zones";
+	default:
+		return nullptr;
+	}
 }
 
-std::string Format(const char *format, int a, int b = 0)
+std::string MessageText(const Message &m, const char *text, const std::string &english)
 {
-	char text[256];
-	_snprintf_s(text, sizeof(text), _TRUNCATE, format, a, b);
-	return text;
-}
-
-}  // namespace
-
-const Words &WordsFor(int language)
-{
-	return language == kFrench ? kFrenchWords : kEnglishWords;
-}
-
-std::string Localize(const std::string &text, int language)
-{
-	if (language != kFrench)
+	if (!MessageKey(m.id) || !text)
+		return english;
+	const std::string a = std::to_string(m.a), b = std::to_string(m.b);
+	switch (m.id) {
+	case MessageId::kTooManyPlayers:
+		return texts::Fill(text, {{"players", a}});
+	case MessageId::kSmallZones:
+	case MessageId::kBigZones:
+		return texts::Fill(text, {{"tiles", a}});
+	case MessageId::kRichZones:
+		return texts::Fill(text, {{"value", a}, {"shipped", b}});
+	default:
 		return text;
-	int a = 0, b = 0;
-	if (StartsWith(text, "Zones are small (") && sscanf_s(text.c_str(), "Zones are small (%d", &a) == 1)
-		return Format("Zones petites (%d cases chacune) : carte plus grande ou moins de zones.", a);
-	if (StartsWith(text, "Zones are very big (") && sscanf_s(text.c_str(), "Zones are very big (%d", &a) == 1)
-		return Format("Zones tr" E_GRAVE "s grandes (%d cases chacune) : le g" E_ACUTE "n" E_ACUTE "rateur peut les "
-		              "laisser vides ; carte plus petite ou plus de zones.",
-		              a);
-	if (StartsWith(text, "Some zones hold more treasure (") &&
-	    sscanf_s(text.c_str(), "Some zones hold more treasure (%d) than any shipped template (%d", &a, &b) == 2)
-		return Format("Des zones ont plus de tr" E_ACUTE "sor (%d) que tout mod" E_GRAVE "le livr" E_ACUTE
-		              " (%d) : pas encore test" E_ACUTE " en jeu.",
-		              a, b);
-	if (StartsWith(text, "the game allows at most 8 players (") &&
-	    sscanf_s(text.c_str(), "the game allows at most 8 players (%d", &a) == 1)
-		return Format("Le jeu permet 8 joueurs au plus (%d demand" E_ACUTE "s).", a);
-	if (StartsWith(text, "need at least 2 teams"))
-		return "Il faut au moins 2 " E_ACUTE "quipes (1 joueur par " E_ACUTE "quipe = chacun pour soi).";
-	return text;
+	}
 }
 
 // positions(g, o) of template-maker.html, line for line.

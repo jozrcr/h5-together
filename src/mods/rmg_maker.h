@@ -93,6 +93,22 @@ struct Stats {
 	int by_distance[4];  // zone counts at 0, 1, 2 and 3+ steps from a base
 };
 
+// A message of the maker (an error or a warning) as an id and its numbers, so
+// that the builder panel can say it in the player's language (the [builder]
+// msg.* texts). The English words stay the page's: the log and the tests use them.
+enum class MessageId {
+	kNone,            // a message the panel's choices never cause (an unknown level...): shown as it is
+	kTooFewTeams,     // "need at least 2 teams (...)"
+	kTooManyPlayers,  // "the game allows at most 8 players (a asked)"
+	kSmallZones,      // "Zones are small (a tiles each): ..."
+	kBigZones,        // "Zones are very big (a tiles each): ..."
+	kRichZones,       // "Some zones hold more treasure (a) than any shipped template (b); ..."
+};
+struct Message {
+	MessageId id = MessageId::kNone;
+	int a = 0, b = 0;
+};
+
 struct Template {
 	std::string name;       // as in the game's list
 	std::string file_name;  // name with anything but A-Z a-z 0-9 . - as "_", plus ".xdb"
@@ -107,6 +123,7 @@ struct Template {
 	int max_map_size;
 	bool underground;
 	std::vector<std::string> warnings;
+	std::vector<Message> warning_ids;  // the same warnings, as ids (same order)
 	Stats stats;
 };
 
@@ -118,12 +135,13 @@ const int kZoneAreaIdeal = 5800;
 const int kZoneAreaMax = 7500;
 
 // Builds the template. On bad choices returns false and sets *error to
-// template_maker.js's message (the page shows the same words).
-bool MakeTemplate(const Choices &choices, Template *out, std::string *error);
+// template_maker.js's message (the page shows the same words), and *message
+// (if given) to its id.
+bool MakeTemplate(const Choices &choices, Template *out, std::string *error, Message *message = nullptr);
 
 // Only MakeTemplate's checks (the same words), without building anything:
 // cheap enough to ask before offering each choice.
-bool CheckChoices(const Choices &choices, std::string *error);
+bool CheckChoices(const Choices &choices, std::string *error, Message *message = nullptr);
 
 }  // namespace rmg
 }  // namespace mods

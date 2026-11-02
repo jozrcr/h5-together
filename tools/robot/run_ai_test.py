@@ -56,12 +56,20 @@ def check_game_dir(game):
         sys.exit("%s does not look like a game folder (no bin/)" % game)
 
 
-def install_dll(game, dll=None):
-    """Copy the hook DLL (default: the last build) into the test copy's bin folder."""
+def install_dll(game, dll=None, texts=None):
+    """Copy the hook DLL (default: the last build) into the test copy's bin folder, and our
+    language files (default: src/mods/texts/*.txt) into its bin/h5-together/texts, as the
+    installer does. --texts-dir gives other files (a partial translation, the long test
+    language); a texts folder of the test copy that holds other files keeps them."""
     dll = pathlib.Path(dll) if dll else REPO / "build" / "hook" / "dinput8.dll"
     if not dll.is_file():
         sys.exit("build the DLL first: powershell -File src\\hook\\build.ps1")
     shutil.copy2(dll, game / "bin" / "dinput8.dll")
+    texts = pathlib.Path(texts) if texts else REPO / "src" / "mods" / "texts"
+    folder = game / "bin" / "h5-together" / "texts"
+    folder.mkdir(parents=True, exist_ok=True)
+    for f in sorted(texts.glob("*.txt")):
+        shutil.copy2(f, folder / f.name)
 
 
 def instance_files(game, instance):
@@ -449,6 +457,8 @@ def main():
     p.add_argument("--profile-ai", action="store_true",
                    help="sample where the AI spends its thinking time (ai-profile.txt, profile_report.py)")
     p.add_argument("--dll", help="hook DLL to install (default build/hook/dinput8.dll), e.g. a frozen copy for batch runs")
+    p.add_argument("--texts-dir", help="language files to install in bin/h5-together/texts (default src/mods/texts): "
+                                       "e.g. a partial fr.txt, or the long test language (tools/lang/ui_texts.py long)")
     p.add_argument("--fast-paths", choices=["on", "off"], default="on",
                    help="the fast pathfinding mod (src/mods/fast_paths.cpp; on by default, like for players); "
                         "off = the game's own pathfinding")
@@ -512,7 +522,7 @@ def main():
         return
     out = REPO / "build" / "robot" / datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     out.mkdir(parents=True)
-    install_dll(game, args.dll)
+    install_dll(game, args.dll, args.texts_dir)
     command = prepare(game, args, out)
 
     # Not "-advmap" on the command line: WinMain runs the console command

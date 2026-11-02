@@ -27,7 +27,8 @@
 //   player_list_top=34     where it starts, in % of the screen height
 //   player_list_left=2     its distance from the left edge, in % of the screen height
 //                          (the game's interface scales with the height)
-//   language=auto          its words: auto (the game's language), en, fr
+//   language=auto          its words (and every panel's): auto (the game's language),
+//                          or a language code with a texts file: en, fr... (src/hook/texts.h)
 //   trace_players=0        testing: 1 = log each change of a player's status,
 //                          2 = also raw dumps of the game's data (research)
 //   player_list_test_rows=0  testing: show N rows (copies of the real players,
@@ -51,7 +52,7 @@ bool g_enabled = false;  // the setting
 bool g_early = false;    // the settings were read at DLL load
 bool g_visible = true;   // F9
 int g_key = VK_F9;
-plist::Look g_look = {1.0f, 0.34f, 0.02f, plist::kEnglish, nullptr, nullptr, nullptr};
+plist::Look g_look = {1.0f, 0.34f, 0.02f, nullptr, nullptr, nullptr};
 int g_trace = 0;
 int g_test_rows = 0;     // testing: show this many rows (copies of the real ones)
 
@@ -91,7 +92,7 @@ void ReadSettings()
 	}
 	g_look.top = Percent(path, L"player_list_top", 34.0f, 0.0f, 90.0f) / 100.0f;
 	g_look.left = Percent(path, L"player_list_left", 2.0f, 0.0f, 100.0f) / 100.0f;
-	// ([ui] language is read by the overlay: overlay::PanelLanguage)
+	// ([ui] language is read by the texts: src/hook/texts.h)
 }
 
 // --- the toggle key ------------------------------------------------------------------
@@ -149,7 +150,6 @@ void Prepare(const overlay::Frame &frame)
 	plist::Snapshot &snapshot = g_snapshot;
 	if (g_test_rows > snapshot.count && snapshot.count > 0)
 		AddTestRows(&snapshot);
-	g_look.language = static_cast<plist::Language>(overlay::PanelLanguage());
 	int loads = 2;  // picture files read per frame at most (each ~0.1-1 ms)
 	bool plain = false;
 	g_look.frame = overlay::GameTexture(frame.device, plist::kFramePicture, &loads, &plain);

@@ -12,7 +12,8 @@
 //            made in memory (Wine on Linux has no Windows sounds).
 //   popup=1  and a pop-up from a notification area (tray) icon, which goes
 //            away when the game is back in front. Where there is no
-//            notification area (often under Wine), nothing happens.
+//            notification area (often under Wine), nothing happens. Its
+//            words are the [notify] texts, in the player's language (texts.h).
 //   trace=0  1: a log line for each change of the players' turn states.
 //
 // When is it "your turn"? (addresses in the vanilla 3.1 exe)
@@ -51,6 +52,7 @@
 
 #include "../hook/log.h"
 #include "../hook/patch.h"
+#include "../hook/texts.h"
 
 namespace mods {
 namespace {
@@ -317,6 +319,9 @@ volatile LONG g_popup_request = 0;  // > 0: show it for that day; -1: remove it
 HWND volatile g_popup_window = nullptr;
 HICON volatile g_popup_icon = nullptr;
 bool g_popup_shown = false;  // the main thread asked for it and not for its removal
+// Its words (the [notify] texts), set once by the main thread before the first pop-up:
+// the texts are chosen on the main thread (it reads a game file for that).
+std::string g_popup_tip, g_popup_title, g_popup_info;
 
 DWORD WINAPI PopupThread(void *)
 {
@@ -332,9 +337,9 @@ DWORD WINAPI PopupThread(void *)
 		if (request > 0) {
 			nid.uFlags = NIF_ICON | NIF_TIP | NIF_INFO;
 			nid.hIcon = g_popup_icon;
-			wcscpy_s(nid.szTip, L"Heroes V: your turn");
-			wcscpy_s(nid.szInfoTitle, L"Heroes of Might and Magic V");
-			_snwprintf_s(nid.szInfo, _countof(nid.szInfo), _TRUNCATE, L"Your turn (day %ld).", request);
+			wcsncpy_s(nid.szTip, texts::Wide(g_popup_tip).c_str(), _TRUNCATE);
+			wcsncpy_s(nid.szInfoTitle, texts::Wide(g_popup_title).c_str(), _TRUNCATE);
+			wcsncpy_s(nid.szInfo, texts::Wide(texts::Fill(g_popup_info, {{"day", std::to_string(request)}})).c_str(), _TRUNCATE);
 			nid.dwInfoFlags = NIIF_INFO | NIIF_NOSOUND;  // the sound is ours (sound=)
 			bool ok = added && Shell_NotifyIconW(NIM_MODIFY, &nid);
 			if (!ok)
@@ -363,6 +368,13 @@ void ShowPopup(HWND window, int day)
 		icon = LoadIconW(nullptr, MAKEINTRESOURCEW(32516));  // IDI_INFORMATION
 	g_popup_window = window;
 	g_popup_icon = icon;
+	static bool words = false;
+	if (!words) {
+		g_popup_tip = texts::Get("notify.tip");
+		g_popup_title = texts::Get("notify.title");
+		g_popup_info = texts::Get("notify.info");
+		words = true;
+	}
 	InterlockedExchange(&g_popup_request, day > 0 ? day : 1);
 	SetEvent(g_popup_wake);
 	g_popup_shown = true;

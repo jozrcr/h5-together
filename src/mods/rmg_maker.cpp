@@ -458,15 +458,21 @@ std::string FileName(const std::string &name)
 // makeTemplate's checks of the choices, in its order and with its words (the
 // builder panel asks before it offers a choice). The map size is checked last,
 // as makeTemplate does once it knows the zones.
-bool CheckChoices(const Choices &o, std::string *error)
+bool CheckChoices(const Choices &o, std::string *error, Message *message)
 {
+	if (message)
+		*message = Message();
 	if (!(o.teams >= 2 && o.per_team >= 1)) {
 		*error = "need at least 2 teams (1 player per team = free-for-all)";
+		if (message)
+			message->id = MessageId::kTooFewTeams;
 		return false;
 	}
 	const int players = o.teams * o.per_team;
 	if (players > 8) {
 		*error = "the game allows at most 8 players (" + Str(players) + " asked)";
+		if (message)
+			*message = {MessageId::kTooManyPlayers, players, 0};
 		return false;
 	}
 	if (!FindLoot(o.loot)) {
@@ -498,16 +504,22 @@ bool CheckChoices(const Choices &o, std::string *error)
 }
 
 // makeTemplate(options)
-bool MakeTemplate(const Choices &o, Template *out, std::string *error)
+bool MakeTemplate(const Choices &o, Template *out, std::string *error, Message *message)
 {
 	*out = Template();
+	if (message)
+		*message = Message();
 	if (!(o.teams >= 2 && o.per_team >= 1)) {
 		*error = "need at least 2 teams (1 player per team = free-for-all)";
+		if (message)
+			message->id = MessageId::kTooFewTeams;
 		return false;
 	}
 	const int players = o.teams * o.per_team;
 	if (players > 8) {
 		*error = "the game allows at most 8 players (" + Str(players) + " asked)";
+		if (message)
+			*message = {MessageId::kTooManyPlayers, players, 0};
 		return false;
 	}
 	const LootLevel *loot = FindLoot(o.loot);
@@ -550,11 +562,15 @@ bool MakeTemplate(const Choices &o, Template *out, std::string *error)
 	t.size = *size;
 	const int map_area = Area(*size, o.underground);
 	const int per_zone = static_cast<int>(JsRound(static_cast<double>(map_area) / zone_count));
-	if (per_zone < kZoneAreaMin)
+	if (per_zone < kZoneAreaMin) {
 		t.warnings.push_back("Zones are small (" + Str(per_zone) + " tiles each): pick a bigger map or fewer zones.");
-	if (per_zone > kZoneAreaMax)
+		t.warning_ids.push_back({MessageId::kSmallZones, per_zone, 0});
+	}
+	if (per_zone > kZoneAreaMax) {
 		t.warnings.push_back("Zones are very big (" + Str(per_zone) +
 		                     " tiles each): the generator may leave them empty; pick a smaller map or more zones.");
+		t.warning_ids.push_back({MessageId::kBigZones, per_zone, 0});
+	}
 
 	int tier = 0;
 	for (int i = 0; i < zone_count; i++) {
@@ -564,9 +580,11 @@ bool MakeTemplate(const Choices &o, Template *out, std::string *error)
 	int richest = t.zones[0].treasure_blocks_total_value;
 	for (const Zone &z : t.zones)
 		richest = (std::max)(richest, z.treasure_blocks_total_value);
-	if (richest > kMaxShippedValue)
+	if (richest > kMaxShippedValue) {
 		t.warnings.push_back("Some zones hold more treasure (" + Str(richest) + ") than any shipped template (" +
 		                     Str(kMaxShippedValue) + "); not tested in the game yet.");
+		t.warning_ids.push_back({MessageId::kRichZones, richest, kMaxShippedValue});
+	}
 	for (const Link &l : links) {
 		const int guard = GuardValue(l.kind, o, *guards_at((std::max)(dist[l.a], dist[l.b])));
 		t.connections.push_back({l.a + 1, l.b + 1, guard, guard > 0, l.kind});

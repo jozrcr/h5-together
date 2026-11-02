@@ -52,13 +52,11 @@ void SetTrace(int level);  // 1 = log status changes, 2 = also raw dumps (resear
 bool ReadSnapshot(Snapshot *out);
 
 // player_list_draw.cpp: the panel. All ImGui drawing of the overlay is there,
-// and all its words (English, French).
-enum Language { kEnglish, kFrench };
+// and its words (the [players] texts, src/hook/texts.h).
 struct Look {
 	float alpha;     // 0..1, lower while the mouse is over the panel
 	float top;       // where it starts, fraction of the screen height (0.34)
 	float left;      // its left inset, fraction of the screen height (0.02)
-	Language language;
 	void *font;       // ImFont *: names
 	void *font_bold;  // ImFont *: the day, team numbers
 	void *frame;      // the game's resource bar picture (IDirect3DTexture9 *), or nullptr: plain style

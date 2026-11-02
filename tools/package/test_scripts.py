@@ -158,6 +158,84 @@ def licence_checks(pkg, zip_path):
         check({"LICENSE.txt", "THIRD-PARTY-NOTICES.txt"} <= names, "licence: both are in the zip, next to README.txt")
 
 
+# ---------------------------------------------------------------- language files
+
+TEXTS_SRC = REPO / "src" / "mods" / "texts"
+
+
+def texts_dir(pkg):
+    return Path(pkg) / "h5-together" / "texts"
+
+
+def texts_package_checks(pkg, zip_path):
+    """Our language files are in the package: UTF-8 with a BOM and CRLF (by design: the
+    other files we ship must stay plain ASCII)."""
+    print("\nLanguage files in the package")
+    wanted = sorted(p.name for p in TEXTS_SRC.glob("*.txt"))
+    packed = sorted(p.name for p in texts_dir(pkg).iterdir()) if texts_dir(pkg).is_dir() else []
+    check({"en.txt", "fr.txt"} <= set(wanted), "src/mods/texts holds en.txt and fr.txt", str(wanted))
+    check(packed == wanted, "package: h5-together/texts holds every src/mods/texts/*.txt and nothing else (no TRANSLATING.md)",
+          f"{packed}\n{wanted}")
+    ok = True
+    for n in packed:
+        data = (texts_dir(pkg) / n).read_bytes()
+        source = (TEXTS_SRC / n).read_bytes().decode("utf-8-sig").replace("\r\n", "\n")
+        ok = ok and data.startswith(b"\xef\xbb\xbf") and b"\n" not in data.replace(b"\r\n", b"") and \
+            data[3:].decode("utf-8").replace("\r\n", "\n") == source
+    check(ok, "package: each language file is its source, as UTF-8 with a byte-order mark and CRLF line ends")
+    fr = (texts_dir(pkg) / "fr.txt").read_bytes().decode("utf-8-sig") if "fr.txt" in packed else ""
+    check("R\u00e8gles" in fr and "\u00e9" in fr, "package: fr.txt keeps its accents (UTF-8, not ASCII)")
+    with zipfile.ZipFile(zip_path) as z:
+        entries = [i for i in z.infolist() if "/h5-together/texts/" in i.filename]
+        check(len(entries) == len(wanted) and all(i.filename.count("/") == 3 for i in entries),
+              "package: the language files sit in the zip under <top folder>/h5-together/texts/")
+        check(all(((i.external_attr >> 16) & 0o777) == 0o644 for i in entries), "package: the language files are plain data files (mode 644)")
+        others = [i.filename for i in z.infolist()
+                  if not i.filename.endswith("/") and "/h5-together/" not in i.filename and not i.filename.endswith("/dinput8.dll")]
+        not_ascii = [n for n in others if any(b >= 0x80 for b in z.read(n))]
+        check(others and not not_ascii, "package: every other file we ship (scripts, settings, read-me, notices) is plain ASCII",
+              str(not_ascii))
+
+
+def texts_tests(who, pkg, game_bin, install, uninstall):
+    """The language files in a fake game folder: install, a translation of the player's own,
+    reinstall, uninstall."""
+    print(f"\nLanguage files ({who})")
+    src = texts_dir(pkg)
+    ours = sorted(p.name for p in src.iterdir())
+    n = len(ours)
+    tdir = game_bin / "h5-together" / "texts"
+    before = tree(game_bin)
+
+    def names():
+        return sorted(p.name for p in tdir.iterdir()) if tdir.is_dir() else None
+
+    code, out = install()
+    check(code == 0, "texts: fresh install: exit 0", out)
+    check(names() == ours and same_bytes(tdir, src, ours), "texts: fresh install: exactly our language files, byte for byte, in bin/h5-together/texts")
+    check(f"installed {n} language files" in out and "en, fr" in out, "texts: fresh install: the summary says how many, and which", out)
+
+    mine = {"de.txt": "[players]\nday = Tag {n}\n".encode("utf-8"), "notes.md": b"my notes"}
+    for name, data in mine.items():
+        (tdir / name).write_bytes(data)
+    (tdir / "fr.txt").write_bytes(b"[players]\nday = changed by hand {n}\n")
+    code, out = install()
+    check(code == 0 and same_bytes(tdir, src, ours), "texts: reinstall overwrites ours (fr.txt changed by hand)", out)
+    check(all((tdir / k).read_bytes() == v for k, v in mine.items()) and names() == sorted(ours + list(mine)),
+          "texts: reinstall keeps the player's own translation and files", str(names()))
+    check(f"{n} of them replaced" in out and "left the 2 other" in out, "texts: reinstall: the summary counts replaced and left alone", out)
+
+    code, out = uninstall()
+    check(code == 0 and names() == sorted(mine), "texts: uninstall removes only our language files; the player's own stay", str(names()))
+    check(f"removed {n} language files" in out and "kept" in out, "texts: uninstall says what it removed and kept", out)
+    for name in mine:
+        (tdir / name).unlink()
+    install()
+    code, out = uninstall()
+    check(code == 0 and not (game_bin / "h5-together").exists() and tree(game_bin) == before,
+          "texts: install then uninstall leaves the game folder exactly as it was (empty folders removed)", out)
+
+
 def template_tests(who, pkg, game_bin, install, uninstall):
     """The templates in a fake game folder: install, a player's own files, reinstall, uninstall.
 
@@ -936,6 +1014,10 @@ def windows_tests(pkg, work):
     template_tests("Windows", pkg, tpl_bin,
                    lambda: install("-GameDir", str(tpl_bin)),
                    lambda: uninstall("-GameDir", str(tpl_bin), stdin="y\n"))
+    txt_bin = make_game(work / "txt lib")
+    texts_tests("Windows", pkg, txt_bin,
+                lambda: install("-GameDir", str(txt_bin)),
+                lambda: uninstall("-GameDir", str(txt_bin), stdin="y\n"))
 
     # a package without its templates folder is incomplete: exit 7, nothing installed
     no_tpl = work / "pkg without templates"
@@ -943,6 +1025,11 @@ def windows_tests(pkg, work):
     code, out = run(bat(str(no_tpl / "install.bat"), "-NoPause", "-GameDir", str(tpl_bin)))
     check(code == 7 and "extract the whole zip" in out and not (tpl_bin / "dinput8.dll").exists() and not (tpl_bin / "h5-together").exists(),
           "package without the templates folder: exit 7, nothing installed", out)
+    no_txt = work / "pkg without texts"
+    shutil.copytree(pkg, no_txt, ignore=shutil.ignore_patterns("texts"))
+    code, out = run(bat(str(no_txt / "install.bat"), "-NoPause", "-GameDir", str(tpl_bin)))
+    check(code == 7 and "h5-together\\texts" in out and not (tpl_bin / "dinput8.dll").exists() and not (tpl_bin / "h5-together").exists(),
+          "package without the language files folder: exit 7, nothing installed", out)
 
     # the bug report script
     def run_report(game_bin, out_dir, *extra):
@@ -1095,6 +1182,10 @@ def linux_tests(pkg, work, bash):
     template_tests("Linux", pkg, tpl_bin,
                    lambda: sh("install.sh", "--game-dir", posix(tpl_bin)),
                    lambda: sh("uninstall.sh", "--game-dir", posix(tpl_bin), stdin="y\n"))
+    txt_bin = make_game(work / "txt_lib")
+    texts_tests("Linux", pkg, txt_bin,
+                lambda: sh("install.sh", "--game-dir", posix(txt_bin)),
+                lambda: sh("uninstall.sh", "--game-dir", posix(txt_bin), stdin="y\n"))
 
     # a package without its templates folder is incomplete: exit 7, nothing installed
     no_tpl = work / "pkg_without_templates"
@@ -1102,6 +1193,11 @@ def linux_tests(pkg, work, bash):
     code, out = run([bash, str(no_tpl / "install.sh"), "--game-dir", posix(tpl_bin)], "", env=env)
     check(code == 7 and not (tpl_bin / "dinput8.dll").exists() and not (tpl_bin / "h5-together").exists(),
           "package without the templates folder: exit 7, nothing installed", out)
+    no_txt = work / "pkg_without_texts"
+    shutil.copytree(pkg, no_txt, ignore=shutil.ignore_patterns("texts"))
+    code, out = run([bash, str(no_txt / "install.sh"), "--game-dir", posix(tpl_bin)], "", env=env)
+    check(code == 7 and "h5-together/texts" in out and not (tpl_bin / "dinput8.dll").exists() and not (tpl_bin / "h5-together").exists(),
+          "package without the language files folder: exit 7, nothing installed", out)
 
     # folders that exist under another spelling (Linux file names are case sensitive,
     # Wine finds them anyway): the existing folders and files are reused, none is duplicated
@@ -1184,6 +1280,7 @@ def main():
         z.extractall(work / "package")
     pkg = work / "package" / "h5-together-0.0.0-test"  # the zip's one top folder
     package_checks(pkg, out_dir / "h5-together-0.0.0-test.zip")
+    texts_package_checks(pkg, out_dir / "h5-together-0.0.0-test.zip")
     licence_checks(pkg, out_dir / "h5-together-0.0.0-test.zip")
     bug_report_package_checks(pkg, out_dir / "h5-together-0.0.0-test.zip")
 

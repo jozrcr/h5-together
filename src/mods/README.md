@@ -5,7 +5,7 @@ Everything here changes how the original game behaves, on purpose. It is kept ap
 **Contents**
 
 - Faster co-op: [LAN link tuning](#lan-link-tuning-net_tuningcpp), [LAN games over VPNs](#lan-games-over-vpns-lan_discoverycpp-on-by-default), [faster co-op segments](#faster-co-op-segments-coop_guardcpp-on-when-every-player-agrees), [quicker lockstep](#quicker-lockstep-lockstepcpp-the-drain-and-the-trace-on-by-default), [one AI decision per frame](#one-ai-decision-per-frame-ai_pacingcpp-on-by-default), [quicker autosaves](#quicker-autosaves-autosavecpp-the-trace-and-level-1-on-by-default), [fast AI pathfinding](#fast-ai-pathfinding-fast_pathscpp-on-by-default)
-- Interface: ["your turn" notification](#your-turn-notification-notifycpp-on-by-default), [player list](#player-list-player_listcpp-on-by-default), [hero looks](#hero-looks-hero_skinscpp-on-but-nothing-changes-until-a-look-is-chosen), [French texts](#one-language-french-texts-languagescpp-off-by-default)
+- Interface: ["your turn" notification](#your-turn-notification-notifycpp-on-by-default), [player list](#player-list-player_listcpp-on-by-default), [hero looks](#hero-looks-hero_skinscpp-on-but-nothing-changes-until-a-look-is-chosen), [our panels in your language](#our-panels-in-your-language-srcmodstextstxt-srchooktextscpp), [French texts for the game](#one-language-french-texts-languagescpp-off-by-default)
 - Random maps: [teams](#teams-on-random-maps-rmg_teamscpp-on-by-default-only-for-recipe-maps), [templates and recipe names](#random-map-templates-rmg_templatescpp-rmg_makercpp-rmg_recipecpp-on-by-default), [template builder](#template-builder-rmg_buildercpp-rmg_screencpp-on-by-default), [start terrain that matches the factions](#start-terrain-that-matches-the-factions-rmg_factionscpp-off-by-default)
 - Rules: [game rules from the host](#game-rules-from-the-host-host_rulescpp-on-and-nothing-changes-unless-the-host-changes-something)
 - Camera, sound and visuals: [original music](#original-music-original_musiccpp-off-by-default), [camera zoom and start distance](#farther-camera-zoom-start-distance-cameracpp-off-by-default), [the mouse wheel under Wine](#the-mouse-wheel-under-wine--proton-wheelcpp-wheel_logiccpp-on-under-wine-only), [wider volume range](#wider-volume-range-audio_volumecpp-off-by-default), [black past the map's edge](#black-past-the-maps-edge-edge_skycpp-off-by-default)
@@ -230,7 +230,7 @@ The robot passes them with `--save-setting KEY=VALUE`; `run_lan_test.py --autosa
 **What it does:** when this PC's player can play again (the computer players are done and a new day starts, or in a game without simultaneous turns the turn passes to this player) **and the game is not the window in front**:
 - the game's **taskbar button flashes** until you come back to the game;
 - a **short sound** plays: Windows' "System Notification" sound where Windows has one (Windows 8 and later), otherwise a short chime the mod makes in memory (Wine has no Windows sounds, so on Linux you hear the chime);
-- a **notification pop-up** appears from a small icon in the notification area ("Your turn (day 5)."), and the icon goes away when you are back in the game. Where there is no notification area (often under Wine/Proton), nothing shows and nothing breaks.
+- a **notification pop-up** appears from a small icon in the notification area ("Your turn (day 5).", in the player's language: [our texts](#our-panels-in-your-language-srcmodstextstxt-srchooktextscpp)), and the icon goes away when you are back in the game. Where there is no notification area (often under Wine/Proton), nothing shows and nothing breaks.
 
 Not on the very first turn of a game (when it starts, or after loading a save): you are at the screen then. The log has one line per turn:
 
@@ -275,7 +275,7 @@ The robot keeps robot runs quiet (`sound=0`, `popup=0`; the flash and the log li
 
 It looks like the game's own interface: the pills are cut from the game's resource bar picture (its metal frame, read from the game's data), round things get the game's thin bronze rims, and the text is white with a dark shadow. If that picture cannot be read, the log says so and the panel uses plain dark capsules.
 
-It only shows the adventure map (not in towns, battles or menus). **F9** hides it or shows it again. When the mouse is over it, it turns almost invisible, so it never hides the map. It never takes a click or a key from the game. Its words follow the game's language (French or English).
+It only shows the adventure map (not in towns, battles or menus). **F9** hides it or shows it again. When the mouse is over it, it turns almost invisible, so it never hides the map. It never takes a click or a key from the game. Its words follow the game's language ([our texts](#our-panels-in-your-language-srcmodstextstxt-srchooktextscpp): English, French, or a language a player added).
 
 **Where the data comes from:** the game world's players (turn order, name, colour, team, selected hero, "my turn now", "pressed End Turn"), the same on every PC; the hero's name and portrait from its game data. Details and addresses: [docs/subsystems/players.md](../../docs/subsystems/players.md). It only reads the game, so it cannot desync a game, and each player can turn it on or off.
 
@@ -304,7 +304,7 @@ player_list=1          ; 0 = no player list (nothing is installed)
 player_list_key=F9     ; F1..F12, or none
 player_list_top=34     ; where it starts, % of the screen height
 player_list_left=2     ; its left inset, % of the screen height
-language=auto          ; auto (the game's language), en, fr
+language=auto          ; every panel's words: auto (the game's language), or a texts file's code: en, fr
 trace_players=0        ; testing: 1 = log each change of a player's turn
 player_list_test_rows=0  ; testing: show N rows (copies of the real players, teams of two)
 ```
@@ -451,7 +451,7 @@ The plan: [docs/plans/in-game-generator.md](../../docs/plans/in-game-generator.m
 - **Under it:** players and zones, the name the game's list will show (with its `*`), the map size.
 - **Right, scrolling in the options list's box** (the wheel, or drag in the game's scroll bar track): the ready templates; teams (steppers, the teammates' path, the start mines); neutral zones (steppers, two town boxes); loot and guards, and "by distance from the bases", which shows a small table (loot and guards per distance ring, with each ring's zone count); size ("Auto" shows the size it picks) and underground; then the maker's warnings.
 - **Invalid choices are not offered:** each arrow asks the maker's own check (`rmg::CheckChoices`) first. An arrow that would make more than 8 players is greyed; clicking it shows the maker's message ("Le jeu permet 8 joueurs au plus (9 demandés).").
-- **Words:** French in a French game, English otherwise (`[ui] language`). Every text is measured; one too long for its place is cut with "…" (none is today, at 1024×768 and 1920×1080).
+- **Words:** in the game's language when there is a texts file for it, English otherwise (`[ui] language`, [our texts](#our-panels-in-your-language-srcmodstextstxt-srchooktextscpp)); the maker's warnings too (each has an id and its numbers, `rmg::MessageId`). Every text is measured; one too long for its place is cut with "…" (none is today, at 1024×768 and 1920×1080).
 - `builder_last=` in `h5-together.ini` remembers the last choices used or saved (a recipe name); the panel opens on them.
 
 **The native button** (`rmg_screen.cpp`). The screen's window comes from UI files of the game's data. The DLL serves, through the game's file system (nothing on disk changes):
@@ -468,7 +468,7 @@ builder_key=F11     ; the panel's key on the random map screen (none = no key)
 builder_last=       ; written by the panel: the last choices used or saved
 
 [ui]
-language=auto          ; the panels' words: auto (the game's), en or fr
+language=auto          ; the panels' words: auto (the game's), or a texts file's code (en, fr...)
 overlay_test_panel=0   ; testing only: 1 = F10 opens the overlay's test panel on any screen
 ```
 
@@ -569,6 +569,65 @@ log_music=0        ; testing: 1 = log every music file the game starts
 log_data_files=0   ; testing: log the first N files the game reads from its data
 ```
 
+## Our panels in your language (`src/mods/texts/*.txt`, `src/hook/texts*.cpp`)
+
+**What it is:** every word of our panels and messages comes from one text file per language: the player list, the "your turn" pop-up, the game rules panel and its lobby tooltips, the hero looks panel and its button, the template builder with its "Template..." button and the maker's warnings. That is 201 texts. English (`en.txt`) and French (`fr.txt`) come with the add-on, in `bin\h5-together\texts\`; a player adds a language by putting a file there ([TRANSLATING.md](texts/TRANSLATING.md), the steps for translators). This is the add-on's own words only: the game's texts are the next section's business, and the log stays English (it is for us).
+
+**Safe by design:**
+- English is built into the DLL (`build.ps1` turns `src/mods/texts/en.txt` into `build\hook\texts_en.inc`), so the panels work with no file at all.
+- A file is read line by line: a line it lacks, a broken line (no `=`, before any `[section]`, not UTF-8, a key twice) and a line whose `{placeholders}` or game tags (`<color=yellow>`, `<br>`) differ from the English line show in English. The log lists each one with its line number.
+- Placeholders are names, not C's `%s`/`%d`: `Computer {n}`. A translator's mistake can only show wrong words, never crash the game (a broken `%s` could).
+- Accepted: UTF-8 with or without its mark, Notepad's "Unicode" (UTF-16 LE with its mark), CRLF or LF.
+
+**The format** (`src/mods/texts/en.txt`):
+
+```
+# a comment
+[players]
+day = Day {n}
+ready = ready
+computer = Computer {n}
+```
+
+`[section]` + `key` gives the key the code asks for (`players.day`); `\n` is a new line. In the code a text is `texts::Get("rules.title")`, `texts::Format("players.computer", {{"n", "3"}})`, or a panel's table of keys (`texts::Table(kKeys)`, a struct of `const char *` written with keys: the panels' drawing code reads `w.title` as before). Sections: `[language]` (the language's own name, and the game's name of the red player in it), `[players]`, `[notify]`, `[rules]`, `[bonus]`, `[looks]`, `[builder]`.
+
+**Which language** (`[ui] language=auto`, the default), the first clue that answers:
+
+1. `[lang] texts=fr` (the game's texts in French, next section): French;
+2. **Steam's language for the game:** the `language` line of `steamapps\appmanifest_15370.acf`, Steam's own file for the game (15370 is Tribes of the East's Steam id), two folders above the game folder. Used only when its `installdir` is this game folder (not for a copy of the game elsewhere). Steam's names map to codes: french to fr, german to de, russian to ru, polish to pl...;
+3. **the game's own texts:** the red player's name (`Text/Game/Player/Colors/red_player.txt`, "Joueur rouge" in a French game), compared with the `red_player` line of each texts file. A name no file has means a language we have no file for: English;
+4. Windows' language (only when the game's texts cannot be read yet);
+5. English.
+
+`[ui] language=<code>` chooses directly (any 2 or 3 letter code, maybe with `-xx`: `de`, `pt-br`). A language without a file shows in English. The language is chosen once, at the first text a panel asks for; the settings menu (v0.3, next block) will switch it at once (`texts::Generation`). `overlay::PanelLanguage()` still answers "French or English" for code that needs only that.
+
+**The log** says what was chosen and why:
+
+```
+texts: fr, from Steam's language for the game (french, appmanifest_15370.acf): fr.txt, 201 of 201 texts (the others in English)
+texts: fr, from the game's texts (the red player is "Joueur rouge"): fr.txt, 201 of 201 texts (the others in English)
+texts: English, from [ui] language=en (built in: 201 texts)
+texts: de, from [ui] language=de; but there is no de.txt in h5-together\texts: English
+texts: fr.txt: 2 line(s) not used (they show in English):
+texts:   line 40: no "=" (a line is "key = text"): left out
+texts:   players.computer: its {names} and <tags> (none) are not the English ones ({n}): English is used
+```
+
+**Fonts:** the panels' font (Tahoma Bold, Segoe UI Bold or Arial Bold, `src/hook/overlay.cpp`) is loaded with Latin-1, Latin Extended-A, Cyrillic and the general punctuation: English, French, German, Spanish, Italian, Portuguese, Polish, Czech, Hungarian, Turkish, Russian, Ukrainian and Bulgarian are covered. Not covered yet (a letter outside the ranges shows as "?"): Greek, Romanian's ș and ț (Latin Extended-B), Vietnamese, and Chinese, Japanese and Korean (those need another font and a much bigger letter sheet). Adding a range is one line in `AddFont` when a translator comes.
+
+**Checks:**
+- `test/texts_test.cpp` (in `build.ps1 -Test`): the reader (sections, comments, the mark, CRLF/LF, UTF-16, every kind of broken line), the placeholders, the check against English and the fallback, the language clues (Steam's file, Windows' ids), and the shipped files: `en.txt` reads cleanly and is byte for byte the built-in English, `fr.txt` fits it and has every text.
+- `tools/lang/ui_texts.py check` (in `build.ps1 -Test` too): every key the code uses is in `en.txt`, every key of `en.txt` is used, the translations have no other keys and the same `{names}` and `<tags>`. `ui_texts.py new de` writes a starter file, `ui_texts.py long` the long test language `xx` (every text 40% longer, with accents) for robot screenshots of what gets cut.
+- `test/rmg_builder_test.cpp`: each message of the template maker has an id; in English the panel says exactly what the maker says, in French its own words with the numbers.
+- The robot copies `src/mods/texts/*.txt` into the test copy with the DLL (`--texts-dir` for other files: a partial translation, the long language).
+
+**Settings** (`h5-together.ini`):
+
+```ini
+[ui]
+language=auto   ; auto (the game's language), or the code of a file in h5-together\texts: en, fr...
+```
+
 ## One language: French texts (`languages*.cpp`, off by default)
 
 **What it is for:** with MMH5.5, a French game mixes languages. The base game's texts are French, but the 3.1 patch's and MMH5.5's texts are English, and they replace many French ones. With `texts=fr`, the game takes every text it can from the French packs in `h5-together\lang\fr\` next to the exe:
@@ -583,7 +642,7 @@ Nothing on disk changes. `game` (the default) installs nothing. The plan, with t
 - **Only `.txt` files** are ever taken from a pack. A language pack cannot change game data, only words on the screen.
 - **The `FF FE` mark** that the game needs before a text (without it the game shows an empty text) is always there. A UTF-8 text in a pack is converted.
 - **Between our packs,** the newest file of a path wins, as in the game. On equal dates, the pack whose name sorts last wins, the same on Windows and Linux.
-- **The player list** (`[ui] language=auto`) uses French words with `texts=fr`.
+- **Our panels** (`[ui] language=auto`) use French words with `texts=fr` ([our texts](#our-panels-in-your-language-srcmodstextstxt-srchooktextscpp)).
 
 Texts are only shown, never part of the game world: the game objects keep a text's path, not its words. So each player can choose for themselves.
 
@@ -816,7 +875,7 @@ Plan, research and robot checks: [docs/plans/host-rules.md](../../docs/plans/hos
 
 **What it is for:** MMH5.5 has switches for many of its rules (governors, town conversion, the town gate, mine guards, the computer's weekly bonus, mixed neutral armies, prank artifacts, the random map extras...), in `scripts/H55-Settings.lua`. Until now a group changed them by swapping a settings pak on every PC. With this mod **the host chooses them for each game**, in a panel, and every PC plays with them.
 
-- **The host:** on the game setup screen or in the waiting room, **F2** (or **"Rules..."** at the right of the waiting room's title) opens the panel: the game mode and ToE start bonuses, the skills of each class, 15 of MMH5.5's switches and "MMH5.5 scripts on random maps" (below), each with one line of explanation, in French or English. Gold = changed from your MMH5.5 file. **OK** keeps the choice (also for your next games, in `[rules]`); **MMH5.5's file** puts everything back.
+- **The host:** on the game setup screen or in the waiting room, **F2** (or **"Rules..."** at the right of the waiting room's title) opens the panel: the game mode and ToE start bonuses, the skills of each class, 15 of MMH5.5's switches and "MMH5.5 scripts on random maps" (below), each with one line of explanation, in the player's language (English, French, or a file a player added). Gold = changed from your MMH5.5 file. **OK** keeps the choice (also for your next games, in `[rules]`); **MMH5.5's file** puts everything back.
 - **The other players** see the host's rules there, read only. On the adventure map, **F2** shows the running game's rules to everyone.
 - **They are used only when every player has the add-on.** Otherwise every PC uses its own MMH5.5 file, as without the add-on; the host's panel names who lacks it, and the button gets a red "!".
 - **The check:** each PC tells the host a fingerprint of its MMH5.5 files (`H55-Settings.lua`, the stats paks). If a player's files differ, the host's panel and log name that player (the game could go out of step); that player's panel says so too.
@@ -831,7 +890,7 @@ Plan, research and robot checks: [docs/plans/host-rules.md](../../docs/plans/hos
 - **Game mode:** "Bonus arrows (MMH5.5)" (the default: as today), or Default, Savage, Nightmare, Random for everyone. Savage and Nightmare still team the computer players against the humans, as MMH5.5 does (MMH5.5's own code runs; only its input changes). Scenarios, campaigns and games without computer players keep MMH5.5's choice (Default).
 - **ToE start bonuses:** on = each player picks a start bonus with the arrows, as in Tribes of the East (gold, resources, a minor artifact, or random), and keeps it; MMH5.5's start artifact is not given (it is the same kind of bonus, so a player would get two). With this on and the mode on "Bonus arrows", the mode is Default.
 - **How:** when the map's scripts read `scripts/H55-AdvMap.lua`, every PC serves it with three small edits in its "StartingBonus" part. Each edit is checked against MMH5.5's text; if MMH5.5 changes that text in an update, the file is served as it is (MMH5.5's way) and the log says why. RC19d and RC19k have the same part. The start rules are used only when every PC has the same part (its hash travels in the hello); otherwise the panel says why and MMH5.5's way stays.
-- **The tooltips:** with these rules on, the bonus icons' tooltips in the waiting room describe ToE's bonuses and the game mode (English or French, as the panel).
+- **The tooltips:** with these rules on, the bonus icons' tooltips in the waiting room describe ToE's bonuses and the game mode (in the panels' language, the `[bonus]` texts).
 - **The icons:** with ToE start bonuses on, the bonus icons show Tribes of the East's own pictures (dice, a helmet, gold, resources) instead of MMH5.5's mode pictures, on every PC, as soon as the rule is on (and MMH5.5's again when it is off). Each PC reads ToE's pictures from its own game's `data.pak` when the waiting room first opens (nothing is copied to disk). If they cannot be read, the icons stay MMH5.5's and the log says why (`rules: ToE's bonus pictures ...`). For a few seconds after a player joins, before the add-on knows that player has it too, the icons and tooltips are MMH5.5's.
 - The log: `rules: the scripts read scripts/H55-AdvMap.lua: served with game mode Default, each human keeps the ToE start bonus; ... hash ...` (the same hash on every PC).
 
