@@ -6,8 +6,10 @@
 // "*.xdb" (slot 10, List), then opens each one (slot 7, Open) and keeps the
 // ones that read as a template; the list shows each template's Name field.
 // This mod reads the .xdb files of the folder h5-together\templates next to the
-// exe once, adds them to that listing as RMG\Templates\<file>, and serves their
-// bytes when the game opens them. Nothing on disk changes.
+// exe once (and of open-homm5\templates, the folder's name until 0.2.7, if a DLL
+// copied by hand finds it there), adds them to that listing as
+// RMG\Templates\<file>, and serves their bytes when the game opens them. Nothing
+// on disk changes.
 //
 // Every player of a multiplayer game must have the same templates: each PC
 // builds the random map itself from the template's path, and a PC without the
@@ -27,6 +29,7 @@
 //                the guard against a missing template stays on)
 //   recipes=     recipe names to offer in the game's list, separated by commas
 #include <windows.h>
+#include <stdio.h>
 #include <string.h>
 
 #include <algorithm>
@@ -39,6 +42,7 @@
 #include "rmg_templates.h"
 
 #include "../hook/log.h"
+#include "../hook/old_names.h"
 #include "../hook/patch.h"
 
 namespace mods {
@@ -170,19 +174,27 @@ bool Matches(const char *mask, const char *name)
 	return *name && (*mask == '?' || a == b) && Matches(mask + 1, name + 1);
 }
 
-void LoadTemplates()
+// The folders the templates came from, for the log: "h5-together\templates", and
+// "open-homm5\templates" if it had some too.
+std::string g_template_folders;
+
+// The .xdb files of <exe folder>\<folder>\templates (the same for every copy the robot
+// runs), except names already read from another folder.
+void LoadTemplatesFrom(const wchar_t *folder)
 {
-	// <exe folder>\h5-together (the same for every copy the robot runs)
 	wchar_t dir[MAX_PATH];
 	DWORD n = GetModuleFileNameW(nullptr, dir, MAX_PATH);
 	while (n > 0 && dir[n - 1] != L'\\')
 		--n;
-	lstrcpynW(dir + n, L"h5-together", MAX_PATH - n);
+	lstrcpynW(dir + n, folder, MAX_PATH - n);
+	char shown[64];
+	_snprintf_s(shown, sizeof(shown), _TRUNCATE, "%ls\\templates", folder);
 	std::wstring pattern = std::wstring(dir) + L"\\templates\\*.xdb";
 	WIN32_FIND_DATAW fd;
 	HANDLE find = FindFirstFileW(pattern.c_str(), &fd);
 	if (find == INVALID_HANDLE_VALUE)
 		return;
+	const size_t before = g_templates.size();
 	do {
 		if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY || fd.nFileSizeHigh || fd.nFileSizeLow > kMaxSize)
 			continue;
@@ -193,17 +205,24 @@ void LoadTemplates()
 			continue;
 		std::string recipe;
 		if (mods::rmg::CanonicalRecipe(name, &recipe)) {  // the name decides, the same on every PC
-			hooklog::Write("rmg templates: h5-together\\templates\\%s skipped: a recipe name, built from the name itself", name);
+			hooklog::Write("rmg templates: %s\\%s skipped: a recipe name, built from the name itself", shown, name);
+			continue;
+		}
+		Template t;
+		t.file = name;
+		const std::string inside = std::string("RMG/Templates/") + name;
+		t.key = Normalize(inside.data(), inside.data() + inside.size());
+		bool known = false;
+		for (const Template &other : g_templates)
+			known = known || other.key == t.key;
+		if (known) {
+			hooklog::Write("rmg templates: %s\\%s skipped: the same name is in %s", shown, name, g_template_folders.c_str());
 			continue;
 		}
 		const std::wstring path = std::wstring(dir) + L"\\templates\\" + fd.cFileName;
 		HANDLE f = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
 		if (f == INVALID_HANDLE_VALUE)
 			continue;
-		Template t;
-		t.file = name;
-		const std::string inside = std::string("RMG/Templates/") + name;
-		t.key = Normalize(inside.data(), inside.data() + inside.size());
 		t.data.resize(fd.nFileSizeLow);
 		DWORD got = 0;
 		if (ReadFile(f, &t.data[0], fd.nFileSizeLow, &got, nullptr) && got == fd.nFileSizeLow)
@@ -211,6 +230,16 @@ void LoadTemplates()
 		CloseHandle(f);
 	} while (FindNextFileW(find, &fd));
 	FindClose(find);
+	if (g_templates.size() > before)
+		g_template_folders += (g_template_folders.empty() ? "" : " and ") + std::string(shown);
+}
+
+void LoadTemplates()
+{
+	// Our folder, then its name until 0.2.7 (an install that got the new DLL by hand; the
+	// installer moves that folder): every template file of either is offered.
+	LoadTemplatesFrom(oldnames::kFolder);
+	LoadTemplatesFrom(oldnames::kOldFolder);
 }
 
 GameStream *NewStream(const std::string &data)
@@ -409,7 +438,8 @@ bool ServeTemplates(const wchar_t *path)
 	std::string names;
 	for (size_t i = 0; i < g_templates.size() && i < 12; ++i)
 		names += (i ? ", " : "") + g_templates[i].file;
-	hooklog::Write("rmg templates: %u template(s) from h5-together\\templates%s%s%s", static_cast<unsigned>(g_templates.size()),
+	hooklog::Write("rmg templates: %u template(s) from %s%s%s%s", static_cast<unsigned>(g_templates.size()),
+	               g_template_folders.empty() ? "h5-together\\templates" : g_template_folders.c_str(),
 	               names.empty() ? "" : ": ", names.c_str(), g_templates.size() > 12 ? ", ..." : "");
 	if (!g_recipes_on)
 		return false;

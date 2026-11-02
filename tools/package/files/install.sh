@@ -15,6 +15,8 @@
 #
 # An existing h5-together.ini is refreshed: it becomes this package's file with the
 # player's values in it (the old one is kept as h5-together.ini.bak; see merge_ini).
+# The files of the add-on's old name (open-homm5, until 0.2.7) get the new name first,
+# the folder bin/open-homm5 included (see move_old_names).
 #
 # Exit codes: 0 done, 3 refused (a dinput8.dll that is not ours is there),
 # 4 game not found, 5 copy failed, 7 package incomplete.
@@ -22,6 +24,7 @@
 [ -n "${BASH_VERSION:-}" ] || { echo "Please run this with bash:  bash install.sh"; exit 2; }
 
 MARKER='H5 Together hook DLL'
+OLD_MARKER='open-homm5 hook DLL'   # the add-on's name until 0.2.7
 GAME_FOLDER='Heroes of Might and Magic 5 Tribes of the East'
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -39,8 +42,9 @@ done
 
 # ---- shared with uninstall.sh and bug-report.sh: finding the game (keep all copies identical) ----
 
-# True if the file is the dinput8.dll of H5 Together (it contains our marker text).
-is_ours() { grep -q -a -F -- "$MARKER" "$1" 2>/dev/null; }
+# True if the file is the dinput8.dll of H5 Together, or of open-homm5 (0.2.7 and
+# older): it contains our marker text.
+is_ours() { grep -q -a -F -e "$MARKER" -e "$OLD_MARKER" -- "$1" 2>/dev/null; }
 
 # Prints the first file or folder called $2 (ignoring upper/lower case) inside $1.
 find_ci() { find "$1" -mindepth 1 -maxdepth 1 -iname "$2" -print 2>/dev/null | head -n 1; }
@@ -300,9 +304,96 @@ refresh_ini() {
 # "1 new setting", "2 new settings"
 count_text() { if [ "$1" -eq 1 ]; then echo "1 $2"; else echo "$1 $3"; fi; }
 
+# ---- the add-on's old name: until 0.2.7 it was called open-homm5 ----
+# Its files in bin get the new name, with the same rules as Move-OldNames in install.ps1
+# (read them there): the settings and their .bak copies, the hero looks, the last log
+# (it becomes h5-together.old.log), and the folder open-homm5 (renamed, or merged into
+# an h5-together folder that is already there). Names are found in any upper/lower case.
+old_moved=" "      # what got the new name, for the summary: " open-homm5.ini open-homm5 ..."
+old_left=()        # old files left as they are (the new name is there already)
+old_folder_left=0  # files of the old folder that the new folder has too
+
+# Gives the file $1 of bin the name $2, unless that name is there already.
+move_old() {
+    local old
+    old="$(find_ci "$bin" "$1")"
+    [ -n "$old" ] && [ -f "$old" ] || return 0
+    if [ -n "$(find_ci "$bin" "$2")" ] || [ -e "$bin/$2" ]; then
+        old_left+=("$1")
+        return 0
+    fi
+    mv "$old" "$bin/$2" || return 1
+    old_moved="$old_moved$1 "
+}
+
+# Moves what folder $1 holds into folder $2: what $2 lacks is moved, a folder both have is
+# merged the same way, a file both have stays in $1. Then $1 goes if it is empty.
+merge_folder() {
+    local from="$1" to="$2" item name dst
+    for item in "$from"/* "$from"/.[!.]* "$from"/..?*; do
+        [ -e "$item" ] || [ -L "$item" ] || continue
+        name="${item##*/}"
+        dst="$(find_ci "$to" "$name")"
+        [ -z "$dst" ] && [ -e "$to/$name" ] && dst="$to/$name"
+        if [ -z "$dst" ]; then
+            mv "$item" "$to/$name" || return 1
+        elif [ -d "$item" ] && [ ! -L "$item" ] && [ -d "$dst" ]; then
+            merge_folder "$item" "$dst" || return 1
+        else
+            old_folder_left=$((old_folder_left + 1))
+        fi
+    done
+    rmdir "$from" 2>/dev/null   # only if nothing is left in it
+    return 0
+}
+
+move_old_names() {
+    local ext log old_dir new_dir old_tpl f p ini_stayed=0
+    move_old open-homm5.ini h5-together.ini || return 1
+    move_old open-homm5-skins.ini h5-together-skins.ini || return 1
+    # the installer's copies of the settings follow the settings file (not when it stayed)
+    for f in "${old_left[@]}"; do [ "$f" = open-homm5.ini ] && ini_stayed=1; done
+    if [ "$ini_stayed" -eq 0 ]; then
+        for ext in bak bak2 bak3; do
+            f="$(find_ci "$bin" "open-homm5.ini.$ext")"
+            if [ -n "$f" ] && [ -f "$f" ] && [ -z "$(find_ci "$bin" "h5-together.ini.$ext")" ]; then
+                mv "$f" "$bin/h5-together.ini.$ext" || return 1
+            fi
+        done
+    fi
+    log="$(find_ci "$bin" open-homm5.log)"
+    if [ -n "$log" ] && [ -f "$log" ]; then
+        if [ -z "$(find_ci "$bin" h5-together.log)" ] && [ -z "$(find_ci "$bin" h5-together.old.log)" ]; then
+            mv "$log" "$bin/h5-together.old.log" || return 1
+            old_moved="${old_moved}open-homm5.log "
+        else
+            rm -f "$log" || return 1
+        fi
+    fi
+    log="$(find_ci "$bin" open-homm5.old.log)"
+    if [ -n "$log" ] && [ -f "$log" ]; then rm -f "$log" || return 1; fi
+    old_dir="$(find_ci "$bin" open-homm5)"
+    [ -n "$old_dir" ] && [ -d "$old_dir" ] || return 0
+    new_dir="$(find_ci "$bin" h5-together)"
+    if [ -z "$new_dir" ]; then
+        mv "$old_dir" "$bin/h5-together" || return 1
+    else
+        # our templates in the old folder go: this install puts them in the new one
+        old_tpl="$(find_ci "$old_dir" templates)"
+        if [ -n "$old_tpl" ] && [ -d "$old_tpl" ]; then
+            for f in "${tpl_files[@]}"; do
+                p="$(find_ci "$old_tpl" "$(basename "$f")")"
+                [ -n "$p" ] && [ -f "$p" ] && { rm -f "$p" || return 1; }
+            done
+        fi
+        merge_folder "$old_dir" "$new_dir" || return 1
+    fi
+    old_moved="${old_moved}open-homm5 "
+}
+
 echo
 echo "H5 Together installer"
-echo "--------------------"
+echo "---------------------"
 
 src_dll="$here/dinput8.dll"
 src_ini="$here/h5-together.ini"
@@ -345,6 +436,15 @@ if [ -n "$existing" ]; then
     fi
     dst_dll="$existing"
     if cmp -s "$src_dll" "$dst_dll"; then dll_was="same"; else dll_was="older"; fi
+fi
+
+# The files of the old name (open-homm5, until 0.2.7) get the new name first, so that the
+# settings refresh and the templates below work on them.
+if ! move_old_names; then
+    echo
+    echo "Could not give your open-homm5 files their new name, h5-together (see the message above)."
+    echo "If the game is running, close it and try again."
+    exit 5
 fi
 
 dst_ini="$(find_ci "$bin" h5-together.ini)"
@@ -391,6 +491,18 @@ tpl_others=$((tpl_total - ${#tpl_files[@]}))
 
 echo
 echo "Done. What I did:"
+if [ "$old_moved" != " " ]; then
+    what=""
+    case "$old_moved" in *" open-homm5.ini "*) what="$what, the settings" ;; esac
+    case "$old_moved" in *" open-homm5-skins.ini "*) what="$what, the hero looks" ;; esac
+    case "$old_moved" in *" open-homm5.log "*) what="$what, the log" ;; esac
+    case "$old_moved" in *" open-homm5 "*) what="$what, the folder" ;; esac
+    echo "  - open-homm5 is now called H5 Together: your files got the new name, h5-together (${what#, })"
+fi
+for name in "${old_left[@]}"; do
+    echo "  - kept $name as it is: there is already a h5-together${name#open-homm5}, which is the one used"
+done
+[ "$old_folder_left" -gt 0 ] && echo "  - left $old_folder_left file(s) in the folder open-homm5: the folder h5-together has them too"
 case "$dll_was" in
     new)   echo "  - added dinput8.dll (the add-on)" ;;
     same)  echo "  - dinput8.dll was already installed and up to date" ;;

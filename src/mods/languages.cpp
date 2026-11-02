@@ -43,6 +43,7 @@
 #include <vector>
 
 #include "../hook/log.h"
+#include "../hook/old_names.h"
 #include "../hook/patch.h"
 
 namespace mods {
@@ -196,14 +197,13 @@ std::string Narrow(const std::wstring &w)
 	return n > 0 ? std::string(buffer) : std::string("?");
 }
 
-// <exe folder>\h5-together\lang\fr\ (the robot's copies have their own exe folder)
+// <exe folder>\h5-together\lang\fr\ (the robot's copies have their own exe folder), or
+// open-homm5\lang\fr\, the folder's name until 0.2.7, while only that one is there
 std::wstring PackFolder()
 {
 	wchar_t dir[MAX_PATH];
-	DWORD n = GetModuleFileNameW(nullptr, dir, MAX_PATH);
-	while (n > 0 && dir[n - 1] != L'\\')
-		--n;
-	return std::wstring(dir, n) + L"h5-together\\lang\\fr\\";
+	oldnames::PathInOurFolder(L"lang\\fr", dir, MAX_PATH);
+	return std::wstring(dir) + L"\\";
 }
 
 bool ReadDirectoryOf(HANDLE file, std::vector<lang::ZipEntry> *out)

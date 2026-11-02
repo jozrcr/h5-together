@@ -4,8 +4,9 @@
 # GitHub. It holds what we need to look into a problem and nothing else:
 #   h5-together.log and h5-together.old.log   what the add-on wrote
 #   h5-together.ini, h5-together-skins.ini    your settings
-#   system.txt                              the add-on, MMH5.5 and Windows versions, a few file
-#                                           sizes and hashes, the other DLLs in the game folder
+#   the same four under the add-on's old name (open-homm5, until 0.2.7), if they are there
+#   system.txt                                the add-on, MMH5.5 and Windows versions, a few file
+#                                             sizes and hashes, the other DLLs in the game folder
 # No saves, no maps, no game files. It sends nothing anywhere: the zip is yours to look at
 # (it is a normal zip) and to attach yourself. The log lists player names and LAN addresses.
 #
@@ -40,13 +41,15 @@ function Wait-AndExit([int]$Code) {
 
 # ---- shared with uninstall.ps1 and bug-report.ps1: finding the game (keep all copies identical) ----
 $Marker = "H5 Together hook DLL"
+$OldMarker = "open-homm5 hook DLL"  # the add-on's name until 0.2.7
 $GameFolderName = "Heroes of Might and Magic 5 Tribes of the East"
 
-# True if the file is the dinput8.dll of H5 Together (it contains our marker text).
+# True if the file is the dinput8.dll of H5 Together, or of open-homm5 (0.2.7 and
+# older): it contains our marker text.
 function Test-IsOurs([string]$Path) {
     $bytes = [System.IO.File]::ReadAllBytes($Path)
     $text = [System.Text.Encoding]::GetEncoding(28591).GetString($bytes)
-    return $text.Contains($Marker)
+    return ($text.Contains($Marker) -or $text.Contains($OldMarker))
 }
 
 # Takes the game folder or its bin folder. Returns the bin folder, or $null if
@@ -186,12 +189,13 @@ function Get-Sha256Hex([string]$Path) {
     }
 }
 
-# The version a dinput8.dll of ours says in its text ("H5 Together hook DLL 0.2.7 loaded"), or $null.
+# The name and version a dinput8.dll of ours says in its text, or $null: "H5 Together 0.2.8"
+# from "H5 Together hook DLL 0.2.8 loaded" ("open-homm5 0.2.7": the add-on's old name).
 function Get-AddonVersion([string]$Path) {
     try {
         $text = $Latin1.GetString([System.IO.File]::ReadAllBytes($Path))
-        $m = [regex]::Match($text, 'H5 Together hook DLL (\S+) loaded')
-        if ($m.Success) { return $m.Groups[1].Value }
+        $m = [regex]::Match($text, '(H5 Together|open-homm5) hook DLL (\S+) loaded')
+        if ($m.Success) { return ($m.Groups[1].Value + " " + $m.Groups[2].Value) }
     } catch { }
     return $null
 }
@@ -245,7 +249,7 @@ function Get-OutFolder {
 try {
     Write-Host ""
     Write-Host "H5 Together bug report"
-    Write-Host "---------------------"
+    Write-Host "----------------------"
 
     $bin = Select-GameBin
     if (-not $bin) {
@@ -256,14 +260,16 @@ try {
     Write-Host "Game folder: $bin"
     $root = Split-Path -Parent $bin
 
-    # The files that go in the zip: only these, and only the ones that exist.
+    # The files that go in the zip: only these, and only the ones that exist (the last four:
+    # the add-on's old name, until 0.2.7, for an install that was not updated yet).
     $pack = New-Object System.Collections.ArrayList
-    foreach ($name in @("h5-together.log", "h5-together.old.log", "h5-together.ini", "h5-together-skins.ini")) {
+    foreach ($name in @("h5-together.log", "h5-together.old.log", "h5-together.ini", "h5-together-skins.ini",
+                        "open-homm5.log", "open-homm5.old.log", "open-homm5.ini", "open-homm5-skins.ini")) {
         $p = Join-Path $bin $name
         if (Test-Path -LiteralPath $p -PathType Leaf) { [void]$pack.Add(@($name, $p)) }
     }
     $hasLog = $false
-    foreach ($item in $pack) { if ($item[0] -eq "h5-together.log") { $hasLog = $true } }
+    foreach ($item in $pack) { if ($item[0] -eq "h5-together.log" -or $item[0] -eq "open-homm5.log") { $hasLog = $true } }
 
     # system.txt
     $t = New-Object System.Collections.Generic.List[string]
@@ -278,9 +284,9 @@ try {
         $t.Add("  dinput8.dll in the game folder: NOT the H5 Together one (another add-on uses that name)")
     } else {
         $v = Get-AddonVersion $dll
-        if (-not $v) { $v = "an older build, version not written in it" }
+        if (-not $v) { $v = "an older build of the add-on, version not written in it" }
         $props = (Get-Item -LiteralPath $dll).VersionInfo
-        $t.Add("  dinput8.dll in the game folder: H5 Together " + $v + " (file properties: " + $(if ($props.ProductVersion) { $props.ProductVersion } else { "no version information" }) + ")")
+        $t.Add("  dinput8.dll in the game folder: " + $v + " (file properties: " + $(if ($props.ProductVersion) { $props.ProductVersion } else { "no version information" }) + ")")
     }
     $mine = Join-Path $PSScriptRoot "dinput8.dll"
     if (Test-Path -LiteralPath $mine -PathType Leaf) {
@@ -288,7 +294,9 @@ try {
         if (-not $v) { $v = "unknown" }
         $t.Add("  the package this script came from: " + $v)
     }
-    $t.Add("  h5-together.nohooks (switches the hooks off): " + $(if (Test-Path -LiteralPath (Join-Path $bin "h5-together.nohooks")) { "present" } else { "not there" }))
+    foreach ($name in @("h5-together.nohooks", "open-homm5.nohooks")) {
+        $t.Add("  " + $name + " (switches the hooks off): " + $(if (Test-Path -LiteralPath (Join-Path $bin $name)) { "present" } else { "not there" }))
+    }
     $t.Add("")
     $t.Add("System")
     try {

@@ -39,6 +39,7 @@
 #include "steam_api_flat.h"
 #include "steam_spike_logic.h"
 #include "../hook/log.h"
+#include "../hook/old_names.h"
 #include "../hook/version.h"
 
 namespace mods {
@@ -696,12 +697,10 @@ void ApplySteamSpikeFromSettings()
 		return;
 	hooklog::Write("steam: spike %s, app id %u, %d s, lobby %s", steamspike::ModeName(g_set.mode), g_set.app_id,
 	               g_set.seconds, g_set.lobby_type_name);
-	// bin\h5-together\steam_api.dll (one file for every robot instance, so not PathNextToExe)
+	// bin\h5-together\steam_api.dll (one file for every robot instance, so not PathNextToExe;
+	// bin\open-homm5\steam_api.dll, the folder's name until 0.2.7, while only that one is there)
 	wchar_t dll_path[MAX_PATH];
-	DWORD n = GetModuleFileNameW(nullptr, dll_path, MAX_PATH);
-	while (n > 0 && dll_path[n - 1] != L'\\')
-		--n;
-	lstrcpynW(dll_path + n, L"h5-together\\steam_api.dll", MAX_PATH - n);
+	oldnames::PathInOurFolder(L"steam_api.dll", dll_path, MAX_PATH);
 	HMODULE dll = LoadLibraryExW(dll_path, nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
 	if (!dll) {
 		hooklog::Write("steam: cannot load %ls (error %lu): spike off", dll_path, GetLastError());

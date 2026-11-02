@@ -11,6 +11,7 @@ INSTALL
 Windows: extract this zip (right-click it, "Extract All"), then double-click install.bat. It finds your Steam copy of the game and tells you what it did.
 Linux (Steam / Proton): extract the zip, open a terminal in the folder, and run: bash install.sh. At the end it gives you one line to paste into the game's Steam launch options.
 Updating: install the new version over the old one. Your settings are kept, and the new ones are added to h5-together.ini (commented out, with what they do); the installer says how many. Your old file is saved as h5-together.ini.bak.
+H5 Together was called open-homm5 until version 0.2.7. Installing over an old version gives your files the new name: open-homm5.ini becomes h5-together.ini, open-homm5-skins.ini becomes h5-together-skins.ini, and the folder open-homm5 becomes h5-together (with everything in it). Nothing you set is lost.
 
 Check that it works: start the game. A file named h5-together.log appears in the game's bin folder. Its first line says "H5 Together hook DLL", the version and "loaded". The log does not grow for ever: over 5 MB, the game keeps it as h5-together.old.log (one older log) and starts a new one.
 

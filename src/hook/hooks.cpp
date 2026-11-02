@@ -37,15 +37,21 @@ void InstallAiTrace();
 namespace {
 
 // Escape hatch for testing: an empty file "h5-together.nohooks" next to the
-// exe keeps the DLL in forwarding-only mode.
+// exe keeps the DLL in forwarding-only mode ("open-homm5.nohooks" too: the
+// add-on's old name, until 0.2.7).
 bool NoHooks()
 {
 	wchar_t path[MAX_PATH];
 	DWORD n = GetModuleFileNameW(nullptr, path, MAX_PATH);
 	while (n > 0 && path[n - 1] != L'\\')
 		--n;
-	lstrcpynW(path + n, L"h5-together.nohooks", MAX_PATH - n);
-	return GetFileAttributesW(path) != INVALID_FILE_ATTRIBUTES;
+	const wchar_t *const names[] = {L"h5-together.nohooks", L"open-homm5.nohooks"};
+	for (const wchar_t *name : names) {
+		lstrcpynW(path + n, name, MAX_PATH - n);
+		if (GetFileAttributesW(path) != INVALID_FILE_ATTRIBUTES)
+			return true;
+	}
+	return false;
 }
 
 }  // namespace
@@ -69,7 +75,7 @@ void InstallEarly()
 void InstallAll()
 {
 	if (NoHooks()) {
-		hooklog::Write("h5-together.nohooks found: hooks disabled");
+		hooklog::Write("h5-together.nohooks (or open-homm5.nohooks) found: hooks disabled");
 		return;
 	}
 	watchdog::Install();  // first: the others register their state for its reports

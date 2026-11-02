@@ -5,8 +5,9 @@
 # bug report on GitHub. It holds what we need to look into a problem and nothing else:
 #   h5-together.log and h5-together.old.log   what the add-on wrote
 #   h5-together.ini, h5-together-skins.ini    your settings
-#   system.txt                              the add-on, MMH5.5 and Linux versions, a few file
-#                                           sizes and hashes, the other DLLs in the game folder
+#   the same four under the add-on's old name (open-homm5, until 0.2.7), if they are there
+#   system.txt                                the add-on, MMH5.5 and Linux versions, a few file
+#                                             sizes and hashes, the other DLLs in the game folder
 # No saves, no maps, no game files. It sends nothing anywhere: the zip is yours to look at
 # (it is a normal zip) and to attach yourself. The log lists player names and LAN addresses.
 #
@@ -28,6 +29,7 @@
 [ -n "${BASH_VERSION:-}" ] || { echo "Please run this with bash:  bash bug-report.sh"; exit 2; }
 
 MARKER='H5 Together hook DLL'
+OLD_MARKER='open-homm5 hook DLL'   # the add-on's name until 0.2.7
 GAME_FOLDER='Heroes of Might and Magic 5 Tribes of the East'
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -49,8 +51,9 @@ done
 
 # ---- shared with uninstall.sh and bug-report.sh: finding the game (keep all copies identical) ----
 
-# True if the file is the dinput8.dll of H5 Together (it contains our marker text).
-is_ours() { grep -q -a -F -- "$MARKER" "$1" 2>/dev/null; }
+# True if the file is the dinput8.dll of H5 Together, or of open-homm5 (0.2.7 and
+# older): it contains our marker text.
+is_ours() { grep -q -a -F -e "$MARKER" -e "$OLD_MARKER" -- "$1" 2>/dev/null; }
 
 # Prints the first file or folder called $2 (ignoring upper/lower case) inside $1.
 find_ci() { find "$1" -mindepth 1 -maxdepth 1 -iname "$2" -print 2>/dev/null | head -n 1; }
@@ -192,9 +195,11 @@ find_python() {
     return 1
 }
 
-# The version a dinput8.dll of ours says in its text ("H5 Together hook DLL 0.2.7 loaded").
+# The name and version a dinput8.dll of ours says in its text: "H5 Together 0.2.8" from
+# "H5 Together hook DLL 0.2.8 loaded" ("open-homm5 0.2.7": the add-on's old name).
 addon_version() {
-    grep -a -o -E 'H5 Together hook DLL [^ ]+ loaded' "$1" 2>/dev/null | head -n 1 | awk '{print $5}'
+    grep -a -o -E '(H5 Together|open-homm5) hook DLL [^ ]+ loaded' "$1" 2>/dev/null | head -n 1 |
+        sed -E 's/ hook DLL ([^ ]+) loaded$/ \1/'
 }
 
 # Prints the text of a file inside a zip file ($1), by the name inside ($2). Fails if it cannot.
@@ -221,7 +226,7 @@ known_55u() {
 
 echo
 echo "H5 Together bug report"
-echo "---------------------"
+echo "----------------------"
 
 if ! choose_game_bin; then
     echo
@@ -244,16 +249,18 @@ if ! mkdir -p "$out_dir" 2>/dev/null || [ ! -w "$out_dir" ]; then
 fi
 out_dir="$(cd "$out_dir" && pwd)"
 
-# The files that go in the report: only these, and only the ones that exist.
+# The files that go in the report: only these, and only the ones that exist (the last four:
+# the add-on's old name, until 0.2.7, for an install that was not updated yet).
 pack_names=()
 pack_paths=()
 has_log=0
-for name in h5-together.log h5-together.old.log h5-together.ini h5-together-skins.ini; do
+for name in h5-together.log h5-together.old.log h5-together.ini h5-together-skins.ini \
+            open-homm5.log open-homm5.old.log open-homm5.ini open-homm5-skins.ini; do
     f="$(find_ci "$bin" "$name")"
     if [ -n "$f" ] && [ -f "$f" ]; then
         pack_names+=("$name")
         pack_paths+=("$f")
-        [ "$name" = "h5-together.log" ] && has_log=1
+        case "$name" in h5-together.log|open-homm5.log) has_log=1 ;; esac
     fi
 done
 
@@ -273,17 +280,19 @@ trap 'rm -rf "$stage"' EXIT
         echo "  dinput8.dll in the game folder: NOT the H5 Together one (another add-on uses that name)"
     else
         v="$(addon_version "$dll")"
-        echo "  dinput8.dll in the game folder: H5 Together ${v:-an older build, version not written in it}"
+        echo "  dinput8.dll in the game folder: ${v:-an older build of the add-on, version not written in it}"
     fi
     if [ -f "$here/dinput8.dll" ]; then
         v="$(addon_version "$here/dinput8.dll")"
         echo "  the package this script came from: ${v:-unknown}"
     fi
-    if [ -n "$(find_ci "$bin" h5-together.nohooks)" ]; then
-        echo "  h5-together.nohooks (switches the hooks off): present"
-    else
-        echo "  h5-together.nohooks (switches the hooks off): not there"
-    fi
+    for name in h5-together.nohooks open-homm5.nohooks; do
+        if [ -n "$(find_ci "$bin" "$name")" ]; then
+            echo "  $name (switches the hooks off): present"
+        else
+            echo "  $name (switches the hooks off): not there"
+        fi
+    done
     echo
     echo "System"
     echo "  $(uname -srm 2>/dev/null)"

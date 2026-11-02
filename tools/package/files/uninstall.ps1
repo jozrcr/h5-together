@@ -4,6 +4,7 @@
 #   dinput8.dll (only if it is ours), h5-together.log (and h5-together.old.log), h5-together.ini (after asking),
 #   and the random map templates of this package (the OH-*.xdb files whose names are in
 #   this package's h5-together\templates folder), then the folders if they are empty.
+# The same files under the add-on's old name (open-homm5, until 0.2.7) go too.
 # Nothing else is touched: a template of your own stays.
 #
 # Keep this file plain ASCII (see install.ps1 for why).
@@ -32,13 +33,15 @@ function Wait-AndExit([int]$Code) {
 
 # ---- shared with uninstall.ps1 and bug-report.ps1: finding the game (keep all copies identical) ----
 $Marker = "H5 Together hook DLL"
+$OldMarker = "open-homm5 hook DLL"  # the add-on's name until 0.2.7
 $GameFolderName = "Heroes of Might and Magic 5 Tribes of the East"
 
-# True if the file is the dinput8.dll of H5 Together (it contains our marker text).
+# True if the file is the dinput8.dll of H5 Together, or of open-homm5 (0.2.7 and
+# older): it contains our marker text.
 function Test-IsOurs([string]$Path) {
     $bytes = [System.IO.File]::ReadAllBytes($Path)
     $text = [System.Text.Encoding]::GetEncoding(28591).GetString($bytes)
-    return $text.Contains($Marker)
+    return ($text.Contains($Marker) -or $text.Contains($OldMarker))
 }
 
 # Takes the game folder or its bin folder. Returns the bin folder, or $null if
@@ -153,7 +156,7 @@ function Select-GameBin {
 try {
     Write-Host ""
     Write-Host "H5 Together uninstaller"
-    Write-Host "----------------------"
+    Write-Host "-----------------------"
 
     $bin = Select-GameBin
     if (-not $bin) {
@@ -182,46 +185,46 @@ try {
         }
     }
 
-    $log = Join-Path $bin "h5-together.log"
-    if (Test-Path -LiteralPath $log) {
-        try {
-            Remove-Item -LiteralPath $log -Force
-            Write-Host "  - removed h5-together.log"
-        } catch {
-            Write-Host ("  - could not remove h5-together.log: " + $_.Exception.Message) -ForegroundColor Red
-            $failed = $true
-        }
-    } else {
+    # The logs, under the add-on's name and its old one (open-homm5, until 0.2.7). The log is
+    # kept to 5 MB: when it got bigger, the game kept the last full one as h5-together.old.log.
+    $logs = @("h5-together.log", "h5-together.old.log", "open-homm5.log", "open-homm5.old.log")
+    if (-not (Test-Path -LiteralPath (Join-Path $bin "h5-together.log")) -and -not (Test-Path -LiteralPath (Join-Path $bin "open-homm5.log"))) {
         Write-Host "  - no h5-together.log here"
     }
-    # The log is kept to 5 MB: when it got bigger, the game kept the last full one as h5-together.old.log.
-    $oldLog = Join-Path $bin "h5-together.old.log"
-    if (Test-Path -LiteralPath $oldLog) {
+    foreach ($name in $logs) {
+        $log = Join-Path $bin $name
+        if (-not (Test-Path -LiteralPath $log)) { continue }
         try {
-            Remove-Item -LiteralPath $oldLog -Force
-            Write-Host "  - removed h5-together.old.log"
+            Remove-Item -LiteralPath $log -Force
+            Write-Host "  - removed $name"
         } catch {
-            Write-Host ("  - could not remove h5-together.old.log: " + $_.Exception.Message) -ForegroundColor Red
+            Write-Host ("  - could not remove " + $name + ": " + $_.Exception.Message) -ForegroundColor Red
             $failed = $true
         }
     }
 
     # The settings file, and the copies of it that the installer keeps when it adds new
-    # settings (.bak, .bak2, .bak3). One question for all of them; no other name.
-    $ini = Join-Path $bin "h5-together.ini"
-    $hasIni = Test-Path -LiteralPath $ini -PathType Leaf
-    $backups = @(@(".bak", ".bak2", ".bak3") | ForEach-Object { $ini + $_ } | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })
-    if (-not $hasIni -and $backups.Count -eq 0) {
+    # settings (.bak, .bak2, .bak3), under both names. One question for all of them.
+    $inis = @(@("h5-together.ini", "open-homm5.ini") | Where-Object { Test-Path -LiteralPath (Join-Path $bin $_) -PathType Leaf })
+    $backups = @()
+    foreach ($base in @("h5-together.ini", "open-homm5.ini")) {
+        $backups += @(@(".bak", ".bak2", ".bak3") | ForEach-Object { Join-Path $bin ($base + $_) } | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })
+    }
+    if ($inis.Count -eq 0 -and $backups.Count -eq 0) {
         Write-Host "  - no h5-together.ini here"
     } else {
-        if (-not $hasIni) { $question = "Also delete the old copies of your settings (h5-together.ini.bak)? [y/N]"; $what = "the old copies of h5-together.ini" }
-        elseif ($backups.Count -gt 0) { $question = "Also delete your settings file h5-together.ini and its old copies (.bak)? [y/N]"; $what = "h5-together.ini and its old copies" }
-        else { $question = "Also delete your settings file h5-together.ini? [y/N]"; $what = "h5-together.ini" }
+        $iniText = $inis -join " and "
+        if ($inis.Count -eq 0) {
+            $copied = (Split-Path -Leaf $backups[0]) -replace '\.bak\d?$', ''
+            $question = "Also delete the old copies of your settings ($copied.bak)? [y/N]"; $what = "the old copies of $copied"
+        }
+        elseif ($inis.Count -gt 1) { $question = "Also delete your settings files $iniText, and their old copies (.bak)? [y/N]"; $what = "$iniText and their old copies" }
+        elseif ($backups.Count -gt 0) { $question = "Also delete your settings file $iniText and its old copies (.bak)? [y/N]"; $what = "$iniText and its old copies" }
+        else { $question = "Also delete your settings file $iniText? [y/N]"; $what = $iniText }
         $answer = $null
         try { $answer = Read-Host $question } catch { }
         if ($answer -and $answer.Trim() -match '^(y|yes|o|oui)$') {
-            $files = @($backups)
-            if ($hasIni) { $files = @($ini) + $files }
+            $files = @($inis | ForEach-Object { Join-Path $bin $_ }) + $backups
             foreach ($f in $files) {
                 $name = Split-Path -Leaf $f
                 try {
@@ -237,19 +240,25 @@ try {
         }
     }
 
-    # The random map templates: only the names this package holds, never another file.
+    # The random map templates: only the names this package holds, never another file. In
+    # our folder, and in its old name (open-homm5, until 0.2.7) if that is still there.
     $srcTemplates = Join-Path $PSScriptRoot "h5-together\templates"
-    $dstDir = Join-Path $bin "h5-together"
-    $dstTemplates = Join-Path $dstDir "templates"
     $tplNames = @()
     if (Test-Path -LiteralPath $srcTemplates) {
         $tplNames = @(Get-ChildItem -LiteralPath $srcTemplates -File | Where-Object { $_.Extension -ieq ".xdb" } | ForEach-Object { $_.Name })
     }
-    if (-not (Test-Path -LiteralPath $dstTemplates)) {
-        Write-Host "  - no random map templates here"
-    } elseif ($tplNames.Count -eq 0) {
-        Write-Host "  - this folder has no list of our templates, so I left h5-together\templates alone" -ForegroundColor Yellow
-    } else {
+    $anyTemplates = $false
+    foreach ($folder in @("h5-together", "open-homm5")) {
+        $dstDir = Join-Path $bin $folder
+        $dstTemplates = Join-Path $dstDir "templates"
+        if (-not (Test-Path -LiteralPath $dstTemplates)) { continue }
+        $anyTemplates = $true
+        $from = ""
+        if ($folder -ne "h5-together") { $from = " from $folder\templates (the folder's old name)" }
+        if ($tplNames.Count -eq 0) {
+            Write-Host "  - this folder has no list of our templates, so I left $folder\templates alone" -ForegroundColor Yellow
+            continue
+        }
         $removed = 0
         foreach ($n in $tplNames) {
             $p = Join-Path $dstTemplates $n
@@ -263,21 +272,22 @@ try {
                 }
             }
         }
-        Write-Host ("  - removed {0} random map templates" -f $removed)
+        Write-Host ("  - removed {0} random map templates{1}" -f $removed, $from)
         $left = @(Get-ChildItem -LiteralPath $dstTemplates -Force)
         if ($left.Count -gt 0) {
-            Write-Host ("  - kept {0} other file(s) in h5-together\templates (not ours)" -f $left.Count)
+            Write-Host ("  - kept {0} other file(s) in {1}\templates (not ours)" -f $left.Count, $folder)
         } else {
             try {
                 Remove-Item -LiteralPath $dstTemplates -Force
                 if (@(Get-ChildItem -LiteralPath $dstDir -Force).Count -eq 0) { Remove-Item -LiteralPath $dstDir -Force }
-                Write-Host "  - removed the empty folder h5-together\templates"
+                Write-Host "  - removed the empty folder $folder\templates"
             } catch {
                 Write-Host ("  - could not remove the empty folder: " + $_.Exception.Message) -ForegroundColor Red
                 $failed = $true
             }
         }
     }
+    if (-not $anyTemplates) { Write-Host "  - no random map templates here" }
 
     Write-Host ""
     if ($failed) {
