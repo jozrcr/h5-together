@@ -868,3 +868,19 @@ trace=0       ; testing: log every script file the game opens, and print each pl
 trace_skills=0        ; testing: log every new skill a level-up offers (class, on the class's list or not)
 class_skills_single=0 ; testing: a single-player game uses class_skills and class_chance (to check saves)
 ```
+
+## Steam test (`steam_spike.cpp`; off by default, for tests only)
+
+A test for online play over Steam ([docs/plans/online-steam.md](../../docs/plans/online-steam.md)). It starts Steam inside the game under the game's own Steam id (15370), and logs whether Steam's relays, lobbies and messages work (lines starting with `steam:`). It needs Valve's `steam_api.dll` (32-bit, from the Steamworks SDK) in `bin\open-homm5\`. Without that file, or with `spike=0`, nothing changes. It sends no game data.
+
+**Settings** (`open-homm5.ini`):
+
+```ini
+[online]
+spike=0              ; 1 = solo test on one PC; host / join = the two-PC test (one PC each)
+app_id=15370         ; 480 = Valve's test app "Spacewar", only to compare
+spike_seconds=       ; how long it runs (solo 60, host 900, join 300)
+spike_lobby=friends  ; the test lobby: friends | public | invisible
+spike_pings=100      ; join: test messages sent to the host and answered
+spike_ping_bytes=300
+```
