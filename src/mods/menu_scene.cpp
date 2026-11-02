@@ -50,6 +50,7 @@
 #include "menu_scene.h"
 
 #include <windows.h>
+#include <bcrypt.h>
 #include <string.h>
 
 #include <algorithm>
@@ -245,8 +246,13 @@ std::string g_arena;              // its arena description
 std::string g_music;              // its music definition, as served under our name
 volatile LONG g_root_patched = 0;  // the root table was served with our theme name
 
+// The draw for scene=random: Windows' own random generator (the owner got Tribes of the East
+// 8 launches in a row from the clock-based mix below, 2026-11-02); that mix only if it fails.
 unsigned Seed()
 {
+	unsigned r = 0;
+	if (BCRYPT_SUCCESS(BCryptGenRandom(nullptr, reinterpret_cast<PUCHAR>(&r), sizeof(r), BCRYPT_USE_SYSTEM_PREFERRED_RNG)))
+		return r;
 	LARGE_INTEGER t;
 	QueryPerformanceCounter(&t);
 	unsigned x = static_cast<unsigned>(t.LowPart) ^ (GetTickCount() * 2654435761u) ^ (GetCurrentProcessId() * 40503u);
