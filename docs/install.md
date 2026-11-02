@@ -29,11 +29,24 @@ Everything goes into the game's `bin` folder (on Steam usually `C:\Program Files
 
 ## Check that it works
 
-Start the game as you do for co-op games (GameRanger, or `MMH55_Utility_64.exe`). A file **`open-homm5.log`** appears in the same `bin` folder; its first line says `open-homm5 hook DLL <version> loaded`. If something goes wrong (a freeze, a crash, an "out of sync"), send that log. After a freeze, wait 30 seconds before closing the game, so the log can say where it was stuck. The log does not grow for ever: when it is over 5 MB at the next start, the game keeps it as `open-homm5.old.log` (one older log is kept) and starts a new `open-homm5.log`.
+Start the game as you do for co-op games (GameRanger, or `MMH55_Utility_64.exe`). A file **`open-homm5.log`** appears in the same `bin` folder; its first line says `open-homm5 hook DLL <version> loaded`. If something goes wrong (a freeze, a crash, an "out of sync"), make a bug report (below). After a freeze, wait 30 seconds before closing the game, so the log can say where it was stuck. The log does not grow for ever: when it is over 5 MB at the next start, the game keeps it as `open-homm5.old.log` (one older log is kept) and starts a new `open-homm5.log`.
 
 ## Updating
 
 Install the new version the same way, over the old one. Your settings are kept, and the new ones are added: `open-homm5.ini` becomes the new version's file (every setting listed and commented out) with your values in it. The installer says `settings file refreshed: N of your settings kept, M new settings available (see the comments)`. A setting the new version no longer lists stays at the end of its section, under `; kept from your previous file:`. Your old file is saved as `open-homm5.ini.bak` (the last three are kept: `.bak`, `.bak2`, `.bak3`). Our templates are replaced by the new ones; templates you added yourself stay.
+
+## Reporting a problem
+
+Run `bug-report.bat` (Windows) or `bash bug-report.sh` (Linux) from the extracted folder. It finds the game the way the installer does and makes **`open-homm5-bug-report-<date>.zip`** on your Desktop (on Linux, in the folder you run it from). Then [open a bug report](https://github.com/jozrcr/open-homm5/issues/new/choose) and drag the zip into it.
+
+The zip holds:
+- `open-homm5.log`, and `open-homm5.old.log` if there is one;
+- your settings, `open-homm5.ini` and `open-homm5-skins.ini`;
+- `system.txt`: the add-on's version, MMH5.5's (its `H55_Version` and which `55u.dll` you have), Windows or Linux, the sizes and hashes of the game's exes, and the names of the other `.dll` files in the game's `bin` folder (another mod's `dinput8.dll` shows up there). Your user name is left out.
+
+No saves, no maps, no game files. The script sends nothing anywhere: the zip is a normal zip, so you can open it and look before you send it. The log lists player names and LAN addresses. It works when the game does not start, and when the add-on is not installed (then the report only tells about your installation).
+
+On Linux the zip is made with `zip`, or else with Python 3; with neither, you get a `.tar.gz` (`--tar` asks for one). `--out-dir <folder>` puts the file elsewhere.
 
 ## Uninstall
 

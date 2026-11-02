@@ -22,6 +22,7 @@ python tools\package\make_package.py --rebuild  # build the DLL again first
 | `install.bat`, `install.ps1` | Windows installer (the `.bat` only starts the `.ps1`) |
 | `uninstall.bat`, `uninstall.ps1` | Windows uninstaller |
 | `install.sh`, `uninstall.sh` | Linux (Steam / Proton) installer and uninstaller |
+| `bug-report.bat`, `bug-report.ps1`, `bug-report.sh` | the "make a bug report" helper, Windows and Linux (see "The bug report script" below) |
 | `README.txt` | a short read-me for players (install, uninstall, settings, what's new; plain ASCII); `@VERSION@` is filled in |
 | `LICENSE.txt` | our MIT licence: the repo's `LICENSE`, copied word for word |
 | `THIRD-PARTY-NOTICES.txt` | the licence notices of what else is inside `dinput8.dll`: Dear ImGui (its `LICENSE.txt` is pasted in word for word, with the version from `imgui.h`), the stb files it carries (Sean Barrett) and its built-in ProggyClean font (Tristan Grimmer). The MIT licences ask for the notice to go along with copies. The text is the template `files/THIRD-PARTY-NOTICES.txt`; if third-party code is added to the DLL, add it there (and see `licence_checks` in `test_scripts.py`) |
@@ -53,6 +54,18 @@ The scripts and text files are in `tools/package/files/`. Everything is in one t
 - Uninstall removes our `dinput8.dll`, `open-homm5.log` (and `open-homm5.old.log`, the older log the DLL keeps once the log passes 5 MB), and `open-homm5.ini` after asking. The same question covers the installer's backups of it (`open-homm5.ini.bak`, `.bak2`, `.bak3`): "yes" removes the file and its backups (they are copies of the settings the player asked to delete), "no" keeps them all. It also removes the templates: only the `OH-*.xdb` names that are in the package it runs from, never another file. If the `templates` folder is then empty it is removed, and then `open-homm5` too if it is empty. Nothing else.
   - A template that an older version of the package installed, and a newer one no longer has, is not in the newer package's list: uninstalling from the newer package leaves it. This is on purpose (the alternative is deleting every `OH-*.xdb`, which would also delete a player's own template made with the template maker page).
 
+## The bug report script
+
+`bug-report.bat` (starts `bug-report.ps1`) and `bug-report.sh` make `open-homm5-bug-report-<yyyy-MM-dd-HHmm>.zip` for the issue form (`.github/ISSUE_TEMPLATE/bug_report.yml` asks for it). They find the game with the same code as the installer (the shared block below), read it only, and write the zip on the Desktop (Windows; `[Environment]::GetFolderPath('Desktop')`, so OneDrive's moved Desktop works) or in the current folder (Linux).
+
+- **In the zip:** `open-homm5.log`, `open-homm5.old.log`, `open-homm5.ini`, `open-homm5-skins.ini` (the ones that exist, byte for byte) and `system.txt`. Nothing else: no saves, no `.bak` copies, no game files. A new file type must be added to the list in both scripts, with a thought for what it holds about the player.
+- **`system.txt`:** the add-on's version (read from the text in `dinput8.dll`, so an old build works too; Windows also shows the file properties), the version of the package the script came from, Windows or Linux, the game folder (with the home folder written as `~`: no user name), MMH5.5's `H55_Version` (from `scripts/H55-Version.lua` in `data\MMH55-Index.pak`, a zip), `55u.dll` with its SHA-256 and the MMH5.5 version it belongs to (RC19d, RC19k, else "a version we have not tested"; the two hashes come from [docs/plans/mmh55-rc19k.md](../../docs/plans/mmh55-rc19k.md) and `test_scripts.py` compares them with that file), the game exes with size, file version (Windows) and SHA-256, and the names and sizes of the other `.dll` and `.asi` files in `bin`.
+- **The game may be running:** the log is read with shared access, so a log that the game holds open is fine (tested).
+- **No log, no add-on, no MMH5.5:** it still makes the zip (with `system.txt` only) and says what is missing.
+- **Linux:** the zip is made with `zip`, else Python 3's `zipfile` (`unzip` or Python 3 reads the MMH5.5 pak), else a `.tar.gz`. `--tar` forces the last one (the tests use it).
+- **Test options:** `-GameDir`, `-SteamDir`, `-OutDir <folder>`, `-NoPause` on Windows (without `-NoPause` it opens Explorer on the file at the end); `--game-dir`, `--steam-dir`, `--out-dir`, `--tar` on Linux.
+- Exit codes: 0 done, 4 game not found or cancelled, 5 could not write the report, 6 unexpected error (Windows).
+
 ## The settings file
 
 Every new version adds settings to `open-homm5.ini`. Earlier installers left an existing file as it was, so players never saw the new settings. Now it rebuilds the file from the package's `open-homm5.ini` and puts the player's values back in:
@@ -77,7 +90,7 @@ Test options (also handy for odd setups): `-GameDir <folder>`, `-SteamDir <folde
 ## Rules for editing the scripts
 
 - **Plain ASCII only** in `files/*` (`make_package.py` checks). Windows PowerShell 5.1 reads a script without a byte-order mark as ANSI, so an accent would be garbled on a French Windows.
-- The code that finds the game is written twice, in the install and the uninstall script, between the lines `# ---- shared with uninstall...` and `# ---- end of the shared block ----`. Edit both copies; `make_package.py` stops if they differ.
+- The code that finds the game is written three times, in the install, uninstall and bug report scripts, between the lines `# ---- shared with uninstall...` and `# ---- end of the shared block ----`. Edit all copies; `make_package.py` stops if they differ.
 - Keep the messages plain and short: the readers are not programmers.
 
 ## Test it
@@ -100,6 +113,15 @@ For the templates it checks that the zip holds every source file byte for byte, 
 - an uninstall removes only our names, then the empty folders, but not an `open-homm5` folder that holds something else;
 - a package without its `templates` folder is refused (exit 7);
 - on Linux, a folder and a file that exist under another spelling (`Open-Homm5/Templates`) are reused.
+
+For the licence files it checks that `LICENSE.txt` is the repo's `LICENSE`, that `THIRD-PARTY-NOTICES.txt` carries Dear ImGui's licence file word for word and names the stb files and the font, and that Dear ImGui still bundles exactly the three stb files the notices list.
+
+For the bug report script (Windows and Linux alike, on fake folders with a log, an older log, the settings, a skins file, a version pak, and things that must stay out: a save, a map, an old `.bak`) it checks that:
+- the zip holds exactly those four files, byte for byte, and `system.txt`, and nothing else;
+- `system.txt` has the add-on version, the version of the package, MMH5.5's `H55_Version`, `55u.dll` with its hash, the exes with size and hash, the other DLLs, no user name, and the home folder as `~` (Linux);
+- without the add-on or a log it still makes a report and says so; another mod's `dinput8.dll` is named as such and left alone; a pak without a version script or a missing pak is reported, not an error; a wrong game folder is exit 4 and no file;
+- on Windows: a log that the running game holds open (opened for appending, others may only read) is packed; without `-OutDir` the file lands on the Desktop (it is deleted again); an output folder that cannot be made is exit 5;
+- on Linux: the `.zip` (or `.tar.gz`, then also with `--tar`) comes out the same way; without `--out-dir` the file is made in the current folder; an output folder that cannot be made is exit 5.
 
 It never touches a real game folder. On Linux, leave out `--bash`; on Windows without Git Bash the Linux part is skipped.
 

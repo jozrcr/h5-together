@@ -16,7 +16,7 @@ The add-on is one file, `dinput8.dll`, that the game loads when it starts, plus 
 ### Stability
 
 - **A rare freeze of the host during computer turns is fixed.** The computer takes at most one decision per frame, as in the original game.
-- **A freeze detector.** If the game stops answering for 20 seconds, `open-homm5.log` says where it is stuck. If that happens, wait 30 seconds before closing the game, then send the log.
+- **A freeze detector.** If the game stops answering for 20 seconds, `open-homm5.log` says where it is stuck. If that happens, wait 30 seconds before closing the game, then make a bug report (see [Reporting a problem](#reporting-a-problem)).
 
 ### Interface
 
@@ -59,6 +59,10 @@ Download the latest `open-homm5-<version>.zip` from the [releases page](https://
 
 Start the game: a file `open-homm5.log` appears in the game's `bin` folder, which means the add-on is running. **Everyone in the same co-op game should install the same version.** To remove it, run `uninstall.bat` (Windows) or `bash uninstall.sh` (Linux); only our own files are removed. More detail (what gets installed, updating): [docs/install.md](docs/install.md).
 
+## Reporting a problem
+
+Run `bug-report.bat` (Windows) or `bash bug-report.sh` (Linux) from the folder you installed from. It makes `open-homm5-bug-report-<date>.zip` on your Desktop (on Linux, in the folder you run it from): `open-homm5.log`, your settings and a short list of versions (the add-on, MMH5.5, your system). No saves. It sends nothing; you attach the zip to a [new bug report](https://github.com/jozrcr/open-homm5/issues/new/choose). The log lists player names and LAN addresses, so look at the zip first if that matters. What is in the zip, in detail: [docs/install.md](docs/install.md#reporting-a-problem).
+
 ## Settings
 
 The settings file is `open-homm5.ini`, in the game's `bin` folder next to the exe. Every line in it is commented out and shows its default, so you can leave it alone.
@@ -80,7 +84,7 @@ The defaults keep the original game: the speed-ups, fixes and panels are on, and
 
 ## Project status
 
-This is a hobby project, built for a group of friends; others are welcome to use it. Bug reports with your `open-homm5.log` help.
+This is a hobby project, built for a group of friends; others are welcome to use it. Bug reports help.
 
 The project started with a bigger long-term idea: rebuild the original exe function by function (each function checked to compile to the same bytes), and one day grow it into an open Heroes V engine, the way VCMI did for Heroes III. That decompilation is **set aside for now**: the work goes into the add-on. What was done stays in `src/decomp/`.
 
