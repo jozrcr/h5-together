@@ -214,7 +214,7 @@ Untested workarounds: on Windows, make the ZeroTier network Private and give it 
 
 | Class | Where | Notes |
 |---|---|---|
-| `NNet::IDriver` / `NNet::CNetDriver` | vftable `0x00e131e4` (38 slots), code `0x0047c460`–`0x004f8c10` | Socket layer. Uses `wsock32.dll`: UDP (`sendto`/`recvfrom`, broadcast to `255.255.255.255` at `0x0047c8e0`) and TCP (`connect`/`send`/`recv`). "Invalid client %d" at `0x0047d500`. |
+| `NNet::IDriver` / `NNet::CNetDriver` | vftable `0x00e131e4` (38 slots), code `0x0047c460`–`0x004f8c10` | Socket layer. Uses `wsock32.dll`: UDP only (`sendto`/`recvfrom`, broadcast to `255.255.255.255` at `0x0047c8e0`). The exe's TCP imports (`connect`/`send`/`recv`/`select`) are used only by ubi.com's GS client library at `0x00d81000`–`0x00d83000`, never in LAN play (2026-11-02, [../plans/online-steam.md](../plans/online-steam.md)). "Invalid client %d" at `0x0047d500`. |
 | `NNet::ILinksManager` / `NNet::CLinksManager` | vftable `0x00e133c8` (13 slots), `0x00484a30`+ | Connections to the other players ("links"). |
 | Settings | `net_game_port` (`0x00402a80`…), `net_timeout`, `net_batched_segments` (`0x004039a0`), `net_load_timeout`, `net_multiplayer_init_timeout`, `net_lan_match_maker_port` (`0x0040bf30`) | |
 | `CMultiplayerCommand` | `0x00403780`+ | Base of the multiplayer-layer commands. |
