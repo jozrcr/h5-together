@@ -66,6 +66,16 @@ std::string Crlf(const std::string &lf)
 	return s;
 }
 
+// The text with LF line ends only (a checkout may have CRLF: git's autocrlf on GitHub's machines).
+std::string Lf(const std::string &text)
+{
+	std::string s;
+	for (char c : text)
+		if (c != '\r')
+			s += c;
+	return s;
+}
+
 // "section key=default" of each ";key=..." line of the shipped file, in order.
 struct Shipped {
 	std::string section, key, def;
@@ -262,7 +272,7 @@ void TableTests(const std::string &ini_path, const texts::Book &en, const texts:
 void IniTests(const std::string &ini_path)
 {
 	using mods::settings::Read;
-	const std::string tpl_lf = ReadAll(ini_path);
+	const std::string tpl_lf = Lf(ReadAll(ini_path));
 	const std::string tpl = Crlf(tpl_lf);  // the zip's file has CRLF (make_package.py)
 
 	// a value fills its commented line; back to the default restores the file byte for byte
