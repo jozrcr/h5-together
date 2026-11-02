@@ -49,6 +49,11 @@ const DWORD kTickMs = 20;
 const uint32_t kScanEveryMs = 2000;
 const uint32_t kAskDataEveryMs = 10000;  // RequestLobbyData for a friend's lobby we are not in
 const uint32_t kForgetLobbyMs = 10000;   // a friend's lobby not seen in the friends list for this long
+// A friend's lobby whose data does not come (Steam may not show a friends-only lobby's
+// data to somebody outside it: not tested yet) is tried anyway, as a host on the
+// game's usual discovery port: its game answers our queries only if it hosts.
+const uint32_t kGuessAfterMs = 6000;
+const uint16_t kUsualDiscoveryPort = 8889;  // net_lan_match_maker_port's default
 const uint32_t kMembersEveryMs = 1000;
 const uint32_t kSessionInfoAfterMs = 3000;
 const uint32_t kStatsEveryMs = 60000;
@@ -64,6 +69,8 @@ struct Watched {
 	uint64_t friend_id;
 	bool asked;
 	uint32_t asked_ms;
+	uint32_t first_asked_ms;
+	bool guessed;  // its data never came: tried at the usual discovery port (kGuessAfterMs)
 	uint32_t seen_ms;
 	LobbyInfo info;
 	HostCheck check;
@@ -231,8 +238,9 @@ public:
 			return;  // (only a host has a lobby to join)
 		uint64_t lobby = 0;
 		for (int i = 0; i < watched_count_; ++i)
-			if (watched_[i].check == HostCheck::kOk && watched_[i].info.host == peer)
-				lobby = watched_[i].lobby;
+			if ((watched_[i].check == HostCheck::kOk && watched_[i].info.host == peer) ||
+			    (watched_[i].guessed && watched_[i].friend_id == peer))
+				lobby = watched_[i].lobby;  // (in it, its data is ours to read)
 		plan_.PlaysWith(peer, lobby, GetTickCount());
 	}
 
@@ -628,6 +636,8 @@ private:
 			w->seen_ms = now;
 			const bool member = lobby == plan_.Lobby();
 			if (!member && (!w->asked || now - w->asked_ms >= kAskDataEveryMs)) {
+				if (!w->asked)
+					w->first_asked_ms = now;
 				w->asked = true;
 				w->asked_ms = now;
 				s_.api.request_lobby_data(s_.mm, lobby);
@@ -637,8 +647,20 @@ private:
 			if (w->info.host == me_)
 				continue;  // (our own lobby, which a friend joined)
 			LogWatched(*w);
-			if (w->check == HostCheck::kOk)
+			if (w->check == HostCheck::kOk) {
 				hosts_.Update(w->info.host, w->info.port, now, w->info.address);
+			} else if (w->check == HostCheck::kNoData && w->asked && now - w->first_asked_ms >= kGuessAfterMs) {
+				if (!w->guessed) {
+					char who[12], id_text[12];
+					Short(id, who, sizeof(who));
+					Short(lobby, id_text, sizeof(id_text));
+					hooklog::Write("vlan steam: friend %s's lobby %s: its data does not come; our queries go to its game "
+					               "at the usual port %u anyway (it answers only if it hosts)",
+					               who, id_text, kUsualDiscoveryPort);
+				}
+				w->guessed = true;
+				hosts_.Update(id, kUsualDiscoveryPort, now, 0);
+			}
 		}
 		for (int i = 0; i < watched_count_;) {  // lobbies no friend is in any more
 			if (now - watched_[i].seen_ms >= kForgetLobbyMs)

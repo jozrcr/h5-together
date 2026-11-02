@@ -147,8 +147,9 @@ def write_mod_settings(game, args, instance):
     skins = getattr(args, "skins_setting", None) or []  # e.g. trace=1, show_others=0
     if skins:
         lines += ["[skins]"] + skins
-    # [online] = the Steam spike (src/mods/steam_spike.cpp), off by default
-    online = getattr(args, "online_setting", None) or []  # e.g. spike=1, app_id=480
+    # [online] = the virtual LAN (src/mods/virtual_lan.cpp) and the Steam spike
+    # (src/mods/steam_spike.cpp), both off by default
+    online = getattr(args, "online_setting", None) or []  # e.g. mode=steam, spike=1, app_id=480
     if online:
         lines += ["[online]"] + online
     # any other section: --setting SECTION.KEY=VALUE (e.g. update.check=1, chain.dll=none);
@@ -505,8 +506,13 @@ def main():
     p.add_argument("--setting", action="append", default=[], metavar="SECTION.KEY=VALUE",
                    help="a setting of another section of h5-together.ini, e.g. update.check=1 or chain.dll=none")
     p.add_argument("--online-setting", action="append", default=[], metavar="KEY=VALUE",
-                   help="[online] setting, e.g. spike=1 or app_id=480 (repeatable; src/mods/steam_spike.cpp; "
-                        "needs bin\\h5-together\\steam_api.dll in the test copy)")
+                   help="[online] setting, e.g. mode=steam, spike=1 or app_id=480 (repeatable; src/mods/virtual_lan.cpp, "
+                        "src/mods/steam_spike.cpp; Steam needs bin\\h5-together\\steam_api.dll in the test copy)")
+    p.add_argument("--trace-crc", action="store_true",
+                   help="log every world checksum (with --setvar \"mp_check_crc = 1\"): lan_report.py compares two PCs' logs")
+    p.add_argument("--net-log", action="store_true", help="the robot's network log (src/hook/robot_net.cpp)")
+    p.add_argument("--net-scan", action="store_true",
+                   help="with --net-log: look for this PC's own addresses in every packet the game sends or gets")
     p.add_argument("--resolution", default="1024x768", metavar="WxH",
                    help="the game window's size (windowed), e.g. 1920x1080 (default 1024x768)")
     p.add_argument("--trace-moves", action="store_true", help="log what the start-move command calls (robot_trace.cpp)")
