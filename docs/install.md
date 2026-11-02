@@ -46,7 +46,7 @@ Everything goes into the game's `bin` folder (on Steam usually `C:\Program Files
 | File | What it is |
 |---|---|
 | `dinput8.dll` | the add-on; the game loads it when it starts |
-| `h5-together.ini` | the settings. Every line is commented out and shows its default, so you can leave it alone |
+| `h5-together.ini` | the settings. Change them in the game (main menu, **Options**, **H5 Together**, or F3), or in this file with Notepad. Every line is commented out and shows its default, so you can leave it alone |
 | `h5-together\templates\OH-*.xdb` | 24 ready random map templates for the game's list. Every player of a multiplayer game needs the same ones |
 
 ## Check that it works
@@ -55,7 +55,7 @@ Start the game as you do for co-op games (GameRanger, or `MMH55_Utility_64.exe`)
 
 ## Updating
 
-Install the new version the same way, over the old one. To hear about new versions, set `check=1` under `[update]` in `h5-together.ini`: then, at most once a day, the add-on asks GitHub for the number of the latest version and says in the main menu when there is a newer one. It is off unless you turn it on; nothing is ever downloaded by the add-on. Your settings are kept, and the new ones are added: `h5-together.ini` becomes the new version's file (every setting listed and commented out) with your values in it. The installer says `settings file refreshed: N of your settings kept, M new settings available (see the comments)`. A setting the new version no longer lists stays at the end of its section, under `; kept from your previous file:`. Your old file is saved as `h5-together.ini.bak` (the last three are kept: `.bak`, `.bak2`, `.bak3`). Our templates are replaced by the new ones; templates you added yourself stay.
+Install the new version the same way, over the old one. To hear about new versions, say Yes to the question the first time the game starts with H5 Together (or tick it in Options, H5 Together, Help; or set `check=1` under `[update]` in `h5-together.ini`): then, at most once a day, the add-on asks GitHub for the number of the latest version and says in the main menu when there is a newer one. It is off unless you turn it on; nothing is ever downloaded by the add-on. Your settings are kept, and the new ones are added: `h5-together.ini` becomes the new version's file (every setting listed and commented out) with your values in it. The installer says `settings file refreshed: N of your settings kept, M new settings available (see the comments)`. A setting the new version no longer lists stays at the end of its section, under `; kept from your previous file:`. Your old file is saved as `h5-together.ini.bak` (the last three are kept: `.bak`, `.bak2`, `.bak3`). Our templates are replaced by the new ones; templates you added yourself stay.
 
 ### From open-homm5 (0.2.7 and older)
 

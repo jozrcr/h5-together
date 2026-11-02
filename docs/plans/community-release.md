@@ -1,6 +1,6 @@
 # Plan: v0.3, the community release
 
-Status: proposal for the owner (2026-11-02), being built. In `main`: block 1 (quick wins), block 2 (texts in files, part 3), **the friendlier install scripts** (part 1, without a setup.exe: see "Built" at the start of part 1) and **block 5, the safety nets** (crash reports, the version check in the lobby, the opt-in update check, chain-loading: see "Built" at the start of part 4). The welcome panel that asks about the update check waits for the settings menu (block 3).
+Status: proposal for the owner (2026-11-02), being built. In `main`: block 1 (quick wins), block 2 (texts in files, part 3), **the friendlier install scripts** (part 1, without a setup.exe: see "Built" at the start of part 1) and **block 5, the safety nets** (crash reports, the version check in the lobby, the opt-in update check, chain-loading: see "Built" at the start of part 4). **Block 3, the settings menu** (with the first-start question about the update check) is built in the branch `v03-settings`: see "Built" at the start of part 2.
 
 The goal: share the add-on with the wider Heroes V / MMH5.5 community. Someone who has never heard of us should be able to:
 1. download one file and double-click it;
@@ -191,7 +191,22 @@ None of them removes the warning on day one: reputation grows with downloads. **
 
 ## Part 2: an in-game settings menu
 
-### Today
+### Built for v0.3 (2026-11-02, branch `v03-settings`): a page of the game's own Options screen
+
+The owner asked for the menu to be "as diegetic as possible". So it is not a panel of ours: it is a category of the game's own **Options** screen, with the game's own rows, check boxes, lists, sliders, scroll bar, tooltips, sounds and buttons ([src/mods/README.md](../../src/mods/README.md#the-settings-menu-settings_cpp-options-h5-together) has the details).
+
+- **Way in:** main menu, Options: the game's scroll now lists `Game`, `Video & audio`, **`H5 Together`**, `Combat replays`, `Back`; from the map, the game's own Options (F4, or the Esc menu). **F3** opens it straight on our page. F8 (the plan's proposal) is the game's quick load, and F4 to F7 and F10 are the game's too; F3 is free. The plan's main-menu button became a line: MMH5.5's "Version: 5.69k" text gets "H5 Together 0.3.0" above it, in the game's own font (a button of ours there would not look like the game's).
+- **Pages:** the game's Options screen has two pages per category, side by side, each a list with headers (its "Game" category: Adventure / Combat). So the plan's 7 pages and Help became two pages with headers: **On this PC** (Interface, Camera and visuals, Sound, Language, Random maps) and **Co-op games** (Host, Advanced, Help). The game's pages have no scroll bar (theirs fit); ours get the game's own one (the random map screen's), which stays hidden on the game's own pages.
+- **47 settings** (the plan's 44, plus the crash reports, the update check and chain-loading of 0.3.0). `lan_peers` is a line showing its value: the game has no text box. The other 61 stay in the file (20 in the game rules panel, F2).
+- **Marks:** the game's rows are narrow (about 25 letters), so "restart" / "next game" became ` *` / ` **` after the name, with a line at the top of each page that says what they mean; the tooltip says it in words. After Apply, a line at the bottom of the screen: "1 change applies after a restart of the game."
+- **Buttons:** the game's own. Apply writes; Default (after the game's own question) puts the whole category back to the defaults (the game's Default works per category, not per page); Back forgets. Nothing is written before Apply or Default.
+- **Read only during a multiplayer game:** the Host and Advanced rows use the game's own `disable_options_by_multiplayer`, as its "quick combat" does.
+- **Saving:** in place, the installer's way (`settings_ini.cpp`, with the cases of `test_scripts.py`): a changed setting fills its `;key=` line, a value equal to the default puts the `;` back. One table of every setting (`settings_table.cpp`), checked against the shipped `h5-together.ini` by `src/hook/test/settings_test.cpp`.
+- **At once / next game / restart:** 18 at once (the "your turn" sound and pop-up, the player list's key and place, the panels' keys, the Rules... and Look buttons, the live hero screen, save compression, autosave days, LAN over VPNs, the freeze detector's wait, the camera's zooms and start distance from the next map or battle), 1 from the next game (the host's teams), the rest after a restart. Fewer than the plan's 20 + 9: the co-op timing and steps, the view delay, recipe teams, show others and the language install hooks, patch code or keep texts at start-up, so they stay "after a restart" (when in doubt, restart). Checked with the robot: a new template builder key opened the builder at once, the camera's hook went in for the next map, and the log shows each mod taking its new value (`... from the settings menu: ...`).
+- **The first-start question** for the update check (part 4): once, the first time the main menu shows, in the game rules panel's look: "Check for new versions of H5 Together once a day? Yes / No". Yes writes `[update] check=1`; both write `[update] asked=1`; Esc answers nothing (asked again next time). Never in robot runs unless `[update] welcome_test=1`.
+- **Not done:** "Make a bug report" and "Open the add-on's folder" buttons on the Help page (the game's Options rows have no buttons): the Help lines say where `h5-together.ini` and `h5-together.log` are. The language does not switch at once.
+
+### Today (before block 3)
 
 - Players edit `h5-together.ini` in Notepad: 103 settings in 13 sections, all commented out, each with a comment. Then they restart the game.
 - Some panels already write there: the template builder (`[rmg] builder_last`) and the game rules panel (`[rules]`, with `WritePrivateProfileStringW`).
