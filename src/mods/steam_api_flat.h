@@ -1,5 +1,6 @@
 // Our own declarations of the few Steamworks functions and structures the
-// Steam spike uses (docs/plans/online-steam.md). The SDK itself is never in
+// Steam spike and the virtual LAN's Steam transport use
+// (docs/plans/online-steam.md). The SDK itself is never in
 // the repo: its licence lets us use it to build our software, not republish
 // its headers. These are the flat C entry points of steam_api.dll (32-bit,
 // __cdecl), loaded at run time with GetProcAddress, so the DLL still works
@@ -27,6 +28,18 @@ const int kErrMsgSize = 1024;  // SteamErrMsg
 
 // EResult values we name (the rest are logged as numbers)
 const int kResultOk = 1;
+
+// EChatMemberStateChange bits (LobbyChatUpdate_t)
+const uint32_t kMemberEntered = 1;
+const uint32_t kMemberLeft = 2;
+const uint32_t kMemberDisconnected = 4;
+const uint32_t kMemberKicked = 8;
+const uint32_t kMemberBanned = 16;
+
+// EChatRoomEnterResponse: success
+const uint32_t kEnterSuccess = 1;
+
+typedef int64_t Microseconds;  // SteamNetworkingMicroseconds
 
 // ELobbyType, ELobbyComparison, ELobbyDistanceFilter
 enum LobbyType { kLobbyPrivate = 0, kLobbyFriendsOnly = 1, kLobbyPublic = 2, kLobbyInvisible = 3 };
@@ -250,6 +263,12 @@ typedef int(__cdecl *GetSessionInfoFn)(Iface, const Identity &, ConnectionInfo *
 typedef void(__cdecl *InitRelayFn)(Iface);
 typedef int(__cdecl *GetRelayStatusFn)(Iface, RelayNetworkStatus *);
 typedef void(__cdecl *ReleaseMessageFn)(Message *);
+// added for the virtual LAN's Steam transport (virtual_lan_steam.cpp)
+typedef SteamId(__cdecl *GetLobbyMemberByIndexFn)(Iface, SteamId lobby, int index);
+typedef const char *(__cdecl *GetLobbyMemberDataFn)(Iface, SteamId lobby, SteamId user, const char *key);
+typedef void(__cdecl *SetLobbyMemberDataFn)(Iface, SteamId lobby, const char *key, const char *value);
+typedef bool(__cdecl *RequestLobbyDataFn)(Iface, SteamId lobby);
+typedef Microseconds(__cdecl *GetLocalTimestampFn)(Iface);
 
 // An identity for a SteamID, filled the way SetSteamID64 does.
 inline Identity IdentityOf(SteamId id)

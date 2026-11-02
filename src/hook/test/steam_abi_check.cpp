@@ -1,11 +1,15 @@
 // Check of our own Steamworks declarations (src/mods/steam_api_flat.h) against
 // Valve's SDK headers: every size, offset, callback number and constant the
-// Steam spike relies on. The SDK is never in the repo (ref\ is gitignored), so
-// build.ps1 -Test builds this only when ref\steamworks_sdk_* is there, and
-// skips it otherwise (as on GitHub's build machines).
+// Steam spike and the virtual LAN's Steam transport rely on, and the shape of
+// every flat function we call (its return value and each argument: same size,
+// same kind, as the 32-bit __cdecl call passes them). The SDK is never in the
+// repo (ref\ is gitignored), so build.ps1 -Test builds this only when
+// ref\steamworks_sdk_* is there, and skips it otherwise (as on GitHub's build
+// machines).
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
+#include <type_traits>
 
 #include "steam/steam_api.h"
 #include "steam/steam_api_flat.h"
@@ -104,6 +108,91 @@ SAME_VALUE(kSendReliable, k_nSteamNetworkingSend_Reliable);
 SAME_VALUE(kSendAutoRestartBrokenSession, k_nSteamNetworkingSend_AutoRestartBrokenSession);
 SAME_VALUE(kConnectionFlagRelayed, k_nSteamNetworkConnectionInfoFlags_Relayed);
 SAME_VALUE(kIdentitySteamId, k_ESteamNetworkingIdentityType_SteamID);
+// added for the virtual LAN's Steam transport
+SAME_AT(Message, time_received_us, SteamNetworkingMessage_t, m_usecTimeReceived);
+SAME_AT(LobbyChatUpdate, user_changed, LobbyChatUpdate_t, m_ulSteamIDUserChanged);
+SAME_AT(LobbyDataUpdate, member, LobbyDataUpdate_t, m_ulSteamIDMember);
+SAME_AT(LobbyEnter, lobby, LobbyEnter_t, m_ulSteamIDLobby);
+SAME_VALUE(kLobbyPrivate, k_ELobbyTypePrivate);
+SAME_VALUE(kMemberEntered, k_EChatMemberStateChangeEntered);
+SAME_VALUE(kMemberLeft, k_EChatMemberStateChangeLeft);
+SAME_VALUE(kMemberDisconnected, k_EChatMemberStateChangeDisconnected);
+SAME_VALUE(kMemberKicked, k_EChatMemberStateChangeKicked);
+SAME_VALUE(kMemberBanned, k_EChatMemberStateChangeBanned);
+SAME_VALUE(kEnterSuccess, k_EChatRoomEnterResponseSuccess);
+static_assert(sizeof(f::Microseconds) == sizeof(SteamNetworkingMicroseconds), "Microseconds size");
+
+// The shape of a function: what a 32-bit __cdecl call puts on the stack and gets back.
+template <typename A, typename B>
+constexpr bool SameSlot()
+{
+	return sizeof(A) == sizeof(B) && std::is_reference<A>::value == std::is_reference<B>::value &&
+	       std::is_floating_point<A>::value == std::is_floating_point<B>::value;
+}
+template <typename A, typename B>
+constexpr bool SameReturn()
+{
+	if constexpr (std::is_void<A>::value || std::is_void<B>::value)
+		return std::is_void<A>::value == std::is_void<B>::value;
+	else
+		return SameSlot<A, B>();
+}
+template <typename R1, typename... A1, typename R2, typename... A2>
+constexpr bool SameShape(R1(__cdecl *)(A1...), R2(__cdecl *)(A2...))
+{
+	if constexpr (sizeof...(A1) != sizeof...(A2))
+		return false;
+	else
+		return SameReturn<R1, R2>() && (true && ... && SameSlot<A1, A2>());
+}
+#define SAME_FN(ours, sdk) \
+	static_assert(SameShape(static_cast<f::ours>(nullptr), static_cast<decltype(&sdk)>(nullptr)), #ours " vs " #sdk)
+
+SAME_FN(InitFlatFn, SteamAPI_InitFlat);
+SAME_FN(GetPipeFn, SteamAPI_GetHSteamPipe);
+SAME_FN(VoidFn, SteamAPI_ManualDispatch_Init);
+SAME_FN(RunFrameFn, SteamAPI_ManualDispatch_RunFrame);
+SAME_FN(GetNextCallbackFn, SteamAPI_ManualDispatch_GetNextCallback);
+SAME_FN(RunFrameFn, SteamAPI_ManualDispatch_FreeLastCallback);
+SAME_FN(GetApiCallResultFn, SteamAPI_ManualDispatch_GetAPICallResult);
+SAME_FN(AccessorFn, SteamAPI_SteamUser_v023);
+SAME_FN(AccessorFn, SteamAPI_SteamFriends_v018);
+SAME_FN(AccessorFn, SteamAPI_SteamUtils_v011);
+SAME_FN(AccessorFn, SteamAPI_SteamMatchmaking_v009);
+SAME_FN(AccessorFn, SteamAPI_SteamNetworkingMessages_SteamAPI_v002);
+SAME_FN(AccessorFn, SteamAPI_SteamNetworkingUtils_SteamAPI_v004);
+SAME_FN(GetSteamIdFn, SteamAPI_ISteamUser_GetSteamID);
+SAME_FN(GetAppIdFn, SteamAPI_ISteamUtils_GetAppID);
+SAME_FN(IfaceBoolFn, SteamAPI_ISteamUtils_IsOverlayEnabled);
+SAME_FN(GetPersonaNameFn, SteamAPI_ISteamFriends_GetPersonaName);
+SAME_FN(GetFriendCountFn, SteamAPI_ISteamFriends_GetFriendCount);
+SAME_FN(GetFriendByIndexFn, SteamAPI_ISteamFriends_GetFriendByIndex);
+SAME_FN(GetFriendRelationshipFn, SteamAPI_ISteamFriends_GetFriendRelationship);
+SAME_FN(GetFriendPersonaNameFn, SteamAPI_ISteamFriends_GetFriendPersonaName);
+SAME_FN(GetFriendGamePlayedFn, SteamAPI_ISteamFriends_GetFriendGamePlayed);
+SAME_FN(CreateLobbyFn, SteamAPI_ISteamMatchmaking_CreateLobby);
+SAME_FN(JoinLobbyFn, SteamAPI_ISteamMatchmaking_JoinLobby);
+SAME_FN(LeaveLobbyFn, SteamAPI_ISteamMatchmaking_LeaveLobby);
+SAME_FN(SetLobbyDataFn, SteamAPI_ISteamMatchmaking_SetLobbyData);
+SAME_FN(GetLobbyDataFn, SteamAPI_ISteamMatchmaking_GetLobbyData);
+SAME_FN(GetNumLobbyMembersFn, SteamAPI_ISteamMatchmaking_GetNumLobbyMembers);
+SAME_FN(GetLobbyOwnerFn, SteamAPI_ISteamMatchmaking_GetLobbyOwner);
+SAME_FN(GetLobbyMemberByIndexFn, SteamAPI_ISteamMatchmaking_GetLobbyMemberByIndex);
+SAME_FN(GetLobbyMemberDataFn, SteamAPI_ISteamMatchmaking_GetLobbyMemberData);
+SAME_FN(SetLobbyMemberDataFn, SteamAPI_ISteamMatchmaking_SetLobbyMemberData);
+SAME_FN(RequestLobbyDataFn, SteamAPI_ISteamMatchmaking_RequestLobbyData);
+SAME_FN(RequestLobbyListFn, SteamAPI_ISteamMatchmaking_RequestLobbyList);
+SAME_FN(AddStringFilterFn, SteamAPI_ISteamMatchmaking_AddRequestLobbyListStringFilter);
+SAME_FN(AddDistanceFilterFn, SteamAPI_ISteamMatchmaking_AddRequestLobbyListDistanceFilter);
+SAME_FN(GetLobbyByIndexFn, SteamAPI_ISteamMatchmaking_GetLobbyByIndex);
+SAME_FN(SendMessageToUserFn, SteamAPI_ISteamNetworkingMessages_SendMessageToUser);
+SAME_FN(ReceiveMessagesFn, SteamAPI_ISteamNetworkingMessages_ReceiveMessagesOnChannel);
+SAME_FN(SessionFn, SteamAPI_ISteamNetworkingMessages_AcceptSessionWithUser);
+SAME_FN(GetSessionInfoFn, SteamAPI_ISteamNetworkingMessages_GetSessionConnectionInfo);
+SAME_FN(InitRelayFn, SteamAPI_ISteamNetworkingUtils_InitRelayNetworkAccess);
+SAME_FN(GetRelayStatusFn, SteamAPI_ISteamNetworkingUtils_GetRelayNetworkStatus);
+SAME_FN(GetLocalTimestampFn, SteamAPI_ISteamNetworkingUtils_GetLocalTimestamp);
+SAME_FN(ReleaseMessageFn, SteamAPI_SteamNetworkingMessage_t_Release);
 
 int main()
 {

@@ -151,24 +151,116 @@ void TestPeers()
 	Check(empty.AddressOf(5) == 0, "no address before Reset");
 }
 
+// Declared addresses: what a peer says its own game uses beats what we computed.
+void TestDeclared()
+{
+	const uint64_t self = 76561197960287930ull;
+	const uint64_t twin = Clash(self);  // the same hash address as ours
+	const uint64_t other = 76561197960287999ull;
+	bool added = false;
+	PeerTable::Learned what = PeerTable::Learned::kSame;
+
+	PeerTable t;
+	t.Reset(self);
+	const uint32_t mine = t.SelfAddress();
+	const uint32_t wanted = Ip(198, 19, 3, 4);
+	Check(t.Learn(other, wanted, &what) == wanted && what == PeerTable::Learned::kAdded, "a new peer takes the address it says");
+	Check(t.Learn(other, wanted, &what) == wanted && what == PeerTable::Learned::kSame, "the same again: nothing new");
+	Check(t.Learn(other, Ip(198, 19, 3, 5), &what) == Ip(198, 19, 3, 5) && what == PeerTable::Learned::kChanged,
+	      "a peer that moved (before its game told anybody): its new address");
+	uint64_t id = 0;
+	Check(!t.IdOf(wanted, &id) && t.IdOf(Ip(198, 19, 3, 5), &id) && id == other, "its old address is free again");
+	Check(t.Learn(other, 0, &what) == Ip(198, 19, 3, 5) && what == PeerTable::Learned::kSame,
+	      "a message without an address: what we know");
+	Check(t.Learn(other, Ip(198, 18, 7, 255), &what) == Ip(198, 19, 3, 5) && what == PeerTable::Learned::kSame,
+	      "a broadcast address is never a player's: ignored");
+	Check(t.Learn(self, Ip(198, 18, 9, 9), &what) == mine && what == PeerTable::Learned::kSame,
+	      "our own messages never move us");
+	const uint64_t fresh = 76561197960288001ull;
+	Check(t.Learn(fresh, 0, &what) == t.AddressOf(fresh) && what == PeerTable::Learned::kComputed,
+	      "no address said: a computed one");
+
+	// a computed peer gives way to one that says it uses that address
+	PeerTable c;
+	c.Reset(self);
+	const uint32_t computed = c.AddressOf(other, &added);
+	const uint64_t newcomer = 76561197960288123ull;
+	Check(c.Learn(newcomer, computed, &what) == computed && what == PeerTable::Learned::kOtherMoved,
+	      "a declared address beats a computed one");
+	Check(c.AddressOf(other) == NextFakeAddress(computed) && c.IdOf(computed, &id) && id == newcomer,
+	      "the computed peer moved to the next address");
+
+	// two declared: the second one is a clash, it gets a computed address
+	Check(c.Learn(other, computed, &what) == NextFakeAddress(computed) && what == PeerTable::Learned::kClash,
+	      "an address another peer said first: a clash, the known peer keeps its address");
+
+	// a peer says our address while our game has told nobody: we move
+	PeerTable s;
+	s.Reset(self);
+	Check(!s.SelfLocked(), "not locked at first");
+	Check(s.Learn(twin, mine, &what) == mine && what == PeerTable::Learned::kSelfMoved, "a peer with our address: it gets it");
+	Check(s.SelfAddress() == NextFakeAddress(mine) && s.IdOf(mine, &id) && id == twin, "and we moved to the next address");
+	// ... after our game told it: the peer gets another one
+	PeerTable l;
+	l.Reset(self);
+	l.LockSelf();
+	Check(l.Learn(twin, mine, &what) == NextFakeAddress(mine) && what == PeerTable::Learned::kClash && l.SelfAddress() == mine,
+	      "locked: we keep ours, the peer is a clash at a computed address");
+
+	// moving off the addresses of a game we may join
+	PeerTable a;
+	a.Reset(self);
+	const uint32_t taken[3] = {Ip(198, 18, 1, 1), mine, NextFakeAddress(mine)};
+	Check(a.AvoidForSelf(taken, 3) && a.SelfAddress() == NextFakeAddress(NextFakeAddress(mine)),
+	      "our address moves past every taken one");
+	const uint32_t before = a.SelfAddress();
+	Check(!a.AvoidForSelf(taken, 3) && a.SelfAddress() == before, "then it stays");
+	a.LockSelf();
+	const uint32_t now_taken[1] = {before};
+	Check(!a.AvoidForSelf(now_taken, 1) && a.SelfAddress() == before, "once locked it never moves");
+	Check(!a.AvoidForSelf(nullptr, 0), "nothing taken: no move");
+
+	PeerTable none;
+	Check(none.Learn(other, wanted, &what) == 0 && what == PeerTable::Learned::kFull, "no address before Reset");
+	PeerTable full;
+	full.Reset(1);
+	for (uint64_t i = 2; i <= PeerTable::kMax; ++i)
+		full.AddressOf(i * 1000003);
+	Check(full.Learn(5555555, Ip(198, 19, 200, 1), &what) == 0 && what == PeerTable::Learned::kFull,
+	      "a full table takes no declared peer");
+	Check(strstr(LearnedName(PeerTable::Learned::kClash), "CLASH") != nullptr, "the log names a clash");
+
+	// the robot's case (no clash): a computed peer, then its first message, which says the same address
+	PeerTable r;
+	r.Reset(LoopbackId(47101));
+	const uint32_t peer = r.AddressOf(LoopbackId(47102));
+	Check(r.Learn(LoopbackId(47102), FakeAddressFor(LoopbackId(47102)), &what) == peer && what == PeerTable::Learned::kSame,
+	      "the loopback's peers say their computed address: nothing changes");
+}
+
 void TestMessages()
 {
 	uint8_t packet[kMaxPacket + 1];
 	for (size_t i = 0; i < sizeof(packet); ++i)
 		packet[i] = static_cast<uint8_t>(i * 13);
 	uint8_t message[kMaxMessage + 8];
-	size_t n = EncodeMessage(8889, packet, 826, message, sizeof(message));
-	Check(n == 828 && message[0] == 0x22 && message[1] == 0xb9, "the source port first, big endian (8889 = 22 b9)");
+	const uint32_t sender = Ip(198, 18, 7, 21);
+	size_t n = EncodeMessage(8889, sender, packet, 826, message, sizeof(message));
+	Check(n == 832 && message[0] == 0x22 && message[1] == 0xb9, "the source port first, big endian (8889 = 22 b9)");
+	Check(message[2] == 198 && message[3] == 18 && message[4] == 7 && message[5] == 21, "then the sender's address");
 	uint16_t port = 0;
+	uint32_t from = 0;
 	const uint8_t *body = nullptr;
 	size_t size = 0;
-	Check(DecodeMessage(message, n, &port, &body, &size) && port == 8889 && size == 826 && memcmp(body, packet, 826) == 0,
+	Check(DecodeMessage(message, n, &port, &from, &body, &size) && port == 8889 && from == sender && size == 826 &&
+	          memcmp(body, packet, 826) == 0,
 	      "it reads back");
-	Check(EncodeMessage(1, packet, kMaxPacket, message, sizeof(message)) == kMaxMessage, "a 2048-byte packet fits");
-	Check(EncodeMessage(1, packet, kMaxPacket + 1, message, sizeof(message)) == 0, "a bigger one does not");
-	Check(EncodeMessage(1, packet, 100, message, 50) == 0, "nor one bigger than the buffer");
-	Check(EncodeMessage(7, nullptr, 0, message, sizeof(message)) == 2, "an empty packet is a bare header");
-	Check(!DecodeMessage(message, 1, &port, &body, &size), "one byte is no message");
+	Check(EncodeMessage(1, sender, packet, kMaxPacket, message, sizeof(message)) == kMaxMessage, "a 2048-byte packet fits");
+	Check(EncodeMessage(1, sender, packet, kMaxPacket + 1, message, sizeof(message)) == 0, "a bigger one does not");
+	Check(EncodeMessage(1, sender, packet, 100, message, 50) == 0, "nor one bigger than the buffer");
+	Check(EncodeMessage(7, sender, nullptr, 0, message, sizeof(message)) == kHeaderSize, "an empty packet is a bare header");
+	Check(!DecodeMessage(message, kHeaderSize - 1, &port, &from, &body, &size), "5 bytes are no message");
+	Check(kHeaderSize + 984 < 1200, "the game's biggest packet (984) fits in one Steam packet (about 1,200 bytes)");
 }
 
 void TestRoutes()
@@ -234,6 +326,158 @@ void TestKnownHosts()
 	for (int i = 0; i < KnownHosts::kMax; ++i)
 		full.Update(static_cast<uint64_t>(i) + 1, 8889, 0);
 	Check(!full.Update(999, 8889, 0) && full.Count() == KnownHosts::kMax, "a full list takes no more");
+	KnownHosts a;
+	a.Update(7, 8889, 0, Ip(198, 18, 4, 4));
+	int at = -1;
+	Check(a.Has(7, &at) && at == 0 && a.At(0).address == Ip(198, 18, 4, 4) && !a.Has(8), "a host's address, and who is one");
+	a.Update(7, 8889, 100);
+	Check(a.At(0).address == Ip(198, 18, 4, 4), "a refresh without an address keeps it");
+}
+
+void TestTexts()
+{
+	Check(ParseIp("198.18.7.21") == Ip(198, 18, 7, 21) && ParseIp("0.0.0.0") == 0 && ParseIp("255.255.255.255") == 0xffffffffu,
+	      "addresses from text");
+	Check(!ParseIp("198.18.7") && !ParseIp("198.18.7.256") && !ParseIp("198.18.7.21x") && !ParseIp("a.b.c.d") &&
+	          !ParseIp("") && !ParseIp(nullptr) && !ParseIp("1988.1.1.1"),
+	      "not addresses");
+	uint32_t list[4];
+	Check(ParseAddressList("198.18.7.21 198.19.0.4,x 10.0.0.1", list, 4) == 3 && list[1] == Ip(198, 19, 0, 4) &&
+	          list[2] == Ip(10, 0, 0, 1),
+	      "a list of addresses");
+	Check(ParseAddressList("1.1.1.1 2.2.2.2 3.3.3.3", list, 2) == 2 && ParseAddressList(nullptr, list, 4) == 0,
+	      "at most max; none");
+	char text[64];
+	const uint32_t two[2] = {Ip(198, 18, 7, 21), Ip(198, 19, 0, 4)};
+	FormatAddressList(two, 2, text, sizeof(text));
+	Check(strcmp(text, "198.18.7.21 198.19.0.4") == 0, "a list as text");
+	FormatAddressList(two, 2, text, 14);
+	Check(strcmp(text, "198.18.7.21") == 0, "a list cut where it does not fit, never half an address");
+	Check(ParseId("76561197960287930") == 76561197960287930ull && ParseId("18446744073709551615") == 0xffffffffffffffffull,
+	      "SteamIDs from text");
+	Check(!ParseId("18446744073709551616") && !ParseId("12a") && !ParseId("") && !ParseId(nullptr) && !ParseId("-1"),
+	      "not SteamIDs");
+	char a[12], b[12];
+	FormatShortId(76561197960287930ull, a, sizeof(a));
+	FormatShortId(76561197960287931ull, b, sizeof(b));
+	Check(strlen(a) == 5 && a[0] == '#' && strcmp(a, b) != 0, "short ids for the log: #abcd, neighbours differ");
+	Check(strstr(a, "7656") == nullptr, "a short id is not a piece of the SteamID");
+	const uint8_t bytes[3] = {'a', 'b', 'c'};
+	Check(HashBytes(bytes, 3) == 0x1a47e90bu && HashBytes(bytes, 0) == 0x811c9dc5u, "FNV-1a of \"abc\" and of nothing");
+	FormatGame("mmh55", true, 0x0a1b2c3du, text, sizeof(text));
+	Check(strcmp(text, "mmh55/0a1b2c3d") == 0, "the game's name");
+	FormatGame("vanilla", false, 0, text, sizeof(text));
+	Check(strcmp(text, "vanilla/no-55u") == 0, "the game's name without MMH5.5");
+}
+
+void TestLobbyInfo()
+{
+	const uint64_t host = 76561197960287930ull;
+	LobbyInfo i = ParseLobbyInfo("1", "0.3.0", "mmh55/0a1b2c3d", "76561197960287930", "8889", "198.18.7.21",
+	                             "198.18.7.21 198.19.0.4");
+	Check(i.protocol == 1 && strcmp(i.version, "0.3.0") == 0 && strcmp(i.game, "mmh55/0a1b2c3d") == 0 && i.host == host &&
+	          i.port == 8889 && i.address == Ip(198, 18, 7, 21) && i.taken_count == 2 && i.taken[1] == Ip(198, 19, 0, 4),
+	      "a lobby's data");
+	Check(CheckHost(i, host, "mmh55/0a1b2c3d") == HostCheck::kOk, "the friend hosts the same game: a host");
+	Check(CheckHost(i, host + 1, "mmh55/0a1b2c3d") == HostCheck::kNotTheFriend, "the friend is in somebody else's lobby");
+	Check(CheckHost(i, host, "mmh55/ffffffff") == HostCheck::kOtherGame, "another MMH5.5: left out");
+	LobbyInfo old = ParseLobbyInfo("2", "0.4.0", "mmh55/0a1b2c3d", "76561197960287930", "8889", "198.18.7.21", "");
+	Check(CheckHost(old, host, "mmh55/0a1b2c3d") == HostCheck::kOtherProtocol, "another protocol: left out");
+	LobbyInfo stopped = ParseLobbyInfo("1", "0.3.0", "mmh55/0a1b2c3d", "76561197960287930", "0", "198.18.7.21", "");
+	Check(CheckHost(stopped, host, "mmh55/0a1b2c3d") == HostCheck::kNotHosting, "port 0: no longer hosts");
+	LobbyInfo empty = ParseLobbyInfo(nullptr, "", nullptr, nullptr, nullptr, nullptr, nullptr);
+	Check(empty.protocol == 0 && CheckHost(empty, host, "mmh55/0a1b2c3d") == HostCheck::kNoData, "no data (yet)");
+	LobbyInfo odd = ParseLobbyInfo("1", "0.3.0", "g", "76561197960287930", "70000", "198.18.7.255", "");
+	Check(odd.port == 0 && odd.address == 0, "a port above 65535 and a broadcast address are not taken");
+	char long_version[64];
+	memset(long_version, 'v', sizeof(long_version) - 1);
+	long_version[sizeof(long_version) - 1] = 0;
+	LobbyInfo cut = ParseLobbyInfo("1", long_version, "g", "1", "1", "", "");
+	Check(strlen(cut.version) == sizeof(cut.version) - 1, "a long text is cut, never overflows");
+	Check(strcmp(HostCheckName(HostCheck::kOtherGame), "another game build or MMH5.5 version") == 0, "check names");
+}
+
+void TestLobbyPlan()
+{
+	uint64_t lobby = 0;
+	LobbyPlan p;
+	Check(p.Next(0, &lobby) == LobbyPlan::Action::kNone && p.Where() == LobbyPlan::In::kNone, "nothing to do at first");
+	// hosting: create, wait for Steam, keep, leave a minute after
+	p.SetHosting(8889, 1000);
+	Check(p.Next(1000, &lobby) == LobbyPlan::Action::kCreate, "our game hosts: make a lobby");
+	Check(p.Next(1020, &lobby) == LobbyPlan::Action::kNone && p.Waiting(), "then wait for Steam's answer");
+	p.Created(0x1234);
+	Check(p.Where() == LobbyPlan::In::kOwn && p.Lobby() == 0x1234 && p.Next(1100, &lobby) == LobbyPlan::Action::kNone,
+	      "in our lobby");
+	p.SetHosting(0, 5000);
+	Check(p.Next(5000 + LobbyPlan::kKeepMs - 1, &lobby) == LobbyPlan::Action::kNone, "kept a minute after the game stopped hosting");
+	p.SetHosting(8889, 30000);
+	p.SetHosting(0, 31000);
+	Check(p.Next(31000 + LobbyPlan::kKeepMs - 1, &lobby) == LobbyPlan::Action::kNone, "hosting again restarts the minute");
+	Check(p.Next(31000 + LobbyPlan::kKeepMs, &lobby) == LobbyPlan::Action::kLeave, "then left");
+	p.Left();
+	Check(p.Where() == LobbyPlan::In::kNone && p.Next(100000, &lobby) == LobbyPlan::Action::kNone, "and nothing more");
+
+	// Steam refuses: try again after kRetryMs
+	LobbyPlan f;
+	f.SetHosting(8889, 0);
+	Check(f.Next(0, &lobby) == LobbyPlan::Action::kCreate, "make a lobby");
+	f.Failed(10);
+	Check(f.Next(10 + LobbyPlan::kRetryMs - 1, &lobby) == LobbyPlan::Action::kNone, "refused: wait");
+	Check(f.Next(10 + LobbyPlan::kRetryMs, &lobby) == LobbyPlan::Action::kCreate, "then try again");
+
+	// playing with a host: join its lobby, keep it while packets go either way
+	LobbyPlan j;
+	j.PlaysWith(77, 0x5555, 1000);
+	Check(j.Next(1000, &lobby) == LobbyPlan::Action::kJoin && lobby == 0x5555, "our game plays with a host: join its lobby");
+	j.Joined(0x5555);
+	Check(j.Where() == LobbyPlan::In::kJoined && j.Host() == 77, "in the host's lobby");
+	j.HeardFrom(77, 50000);
+	Check(j.Next(50000 + LobbyPlan::kKeepMs - 1, &lobby) == LobbyPlan::Action::kNone, "kept while the host's packets come");
+	j.HeardFrom(78, 100000);
+	Check(j.Next(50000 + LobbyPlan::kKeepMs, &lobby) == LobbyPlan::Action::kLeave,
+	      "a minute without a packet to or from the host (others do not count): left");
+	j.Left();
+	// another host: leave the first one's lobby, join the second's
+	LobbyPlan k;
+	k.PlaysWith(77, 0x5555, 0);
+	k.Next(0, &lobby);
+	k.Joined(0x5555);
+	k.PlaysWith(88, 0x6666, 100);
+	Check(k.Next(100, &lobby) == LobbyPlan::Action::kLeave, "another host: leave the old lobby");
+	k.Left();
+	Check(k.Next(120, &lobby) == LobbyPlan::Action::kJoin && lobby == 0x6666, "then join the new host's");
+	k.Joined(0x6666);
+	// our game hosts while we are in a host's lobby: ours wins
+	k.SetHosting(8889, 200);
+	Check(k.Next(200, &lobby) == LobbyPlan::Action::kLeave, "our game hosts now: leave the host's lobby");
+	k.Left();
+	Check(k.Next(220, &lobby) == LobbyPlan::Action::kCreate, "and make ours");
+	// the host left its lobby: no going back
+	LobbyPlan g;
+	g.PlaysWith(77, 0x5555, 0);
+	g.Next(0, &lobby);
+	g.Joined(0x5555);
+	g.Left();
+	g.Forget();
+	Check(g.Next(100, &lobby) == LobbyPlan::Action::kNone, "the host left: we do not join its lobby again");
+	g.PlaysWith(77, 0x5555, 200);
+	Check(g.Next(200, &lobby) == LobbyPlan::Action::kJoin, "unless our game plays with it again");
+	// no lobby known for the host yet
+	LobbyPlan u;
+	u.PlaysWith(77, 0, 0);
+	Check(u.Next(0, &lobby) == LobbyPlan::Action::kNone, "a host without a known lobby: nothing to join");
+	u.PlaysWith(77, 0x5555, 10);
+	Check(u.Next(10, &lobby) == LobbyPlan::Action::kJoin && lobby == 0x5555, "its lobby known later: joined then");
+	// GetTickCount wrapping around
+	LobbyPlan w;
+	w.SetHosting(8889, 0xfffff000u);
+	w.Next(0xfffff000u, &lobby);
+	w.Created(1);
+	w.SetHosting(0, 0xfffff000u);
+	Check(w.Next(0x00001000u, &lobby) == LobbyPlan::Action::kNone && w.Next(0xfffff000u + LobbyPlan::kKeepMs, &lobby) ==
+	                                                                     LobbyPlan::Action::kLeave,
+	      "GetTickCount wrapping around");
 }
 
 void TestQueryCopies()
@@ -278,12 +522,16 @@ int main()
 	TestSettings();
 	TestAddresses();
 	TestPeers();
+	TestDeclared();
 	TestMessages();
 	TestRoutes();
 	TestHosting();
 	TestKnownHosts();
 	TestQueryCopies();
 	TestLoopback();
+	TestTexts();
+	TestLobbyInfo();
+	TestLobbyPlan();
 	printf("%s (%d failed)\n", g_failures ? "FAILED" : "all passed", g_failures);
 	return g_failures ? 1 : 0;
 }

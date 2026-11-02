@@ -1082,7 +1082,7 @@ welcome_test=0 ; testing only (not in the shipped file): ask the question in rob
 
 ## Steam test (`steam_spike.cpp`; off by default, for tests only)
 
-A test for online play over Steam ([docs/plans/online-steam.md](../../docs/plans/online-steam.md)). It starts Steam inside the game under the game's own Steam id (15370), and logs whether Steam's relays, lobbies and messages work (lines starting with `steam:`). It needs Valve's `steam_api.dll` (32-bit, from the Steamworks SDK) in `bin\h5-together\`. Without that file, or with `spike=0`, nothing changes. It sends no game data.
+A test for online play over Steam ([docs/plans/online-steam.md](../../docs/plans/online-steam.md)). It starts Steam inside the game under the game's own Steam id (15370), and logs whether Steam's relays, lobbies and messages work (lines starting with `steam:`). It needs Valve's `steam_api.dll` (32-bit, from the Steamworks SDK) in `bin\h5-together\`. Without that file, or with `spike=0`, nothing changes. It sends no game data. It stays off with `[online] mode=steam` (the virtual LAN uses Steam then). Steam is started by `steam_runtime.cpp`, shared with the virtual LAN.
 
 **Settings** (`h5-together.ini`):
 
@@ -1098,24 +1098,34 @@ spike_ping_bytes=300
 
 ## Virtual LAN (`virtual_lan*.cpp`; off by default, being built)
 
-The core of online play over Steam ([docs/plans/online-steam.md](../../docs/plans/online-steam.md), step 2). The game keeps its own LAN play; the add-on carries its LAN packets somewhere else. For now that "somewhere" is only a **loopback transport** for the robot's tests (two copies of the game on one PC); Steam comes in step 3. With `mode=off` (the default) nothing is hooked and nothing changes.
+The core of online play over Steam ([docs/plans/online-steam.md](../../docs/plans/online-steam.md), steps 2 and 3). The game keeps its own LAN play; the add-on carries its LAN packets somewhere else: **over Steam, between Steam friends** (`mode=steam`, `virtual_lan_steam.cpp`), or through a **loopback transport** for the robot's tests (two copies of the game on one PC, `virtual_lan_loopback.cpp`). With `mode=off` (the default) nothing is hooked and nothing changes. There is no panel yet (step 4): a friend's game shows up in the game's own LAN list.
 
 How it works, in plain words:
 
-- **Fake addresses.** Every player gets a made-up address in `198.18.0.0/15` (a range set aside for network tests, so it never clashes with a real network or ZeroTier), computed from their id (a SteamID later; the loopback makes one up from its port). Every PC computes the same address for the same player.
+- **Fake addresses.** Every player gets a made-up address in `198.18.0.0/15` (a range set aside for network tests, so it never clashes with a real network or ZeroTier), computed from their id (their SteamID; the loopback makes one up from its port). Every PC computes the same address for the same player. Each message also says which address its sender's game uses, and the others take that one: so two players whose ids give the same address (about 1 in 20,000 for 4 players) still agree. A PC moves off an address it knows to be taken, but only until its game has told its address to anybody.
 - **The game only ever sees fake addresses.** When it asks for its own addresses (`gethostbyname` of its own host name), the add-on answers with this PC's fake address only. The game writes its addresses into its packets itself (the join request `01`, the game description `03`, the player records of the lobby; see [multiplayer-sync.md](../../docs/subsystems/multiplayer-sync.md#addresses-inside-the-packets-2026-11-02)), so they all hold the fake one: no packet is rewritten.
-- **Sending** (`sendto`): a packet to a fake address goes to that player through the transport, with the game's destination port as the "channel" and a 2-byte header holding the source port. An "any games here?" query (`02`) to a broadcast goes to every host the transport knows. Everything else (real addresses, other broadcasts, `lan_discovery`'s copies to the network adapters) is dropped: **the real network is not used** while the virtual LAN is on.
+- **Sending** (`sendto`): a packet to a fake address goes to that player through the transport, with the game's destination port as the "channel" and a 6-byte header holding the source port and the sender's own fake address. An "any games here?" query (`02`) to a broadcast goes to every host the transport knows. Everything else (real addresses, other broadcasts, `lan_discovery`'s copies to the network adapters) is dropped: **the real network is not used** while the virtual LAN is on.
 - **Receiving** (`recvfrom`): the next message for the socket's port, as if it came from the sender's fake address and source port. What the real network brings is read and dropped.
-- **Who hosts.** Once a second the game's discovery socket gets a copy of its own last query, as if from `198.18.0.1` (an address nobody has). A game that hosts answers with its game description; the add-on swallows that answer and tells the others (the loopback's stand-in for a Steam lobby).
+- **Who hosts.** Once a second the game's discovery socket gets a copy of its own last query, as if from `198.18.0.1` (an address nobody has). A game that hosts answers with its game description; the add-on swallows that answer and tells the transport (Steam: it makes a lobby; the loopback: it tells the other copies).
 - The hooks sit under `lan_discovery`'s and the robot's (they go in when the DLL loads), so the robot's network log shows the packets exactly as the game sends and gets them.
 
-The log says what it does (lines starting with `vlan:`): this PC's fake address, each new peer, when this PC starts or stops hosting, and every 30 s the packets carried and dropped.
+**Over Steam** (`mode=steam`, `virtual_lan_steam.cpp`):
+
+- **Steam starts** at the game's first DirectInput call (long before the LAN screen), from `bin\h5-together\steam_api.dll`, as the game's own Steam app (15370), also when Steam did not start the game (`steam_runtime.cpp`). Without that file or without Steam, the log says so and the game plays its own LAN, as with `mode=off`. It never crashes the game for that.
+- **Messages** go with Steam's `ISteamNetworkingMessages`: to a friend's SteamID, on channel = the game's port, unreliable (the game resends what it needs, as on a LAN). Steam finds a direct path or uses its relays; real IP addresses are never in the game's packets.
+- **The host's lobby.** When the game hosts, the add-on makes a **friends-only Steam lobby**. Its data holds our protocol number, H5 Together's version, the game's build and MMH5.5's `55u.dll` (a hash: only the same game can play together), the game's discovery port and the fake addresses in the game. It is kept while the game hosts and for a minute after.
+- **Finding games.** Every 2 s the add-on looks at the Steam friends list: Steam tells which lobby a friend is in. A friend whose lobby says that friend hosts the same game is a host, and the game's "any games here?" queries go to it; its game then shows in the **game's own LAN list**. (If a lobby's data does not come, the friend's game is tried anyway at the usual port 8889.)
+- **Joining.** When the game sends a host more than queries (its join request), the add-on joins the host's lobby; the lobby's members are the other players, in the lobby's order. A friend's first message is accepted only from Steam friends and members of our lobby.
+- **Threads.** Steam's callbacks run on a thread of the add-on's own every 20 ms, under the same lock as the hooks; never on the game's threads.
+
+The log says what it does (lines starting with `vlan:` and `vlan steam:`): this PC's fake address, each new peer, when this PC starts or stops hosting, the lobby, the friends' games, sessions, and every 30 to 60 s the packets carried and dropped. **No SteamID or name** goes to the log: players and lobbies show as short hashes like `#3f2a`.
 
 **Settings** (`h5-together.ini`):
 
 ```ini
 [online]
-mode=off             ; off (default) | loopback (robot tests only); steam comes later
+mode=off             ; off (default) | steam (tests for now: docs/plans/online-steam-test2.md) | loopback (robot tests only)
+app_id=15370         ; steam: the game's Steam app (only for tests: 480 = Valve's Spacewar)
 loopback_port=47100  ; loopback: this copy's own port on 127.0.0.1
 loopback_peers=      ; loopback: the other copies' ports, e.g. 47102
 ```

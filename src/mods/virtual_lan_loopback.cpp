@@ -134,11 +134,11 @@ public:
 
 	const KnownHosts &Hosts() const override { return hosts_; }
 
-	int Members(uint64_t *out, int max) const override
+	int Members(Member *out, int max) const override
 	{
 		int n = 0;
 		for (; n < member_count_ && n < max; ++n)
-			out[n] = members_[n];
+			out[n] = {members_[n], 0};  // (their messages say which address they use)
 		return n;
 	}
 
