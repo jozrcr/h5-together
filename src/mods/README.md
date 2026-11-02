@@ -841,6 +841,7 @@ Plan, research and robot checks: [docs/plans/host-rules.md](../../docs/plans/hos
 - A random map straight from the generator: MMH5.5's scripts did not run on either PC (no map script); the host's panel says so.
 - **MMH5.5 scripts on random maps**, on generated maps: RC19d with `map_scripts=1 mixed_stacks=0`: both PCs ran MMH5.5's scripts (every `H55` start-up line twice), the same served file, no mixed stacks, 365 checksums equal; RC19d's default (off): no scripts, as before (328 equal). RC19k on a map made by RC19k: default (on) 327 equal, `map_scripts=0` no scripts (325 equal).
 - **Saves:** loading a save opens no script file; the scripts go on with the values the game started with (single player, robot).
+- **Skills of each class** (2026-11-02, `[rules] trace_skills=1` logs every new skill a level-up offers): unlocked, the AI's heroes were offered skills off their class's list (a Seer: Runelore, Demonic Rage, Summoning; a Runemage at chance 2: Avenger, Runelore, Invocation), the same on both PCs, all checksums equal (RC19d 1261, RC19k 2028); locked, every offer was on the list (2231 equal). A single-player autosave made unlocked kept the rule when loaded, and loaded normally with the rules off.
 
 More in the plan.
 

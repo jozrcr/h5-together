@@ -23,10 +23,13 @@
 //
 // Saves: the world's serializer (CWorld's CObjectBase vtable 0x00e625d8, slot 3
 // 0x009a2340 -> 0x009a2350; it writes the chunks 1 to 0x3e) gets one more chunk,
-// 0x4f, while this game's class skills are unlocked: "OHW1;class_skills=1;...".
-// The game's reader skips a chunk it does not know (a PC without the add-on
-// loads the save on MMH5.5's lock), and zero-fills a missing one (a save
-// without it: MMH5.5's lock). When a save is read, the rule comes from it.
+// 0x4f, while this game's class skills are unlocked: "OHW1;class_skills=1;...",
+// only for the game's file saver (CStructureSaver: saves and loads). The
+// checksum savers and the other serializers are left exactly as the game runs
+// them (see WorldSerializeHook). The game's reader skips a chunk it does not
+// know (a PC without the add-on loads the save on MMH5.5's lock), and zero-fills
+// a missing one (a save without it: MMH5.5's lock). When a save is read, the
+// rule comes from it.
 //
 // Testing ([rules] in open-homm5.ini):
 //   trace_skills=1         log every "new skill" a level-up offers (0x00b50db0, called at
@@ -78,6 +81,8 @@ const DWORD kWorldSerializeSlot = 0x00e625e4;
 const DWORD kWorldSerialize = 0x009a2340;  // sub ecx, [ecx-4]; jmp 0x009a2350 (ret 4)
 const BYTE kWorldSerializeCode[] = {0x2b, 0x49, 0xfc, 0xe9, 0x08, 0x00, 0x00, 0x00};
 const int kWorldChunk = 0x4f;     // the world's own are 1..0x3e
+// CStructureSaver (saves, loads, network messages): slot 10 DataChunk, 15 IsReading (mov al, [ecx+0x4c])
+const DWORD kStructureSaverVftable = 0x00e93dfc;
 const int kWorldChunkSize = 64;   // fixed: a reader copies this many bytes
 
 typedef void *(__cdecl *NewFn)(size_t size);
@@ -337,11 +342,9 @@ int __fastcall NewSkillHook(void *hero, void *edx, int excluded)
 }
 
 // --- saves: the world's serializer -----------------------------------------------------------------
-int __fastcall WorldSerializeHook(void *self, void *edx, void *saver)
+// Our chunk, for the game's file saver only (a save being written or read).
+__declspec(noinline) void WorldChunk(void *saver)
 {
-	const int r = g_serialize_next(self, edx, saver);
-	if (!saver || !Readable(saver, 4))
-		return r;
 	void **vt = *reinterpret_cast<void ***>(saver);
 	const bool reading = reinterpret_cast<IsReadingFn>(vt[15])(saver, nullptr) != 0;
 	const DataChunkFn chunk = reinterpret_cast<DataChunkFn>(vt[10]);
@@ -352,23 +355,21 @@ int __fastcall WorldSerializeHook(void *self, void *edx, void *saver)
 		{
 			Lock lock;
 			if (g_swaps.empty())
-				return r;  // MMH5.5's lock: the world as the game writes it
+				return;  // MMH5.5's lock: the world as the game writes it
 			Values v = NoValues();
 			v[kClassSkills] = g_state.mode;
 			v[kClassChance] = g_state.chance;
 			text = EncodeWorld(v);
 		}
 		if (text.size() >= sizeof(buf))
-			return r;
+			return;
 		memcpy(buf, text.c_str(), text.size());
 		chunk(saver, nullptr, kWorldChunk, buf, kWorldChunkSize, 1);
 		static LONG written = 0;
 		const LONG n = InterlockedIncrement(&written);
-		if (n <= 3 || n % 500 == 0)
-			hooklog::Write("rules: class skills: the world is written with \"%s\" (%ld times so far: saves, the multiplayer "
-			               "checksums)",
-			               text.c_str(), n);
-		return r;
+		if (n <= 3 || n % 100 == 0)
+			hooklog::Write("rules: class skills: a save of the world is written with \"%s\" (%ld so far)", text.c_str(), n);
+		return;
 	}
 	chunk(saver, nullptr, kWorldChunk, buf, kWorldChunkSize, 1);  // all zeros when the save has none
 	buf[kWorldChunkSize - 1] = 0;
@@ -382,6 +383,40 @@ int __fastcall WorldSerializeHook(void *self, void *edx, void *saver)
 	g_read_at = GetTickCount();
 	if (!g_read_at)
 		g_read_at = 1;
+}
+
+// The other savers that serialize the world (the multiplayer checksums: CWorldCRCSaver,
+// CCheckSumSaver...): each logged once, never touched.
+__declspec(noinline) void OtherSaver(DWORD vftable)
+{
+	static volatile LONG seen[8];
+	for (int i = 0; i < 8; ++i) {
+		const LONG was = InterlockedCompareExchange(&seen[i], static_cast<LONG>(vftable), 0);
+		if (was == static_cast<LONG>(vftable))
+			return;
+		if (was == 0) {
+			hooklog::Write("rules: class skills: the world is also serialized by another saver (vftable 0x%08x): left alone",
+			               vftable);
+			return;
+		}
+	}
+}
+
+// The wrap stays as small as it can: the game's serializer, then one compare. Only the
+// game's file saver (CStructureSaver: saves and loads) gets our chunk. (A first version
+// also looked at the checksum savers, calling their IsReading; on RC19k the multiplayer
+// checksums then differed now and then between the PCs, even with the rule off: robot
+// runs 20261102-012505, -013519, -015203.)
+int __fastcall WorldSerializeHook(void *self, void *edx, void *saver)
+{
+	const int r = g_serialize_next(self, edx, saver);
+	if (saver) {
+		const DWORD vftable = *static_cast<const DWORD *>(saver);
+		if (vftable == kStructureSaverVftable)
+			WorldChunk(saver);
+		else
+			OtherSaver(vftable);
+	}
 	return r;
 }
 

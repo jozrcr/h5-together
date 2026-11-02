@@ -143,7 +143,7 @@ const Words kEnglish = {
 	 "Default, Savage or Nightmare for everyone (MMH5.5: the bonus arrows).",
 	 "Each player keeps the start bonus picked with the arrows: gold, resources, artifact.",
 	 "In multiplayer, MMH5.5's scripts also run on maps without a script (from the generator).",
-	 "Unlocked: a level-up may offer any skill, those off the class's list rarely (chance 2, as in ToE).",
+	 "Unlocked: any skill, those off the class's list at chance 2 (as in ToE).",
 	 "The chance of the skills a class does not list (testing)."},
 	{"Off", "40%", "60%", "80%", "100% (MMH5.5)", "120%", "140%"},
 	"On", "Off",
@@ -211,8 +211,8 @@ const Words kFrench = {
 	 "Par d" E_ACUTE "faut, Sauvage ou Cauchemar pour tous (MMH5.5" NBSP ": les fl" E_GRAVE "ches de bonus).",
 	 "Chacun garde le bonus de d" E_ACUTE "part choisi avec les fl" E_GRAVE "ches" NBSP ": or, ressources, artefact.",
 	 "En multijoueur, les scripts MMH5.5 tournent aussi sur les cartes sans script (du g" E_ACUTE "n" E_ACUTE "rateur).",
-	 "D" E_ACUTE "bloqu" E_ACUTE "es" NBSP ": un niveau peut proposer toute comp" E_ACUTE "tence, celles hors de la liste "
-	 "de la classe rarement (chance 2, comme dans ToE).",
+	 "D" E_ACUTE "bloqu" E_ACUTE "es" NBSP ": toute comp" E_ACUTE "tence, hors liste de la classe " A_GRAVE
+	 " chance 2 (comme ToE).",
 	 "La chance des comp" E_ACUTE "tences hors de la liste d'une classe (tests)."},
 	{"Aucun", "40" NBSP "%", "60" NBSP "%", "80" NBSP "%", "100" NBSP "% (MMH5.5)", "120" NBSP "%", "140" NBSP "%"},
 	"Oui", "Non",
