@@ -8,14 +8,14 @@
 
 namespace mods {
 
-// open-homm5.ini [lang] texts=
+// h5-together.ini [lang] texts=
 enum class Texts {
 	Game,     // "game" (default): the texts as installed, nothing changes
-	French,   // "fr": the .txt files of bin\open-homm5\lang\fr\*.pak
+	French,   // "fr": the .txt files of bin\h5-together\lang\fr\*.pak
 	English,  // "en": designed, not built yet (the game's own texts are used)
 };
 
-// The setting (read once from open-homm5.ini).
+// The setting (read once from h5-together.ini).
 Texts TextsChoice();
 
 // From hooks::InstallEarly (DLL load, a build recognized then): with

@@ -6,7 +6,7 @@
 //   functions.tsv     one row per function (address, size, name, namespace, flags)
 //   func_strings.tsv  strings referenced directly by each function
 //   rtti.tsv          RTTI type descriptors and vftables found by Ghidra's RTTI analyzer
-//@category open-homm5
+//@category H5 Together
 
 import java.io.File;
 import java.io.PrintWriter;

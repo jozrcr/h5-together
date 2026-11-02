@@ -3,7 +3,7 @@
 // check box or a list.
 //   - The host chooses on the setup screen (NUI::CMPCreateScreen) or in the
 //     waiting room (NUI::CMPWaitScreen). OK saves the choices to
-//     open-homm5.ini [rules] and the players' panels show them at once.
+//     h5-together.ini [rules] and the players' panels show them at once.
 //   - A client sees the host's rules, read only (what the host sent in the lobby).
 //   - On the adventure map, everyone sees this game's rules, read only.
 // It opens with its key (F2 by default, [rules] key; a temporary key until the
@@ -149,13 +149,13 @@ const Words kEnglish = {
 	"On", "Off",
 	"your file: %s",
 	"MMH5.5 alone: %s",
-	"Every player has open-homm5: these rules will be used.",
-	"Without open-homm5 (or with an older one): %s. Then every PC uses its own MMH5.5 file.",
+	"Every player has H5 Together: these rules will be used.",
+	"Without H5 Together (or with an older one): %s. Then every PC uses its own MMH5.5 file.",
 	"MMH5.5 files differ: %s. The game may not stay in step.",
 	"The players will see these rules in the waiting room.",
-	"The host sent no rules (no open-homm5 there, or another version): every PC uses its own MMH5.5 file.",
-	"They will be used: every player has open-homm5.",
-	"A player lacks open-homm5: every PC will use its own MMH5.5 file.",
+	"The host sent no rules (no H5 Together there, or another version): every PC uses its own MMH5.5 file.",
+	"They will be used: every player has H5 Together.",
+	"A player lacks H5 Together: every PC will use its own MMH5.5 file.",
 	"Your MMH5.5 files differ from the host's: the game may not stay in step.",
 	"This game uses the host's rules.",
 	"This game uses this PC's MMH5.5 file.",
@@ -218,14 +218,14 @@ const Words kFrench = {
 	"Oui", "Non",
 	"votre fichier" NBSP ": %s",
 	"MMH5.5 seul" NBSP ": %s",
-	"Tous les joueurs ont open-homm5" NBSP ": ces r" E_GRAVE "gles seront utilis" E_ACUTE "es.",
-	"Sans open-homm5 (ou avec une version plus ancienne)" NBSP ": %s. Chaque PC utilise alors son propre fichier MMH5.5.",
+	"Tous les joueurs ont H5 Together" NBSP ": ces r" E_GRAVE "gles seront utilis" E_ACUTE "es.",
+	"Sans H5 Together (ou avec une version plus ancienne)" NBSP ": %s. Chaque PC utilise alors son propre fichier MMH5.5.",
 	"Fichiers MMH5.5 diff" E_ACUTE "rents" NBSP ": %s. La partie risque de se d" E_ACUTE "synchroniser.",
 	"Les joueurs verront ces r" E_GRAVE "gles dans la salle d'attente.",
-	"L'h" O_CIRC "te n'a pas envoy" E_ACUTE " de r" E_GRAVE "gles (pas d'open-homm5 chez lui, ou une autre version)" NBSP
+	"L'h" O_CIRC "te n'a pas envoy" E_ACUTE " de r" E_GRAVE "gles (pas de H5 Together chez lui, ou une autre version)" NBSP
 	": chaque PC utilise son propre fichier MMH5.5.",
-	"Elles seront utilis" E_ACUTE "es" NBSP ": tous les joueurs ont open-homm5.",
-	"Un joueur n'a pas open-homm5" NBSP ": chaque PC utilisera son propre fichier MMH5.5.",
+	"Elles seront utilis" E_ACUTE "es" NBSP ": tous les joueurs ont H5 Together.",
+	"Un joueur n'a pas H5 Together" NBSP ": chaque PC utilisera son propre fichier MMH5.5.",
 	"Vos fichiers MMH5.5 diff" E_GRAVE "rent de ceux de l'h" O_CIRC "te" NBSP ": la partie risque de se d" E_ACUTE
 	"synchroniser.",
 	"Cette partie utilise les r" E_GRAVE "gles de l'h" O_CIRC "te.",

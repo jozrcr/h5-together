@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Names the addresses in the hang watchdog's report (src/hook/watchdog.cpp).
 
-    python tools/hang/symbolize.py <open-homm5.log> [--map build/hook/dinput8.map]
+    python tools/hang/symbolize.py <h5-together.log> [--map build/hook/dinput8.map]
                                    [--functions analysis/export/functions.tsv] [--all]
 
 Reads the "watchdog:" lines of the log (only the last report, or all with --all)
 and adds a name after each address:
-  - our DLL ("dinput8.dll (open-homm5)+0x1234"): the function from the map file of
+  - our DLL ("dinput8.dll (H5 Together)+0x1234", "(open-homm5)" in 0.2.7 and older
+    logs): the function from the map file of
     THE SAME BUILD (the report gives the DLL's link time stamp; the map's header
     has it too: "Timestamp is ...");
   - the exe ("MMH55_Utility_64.exe+0x46e9d0 (0x0086e9d0..."): the Ghidra function
@@ -95,7 +96,7 @@ def main():
         m = re.search(r"link time stamp ([0-9a-f]{8})", line)
         if m and stamp is not None and int(m.group(1), 16) != stamp:
             notes.append(f"WARNING: the map is from another build (its time stamp is {stamp:08x})")
-        for m in re.finditer(r"dinput8\.dll \(open-homm5\)\+0x([0-9a-f]+)", line):
+        for m in re.finditer(r"dinput8\.dll \((?:H5 Together|open-homm5)\)\+0x([0-9a-f]+)", line):
             rva = int(m.group(1), 16)
             r = nearest(dll, rva) if dll else None
             if r:

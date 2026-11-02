@@ -1,7 +1,7 @@
 // List every reference to the given addresses (code or data), with the function it is in.
 //   analyzeHeadless <projdir> <proj> -process <exe> -noanalysis -readOnly
 //       -scriptPath tools/inventory/ghidra -postScript XrefsTo.java <out.txt> <addr> [<addr> ...]
-//@category open-homm5
+//@category H5 Together
 
 import java.io.PrintWriter;
 

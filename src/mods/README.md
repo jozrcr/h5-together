@@ -1,6 +1,6 @@
 # Mods: our improvements to the game
 
-Everything here changes how the original game behaves, on purpose. It is kept apart from the decompiled code (`src/decomp/`), which must stay byte-for-byte faithful. The mods are built into the hook DLL (`src/hook/`, `dinput8.dll`) and switched on and off with a settings file, `open-homm5.ini`, next to the game exe.
+Everything here changes how the original game behaves, on purpose. It is kept apart from the decompiled code (`src/decomp/`), which must stay byte-for-byte faithful. The mods are built into the hook DLL (`src/hook/`, `dinput8.dll`) and switched on and off with a settings file, `h5-together.ini`, next to the game exe. (Until 0.2.7 the add-on was called open-homm5, and its files `open-homm5.ini`, `open-homm5\templates` and so on: the installer and the DLL move them to the new names, see [src/hook/README.md](../hook/README.md#the-old-name-old_namescpp).)
 
 **Contents**
 
@@ -36,7 +36,7 @@ Game commands still run in the same order on every PC; only the network gets fas
 
 (Each change alone helps less: send interval only 2.2 s, keepalive only 1.6 s, both 0.9 s, all three 0.6 s.) Over the Internet the ping between the PCs comes on top.
 
-**Settings** (`open-homm5.ini` next to the game exe; without the file the mod is on with the values above):
+**Settings** (`h5-together.ini` next to the game exe; without the file the mod is on with the values above):
 
 ```ini
 [net]
@@ -46,7 +46,7 @@ send_interval_ms=10
 batched_segments=0
 ```
 
-The DLL's log (`open-homm5.log`) says what it changed, for example `net tuning: links may send every 10 ms (game: 50)`.
+The DLL's log (`h5-together.log`) says what it changed, for example `net tuning: links may send every 10 ms (game: 50)`.
 
 **MMH5.5 RC19k** sets the send interval to 20 ms itself (`<TransmissionInterval>` in `MMH55Stats.xml`, applied by `55u.dll` at start-up). The mod also accepts that value and still makes it 10 ms; the log then says `(game: 50, MMH5.5: 20)`. Measured on RC19k (A1M4, robot LAN run): 0.46 s per AI step with MMH5.5's 20 ms, 0.26 s with 10 ms (RC19d with 10 ms: 0.26 s). `send_interval_ms=0` keeps MMH5.5's 20 ms.
 
@@ -64,7 +64,7 @@ lan: game found at 10.21.174.28:8889 (826 bytes)
 lan: join request to 10.21.174.28:8888
 ```
 
-**Settings** (`open-homm5.ini`):
+**Settings** (`h5-together.ini`):
 
 ```ini
 [net]
@@ -85,7 +85,7 @@ Every player who looks for games needs it (the host only answers). On a Windows 
 2. Ten seconds in (segment 50), each DLL checks that **every** other PC sent the same wish.
 3. If so, they all switch together at that segment. If not (someone has no DLL, an older one, or other settings), nobody switches and the game keeps its own timing.
 
-`open-homm5.log` says which:
+`h5-together.log` says which:
 
 ```
 co-op timing: hello from player 1 (asks for 100 ms segments, protocol 1)
@@ -102,7 +102,7 @@ co-op timing: ON from segment 50: 100 ms segments (all 2 PCs agree)
 
 The world checksums stayed equal on both PCs (no desync). When the copies disagree, both stay OFF.
 
-**Settings** (`open-homm5.ini`):
+**Settings** (`h5-together.ini`):
 
 ```ini
 [coop]
@@ -252,7 +252,7 @@ notify: your turn (day 3): the game is in front, no notification
 
 None on day 1. Not checked by the robot: the game window in front (it would take the focus from whoever uses the PC), and Linux.
 
-**Settings** (`open-homm5.ini`):
+**Settings** (`h5-together.ini`):
 
 ```ini
 [notify]
@@ -296,7 +296,7 @@ It only shows the adventure map (not in towns, battles or menus). **F9** hides i
 
 Not checked by the robot: F9 and the fade (the robot's windows are in the background), fullscreen, and Linux.
 
-**Settings** (`open-homm5.ini`):
+**Settings** (`h5-together.ini`):
 
 ```ini
 [ui]
@@ -335,7 +335,7 @@ One subtlety: the original AI thinks in real-time slices, so how fast it runs ca
 | + fast "go ashore?" check | 22.7 s |
 | + cheaper steps (per-tile records, compact open list, fewer copies) | **16.7 s** (x5.6) |
 
-**Settings** (`open-homm5.ini`):
+**Settings** (`h5-together.ini`):
 
 ```ini
 [ai]
@@ -400,13 +400,13 @@ LAN robot games on random maps came later: the recipe maps' teams (above) and th
 Step 1 of the map generator plan ([docs/plans/map-generator.md](../../docs/plans/map-generator.md)), and steps 1 and 2 of the in-game builder plan ([docs/plans/in-game-generator.md](../../docs/plans/in-game-generator.md)).
 
 - **How the game finds templates:** the random map screen asks the game's file system (`NVFS::CWinVFS`) for the files in `RMG/Templates` (List, vtable slot 10), then opens each one (Open, slot 7). The mod sits on those two slots. Nothing on disk changes.
-- **Template files:** the `.xdb` files of `open-homm5\templates\` next to the exe (the install package puts the 24 ready ones there) are added to the list and served when the game opens them.
+- **Template files:** the `.xdb` files of `h5-together\templates\` next to the exe (the install package puts the 24 ready ones there) are added to the list and served when the game opens them.
 - **Recipe names** (new): a template named `RMG/Templates/OH-X1-<16 characters>.xdb` needs no file at all. Its name holds every choice of the template maker, for example `OH-X1-321110nnxxxxxxxa` = 2v2v2, Normal, best size, underground. When the game opens such a name, the DLL builds the template's bytes from the name with `rmg_maker.cpp`, a C++ copy of the web page's template maker. The format: [tools/rmg/README.md](../../tools/rmg/README.md#recipe-names).
   - **Why:** in multiplayer every PC builds the random map itself from the template's path. With a recipe, every PC with the DLL has the template, and they all get the same bytes.
   - **The list** shows every recipe this PC was asked to open (for example a joined game's), plus those of `recipes=`. In the list, a recipe template's name is the maker's name plus `*`, for example `OH-2v2v2-Lu-Normal*`, so it can't be mixed up with the ready file of the same layout.
   - **Same bytes as the page:** `build.ps1 -Test` checks that `rmg_maker.cpp` writes exactly what `tools/rmg/template_maker.js` writes, on the 24 ready templates and 400 random choices.
   - **Same bytes forever:** what an `X1` name builds never changes (`tools/rmg/x1_fingerprints.txt` records 302 of them; the test fails on any change). And at start, the DLL builds three recorded names itself and serves no recipe if one differs (the log says `self-check FAILED`).
-  - A file in `open-homm5\templates\` whose name is a recipe is skipped (the log says so): the name decides.
+  - A file in `h5-together\templates\` whose name is a recipe is skipped (the log says so): the name decides.
 - **Joining a random map game** (`rmg_join.cpp`, step 3). Each PC rebuilds the host's random map from the template's name, the seed and the options, which the host's game info carries.
   - When this PC reads a host's game info, the game loads the template by its name at once: for a recipe, the Open hook builds it and puts it in the list. Just before the game builds the map, a hook on the connector (`0x00701530`) registers the recipe again from the game info, in case.
   - **The guard:** a PC without the map's template used to crash there, because the game used the missing template without a check (`0x007012b1`). Now the game shows its own "can't make the map" message (`RMG_MAP_FAIL`). This works for any missing template, also with `templates=0`.
@@ -423,7 +423,7 @@ recipes=        ; recipe names to offer in the list, separated by commas (for te
 The log says what was served, for example:
 
 ```
-rmg templates: 24 template(s) from open-homm5\templates: OH-2v2-Lu-Normal.xdb, ...
+rmg templates: 24 template(s) from h5-together\templates: OH-2v2-Lu-Normal.xdb, ...
 rmg templates: recipe names (RMG/Templates/OH-X1-....xdb) are built when the game asks for them (maker self-check ok); in the list from recipes=: OH-X1-321110nnxxxxxxxa
 rmg templates: OH-X1-321110nnxxxxxxxa.xdb built from its name: "OH-2v2v2-Lu-Normal*", 6 players, 13 zones, Large (176x176, with underground), 23121 bytes
 ```
@@ -444,7 +444,7 @@ The plan: [docs/plans/in-game-generator.md](../../docs/plans/in-game-generator.m
 2. **Modèles... / Template...**, the new button between Save and Back (or **F11**). The builder covers the screen's main panel; the game behind is dimmed and gets no input.
 3. Pick a ready template in **Partir d'un modèle / Start from**, or change the choices. The zone map, the numbers and the warnings follow at once.
 4. **Utiliser / Use**: the panel closes and the game's own screen is set: map size, underground level, players, "ARMG Templates" ticked and our template chosen in its list (`OH-2v2v2-Lu-Normal*`). Also, ticked, so that nothing is left to chance: **no water** (our templates are land maps; unticked, the game makes an island map half the time), **resources and experience normal** (×1 on the template's treasure and chests; unticked, the game uses the list's first item, ×0.2), and the **monster level that leaves the template's guards as written** ("Faibles"/weak in MMH5.5, whose levels are ×1.0, 1.9, 2.7, 3.5, 7.0; unticked, the game draws one of the first three). The facts: [docs/subsystems/rmg.md](../../docs/subsystems/rmg.md#the-screens-own-options-and-the-template-static-reading-2026-10-25-robot-checked). Then the game's own options if wanted, **Créer / Create**, **Sauvegarder / Save**, and play the map. In multiplayer, the other PCs rebuild the template from its name ([Random map templates](#random-map-templates-rmg_templatescpp-rmg_makercpp-rmg_recipecpp-on-by-default)).
-5. **Enregistrer / Save as file** writes the template as the web page's download gives it, to `open-homm5\templates\<name>.xdb` (listed by the game from its next start; a different file of the same name gets `-2`, `-3`...). **Annuler / Cancel** or **Esc** changes nothing.
+5. **Enregistrer / Save as file** writes the template as the web page's download gives it, to `h5-together\templates\<name>.xdb` (listed by the game from its next start; a different file of the same name gets `-2`, `-3`...). **Annuler / Cancel** or **Esc** changes nothing.
 
 **The panel** (`rmg_builder.cpp`, drawn with the game's pictures by `rmg_builder_widgets.cpp`). Its parts sit where the screen's own parts are:
 - **Left, in the minimap's box:** the zone map, drawn from the maker's own zones and paths (`rmg_builder_data.cpp`: the page's `positions()`, checked against Node). Start zones in their team's colour with the player's number, each team's treasure zones paler, neutral zones grey, the centre gold ("C"); thicker paths for stronger guards, dashed when open; a small gold mark for a town.
@@ -452,7 +452,7 @@ The plan: [docs/plans/in-game-generator.md](../../docs/plans/in-game-generator.m
 - **Right, scrolling in the options list's box** (the wheel, or drag in the game's scroll bar track): the ready templates; teams (steppers, the teammates' path, the start mines); neutral zones (steppers, two town boxes); loot and guards, and "by distance from the bases", which shows a small table (loot and guards per distance ring, with each ring's zone count); size ("Auto" shows the size it picks) and underground; then the maker's warnings.
 - **Invalid choices are not offered:** each arrow asks the maker's own check (`rmg::CheckChoices`) first. An arrow that would make more than 8 players is greyed; clicking it shows the maker's message ("Le jeu permet 8 joueurs au plus (9 demandés).").
 - **Words:** French in a French game, English otherwise (`[ui] language`). Every text is measured; one too long for its place is cut with "…" (none is today, at 1024×768 and 1920×1080).
-- `builder_last=` in `open-homm5.ini` remembers the last choices used or saved (a recipe name); the panel opens on them.
+- `builder_last=` in `h5-together.ini` remembers the last choices used or saved (a recipe name); the panel opens on them.
 
 **The native button** (`rmg_screen.cpp`). The screen's window comes from UI files of the game's data. The DLL serves, through the game's file system (nothing on disk changes):
 - `UI/RMGScreen/MainPanel.(WindowSimpleShared).xdb`: the game's file with one more child, our button. **Only when the file is the one we know** (its fingerprint); otherwise the builder draws a button of its own at the same place, and the log says why.
@@ -537,7 +537,7 @@ So the original choice is made tile by tile: on flowers you hear the original gr
 
 **Where the original game has no music** (heroes and tiles only MMH5.5 has, and hero themes MMH5.5 gave to heroes that had none): no hero theme, no tile music. The game then picks, as it always does, among the other music of that place: the terrain under the hero and the map's own music. MMH5.5's new tracks are never played.
 
-The log (`open-homm5.log`) says what was set back, for example:
+The log (`h5-together.log`) says what was set back, for example:
 
 ```
 original music: on; mods: MMH55-Data.pak, MMH55-Index.pak, ... (16951 data files, 3028 of them also in the original game); indexed in 32 ms; ...
@@ -560,7 +560,7 @@ In a LAN game with the switch on for the host and off for the client, the world 
 
 Only mods in the game's `data\*.pak` files are considered (not `UserMODS\`). It works with any MMH5.5 version: the original files are read when the game starts (~40 ms).
 
-**Settings** (`open-homm5.ini`):
+**Settings** (`h5-together.ini`):
 
 ```ini
 [audio]
@@ -571,7 +571,7 @@ log_data_files=0   ; testing: log the first N files the game reads from its data
 
 ## One language: French texts (`languages*.cpp`, off by default)
 
-**What it is for:** with MMH5.5, a French game mixes languages. The base game's texts are French, but the 3.1 patch's and MMH5.5's texts are English, and they replace many French ones. With `texts=fr`, the game takes every text it can from the French packs in `open-homm5\lang\fr\` next to the exe:
+**What it is for:** with MMH5.5, a French game mixes languages. The base game's texts are French, but the 3.1 patch's and MMH5.5's texts are English, and they replace many French ones. With `texts=fr`, the game takes every text it can from the French packs in `h5-together\lang\fr\` next to the exe:
 
 - **MMH5.5's own French pack.** The MMH5.5 team publishes it on MMH5.5's ModDB page. Each player downloads the one for their MMH5.5 version, unzips it and puts its `.pak` there. Any version works, and the log names it. A `.zip` of texts is read too; a `.zip` that only wraps the `.pak` is reported in the log.
 - **Our pack** of what that pack leaves out, shared within the group.
@@ -599,11 +599,11 @@ Texts are only shown, never part of the game world: the game objects keep a text
 
 **Not seen yet:** the combat log (the robot's battles resolve at once) and the random map screen's labels.
 
-The log (`open-homm5.log`) says what was found, for example (MMH5.5 RC19k, its RC19i French pack and our pack):
+The log (`h5-together.log`) says what was found, for example (MMH5.5 RC19k, its RC19i French pack and our pack):
 
 ```
-languages: texts=fr: the game's texts come from open-homm5\lang\fr\*.pak where they have them
-languages: texts=fr: 6083 French texts from open-homm5\lang\fr: MMH55-Texts-FR.pak (5603), open-homm5-fr.pak (480); 272 of them newer than another pack's; indexed in 16 ms
+languages: texts=fr: the game's texts come from h5-together\lang\fr\*.pak where they have them
+languages: texts=fr: 6083 French texts from h5-together\lang\fr: MMH55-Texts-FR.pak (5603), open-homm5-fr.pak (480); 272 of them newer than another pack's; indexed in 16 ms
 languages: version text: French pack "Version: 5.69i" (MMH55-Texts-FR.pak), the game "Version: 5.69k" (another MMH5.5 version: some French descriptions may not match the game)
 ```
 
@@ -644,7 +644,7 @@ Not checked by the robot: the mouse wheel during play (the robot's windows are i
 
 **What to watch** far out: near the map's corners you see past its edge; on big maps more of the map is drawn, so a slow PC may lose frames; scrolling does not speed up with the distance. It works in the vanilla exe and MMH5.5's co-op exe (`MMH55_Utility`), not in MMH5.5's single-player exe (`MMH55.exe`, another build, where the DLL installs nothing); camera.md says how to get the same there by hand.
 
-**Settings** (`open-homm5.ini`):
+**Settings** (`h5-together.ini`):
 
 ```ini
 [lang]
@@ -706,7 +706,7 @@ Page Down (1.5 s) zoomed out to the farthest and Page Up back in, with `builder=
 
 **What it is for:** the owner's request, "a way in game to select our hero's skin". A hero can wear the look of another hero **of the same faction**: its 3D figures on the adventure map, in battle and on the hero screen. The portrait, the class, the skills, the music and everything the rules use stay the hero's own. Plan and findings: [docs/plans/hero-skins.md](../../docs/plans/hero-skins.md).
 
-**How a player chooses:** the small **Look / Apparence** button on the hero screen (in the "Armée & Stats" header, left of MMH5.5's two buttons, where the owner's sketch put it; it shows the portrait of the hero's look and a tooltip), or **F7** (`[skins] key`) on the adventure map, the hero screen or the town screen, opens a panel for this PC's player's selected hero (`hero_skins_panel.cpp`, the template builder's style, a modal overlay panel: the game gets no input while it is open). It shows the looks of the hero's faction as portraits, its own first ("son apparence"), each with the name of the hero it is named after and how many others wear it; the selected one lists them ("Aussi portée par : ..."). **Appliquer / Apply** saves the choice to `open-homm5-skins.ini` (next to `open-homm5.ini`, by the hero's internal name: `Godric=Freyda`; "Own look" removes the line) and makes it count: at once in single player and hot seat (the map figure is rebuilt); in multiplayer for every player a few seconds later (below). The choice is remembered for every game. The button is drawn by the DLL (ImGui) at MMH5.5's hero screen layout, scaled with the screen height: the screen's panel `UI/HeroScreen3/SingleHero` is at x 60, centred vertically, and the skill wheel's round button (`MMH55-Skillwheel.pak`, `Single/Army`, `Button_HS`) at 372,48 inside it; ours is 24×24 at 403,94 of the 1024×768 reference: the slot of MMH5.5's small square button (which MMH5.5 shows only sometimes, and which is in none of the screen's UI files), centred on the round button's line (y 106, measured in the owner's two screenshots). `[skins] hero_screen_button_x` / `_y` move it. It reads the mouse itself (the click also reaches the game, on an empty spot of the header). Not native yet: serving the screen's own UI file would need its command handler, not researched.
+**How a player chooses:** the small **Look / Apparence** button on the hero screen (in the "Armée & Stats" header, left of MMH5.5's two buttons, where the owner's sketch put it; it shows the portrait of the hero's look and a tooltip), or **F7** (`[skins] key`) on the adventure map, the hero screen or the town screen, opens a panel for this PC's player's selected hero (`hero_skins_panel.cpp`, the template builder's style, a modal overlay panel: the game gets no input while it is open). It shows the looks of the hero's faction as portraits, its own first ("son apparence"), each with the name of the hero it is named after and how many others wear it; the selected one lists them ("Aussi portée par : ..."). **Appliquer / Apply** saves the choice to `h5-together-skins.ini` (next to `h5-together.ini`, by the hero's internal name: `Godric=Freyda`; "Own look" removes the line) and makes it count: at once in single player and hot seat (the map figure is rebuilt); in multiplayer for every player a few seconds later (below). The choice is remembered for every game. The button is drawn by the DLL (ImGui) at MMH5.5's hero screen layout, scaled with the screen height: the screen's panel `UI/HeroScreen3/SingleHero` is at x 60, centred vertically, and the skill wheel's round button (`MMH55-Skillwheel.pak`, `Single/Army`, `Button_HS`) at 372,48 inside it; ours is 24×24 at 403,94 of the 1024×768 reference: the slot of MMH5.5's small square button (which MMH5.5 shows only sometimes, and which is in none of the screen's UI files), centred on the round button's line (y 106, measured in the owner's two screenshots). `[skins] hero_screen_button_x` / `_y` move it. It reads the mouse itself (the click also reaches the game, on an empty spot of the header). Not native yet: serving the screen's own UI file would need its command handler, not researched.
 
 **The hero screen follows at once** (`[skins] live_hero_screen=1`): after Apply on the hero screen (single player), or when a changed look counts at its segment (multiplayer), the hero screen showing that hero closes and opens again, on the same page, at the next adventure-map frame. It is what the screen's own "next hero" arrow does when the player has one hero (`0x006c4880(screen, hero)`: the game's close, then a new screen with the old one's values); the new screen builds the 3D figure with the look. Only in the screen's own-hero mode, when it is shown and its close would close it (no dialog, nothing waiting for "are you sure"); otherwise nothing is done and the screen shows the look when opened again. The game never rebuilds the figure of a screen that is already shown, and making it do so crashed (DLL `9823B52E`). Log: `the hero screen closes and opens again for <hero> ...`, then `the hero screen is open again after 500 ms (...): <hero> with <look>'s look, battle model <file>`. Details: [the plan](../../docs/plans/hero-skins.md), "The hero screen's 3D figure changes at once".
 
@@ -722,20 +722,20 @@ Page Down (1.5 s) zoomed out to the farthest and Page Up back in, with `builder=
 The log says what happened, for example:
 
 ```
-hero skins: on; 3 line(s) in open-homm5-skins.ini (read when the game's hero list is); multiplayer looks when every PC takes part
-hero skins: 179 heroes in the game's list (fingerprint 0518, other entries skipped); 2 look(s) chosen in open-homm5-skins.ini
+hero skins: on; 3 line(s) in h5-together-skins.ini (read when the game's hero list is); multiplayer looks when every PC takes part
+hero skins: 179 heroes in the game's list (fingerprint 0518, other entries skipped); 2 look(s) chosen in h5-together-skins.ini
 hero skins:   Godric wears the look of Freyda
 hero skins:   Axel=Giovanni: another faction: left out (same faction only)
 hero skins: Jeddite: the map figure is rebuilt with Freyda's look
 hero skins: sent to the other PCs: 2 look(s) for player 1 (after this PC's report 2)
 hero skins: from PC 1: player 2 sends its looks (same game data)
 hero skins: looks on for this game (all 2 PCs sent theirs, with the same game data)
-hero skins: no looks in this game: PC 1 sent none in time (no open-homm5 DLL, an old one, other game data, or show_others=0)
+hero skins: no looks in this game: PC 1 sent none in time (no H5 Together DLL, an old one, other game data, or show_others=0)
 ```
 
 **Checked with the robot** (A1M4; details in the plan's "Robot results"): single player (the look on the map and in a battle the AI started; the panel opened, a look picked and applied: the map figure changed at once), LAN with different looks on each PC (793 checksums, all equal), LAN with one PC taking no part (no looks, 517 checksums, all equal), LAN with a look changed through the panel during the game (both PCs rebuilt the figure at the same segment, 702 checksums, all equal).
 
-**Settings** (`open-homm5.ini`):
+**Settings** (`h5-together.ini`):
 
 ```ini
 [skins]
@@ -772,7 +772,7 @@ The robot passes them with `--skins-setting KEY=VALUE` and the choices with `--s
 
 Still to check: the owner's ears (the lowest step quiet but audible, music and sounds balanced as before). In a LAN game where only the host used it, the world checksums stayed equal (700, below).
 
-**Settings** (`open-homm5.ini`):
+**Settings** (`h5-together.ini`):
 
 ```ini
 [audio]
@@ -802,7 +802,7 @@ log_volume=0        ; testing: log the first N changes of an audible channel vol
 - **LAN game**, only the host with `edge_sky=none`, the test light, `volume_curve=wide` and French texts: 700 world checksums, all equal on both copies.
 - Give a Git Bash command line `MSYS_NO_PATHCONV=1`, or use PowerShell: Git Bash rewrites `--map /Maps/...` into a Windows path, and the game then says `Couldn't find map`.
 
-**Settings** (`open-homm5.ini`):
+**Settings** (`h5-together.ini`):
 
 ```ini
 [camera]
@@ -846,7 +846,7 @@ Plan, research and robot checks: [docs/plans/host-rules.md](../../docs/plans/hos
 
 More in the plan.
 
-**Settings** (`open-homm5.ini`):
+**Settings** (`h5-together.ini`):
 
 ```ini
 [rules]
@@ -871,9 +871,9 @@ class_skills_single=0 ; testing: a single-player game uses class_skills and clas
 
 ## Steam test (`steam_spike.cpp`; off by default, for tests only)
 
-A test for online play over Steam ([docs/plans/online-steam.md](../../docs/plans/online-steam.md)). It starts Steam inside the game under the game's own Steam id (15370), and logs whether Steam's relays, lobbies and messages work (lines starting with `steam:`). It needs Valve's `steam_api.dll` (32-bit, from the Steamworks SDK) in `bin\open-homm5\`. Without that file, or with `spike=0`, nothing changes. It sends no game data.
+A test for online play over Steam ([docs/plans/online-steam.md](../../docs/plans/online-steam.md)). It starts Steam inside the game under the game's own Steam id (15370), and logs whether Steam's relays, lobbies and messages work (lines starting with `steam:`). It needs Valve's `steam_api.dll` (32-bit, from the Steamworks SDK) in `bin\h5-together\`. Without that file, or with `spike=0`, nothing changes. It sends no game data.
 
-**Settings** (`open-homm5.ini`):
+**Settings** (`h5-together.ini`):
 
 ```ini
 [online]

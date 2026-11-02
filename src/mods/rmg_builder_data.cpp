@@ -89,8 +89,8 @@ const Words kEnglishWords = {
 	"%s",
 	"%s " MIDDOT " underground",
 	"Use", "Save as file", "Cancel",
-	"Saved: %s", "Not saved: %s", "The game's screen was not set (see open-homm5.log)",
-	"Template...", "The template builder (open-homm5)",
+	"Saved: %s", "Not saved: %s", "The game's screen was not set (see h5-together.log)",
+	"Template...", "The template builder (H5 Together)",
 };
 
 const Words kFrenchWords = {
@@ -114,8 +114,8 @@ const Words kFrenchWords = {
 	"%s " MIDDOT " souterrain",
 	"Utiliser", "Enregistrer", "Annuler",
 	"Enregistr" E_ACUTE " : %s", "Non enregistr" E_ACUTE " : %s",
-	"L'" E_ACUTE "cran du jeu n'a pas " E_ACUTE "t" E_ACUTE " r" E_ACUTE "gl" E_ACUTE " (voir open-homm5.log)",
-	"Mod" E_GRAVE "les...", "Le cr" E_ACUTE "ateur de mod" E_GRAVE "les (open-homm5)",
+	"L'" E_ACUTE "cran du jeu n'a pas " E_ACUTE "t" E_ACUTE " r" E_ACUTE "gl" E_ACUTE " (voir h5-together.log)",
+	"Mod" E_GRAVE "les...", "Le cr" E_ACUTE "ateur de mod" E_GRAVE "les (H5 Together)",
 };
 
 bool StartsWith(const std::string &s, const char *prefix)

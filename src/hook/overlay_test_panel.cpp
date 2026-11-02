@@ -4,7 +4,7 @@
 // mouse, the wheel, the keys. It checks that a modal panel gets the mouse and
 // the keyboard and the game behind it gets nothing, on Windows and under
 // Wine/Proton (the robot cannot click: its game runs in the background). Each
-// click is also written to open-homm5.log.
+// click is also written to h5-together.log.
 //
 // On the adventure map F10 is also the game's own menu key: the game sees the
 // press before the panel opens, opens its menu, and the panel closes at once
@@ -33,7 +33,7 @@ float g_wheel = 0;
 void ReadSettings()
 {
 	wchar_t path[MAX_PATH], text[32];
-	hooklog::PathNextToExe(L"open-homm5", L".ini", path, MAX_PATH);
+	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
 	g_on = GetPrivateProfileIntW(L"ui", L"overlay_test_panel", 0, path) != 0;
 	GetPrivateProfileStringW(L"ui", L"overlay_test_key", L"F10", text, 32, path);
 	g_key = ParseKey(text, VK_F10);
@@ -70,7 +70,7 @@ void Draw(const Frame &frame)
 	ImGui::PushFont(Font(FontPx(frame.height)));
 	ImGui::SetNextWindowPos(ImVec2(frame.width / 2, frame.height / 2), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
 	ImGui::SetNextWindowSize(ImVec2(440.0f * k, 0.0f), ImGuiCond_Always);
-	ImGui::Begin("open-homm5: overlay test", nullptr,
+	ImGui::Begin("H5 Together: overlay test", nullptr,
 	             ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
 	                 ImGuiWindowFlags_NoSavedSettings);
 	ImGui::TextWrapped("The game behind this panel must get no mouse click, no wheel and no key. Esc or F%d closes it.",

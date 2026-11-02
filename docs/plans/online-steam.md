@@ -121,7 +121,7 @@ From the robot's two copies on one PC (host ports 8889/8888, client ports 8891/8
   - (a) the whole group uses ZeroTier/LAN for that game, as today (simplest);
   - (b) use Spacewar 480 (any free Steam account works, so a GOG player could join);
   - (c) later, a "bridge" host that is in a Steam game and on ZeroTier at once and passes packets between them. That is complex, because every PC must reach every other PC.
-- **Different add-on, MMH5.5 or exe versions.** The host's lobby carries them. A client's add-on doesn't send queries to a host it can't play with, so that game never appears in its LAN list. Our panel says why, for example "Pierre's game: needs open-homm5 0.3.1 (you have 0.3.0)" or "needs MMH5.5 RC19k". The game's own `NetGameVersion` check and our co-op guard stay as a second check.
+- **Different add-on, MMH5.5 or exe versions.** The host's lobby carries them. A client's add-on doesn't send queries to a host it can't play with, so that game never appears in its LAN list. Our panel says why, for example "Pierre's game: needs H5 Together 0.3.1 (you have 0.3.0)" or "needs MMH5.5 RC19k". The game's own `NetGameVersion` check and our co-op guard stay as a second check.
 - **One PC both on a real LAN and on Steam:** in Steam mode the PC advertises only its fake address, so a real-LAN player without Steam can't join that game. A game uses one transport for everybody (setting `keep_lan`, below, later).
 
 ## The design
@@ -197,7 +197,7 @@ From the robot's two copies on one PC (host ports 8889/8888, client ports 8891/8
 - **Steam callbacks** (lobby events, session requests, invites): **one thread of our own** runs `SteamAPI_RunCallbacks` (or the manual-dispatch API) every 20 ms. Valve recommends at least once a second.
   - Not in `Present`: the game shows no frames while a map loads, and a session request left unanswered for that long would stall a join.
 - **One lock around every Steam call**, shared by the two threads, so we never depend on the library's own thread safety.
-- **Steam starts lazily:** our DLL loads `bin\open-homm5\steam_api.dll` with `LoadLibrary` when `[online] mode=steam`. Without the file (GOG, Linux without Steam) the add-on runs as today and says so in the log.
+- **Steam starts lazily:** our DLL loads `bin\h5-together\steam_api.dll` with `LoadLibrary` when `[online] mode=steam`. Without the file (GOG, Linux without Steam) the add-on runs as today and says so in the log.
   - Init happens in `InstallHooksOnce` (first `DirectInput8Create`), never in `DllMain`.
   - Whether that comes before the D3D device (needed for the overlay outside Steam) is to check in the spike.
 
@@ -224,8 +224,8 @@ log=1             ; log lobby events and each new peer (fake address <-> SteamID
 ```
 
 - **Off by default** at first. It changes no gameplay (only gameplay changes must default to the original), so it can be turned on by default once it has proven itself.
-- **Picking Steam or LAN:** a small ImGui box on the game's LAN screen: "Play over: Steam / LAN", with Steam's status ("Steam: 3 friends online with open-homm5"). It applies the next time the LAN screen opens, because the game creates its sockets then.
-- **The list:** the games stay in the game's own LAN list. Our box beside it lists Steam games with problems ("needs open-homm5 0.3.1") and has "Invite friends...".
+- **Picking Steam or LAN:** a small ImGui box on the game's LAN screen: "Play over: Steam / LAN", with Steam's status ("Steam: 3 friends online with H5 Together"). It applies the next time the LAN screen opens, because the game creates its sockets then.
+- **The list:** the games stay in the game's own LAN list. Our box beside it lists Steam games with problems ("needs H5 Together 0.3.1") and has "Invite friends...".
 - **Reuse:** the ImGui overlay (`src/hook/overlay.cpp`), the button-on-a-game-screen code of the template builder (`rmg_screen.cpp`), the toast and taskbar flash (`notify.cpp`), French texts (`languages`).
 
 ## Testing
@@ -255,7 +255,7 @@ log=1             ; log lobby events and each new peer (fake address <-> SteamID
 
 1. Unpack `ref\steamworks_sdk.zip` (in `ref\`, gitignored). Note the SDK version and check that `redistributable_bin\steam_api.dll` is 32-bit.
 2. Add a spike mode to the DLL, `[online] spike=1`, off by default, logging everything:
-   - load `bin\open-homm5\steam_api.dll`;
+   - load `bin\h5-together\steam_api.dll`;
    - set `SteamAppId` and `SteamGameId` to `app_id` if Steam hasn't already;
    - `SteamAPI_Init` (log the error text);
    - log the SteamID, `GetAppID()` and our persona name;
@@ -269,13 +269,13 @@ log=1             ; log lobby events and each new peer (fake address <-> SteamID
 **What the owner does:**
 
 - Downloads the SDK with his Steam account (he accepts Valve's SDK agreement) and puts it at `ref\steamworks_sdk.zip`.
-- Approves copying `steam_api.dll` into **his test copy** of the game (`bin\open-homm5\`).
+- Approves copying `steam_api.dll` into **his test copy** of the game (`bin\h5-together\`).
 - With Steam open, starts the test copy on his PC with `spike=host`. A friend or his brother starts it on a second PC with his own Steam account (owning ToE, Steam friends with the owner) with `spike=join`.
 - Runs three variants, about 10 minutes in all:
   - (a) both started from Steam;
   - (b) the joiner started directly (shortcut or GameRanger);
   - (c) the joiner on Linux with Proton.
-- Sends both `open-homm5.log` files.
+- Sends both `h5-together.log` files.
 
 **It worked if:**
 
@@ -290,7 +290,7 @@ log=1             ; log lobby events and each new peer (fake address <-> SteamID
 ### What was built
 
 - **`src/mods/steam_spike.cpp`**, setting `[online] spike`. Values: `0` (off, the default), `1` (solo, one PC), `host` / `join` (the two-PC test). Other keys: `app_id` (default 15370), `spike_seconds`, `spike_lobby`, `spike_pings`, `spike_ping_bytes`.
-- **No SDK in the repo.** `src/mods/steam_api_flat.h` declares the ~40 flat C functions and structures we use. The DLL loads `bin\open-homm5\steam_api.dll` with `LoadLibrary` and `GetProcAddress`. Without that file, nothing changes.
+- **No SDK in the repo.** `src/mods/steam_api_flat.h` declares the ~40 flat C functions and structures we use. The DLL loads `bin\h5-together\steam_api.dll` with `LoadLibrary` and `GetProcAddress`. Without that file, nothing changes.
 - **The declarations are checked against the SDK.** `src/hook/test/steam_abi_check.cpp` compares every size, offset, callback number and constant with Valve's headers. `build.ps1 -Test` runs it when `ref\steamworks_sdk_*` (or `STEAMWORKS_SDK`) is there, and skips it on GitHub. All checks pass for SDK 1.65.
 - **The pure parts are unit-tested** (`steam_spike_logic.cpp`, `test/steam_spike_test.cpp`): the setting, the log names, the test messages, the round-trip statistics.
 - **Threads:**
@@ -341,7 +341,7 @@ A session is one focused working block of a few hours.
 | 3 | Steam transport: lazy loading, init, our callback thread, lobbies, known hosts, sessions, version data; logs | 2 |
 | 4 | UI: the box on the LAN screen (Steam/LAN choice, status, games with problems), "Invite friends...", invite toast, French texts | 2 |
 | 5 | Real tests with the owner and friends (Windows, Linux, 3 PCs) and fixes | 1–2 |
-| 6 | Package: `steam_api.dll` in `bin\open-homm5\`, install guide, release notes | 0.5 |
+| 6 | Package: `steam_api.dll` in `bin\h5-together\`, install guide, release notes | 0.5 |
 
 About **10 sessions** after a successful spike. Steps 1 and 2 need no SDK and could start before it arrives.
 

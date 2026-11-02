@@ -44,7 +44,7 @@
 // also runs the ported open list against the game's code on random nodes and
 // keeps the game's if anything differs.
 //
-// Settings: open-homm5.ini [ai] fast_paths (default 1, on: the owner agreed on
+// Settings: h5-together.ini [ai] fast_paths (default 1, on: the owner agreed on
 // 2026-10-24, Q3 in docs/questions.md; 0 = the game's own pathfinding). Each
 // part has its own switch, all default 1: remember_checks, fast_queue,
 // fast_ashore, port_expand, port_search, port_relax.
@@ -645,7 +645,7 @@ void Relax(BYTE *pf, Node *from, Node *grid, Node *candidate, int step, Cost cos
 void ApplyFastPathsFromSettings()
 {
 	wchar_t path[MAX_PATH];
-	hooklog::PathNextToExe(L"open-homm5", L".ini", path, MAX_PATH);
+	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
 	if (!Setting(path, L"fast_paths", 1)) {
 		hooklog::Write("fast paths: off");
 		return;

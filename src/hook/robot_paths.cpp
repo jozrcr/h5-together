@@ -1,4 +1,4 @@
-// Robot-mode trace of the hero pathfinder (trace_paths=1 in open-homm5-robot.ini):
+// Robot-mode trace of the hero pathfinder (trace_paths=1 in h5-together-robot.ini):
 // how many path searches each AI step runs, from where, how long they take, how
 // many nodes they visit and how many repeat an earlier search of the same step.
 // See docs/subsystems/ai-turn.md, "Late game".

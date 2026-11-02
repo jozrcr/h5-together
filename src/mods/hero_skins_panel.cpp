@@ -1,10 +1,10 @@
 // The hero looks' panel (plan step 2, docs/plans/hero-skins.md): a modal
 // overlay panel in the template builder's style. Its key (F7 by default,
-// open-homm5.ini [skins] key; for now, until the hero screen gets a button)
+// h5-together.ini [skins] key; for now, until the hero screen gets a button)
 // opens it on the adventure map, the hero screen or the town screen, for this
 // PC's player's selected hero. It shows the looks of the hero's faction as
 // portraits (its own first), with the names of the heroes who wear each one.
-// Apply saves the choice to open-homm5-skins.ini and makes it count
+// Apply saves the choice to h5-together-skins.ini and makes it count
 // (hero_skins.cpp: at once in single player; in multiplayer for every PC at
 // the same segment, a few seconds later). A 3D preview is not drawn here: the
 // hero screen shows the hero's battle figure in 3D when it opens.
@@ -81,14 +81,14 @@ const Words kEnglish = {"%s's look", "its own look", "Also worn by: %s", "Apply"
                         "Its portrait stays its own.",
                         "Multiplayer: the choice counts for every player a few seconds into the game.",
                         "Multiplayer: the choice counts for every player a few seconds after Apply.",
-                        "In this game the looks are off (a PC lacks open-homm5, or another version): "
+                        "In this game the looks are off (a PC lacks H5 Together, or another version): "
                         "the choice is kept for your next games."};
 const Words kFrench = {"Apparence : %s", "son apparence", "Aussi port\xc3\xa9\x65 par : %s", "Appliquer", "Annuler",
                        "Choisissez une apparence de sa faction : ses figures sur la carte, en combat et dans "
                        "l'\xc3\xa9\x63ran du h\xc3\xa9ros. Son portrait reste le sien.",
                        "Partie \xc3\xa0 plusieurs : le choix compte pour tous quelques secondes apr\xc3\xa8s le d\xc3\xa9\x62ut.",
                        "Partie \xc3\xa0 plusieurs : le choix compte pour tous quelques secondes apr\xc3\xa8s \xc2\xab Appliquer \xc2\xbb.",
-                       "Dans cette partie, les apparences sont d\xc3\xa9sactiv\xc3\xa9\x65s (un PC n'a pas open-homm5, "
+                       "Dans cette partie, les apparences sont d\xc3\xa9sactiv\xc3\xa9\x65s (un PC n'a pas H5 Together, "
                        "ou une autre version) : le choix servira aux prochaines parties."};
 
 const Words &WordsNow()
@@ -537,7 +537,7 @@ void Draw(const overlay::Frame &frame)
 void ReadSettings()
 {
 	wchar_t path[MAX_PATH];
-	hooklog::PathNextToExe(L"open-homm5", L".ini", path, MAX_PATH);
+	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
 	wchar_t key[16];
 	GetPrivateProfileStringW(L"skins", L"key", L"F7", key, 16, path);
 	g_key = overlay::ParseKey(key, VK_F7);

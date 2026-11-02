@@ -20,7 +20,7 @@
 // It also logs each address games were found at (packets 03 received) and
 // each address join requests went to (packets 07 sent; the game sends them to
 // every address of the other PC, its ZeroTier one included), so that a join
-// that fails can be read in open-homm5.log.
+// that fails can be read in h5-together.log.
 //
 // How: the exe imports WSOCK32.dll's sendto and recvfrom (by number); their
 // import table entries point to the functions below (data, not code).
@@ -198,7 +198,7 @@ int WINAPI LanRecvFrom(SOCKET s, char *buf, int len, int flags, sockaddr *from, 
 void ApplyLanDiscoveryFromSettings()
 {
 	wchar_t path[MAX_PATH];
-	hooklog::PathNextToExe(L"open-homm5", L".ini", path, MAX_PATH);
+	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
 	g_all_adapters = GetPrivateProfileIntW(L"net", L"lan_all_adapters", 1, path) != 0;
 	wchar_t peers[512];
 	GetPrivateProfileStringW(L"net", L"lan_peers", L"", peers, 512, path);

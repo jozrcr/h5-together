@@ -4,7 +4,7 @@
 // language of the install (French on a French Steam copy), the 3.1 patch's
 // and MMH5.5's are English, and the newest file of a path wins. With
 // [lang] texts=fr, every text the game reads is taken, when it exists there,
-// from the packs in bin\open-homm5\lang\fr\ (*.pak, also *.zip): MMH5.5's own
+// from the packs in bin\h5-together\lang\fr\ (*.pak, also *.zip): MMH5.5's own
 // French pack for the player's MMH5.5 version (each player downloads it from
 // MMH5.5's ModDB page; any version works, the log names it) and our pack of
 // what it leaves out. Nothing on disk changes, and each player chooses for
@@ -28,7 +28,7 @@
 // dates the pack whose name sorts last. A change of setting needs a restart
 // (the game keeps the texts it has read).
 //
-// Settings, open-homm5.ini [lang]:
+// Settings, h5-together.ini [lang]:
 //   texts=game     game (default: the texts as installed), fr; en is planned,
 //                  not built yet (the game's own texts are used)
 //   log_texts=0    testing: log the first N texts taken from our packs
@@ -43,6 +43,7 @@
 #include <vector>
 
 #include "../hook/log.h"
+#include "../hook/old_names.h"
 #include "../hook/patch.h"
 
 namespace mods {
@@ -92,7 +93,7 @@ void ReadSettings()
 		return;
 	g_read = true;
 	wchar_t ini[MAX_PATH];
-	hooklog::PathNextToExe(L"open-homm5", L".ini", ini, MAX_PATH);
+	hooklog::PathNextToExe(L"h5-together", L".ini", ini, MAX_PATH);
 	wchar_t text[32];
 	GetPrivateProfileStringW(L"lang", L"texts", L"game", text, 32, ini);
 	if (_wcsicmp(text, L"fr") == 0)
@@ -196,14 +197,13 @@ std::string Narrow(const std::wstring &w)
 	return n > 0 ? std::string(buffer) : std::string("?");
 }
 
-// <exe folder>\open-homm5\lang\fr\ (the robot's copies have their own exe folder)
+// <exe folder>\h5-together\lang\fr\ (the robot's copies have their own exe folder), or
+// open-homm5\lang\fr\, the folder's name until 0.2.7, while only that one is there
 std::wstring PackFolder()
 {
 	wchar_t dir[MAX_PATH];
-	DWORD n = GetModuleFileNameW(nullptr, dir, MAX_PATH);
-	while (n > 0 && dir[n - 1] != L'\\')
-		--n;
-	return std::wstring(dir, n) + L"open-homm5\\lang\\fr\\";
+	oldnames::PathInOurFolder(L"lang\\fr", dir, MAX_PATH);
+	return std::wstring(dir) + L"\\";
 }
 
 bool ReadDirectoryOf(HANDLE file, std::vector<lang::ZipEntry> *out)
@@ -296,7 +296,7 @@ bool BuildIndex()
 			}
 		}
 		if (!has_text && !inner.empty())
-			hooklog::Write("languages: %s holds %s, not texts: unzip it and put the .pak itself in open-homm5\\lang\\fr",
+			hooklog::Write("languages: %s holds %s, not texts: unzip it and put the .pak itself in h5-together\\lang\\fr",
 			               Narrow(name).c_str(), inner.c_str());
 	}
 	if (g_texts.empty()) {
@@ -307,7 +307,7 @@ bool BuildIndex()
 	std::string list;
 	for (const Pack &p : g_packs)
 		list += (list.empty() ? "" : ", ") + p.name + " (" + std::to_string(p.texts) + ")";
-	hooklog::Write("languages: texts=fr: %u French texts from open-homm5\\lang\\fr: %s; %d of them newer than "
+	hooklog::Write("languages: texts=fr: %u French texts from h5-together\\lang\\fr: %s; %d of them newer than "
 	               "another pack's; indexed in %lu ms",
 	               static_cast<unsigned>(g_texts.size()), list.c_str(), replaced, GetTickCount() - start);
 	return true;
@@ -508,7 +508,7 @@ void ApplyLanguagesFromSettings()
 		hooklog::Write("languages: texts=fr, but no French pack could be used (see above): the game's own texts");
 		return;
 	}
-	hooklog::Write("languages: texts=fr: the game's texts come from open-homm5\\lang\\fr\\*.pak where they have them%s",
+	hooklog::Write("languages: texts=fr: the game's texts come from h5-together\\lang\\fr\\*.pak where they have them%s",
 	               g_early ? "" : " (installed late: texts read before now stay as they were)");
 }
 

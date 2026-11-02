@@ -10,7 +10,7 @@ namespace mods {
 // Only after DetectGameBuild() said the build is hookable.
 void ApplyNetTuning(DWORD keepalive_ms, DWORD send_interval_ms, int batched_segments);
 
-// The same with the settings of open-homm5.ini ([net] tuning=1, keepalive_ms=50,
+// The same with the settings of h5-together.ini ([net] tuning=1, keepalive_ms=50,
 // send_interval_ms=10, batched_segments=0 by default).
 void ApplyNetTuningFromSettings();
 

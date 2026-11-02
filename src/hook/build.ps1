@@ -18,7 +18,7 @@ if (-not $vcvars) {
 }
 if (-not $vcvars) { throw "no Visual Studio found; set HOOK_VCVARS to vcvarsall.bat" }
 
-$sources = "dllmain.cpp", "log.cpp", "game_build.cpp", "hooks.cpp", "ai_trace.cpp", "robot.cpp", "robot_input.cpp", "robot_endturn.cpp", "robot_trace.cpp", "robot_menu.cpp", "robot_screen.cpp", "robot_ui.cpp", "robot_lobby.cpp", "robot_net.cpp", "robot_profile.cpp", "robot_paths.cpp", "robot_clock.cpp", "patch.cpp", "d3d9_hook.cpp", "watchdog.cpp", "..\mods\net_tuning.cpp", "..\mods\lan_discovery.cpp", "..\mods\coop_guard.cpp", "..\mods\lockstep.cpp", "..\mods\ai_pacing.cpp", "..\mods\autosave.cpp", "..\mods\notify.cpp", "..\mods\rmg_teams.cpp", "..\mods\rmg_templates.cpp", "..\mods\fast_paths.cpp", "..\mods\fast_paths_relax.cpp", "..\mods\fast_paths_search.cpp", "..\mods\fast_paths_expand.cpp", "..\mods\fast_paths_ashore.cpp", "..\mods\original_music.cpp", "..\mods\original_music_xdb.cpp", "..\mods\player_list.cpp", "..\mods\player_list_game.cpp", "..\mods\player_list_draw.cpp", "..\mods\rmg_maker.cpp", "..\mods\rmg_recipe.cpp", "..\mods\rmg_join.cpp", "..\mods\camera.cpp", "..\mods\languages.cpp", "..\mods\languages_text.cpp", "dinput_hook.cpp", "input_mute.cpp", "overlay.cpp", "overlay_input.cpp", "overlay_textures.cpp", "overlay_test_panel.cpp", "..\mods\rmg_builder.cpp", "..\mods\rmg_builder_data.cpp", "..\mods\rmg_builder_widgets.cpp", "..\mods\rmg_screen.cpp", "..\mods\rmg_factions.cpp", "..\mods\audio_volume.cpp", "..\mods\edge_sky.cpp", "..\mods\wheel.cpp", "..\mods\wheel_logic.cpp", "..\mods\host_rules.cpp", "..\mods\host_rules_logic.cpp", "..\mods\host_rules_panel.cpp", "..\mods\host_rules_bonus.cpp", "..\mods\host_rules_icons.cpp", "..\mods\host_rules_classes.cpp", "..\mods\hero_skins.cpp", "..\mods\hero_skins_logic.cpp", "..\mods\hero_skins_panel.cpp", "..\mods\steam_spike.cpp", "..\mods\steam_spike_logic.cpp"
+$sources = "dllmain.cpp", "log.cpp", "old_names.cpp", "game_build.cpp", "hooks.cpp", "ai_trace.cpp", "robot.cpp", "robot_input.cpp", "robot_endturn.cpp", "robot_trace.cpp", "robot_menu.cpp", "robot_screen.cpp", "robot_ui.cpp", "robot_lobby.cpp", "robot_net.cpp", "robot_profile.cpp", "robot_paths.cpp", "robot_clock.cpp", "patch.cpp", "d3d9_hook.cpp", "watchdog.cpp", "..\mods\net_tuning.cpp", "..\mods\lan_discovery.cpp", "..\mods\coop_guard.cpp", "..\mods\lockstep.cpp", "..\mods\ai_pacing.cpp", "..\mods\autosave.cpp", "..\mods\notify.cpp", "..\mods\rmg_teams.cpp", "..\mods\rmg_templates.cpp", "..\mods\fast_paths.cpp", "..\mods\fast_paths_relax.cpp", "..\mods\fast_paths_search.cpp", "..\mods\fast_paths_expand.cpp", "..\mods\fast_paths_ashore.cpp", "..\mods\original_music.cpp", "..\mods\original_music_xdb.cpp", "..\mods\player_list.cpp", "..\mods\player_list_game.cpp", "..\mods\player_list_draw.cpp", "..\mods\rmg_maker.cpp", "..\mods\rmg_recipe.cpp", "..\mods\rmg_join.cpp", "..\mods\camera.cpp", "..\mods\languages.cpp", "..\mods\languages_text.cpp", "dinput_hook.cpp", "input_mute.cpp", "overlay.cpp", "overlay_input.cpp", "overlay_textures.cpp", "overlay_test_panel.cpp", "..\mods\rmg_builder.cpp", "..\mods\rmg_builder_data.cpp", "..\mods\rmg_builder_widgets.cpp", "..\mods\rmg_screen.cpp", "..\mods\rmg_factions.cpp", "..\mods\audio_volume.cpp", "..\mods\edge_sky.cpp", "..\mods\wheel.cpp", "..\mods\wheel_logic.cpp", "..\mods\host_rules.cpp", "..\mods\host_rules_logic.cpp", "..\mods\host_rules_panel.cpp", "..\mods\host_rules_bonus.cpp", "..\mods\host_rules_icons.cpp", "..\mods\host_rules_classes.cpp", "..\mods\hero_skins.cpp", "..\mods\hero_skins_logic.cpp", "..\mods\hero_skins_panel.cpp", "..\mods\steam_spike.cpp", "..\mods\steam_spike_logic.cpp"
 # Source paths are relative to src\hook (the build runs there): with the full
 # path of a deep folder, the command line grew past cmd's 8191 characters.
 # Dear ImGui (third_party\imgui, for the player list overlay): the same settings
@@ -57,11 +57,13 @@ if ($Test) {
     $cmd += " && cl $flags test\original_music_test.cpp ..\mods\original_music_xdb.cpp /Fo`"$out\\`" /Fe`"$out\original_music_test.exe`""
     # the log's size limit: a big log becomes the old log at start-up
     $cmd += " && cl $flags test\log_test.cpp log.cpp /Fo`"$out\\`" /Fe`"$out\log_test.exe`""
+    # the move from the add-on's old name (open-homm5.ini and the others become h5-together.*)
+    $cmd += " && cl $flags test\old_names_test.cpp old_names.cpp log.cpp /Fo`"$out\\`" /Fe`"$out\old_names_test.exe`""
     # the "languages" mod's work on bytes: paths, text encodings, zip directories
     $cmd += " && cl $flags test\languages_test.cpp ..\mods\languages_text.cpp /Fo`"$out\\`" /Fe`"$out\languages_test.exe`""
     # the C++ template maker against the JavaScript one, and the recipe names
     $cmd += " && cl $flags test\rmg_maker_test.cpp ..\mods\rmg_maker.cpp /Fo`"$out\\`" /Fe`"$out\rmg_maker_test.exe`""
-    $cmd += " && cl $flags test\rmg_recipe_test.cpp ..\mods\rmg_recipe.cpp ..\mods\rmg_maker.cpp ..\mods\rmg_join.cpp ..\mods\rmg_templates.cpp log.cpp patch.cpp /Fo`"$out\\`" /Fe`"$out\rmg_recipe_test.exe`""
+    $cmd += " && cl $flags test\rmg_recipe_test.cpp ..\mods\rmg_recipe.cpp ..\mods\rmg_maker.cpp ..\mods\rmg_join.cpp ..\mods\rmg_templates.cpp log.cpp old_names.cpp patch.cpp /Fo`"$out\\`" /Fe`"$out\rmg_recipe_test.exe`""
     # the template builder's data: presets, zone map, words, the native button's files
     $cmd += " && cl $flags test\rmg_builder_test.cpp ..\mods\rmg_builder_data.cpp ..\mods\rmg_recipe.cpp ..\mods\rmg_maker.cpp /Fo`"$out\\`" /Fe`"$out\rmg_builder_test.exe`""
     # the hero looks' rules: the choices file, the messages between PCs, who decides
@@ -107,11 +109,11 @@ Write-Host "built $out\dinput8.dll"
 if ($Test) {
     Push-Location $out
     try {
-        Remove-Item -ErrorAction SilentlyContinue open-homm5.log
+        Remove-Item -ErrorAction SilentlyContinue h5-together.log
         & (Join-Path $out "proxy_test.exe") (Join-Path $out "dinput8.dll")
         if ($LASTEXITCODE -ne 0) { throw "smoke test failed" }
-        Get-Content open-homm5.log
-        Remove-Item -ErrorAction SilentlyContinue open-homm5.log
+        Get-Content h5-together.log
+        Remove-Item -ErrorAction SilentlyContinue h5-together.log
         & (Join-Path $out "ai_trace_test.exe")
         if ($LASTEXITCODE -ne 0) { throw "AI trace test failed" }
         & (Join-Path $out "original_music_test.exe")
@@ -120,6 +122,8 @@ if ($Test) {
         if ($LASTEXITCODE -ne 0) { throw "languages test failed" }
         & (Join-Path $out "log_test.exe")
         if ($LASTEXITCODE -ne 0) { throw "log test failed" }
+        & (Join-Path $out "old_names_test.exe")
+        if ($LASTEXITCODE -ne 0) { throw "old names test failed" }
         # Node writes what the C++ template maker must build (and runs the
         # JavaScript maker's own checks); the two test exes compare.
         if (-not (Get-Command node -ErrorAction SilentlyContinue)) { throw "Node.js is needed for the template maker's parity test" }
@@ -148,9 +152,9 @@ if ($Test) {
             & (Join-Path $out "steam_abi_check.exe")
             if ($LASTEXITCODE -ne 0) { throw "Steam declarations check failed" }
         } else { Write-Host "Steam declarations check skipped: no ref\steamworks_sdk_* here" }
-        Remove-Item -ErrorAction SilentlyContinue open-homm5.log
+        Remove-Item -ErrorAction SilentlyContinue h5-together.log
         & (Join-Path $out "watchdog_test.exe")
-        if ($LASTEXITCODE -ne 0) { Get-Content open-homm5.log; throw "watchdog test failed" }
-        Remove-Item -ErrorAction SilentlyContinue open-homm5.log
+        if ($LASTEXITCODE -ne 0) { Get-Content h5-together.log; throw "watchdog test failed" }
+        Remove-Item -ErrorAction SilentlyContinue h5-together.log
     } finally { Pop-Location }
 }

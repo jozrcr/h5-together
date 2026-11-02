@@ -4,7 +4,7 @@
 
 namespace mods {
 
-// With the settings of open-homm5.ini [camera]: edge_sky=game (the default:
+// With the settings of h5-together.ini [camera]: edge_sky=game (the default:
 // nothing is installed) or none; edge_sky_test_light= (testing: one more light
 // file to serve without its sky dome). Only after DetectGameBuild() said the
 // build is hookable.

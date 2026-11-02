@@ -570,9 +570,9 @@ bool g_early = false;      // ... since the DLL was loaded
 
 void IniPath(wchar_t *ini)
 {
-	// open-homm5.ini next to the game exe (open-homm5-<instance>.ini for the
+	// h5-together.ini next to the game exe (h5-together-<instance>.ini for the
 	// robot's copies, see hooklog::PathNextToExe)
-	hooklog::PathNextToExe(L"open-homm5", L".ini", ini, MAX_PATH);
+	hooklog::PathNextToExe(L"h5-together", L".ini", ini, MAX_PATH);
 }
 
 void Install(bool early)

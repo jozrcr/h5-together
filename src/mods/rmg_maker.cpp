@@ -376,6 +376,7 @@ std::string ToXml(const Template &t)
 	};
 	line("\xEF\xBB\xBF<?xml version=\"1.0\" encoding=\"UTF-8\"?>");  // the BOM, U+FEFF
 	line("<RMGTemplate>");
+	// the add-on's old name (until 0.2.7) stays: every PC builds the same bytes from a name
 	line("  <Editor name=\"open-homm5 template maker\" version=\"1\" />");
 	line("  <NameFileRef href=\"\" />");
 	line("  <DescriptionFileRef href=\"\" />");

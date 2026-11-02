@@ -1,6 +1,6 @@
 // Robot mode: lets tools/robot/run_ai_test.py run the game unattended.
 //
-// Active only when a file "open-homm5-robot.ini" ("open-homm5-robot-<instance>.ini"
+// Active only when a file "h5-together-robot.ini" ("h5-together-robot-<instance>.ini"
 // when OPEN_HOMM5_INSTANCE is set, see log.h) sits next to the game exe (only
 // ever in a test copy of the game). It then:
 //   - redirects the "My Documents" folder (SHGetFolderPathA) to a robot home
@@ -131,7 +131,7 @@ void DescribeStack(DWORD esp, char *line, size_t size, int max_frames);
 void *PatchImport(const char *dll, const char *function, void *replacement);
 
 // AI profiler (robot_profile.cpp), when profile_ai=1: samples the main thread
-// while the AI thinks (OnAiThinking from the AI trace) into open-homm5-profile.txt.
+// while the AI thinks (OnAiThinking from the AI trace) into h5-together-profile.txt.
 void StartAiProfiler();
 void OnAiThinking(bool thinking);
 

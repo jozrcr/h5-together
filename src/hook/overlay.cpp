@@ -451,7 +451,7 @@ Language PanelLanguage()
 	if (language >= 0)
 		return static_cast<Language>(language);
 	wchar_t path[MAX_PATH], text[32];
-	hooklog::PathNextToExe(L"open-homm5", L".ini", path, MAX_PATH);
+	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
 	GetPrivateProfileStringW(L"ui", L"language", L"auto", text, 32, path);
 	if (_wcsicmp(text, L"en") == 0 || _wcsicmp(text, L"fr") == 0) {
 		language = _wcsicmp(text, L"fr") == 0 ? kFrench : kEnglish;

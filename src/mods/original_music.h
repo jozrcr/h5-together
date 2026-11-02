@@ -5,7 +5,7 @@
 
 namespace mods {
 
-// With the settings of open-homm5.ini: [audio] original_music=0 (default: the
+// With the settings of h5-together.ini: [audio] original_music=0 (default: the
 // music of the installed mod, as without the add-on; 1 = the original game's
 // music wherever a mod changed it) and log_music=0 (1 = log the music files the
 // game opens, for testing). Only after DetectGameBuild() said the build is

@@ -35,7 +35,7 @@ For the ready templates it also checks that:
 
 ## The ready templates (24)
 
-The install package puts these in the game's `bin\open-homm5\templates\` (see [../package/README.md](../package/README.md)), and the hook DLL adds them to the random map list. Every player of a multiplayer game needs the same files. The map size is automatic: the maker picks the size that gives zones closest to 5,800 tiles. `Lu` = Large with underground, `XLu` = Extra large with underground, `Hu` = Huge with underground.
+The install package puts these in the game's `bin\h5-together\templates\` (see [../package/README.md](../package/README.md)), and the hook DLL adds them to the random map list. Every player of a multiplayer game needs the same files. The map size is automatic: the maker picks the size that gives zones closest to 5,800 tiles. `Lu` = Large with underground, `XLu` = Extra large with underground, `Hu` = Huge with underground.
 
 How to read the names: `OH-<layout>-<size>-<loot>[-Towns]`.
 - **Normal** is the basic shape of a layout: a treasure zone behind each team, one neutral zone between neighbours, one rich zone in the middle. On the team layouts, **Rich** has richer loot, more neutral zones and a bigger map (2v2: two neutral zones per side and two in the middle; the larger layouts also go up a map size). In the free-for-all layouts, Rich only changes the loot.
@@ -114,7 +114,7 @@ Rules:
 
 **In the game**, the template builder makes them: the random map screen's "Template..." button opens every choice of this page, and "Use" puts the recipe template in the game's list and chooses it ([src/mods/README.md](../../src/mods/README.md#template-builder-rmg_buildercpp-rmg_screencpp-on-by-default)). Its "Start from" list is the 24 ready templates above, by their recipe names.
 
-For tests, recipe templates can also be offered in the game's list by name, in `open-homm5.ini`:
+For tests, recipe templates can also be offered in the game's list by name, in `h5-together.ini`:
 
 ```ini
 [rmg]

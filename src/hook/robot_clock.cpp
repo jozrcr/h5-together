@@ -1,4 +1,4 @@
-// Robot-mode virtual clock (virtual_clock=1 in open-homm5-robot.ini): the
+// Robot-mode virtual clock (virtual_clock=1 in h5-together-robot.ini): the
 // game's main thread sees a clock that advances by a fixed step per frame and
 // by the requested time in Sleep, not with real time. The date and time of day
 // are fixed too.

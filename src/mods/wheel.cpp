@@ -169,7 +169,7 @@ void Check(void *device, LONG last_raw)
 		               g_converter.steps_votes(), g_converter.checks());
 	else
 		hooklog::Write("wheel: the mouse wheel's events were left as they are (%d checks: %d steps, %d positions). If "
-		               "the wheel still does not zoom out, try [camera] wheel_fix=1 and send us open-homm5.log",
+		               "the wheel still does not zoom out, try [camera] wheel_fix=1 and send us h5-together.log",
 		               g_converter.checks(), g_converter.steps_votes(), g_converter.positions_votes());
 }
 
@@ -291,7 +291,7 @@ Setting ReadSetting(const wchar_t *ini)
 void ApplyWheelFromSettings()
 {
 	wchar_t ini[MAX_PATH];
-	hooklog::PathNextToExe(L"open-homm5", L".ini", ini, MAX_PATH);
+	hooklog::PathNextToExe(L"h5-together", L".ini", ini, MAX_PATH);
 	g_setting = ReadSetting(ini);
 	g_trace = GetPrivateProfileIntW(L"debug", L"trace_wheel", 0, ini) != 0;
 	typedef const char *(__cdecl * WineVersionFn)();

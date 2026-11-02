@@ -13,9 +13,9 @@ Status: proposal for the owner (2026-10-24).
 
 Goal: a friend downloads one zip, double-clicks one file, and plays.
 
-- **The package** `open-homm5-<version>.zip`:
+- **The package** `h5-together-<version>.zip`:
   - `dinput8.dll`;
-  - `open-homm5.ini` with every setting at its default, commented;
+  - `h5-together.ini` with every setting at its default, commented;
   - `install.bat` (Windows) and `install.sh` (Linux), with matching uninstall scripts;
   - a 10-line `README.txt`.
 - **`install.bat`:**
@@ -24,8 +24,8 @@ Goal: a friend downloads one zip, double-clicks one file, and plays.
   - never touches the game's own files, and refuses to overwrite a `dinput8.dll` that isn't ours.
 - **`install.sh` (Linux, Steam/Proton):** finds the Steam library, copies the DLL, and prints the one launch option to paste: `WINEDLLOVERRIDES="dinput8=n,b" %command%`. Steam's own config files are too fragile to edit from a script.
 - **Version:**
-  - the DLL writes its version on the first line of `open-homm5.log`;
-  - later, a small "open-homm5 0.x" in a corner of the main menu, so everyone can check they have the same one (the co-op guard needs that anyway).
+  - the DLL writes its version on the first line of `h5-together.log`;
+  - later, a small "H5 Together 0.x" in a corner of the main menu, so everyone can check they have the same one (the co-op guard needs that anyway).
 - **Builds:**
   - GitHub builds the package by itself for every version tag (a Windows build machine has the compiler);
   - **you** publish each release with one click;
@@ -68,4 +68,4 @@ Goal: a friend downloads one zip, double-clicks one file, and plays.
   - that the game is started through MMH5.5's exe.
 
   It should then say plainly what is missing. It must still never change the game's files, and it must not install MMH5.5 itself, which is a separate project's download.
-- **Upgrades:** when an existing `open-homm5.ini` is kept, add the setting sections that are new in this version, commented out, so players see them. As of 0.1.1, upgraders have to add `[audio]` by hand.
+- **Upgrades:** when an existing `h5-together.ini` is kept, add the setting sections that are new in this version, commented out, so players see them. As of 0.1.1, upgraders have to add `[audio]` by hand.

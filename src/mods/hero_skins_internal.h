@@ -35,7 +35,7 @@ struct PanelData {
 // behind the hero screen it opens). False when there is none, or the looks are off.
 bool PanelHero(PanelData *out);
 
-// Saves a choice to open-homm5-skins.ini and makes it count: at once in single
+// Saves a choice to h5-together-skins.ini and makes it count: at once in single
 // player; in multiplayer it is sent and counts on every PC at the same segment
 // (a few seconds), if this game's looks are on. Returns a line for the log.
 enum Applied { kAppliedNow, kAppliedSoon, kSavedForNextGames, kNotApplied };
@@ -63,7 +63,7 @@ std::string NameFile(int hero);
 }  // namespace skins
 
 // The panel (hero_skins_panel.cpp): adds the overlay client. The key comes
-// from open-homm5.ini [skins] key (F7 by default).
+// from h5-together.ini [skins] key (F7 by default).
 void InstallHeroSkinsPanel();
 void InstallHeroSkinsPanelEarly();
 

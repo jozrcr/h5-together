@@ -1,4 +1,4 @@
-# open-homm5 installer for Windows. Runs on Windows PowerShell 5.1.
+# H5 Together installer for Windows. Runs on Windows PowerShell 5.1.
 #
 # Keep this file plain ASCII: PowerShell 5.1 reads a file without a byte-order
 # mark as ANSI, so any accent would be garbled on a French Windows.
@@ -8,8 +8,10 @@
 #   -SteamDir <folder>  look in this Steam folder instead of the one in the registry
 #   -NoPause            do not wait for Enter at the end
 #
-# An existing open-homm5.ini is refreshed: it becomes this package's file with the
-# player's values in it (the old one is kept as open-homm5.ini.bak; see Merge-Settings).
+# An existing h5-together.ini is refreshed: it becomes this package's file with the
+# player's values in it (the old one is kept as h5-together.ini.bak; see Merge-Settings).
+# The files of the add-on's old name (open-homm5, until 0.2.7) get the new name first,
+# the folder bin\open-homm5 included (see Move-OldNames).
 #
 # Exit codes: 0 done, 3 refused (a dinput8.dll that is not ours is there),
 # 4 game not found, 5 copy failed, 6 unexpected error, 7 package incomplete.
@@ -32,14 +34,16 @@ function Wait-AndExit([int]$Code) {
 }
 
 # ---- shared with uninstall.ps1 and bug-report.ps1: finding the game (keep all copies identical) ----
-$Marker = "open-homm5 hook DLL"
+$Marker = "H5 Together hook DLL"
+$OldMarker = "open-homm5 hook DLL"  # the add-on's name until 0.2.7
 $GameFolderName = "Heroes of Might and Magic 5 Tribes of the East"
 
-# True if the file is the dinput8.dll of open-homm5 (it contains our marker text).
+# True if the file is the dinput8.dll of H5 Together, or of open-homm5 (0.2.7 and
+# older): it contains our marker text.
 function Test-IsOurs([string]$Path) {
     $bytes = [System.IO.File]::ReadAllBytes($Path)
     $text = [System.Text.Encoding]::GetEncoding(28591).GetString($bytes)
-    return $text.Contains($Marker)
+    return ($text.Contains($Marker) -or $text.Contains($OldMarker))
 }
 
 # Takes the game folder or its bin folder. Returns the bin folder, or $null if
@@ -181,10 +185,10 @@ function Get-PublicZeroTier {
     return $names
 }
 
-# ---- the settings file: refresh it from this package's open-homm5.ini ----
+# ---- the settings file: refresh it from this package's h5-together.ini ----
 # install.sh does exactly the same (merge_ini); test_scripts.py checks that both give
 # the same bytes. The rules:
-# - the result is this package's open-homm5.ini (every setting, commented out), with
+# - the result is this package's h5-together.ini (every setting, commented out), with
 #   its line endings;
 # - each "key=value" line of the player's file fills the line ";key=..." of the same
 #   [section] of the new file: it becomes "key=value". Names ignore upper/lower case
@@ -193,7 +197,7 @@ function Get-PublicZeroTier {
 #   second copy of one) go, as they were, at the end of their section under
 #   "; kept from your previous file:". A section the new file lacks goes at the end;
 # - the player's own comments and blank lines are not carried over (the backup,
-#   open-homm5.ini.bak, has them).
+#   h5-together.ini.bak, has them).
 # Files are read and written one byte = one character (Latin-1), so nothing is
 # re-encoded: an ASCII file stays ASCII.
 $Latin1 = [System.Text.Encoding]::GetEncoding(28591)
@@ -375,26 +379,107 @@ function Get-Count([int]$N, [string]$One, [string]$Many) {
     return "$N $Many"
 }
 
+# ---- the add-on's old name: until 0.2.7 it was called open-homm5 ----
+# Its files in bin had that name: open-homm5.ini (and its .bak copies), open-homm5-skins.ini
+# (the hero looks), open-homm5.log and open-homm5.old.log, and the folder open-homm5 (our
+# templates, the French packs in lang\fr, anything the player put there). They get the new
+# name, so nothing the player set or added is lost. install.sh does the same (move_old_names).
+#   - a file moves only if the new name is not there yet; else it stays as it is (the new
+#     one is the one used), and the summary says so;
+#   - the last log becomes h5-together.old.log (the older log) while there is no log of the
+#     new name yet; the other old logs are removed (ours, and older than that);
+#   - the folder is renamed; if h5-together is there too, what it lacks is moved into it,
+#     and our templates in the old folder go (this install puts them in the new one).
+
+# Moves what the folder $From holds into the folder $To: what $To lacks is moved, a folder
+# both have is merged the same way, a file both have stays in $From. Then $From is removed
+# if it is empty. Returns how many files or folders stayed in $From.
+function Merge-Folder([string]$From, [string]$To) {
+    $left = 0
+    foreach ($item in @(Get-ChildItem -LiteralPath $From -Force)) {
+        $dst = Join-Path $To $item.Name
+        if (-not (Test-Path -LiteralPath $dst)) {
+            Move-Item -LiteralPath $item.FullName -Destination $dst
+        } elseif ($item.PSIsContainer -and (Test-Path -LiteralPath $dst -PathType Container)) {
+            $left += Merge-Folder $item.FullName $dst
+        } else {
+            $left++
+        }
+    }
+    if (@(Get-ChildItem -LiteralPath $From -Force).Count -eq 0) { Remove-Item -LiteralPath $From -Force }
+    return $left
+}
+
+# Gives the old files in $Bin their new names. $Templates: the names of this package's
+# templates. Returns Moved (what got the new name), Left (old files left as they are) and
+# FolderLeft (files of the old folder that the new one also has).
+function Move-OldNames([string]$Bin, $Templates) {
+    $r = @{ Moved = New-Object System.Collections.ArrayList; Left = New-Object System.Collections.ArrayList; FolderLeft = 0 }
+    foreach ($ext in @(".ini", "-skins.ini")) {
+        $old = Join-Path $Bin ("open-homm5" + $ext)
+        $new = Join-Path $Bin ("h5-together" + $ext)
+        if (-not (Test-Path -LiteralPath $old -PathType Leaf)) { continue }
+        if (Test-Path -LiteralPath $new) { [void]$r.Left.Add("open-homm5" + $ext); continue }
+        Move-Item -LiteralPath $old -Destination $new
+        [void]$r.Moved.Add("open-homm5" + $ext)
+    }
+    # the installer's copies of the settings follow the settings file (not when it stayed)
+    if (-not $r.Left.Contains("open-homm5.ini")) {
+        foreach ($ext in @(".bak", ".bak2", ".bak3")) {
+            $old = Join-Path $Bin ("open-homm5.ini" + $ext)
+            $new = Join-Path $Bin ("h5-together.ini" + $ext)
+            if ((Test-Path -LiteralPath $old -PathType Leaf) -and -not (Test-Path -LiteralPath $new)) { Move-Item -LiteralPath $old -Destination $new }
+        }
+    }
+    $oldLog = Join-Path $Bin "open-homm5.log"
+    if (Test-Path -LiteralPath $oldLog -PathType Leaf) {
+        $older = Join-Path $Bin "h5-together.old.log"
+        if (-not (Test-Path -LiteralPath (Join-Path $Bin "h5-together.log")) -and -not (Test-Path -LiteralPath $older)) {
+            Move-Item -LiteralPath $oldLog -Destination $older
+            [void]$r.Moved.Add("open-homm5.log")
+        } else {
+            Remove-Item -LiteralPath $oldLog -Force
+        }
+    }
+    $oldOldLog = Join-Path $Bin "open-homm5.old.log"
+    if (Test-Path -LiteralPath $oldOldLog -PathType Leaf) { Remove-Item -LiteralPath $oldOldLog -Force }
+    $oldDir = Join-Path $Bin "open-homm5"
+    $newDir = Join-Path $Bin "h5-together"
+    if (Test-Path -LiteralPath $oldDir -PathType Container) {
+        if (-not (Test-Path -LiteralPath $newDir)) {
+            Move-Item -LiteralPath $oldDir -Destination $newDir
+        } else {
+            foreach ($name in $Templates) {
+                $p = Join-Path $oldDir ("templates\" + $name)
+                if (Test-Path -LiteralPath $p -PathType Leaf) { Remove-Item -LiteralPath $p -Force }
+            }
+            $r.FolderLeft = Merge-Folder $oldDir $newDir
+        }
+        [void]$r.Moved.Add("open-homm5")
+    }
+    return $r
+}
+
 try {
     Write-Host ""
-    Write-Host "open-homm5 installer"
-    Write-Host "--------------------"
+    Write-Host "H5 Together installer"
+    Write-Host "---------------------"
 
     $srcDll = Join-Path $PSScriptRoot "dinput8.dll"
-    $srcIni = Join-Path $PSScriptRoot "open-homm5.ini"
-    $srcTemplates = Join-Path $PSScriptRoot "open-homm5\templates"
+    $srcIni = Join-Path $PSScriptRoot "h5-together.ini"
+    $srcTemplates = Join-Path $PSScriptRoot "h5-together\templates"
     $templateFiles = @()
     if (Test-Path -LiteralPath $srcTemplates) {
         $templateFiles = @(Get-ChildItem -LiteralPath $srcTemplates -File | Where-Object { $_.Extension -ieq ".xdb" })
     }
     if (-not (Test-Path -LiteralPath $srcDll) -or -not (Test-Path -LiteralPath $srcIni) -or $templateFiles.Count -eq 0) {
-        Write-Host "dinput8.dll, open-homm5.ini and the folder open-homm5\templates must be next to this script." -ForegroundColor Red
+        Write-Host "dinput8.dll, h5-together.ini and the folder h5-together\templates must be next to this script." -ForegroundColor Red
         Write-Host "Please extract the whole zip first (right-click the zip, Extract All)," -ForegroundColor Red
         Write-Host "then run install.bat from the new folder. Nothing was installed." -ForegroundColor Red
         Wait-AndExit 7
     }
     if (-not (Test-IsOurs $srcDll)) {
-        Write-Host "The dinput8.dll in this package is not the open-homm5 one. The download may be damaged." -ForegroundColor Red
+        Write-Host "The dinput8.dll in this package is not the H5 Together one. The download may be damaged." -ForegroundColor Red
         Write-Host "Nothing was installed." -ForegroundColor Red
         Wait-AndExit 7
     }
@@ -408,8 +493,8 @@ try {
     Write-Host "Game folder: $bin"
 
     $dstDll = Join-Path $bin "dinput8.dll"
-    $dstIni = Join-Path $bin "open-homm5.ini"
-    $dstTemplates = Join-Path $bin "open-homm5\templates"
+    $dstIni = Join-Path $bin "h5-together.ini"
+    $dstTemplates = Join-Path $bin "h5-together\templates"
 
     # Never overwrite a dinput8.dll that belongs to something else.
     $dllWas = "new"
@@ -417,13 +502,25 @@ try {
         if (-not (Test-IsOurs $dstDll)) {
             Write-Host ""
             Write-Host "Stopped. There is already a file called dinput8.dll in the game folder," -ForegroundColor Red
-            Write-Host "and it is not the open-homm5 one (another add-on may use it)." -ForegroundColor Red
-            Write-Host "I did not change anything. If you want open-homm5, move that file away" -ForegroundColor Red
+            Write-Host "and it is not the H5 Together one (another add-on may use it)." -ForegroundColor Red
+            Write-Host "I did not change anything. If you want H5 Together, move that file away" -ForegroundColor Red
             Write-Host "yourself and run this installer again." -ForegroundColor Red
             Wait-AndExit 3
         }
         $same = (Get-Sha256 $srcDll) -eq (Get-Sha256 $dstDll)
         if ($same) { $dllWas = "same" } else { $dllWas = "older" }
+    }
+
+    # The files of the old name (open-homm5, until 0.2.7) get the new name first, so that
+    # the settings refresh and the templates below work on them.
+    try {
+        $renamed = Move-OldNames $bin @($templateFiles | ForEach-Object { $_.Name })
+    } catch {
+        Write-Host ""
+        Write-Host "Could not give your open-homm5 files their new name (h5-together):" -ForegroundColor Red
+        Write-Host ("  " + $_.Exception.Message) -ForegroundColor Red
+        Write-Host "If the game is running, close it and try again. Nothing else was changed." -ForegroundColor Red
+        Wait-AndExit 5
     }
 
     try {
@@ -478,14 +575,28 @@ try {
 
     Write-Host ""
     Write-Host "Done. What I did:" -ForegroundColor Green
+    if ($renamed.Moved.Count -gt 0) {
+        $what = @()
+        if ($renamed.Moved.Contains("open-homm5.ini")) { $what += "the settings" }
+        if ($renamed.Moved.Contains("open-homm5-skins.ini")) { $what += "the hero looks" }
+        if ($renamed.Moved.Contains("open-homm5.log")) { $what += "the log" }
+        if ($renamed.Moved.Contains("open-homm5")) { $what += "the folder" }
+        Write-Host ("  - open-homm5 is now called H5 Together: your files got the new name, h5-together (" + ($what -join ", ") + ")")
+    }
+    foreach ($name in $renamed.Left) {
+        Write-Host ("  - kept {0} as it is: there is already a {1}, which is the one used" -f $name, ($name -replace '^open-homm5', 'h5-together')) -ForegroundColor Yellow
+    }
+    if ($renamed.FolderLeft -gt 0) {
+        Write-Host ("  - left {0} file(s) in the folder open-homm5: the folder h5-together has them too" -f $renamed.FolderLeft) -ForegroundColor Yellow
+    }
     if ($dllWas -eq "new") { Write-Host "  - added dinput8.dll (the add-on)" }
     elseif ($dllWas -eq "same") { Write-Host "  - dinput8.dll was already installed and up to date" }
-    else { Write-Host "  - replaced the older open-homm5 dinput8.dll with this version" }
-    if ($iniWas -eq "new") { Write-Host "  - added open-homm5.ini (settings, all at their defaults)" }
+    else { Write-Host "  - replaced the older H5 Together dinput8.dll with this version" }
+    if ($iniWas -eq "new") { Write-Host "  - added h5-together.ini (settings, all at their defaults)" }
     elseif ($iniWas -eq "refreshed") {
         $newText = Get-Count $merged.New "new setting" "new settings"
         Write-Host ("  - settings file refreshed: {0} of your settings kept, {1} available (see the comments)" -f $merged.Settings, $newText)
-        Write-Host "    (your previous file is saved as open-homm5.ini.bak)"
+        Write-Host "    (your previous file is saved as h5-together.ini.bak)"
         if ($merged.Unknown -gt 0) {
             $unknownText = Get-Count $merged.Unknown "setting" "settings"
             Write-Host ("    ({0} not listed in this version: kept at the end of their section, under ""kept from your previous file"")" -f $unknownText)
@@ -496,13 +607,13 @@ try {
         else { Write-Host "  - settings file already up to date (every setting at its default)" }
     }
     elseif ($iniWas -eq "unreadable") {
-        Write-Host "  - kept open-homm5.ini as it is: it is not a plain text file, so I could not add the new settings" -ForegroundColor Yellow
+        Write-Host "  - kept h5-together.ini as it is: it is not a plain text file, so I could not add the new settings" -ForegroundColor Yellow
     }
     else {
-        Write-Host ("  - could not refresh open-homm5.ini: " + $iniError) -ForegroundColor Yellow
+        Write-Host ("  - could not refresh h5-together.ini: " + $iniError) -ForegroundColor Yellow
         Write-Host "    If the game is running, close it and run the installer again." -ForegroundColor Yellow
     }
-    Write-Host ("  - installed {0} random map templates in open-homm5\templates (they are in the game's random map list)" -f $templateFiles.Count)
+    Write-Host ("  - installed {0} random map templates in h5-together\templates (they are in the game's random map list)" -f $templateFiles.Count)
     if ($tplReplaced -gt 0) { Write-Host ("    ({0} of them replaced our files from an earlier install)" -f $tplReplaced) }
     if ($tplOthers -gt 0) { Write-Host ("    (left the {0} other file(s) in that folder alone)" -f $tplOthers) }
     Write-Host "    Everyone in a multiplayer game needs the same templates: install the same version."
@@ -514,7 +625,7 @@ try {
     }
     Write-Host ""
     Write-Host "How to check: start the game as you do for co-op games (GameRanger, or"
-    Write-Host "MMH55_Utility_64.exe). A file named open-homm5.log then appears in:"
+    Write-Host "MMH55_Utility_64.exe). A file named h5-together.log then appears in:"
     Write-Host "  $bin"
     Write-Host "If you see it, the add-on is running. Everyone in the same co-op game should install it."
     Write-Host "To remove it later, run uninstall.bat."

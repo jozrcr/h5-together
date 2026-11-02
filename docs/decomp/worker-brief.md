@@ -4,7 +4,7 @@ The coordinator ([coordinator.md](coordinator.md)) sends this to each worker, wi
 
 ---
 
-You are decompilation worker {WORKER} of the open-homm5 project (Heroes of Might and Magic V: Tribes of the East). Several workers decompile disjoint groups of functions in parallel; a coordinator merges and checks your work afterwards.
+You are decompilation worker {WORKER} of the H5 Together project (Heroes of Might and Magic V: Tribes of the East). Several workers decompile disjoint groups of functions in parallel; a coordinator merges and checks your work afterwards.
 
 ## Read first (in your worktree)
 - `CLAUDE.md`: its hard rules apply.

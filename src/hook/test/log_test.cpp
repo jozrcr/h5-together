@@ -1,5 +1,5 @@
 // Test of the log's size limit (src/hook/log.cpp): a log over the limit becomes
-// open-homm5.old.log at start-up, a small one is left alone, and a log that another
+// h5-together.old.log at start-up, a small one is left alone, and a log that another
 // copy of the game holds open stays where it is. No game needed; the files are made in
 // a new folder of the temp folder, and next to this exe (instance "logtest").
 #include <windows.h>
@@ -53,7 +53,7 @@ std::wstring NewFolder()
 {
 	wchar_t temp[MAX_PATH];
 	GetTempPathW(MAX_PATH, temp);
-	std::wstring dir = std::wstring(temp) + L"open-homm5-log-test-" + std::to_wstring(GetCurrentProcessId());
+	std::wstring dir = std::wstring(temp) + L"h5-together-log-test-" + std::to_wstring(GetCurrentProcessId());
 	CreateDirectoryW(dir.c_str(), nullptr);
 	return dir;
 }
@@ -61,8 +61,8 @@ std::wstring NewFolder()
 void TestRotateIfLarge()
 {
 	const std::wstring dir = NewFolder();
-	const std::wstring log = dir + L"\\open-homm5.log";
-	const std::wstring old = dir + L"\\open-homm5.old.log";
+	const std::wstring log = dir + L"\\h5-together.log";
+	const std::wstring old = dir + L"\\h5-together.old.log";
 	const unsigned long long limit = 100;
 
 	Check(!hooklog::RotateIfLarge(log.c_str(), old.c_str(), limit) && !Exists(old), "no log: nothing happens");
@@ -98,16 +98,16 @@ void TestRotateIfLarge()
 	RemoveDirectoryW(dir.c_str());
 }
 
-// Open() end to end, on the files next to this exe: instance "logtest" gives open-homm5-logtest.log.
+// Open() end to end, on the files next to this exe: instance "logtest" gives h5-together-logtest.log.
 void TestOpen()
 {
 	SetEnvironmentVariableW(L"OPEN_HOMM5_INSTANCE", L"logtest");
 	wchar_t log_c[MAX_PATH], old_c[MAX_PATH];
-	hooklog::PathNextToExe(L"open-homm5", L".log", log_c, MAX_PATH);
-	hooklog::PathNextToExe(L"open-homm5", L".old.log", old_c, MAX_PATH);
+	hooklog::PathNextToExe(L"h5-together", L".log", log_c, MAX_PATH);
+	hooklog::PathNextToExe(L"h5-together", L".old.log", old_c, MAX_PATH);
 	const std::wstring log = log_c, old = old_c;
-	Check(log.find(L"open-homm5-logtest.log") != std::wstring::npos && old.find(L"open-homm5-logtest.old.log") != std::wstring::npos,
-	      "paths: open-homm5-<instance>.log and open-homm5-<instance>.old.log");
+	Check(log.find(L"h5-together-logtest.log") != std::wstring::npos && old.find(L"h5-together-logtest.old.log") != std::wstring::npos,
+	      "paths: h5-together-<instance>.log and h5-together-<instance>.old.log");
 	DeleteFileW(log.c_str());
 	DeleteFileW(old.c_str());
 

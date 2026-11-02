@@ -38,7 +38,7 @@
 // save. With the owner's 17 multiplayer saves in the folder, a round froze
 // for ~10 s; zlib was ~0.1 s of it.
 //
-// What this mod does, settings in open-homm5.ini [save]:
+// What this mod does, settings in h5-together.ini [save]:
 //   trace_autosave=1   one log line per request (which PC asks, the folder
 //                      lookups) and per save (which PC, how long, each phase,
 //                      the zlib time and sizes, the file flushes).
@@ -588,7 +588,7 @@ bool Matches(DWORD address, const BYTE *bytes, size_t size)
 void ApplyAutosaveFromSettings()
 {
 	wchar_t path[MAX_PATH];
-	hooklog::PathNextToExe(L"open-homm5", L".ini", path, MAX_PATH);
+	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
 	g_trace = ReadInt(path, L"trace_autosave", 1) != 0;
 	g_level = ReadInt(path, L"compression", 1);
 	g_every = ReadInt(path, L"autosave_every", 1);

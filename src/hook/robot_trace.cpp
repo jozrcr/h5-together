@@ -7,7 +7,7 @@
 //            the transceiver's time (this+0x14); *segment = this+0x14 + 200
 //   slot 4 = 0x007c7b20  void RunSegment()               __thiscall, ret
 //            executes the queued commands, then this+0x14 += 200
-// Enabled with trace_segments=1 in open-homm5-robot.ini. Vftable entries only.
+// Enabled with trace_segments=1 in h5-together-robot.ini. Vftable entries only.
 // The multiplayer version (trace_mp=1) is further down.
 #include <windows.h>
 #include <stdio.h>

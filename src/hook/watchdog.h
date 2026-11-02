@@ -1,7 +1,7 @@
 // The hang watchdog (docs/subsystems/hangs.md): when the game's main thread
 // stops looking at its window messages for a while (Windows then calls the
 // window "not responding"), a background thread looks where it is stuck and
-// writes that to open-homm5.log, once per freeze. It only looks: it never stops,
+// writes that to h5-together.log, once per freeze. It only looks: it never stops,
 // kills or changes anything.
 #pragma once
 #include <windows.h>

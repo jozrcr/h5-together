@@ -3,7 +3,7 @@
 // The owner's problem: in co-op games the friends switch to another window
 // while the computer players move, and miss the moment they can play again.
 //
-// What this mod does, settings in open-homm5.ini [notify]:
+// What this mod does, settings in h5-together.ini [notify]:
 //   turn=1   when this PC's player can play again and the game window is not
 //            in front: the game's taskbar button flashes (until the game is
 //            back in front), and the log says "notify: your turn (day N)".
@@ -441,9 +441,9 @@ void __fastcall UpdateHook(void *controller, void *edx, DWORD a, DWORD b, DWORD 
 void ApplyNotifyFromSettings()
 {
 	wchar_t path[MAX_PATH];
-	hooklog::PathNextToExe(L"open-homm5", L".ini", path, MAX_PATH);
+	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
 	if (!GetPrivateProfileIntW(L"notify", L"turn", 1, path)) {
-		hooklog::Write("notify: \"your turn\" notification off (open-homm5.ini)");
+		hooklog::Write("notify: \"your turn\" notification off (h5-together.ini)");
 		return;
 	}
 	g_sound = GetPrivateProfileIntW(L"notify", L"sound", 1, path) != 0;

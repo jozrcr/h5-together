@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# open-homm5 bug report helper for Linux (Steam / Proton).
+# H5 Together bug report helper for Linux (Steam / Proton).
 #
-# Makes open-homm5-bug-report-<date>.zip in the folder you run it from, to attach to a
+# Makes h5-together-bug-report-<date>.zip in the folder you run it from, to attach to a
 # bug report on GitHub. It holds what we need to look into a problem and nothing else:
-#   open-homm5.log and open-homm5.old.log   what the add-on wrote
-#   open-homm5.ini, open-homm5-skins.ini    your settings
-#   system.txt                              the add-on, MMH5.5 and Linux versions, a few file
-#                                           sizes and hashes, the other DLLs in the game folder
+#   h5-together.log and h5-together.old.log   what the add-on wrote
+#   h5-together.ini, h5-together-skins.ini    your settings
+#   the same four under the add-on's old name (open-homm5, until 0.2.7), if they are there
+#   system.txt                                the add-on, MMH5.5 and Linux versions, a few file
+#                                             sizes and hashes, the other DLLs in the game folder
 # No saves, no maps, no game files. It sends nothing anywhere: the zip is yours to look at
 # (it is a normal zip) and to attach yourself. The log lists player names and LAN addresses.
 #
@@ -27,7 +28,8 @@
 
 [ -n "${BASH_VERSION:-}" ] || { echo "Please run this with bash:  bash bug-report.sh"; exit 2; }
 
-MARKER='open-homm5 hook DLL'
+MARKER='H5 Together hook DLL'
+OLD_MARKER='open-homm5 hook DLL'   # the add-on's name until 0.2.7
 GAME_FOLDER='Heroes of Might and Magic 5 Tribes of the East'
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -49,8 +51,9 @@ done
 
 # ---- shared with uninstall.sh and bug-report.sh: finding the game (keep all copies identical) ----
 
-# True if the file is the dinput8.dll of open-homm5 (it contains our marker text).
-is_ours() { grep -q -a -F -- "$MARKER" "$1" 2>/dev/null; }
+# True if the file is the dinput8.dll of H5 Together, or of open-homm5 (0.2.7 and
+# older): it contains our marker text.
+is_ours() { grep -q -a -F -e "$MARKER" -e "$OLD_MARKER" -- "$1" 2>/dev/null; }
 
 # Prints the first file or folder called $2 (ignoring upper/lower case) inside $1.
 find_ci() { find "$1" -mindepth 1 -maxdepth 1 -iname "$2" -print 2>/dev/null | head -n 1; }
@@ -192,9 +195,11 @@ find_python() {
     return 1
 }
 
-# The version a dinput8.dll of ours says in its text ("open-homm5 hook DLL 0.2.7 loaded").
+# The name and version a dinput8.dll of ours says in its text: "H5 Together 0.3.0" from
+# "H5 Together hook DLL 0.3.0 loaded" ("open-homm5 0.2.7": the add-on's old name).
 addon_version() {
-    grep -a -o -E 'open-homm5 hook DLL [^ ]+ loaded' "$1" 2>/dev/null | head -n 1 | awk '{print $4}'
+    grep -a -o -E '(H5 Together|open-homm5) hook DLL [^ ]+ loaded' "$1" 2>/dev/null | head -n 1 |
+        sed -E 's/ hook DLL ([^ ]+) loaded$/ \1/'
 }
 
 # Prints the text of a file inside a zip file ($1), by the name inside ($2). Fails if it cannot.
@@ -220,8 +225,8 @@ known_55u() {
 }
 
 echo
-echo "open-homm5 bug report"
-echo "---------------------"
+echo "H5 Together bug report"
+echo "----------------------"
 
 if ! choose_game_bin; then
     echo
@@ -244,25 +249,27 @@ if ! mkdir -p "$out_dir" 2>/dev/null || [ ! -w "$out_dir" ]; then
 fi
 out_dir="$(cd "$out_dir" && pwd)"
 
-# The files that go in the report: only these, and only the ones that exist.
+# The files that go in the report: only these, and only the ones that exist (the last four:
+# the add-on's old name, until 0.2.7, for an install that was not updated yet).
 pack_names=()
 pack_paths=()
 has_log=0
-for name in open-homm5.log open-homm5.old.log open-homm5.ini open-homm5-skins.ini; do
+for name in h5-together.log h5-together.old.log h5-together.ini h5-together-skins.ini \
+            open-homm5.log open-homm5.old.log open-homm5.ini open-homm5-skins.ini; do
     f="$(find_ci "$bin" "$name")"
     if [ -n "$f" ] && [ -f "$f" ]; then
         pack_names+=("$name")
         pack_paths+=("$f")
-        [ "$name" = "open-homm5.log" ] && has_log=1
+        case "$name" in h5-together.log|open-homm5.log) has_log=1 ;; esac
     fi
 done
 
-stage="$(mktemp -d "${TMPDIR:-/tmp}/open-homm5-report.XXXXXX")" || { echo "Cannot make a temporary folder."; exit 5; }
+stage="$(mktemp -d "${TMPDIR:-/tmp}/h5-together-report.XXXXXX")" || { echo "Cannot make a temporary folder."; exit 5; }
 trap 'rm -rf "$stage"' EXIT
 
 # system.txt
 {
-    echo "open-homm5 bug report"
+    echo "H5 Together bug report"
     echo "Made by bug-report.sh on $(date '+%Y-%m-%d %H:%M:%S'). Nothing was sent anywhere."
     echo
     echo "Add-on"
@@ -270,20 +277,22 @@ trap 'rm -rf "$stage"' EXIT
     if [ -z "$dll" ]; then
         echo "  dinput8.dll in the game folder: none (the add-on is not installed here)"
     elif ! is_ours "$dll"; then
-        echo "  dinput8.dll in the game folder: NOT the open-homm5 one (another add-on uses that name)"
+        echo "  dinput8.dll in the game folder: NOT the H5 Together one (another add-on uses that name)"
     else
         v="$(addon_version "$dll")"
-        echo "  dinput8.dll in the game folder: open-homm5 ${v:-an older build, version not written in it}"
+        echo "  dinput8.dll in the game folder: ${v:-an older build of the add-on, version not written in it}"
     fi
     if [ -f "$here/dinput8.dll" ]; then
         v="$(addon_version "$here/dinput8.dll")"
         echo "  the package this script came from: ${v:-unknown}"
     fi
-    if [ -n "$(find_ci "$bin" open-homm5.nohooks)" ]; then
-        echo "  open-homm5.nohooks (switches the hooks off): present"
-    else
-        echo "  open-homm5.nohooks (switches the hooks off): not there"
-    fi
+    for name in h5-together.nohooks open-homm5.nohooks; do
+        if [ -n "$(find_ci "$bin" "$name")" ]; then
+            echo "  $name (switches the hooks off): present"
+        else
+            echo "  $name (switches the hooks off): not there"
+        fi
+    done
     echo
     echo "System"
     echo "  $(uname -srm 2>/dev/null)"
@@ -337,7 +346,7 @@ trap 'rm -rf "$stage"' EXIT
     for i in "${!pack_names[@]}"; do
         echo "  ${pack_names[$i]}  $(wc -c < "${pack_paths[$i]}" | tr -d ' ') bytes"
     done
-    [ "$has_log" -eq 1 ] || echo "  (there is no open-homm5.log in the game folder: the game was not started since the add-on was installed, or the add-on is not installed)"
+    [ "$has_log" -eq 1 ] || echo "  (there is no h5-together.log in the game folder: the game was not started since the add-on was installed, or the add-on is not installed)"
     echo "  system.txt  (this file)"
 } > "$stage/system.txt"
 
@@ -347,7 +356,7 @@ done
 
 # The archive: zip, else python3's zipfile, else a .tar.gz.
 stamp="$(date '+%Y-%m-%d-%H%M')"
-base="open-homm5-bug-report-$stamp"
+base="h5-together-bug-report-$stamp"
 files=("${pack_names[@]}" system.txt)
 report=""
 if [ "$force_tar" -eq 0 ] && command -v zip >/dev/null 2>&1; then
@@ -366,7 +375,7 @@ fi
 if [ -z "$report" ]; then
     echo
     echo "Could not make the report file in $out_dir."
-    echo "You can attach open-homm5.log from the game's bin folder instead:"
+    echo "You can attach h5-together.log from the game's bin folder instead:"
     echo "  $bin"
     exit 5
 fi
@@ -377,11 +386,11 @@ echo "  $report"
 echo "  ($(wc -c < "$report" | tr -d ' ') bytes; it holds: $(IFS=,; echo "${pack_names[*]}" | sed 's/,/, /g'), system.txt)"
 if [ "$has_log" -eq 0 ]; then
     echo
-    echo "There is no open-homm5.log in the game folder, so the report only tells about your installation."
+    echo "There is no h5-together.log in the game folder, so the report only tells about your installation."
     echo "(Either the add-on is not installed here, or the game was not started since.)"
 fi
 echo
-echo "Attach that file to your report on GitHub: https://github.com/jozrcr/open-homm5/issues/new/choose"
+echo "Attach that file to your report on GitHub: https://github.com/jozrcr/h5-together/issues/new/choose"
 echo "Nothing was sent anywhere. The log lists player names and LAN addresses; the file is a normal"
 echo "archive, so you can open it and look before you send it."
 exit 0

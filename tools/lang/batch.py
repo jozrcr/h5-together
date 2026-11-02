@@ -16,7 +16,7 @@ fr.txt: the translation, same format as en.txt (written by a person or a worker)
 check: every path translated, tags and <value=...> placeholders unchanged, same
       number of lines, no English left, length warnings. Exit code 1 on errors.
 pack: one file per path as the game reads it (UTF-16 LE + BOM, CRLF), ready to
-      zip into a .pak for open-homm5\\lang\\fr.
+      zip into a .pak for h5-together\\lang\\fr.
 pak:  the same, straight into one .pak from several batches (dated now, so it
       wins over an older pack on the same path). It holds game texts: build/ only.
 add:  a copy of an existing pack with the batches' texts added or replaced (those
@@ -154,7 +154,7 @@ def pack(args):
 
 
 def pak(args):
-    """All the batches' fr.txt in one game pack (.pak = zip), for open-homm5\\lang\\fr."""
+    """All the batches' fr.txt in one game pack (.pak = zip), for h5-together\\lang\\fr."""
     import time
     import zipfile
     stamp = time.localtime()[:6]  # newer than any pack made before: ours wins on the same path

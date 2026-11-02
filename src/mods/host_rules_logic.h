@@ -35,14 +35,14 @@ enum Kind {
 enum Group { kStart, kHeroes, kTowns, kComputer, kItems, kRandomMaps, kGroupCount };
 
 struct RuleDef {
-	const char *key;  // open-homm5.ini [rules] and the carried text: "governance"
+	const char *key;  // h5-together.ini [rules] and the carried text: "governance"
 	const char *var;  // the variable in H55-Settings.lua: "H55_GovernanceEnabled";
 	                  // nullptr = not in that file: a start rule (kStartRuleOff is MMH5.5's way)
 	                  // or one the add-on applies itself (map_scripts, class_skills, class_chance)
 	Kind kind;
 	int low, high;  // kInt, kChoice
 	Group group;
-	bool hidden;    // not in the panel (a testing value, set in open-homm5.ini only)
+	bool hidden;    // not in the panel (a testing value, set in h5-together.ini only)
 };
 
 const int kRuleCount = 20;
@@ -58,7 +58,7 @@ const int kMapScripts = 17;
 //                 offers to some class at class_chance); a later 2 = vanilla classes;
 //   class_chance: the chance of those other skills, as the class table counts
 //                 (MMH5.5's lists add up to 100): 2 = vanilla ToE's rare skills.
-//                 Hidden: only open-homm5.ini sets another one (testing).
+//                 Hidden: only h5-together.ini sets another one (testing).
 const int kClassSkills = 18, kClassChance = 19;
 const char kClassLocked[] = "0", kClassUnlocked[] = "1";
 const char kClassChanceVanilla[] = "2";

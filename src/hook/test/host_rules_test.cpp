@@ -207,16 +207,16 @@ void TestSubstitute()
 	only[Index("bank_difficulty")] = "2";
 	const std::string small = "H55_RPGPotions = 0;\r\n";
 	const std::string added = Substitute(small, only, nullptr);
-	Check(added == "H55_RPGPotions = 1;\r\nH55_BanksDifficulty = 2; -- open-homm5: the host's rules\r\n",
+	Check(added == "H55_RPGPotions = 1;\r\nH55_BanksDifficulty = 2; -- H5 Together: the host's rules\r\n",
 	      "a missing variable gets a line at the end");
 	Check(Substitute("H55_RPGPotions = 0;", only, nullptr) ==
-	          "H55_RPGPotions = 1;\nH55_BanksDifficulty = 2; -- open-homm5: the host's rules\n",
+	          "H55_RPGPotions = 1;\nH55_BanksDifficulty = 2; -- H5 Together: the host's rules\n",
 	      "no line end at the end of the file: one is added first");
 	// a variable set by an expression: our line at the end wins
 	Values ai = NoValues();
 	ai[Index("ai_cheat")] = "2";
 	const std::string expr = Substitute("H55_AICheatMode = 1;\nH55_AICheatMode = random(3);\n", ai, nullptr);
-	const std::string tail = "H55_AICheatMode = 2; -- open-homm5: the host's rules\n";
+	const std::string tail = "H55_AICheatMode = 2; -- H5 Together: the host's rules\n";
 	Check(ParseSettings(expr)[Index("ai_cheat")].empty() && expr.size() > tail.size() &&
 	          expr.compare(expr.size() - tail.size(), tail.size(), tail) == 0 && expr.find("H55_AICheatMode = 2;\n") == 0,
 	      "a variable also set by an expression gets our line at the end");
@@ -443,7 +443,7 @@ const char kStartSample[] =
 std::string WithoutOurs(std::string s)
 {
 	for (;;) {
-		const size_t at = s.find("-- open-homm5");
+		const size_t at = s.find("-- H5 Together");
 		if (at == std::string::npos)
 			break;
 		size_t b = at, e = s.find('\n', at);
@@ -480,14 +480,14 @@ void TestStartScript()
 	out.clear();
 	Check(PatchStartScript(lua, 0, true, false, &out, &why), "ToE bonuses: patched");
 	Check(out.find("\t\tlocal amountai = table.containsamount(H55_PlayerStatus,1);\r\n"
-	               "\t\tlocal OH55_KeepToEBonus, OH55_Mode = 1, 1; -- open-homm5") != std::string::npos,
+	               "\t\tlocal OH55_KeepToEBonus, OH55_Mode = 1, 1; -- H5 Together") != std::string::npos,
 	      "edit 1: the values after the computer players' count, its indent and line end; mode Default");
 	Check(out.find("\t\tif H55_MapType ~= \"Campaign\" and OH55_KeepToEBonus ~= 1 then\n\t\t\tfor i=1,8 do") != std::string::npos,
 	      "edit 2: the humans' loop is skipped when the ToE bonuses are kept");
 	const std::string decide = "\t\tif OH55_Mode ~= 0 then if OH55_Mode == 4 then OH55_Mode = random(3)+1 end; "
 	                           "somebodyartifact = 0; somebodygold = 0; somebodyres = 0; "
 	                           "if OH55_Mode == 1 then somebodyartifact = 1 elseif OH55_Mode == 2 then somebodygold = 1 else "
-	                           "somebodyres = 1 end; end; -- open-homm5: the game mode is the host's rule, not the bonus arrows\r\n"
+	                           "somebodyres = 1 end; end; -- H5 Together: the game mode is the host's rule, not the bonus arrows\r\n"
 	                           "\t\tif H55_MapType == \"Scenario\" then\r\n";
 	Check(out.find(decide) != std::string::npos, "edit 3: the mode's flags just before the decision (its indent and line end)");
 	Check(WithoutOurs(out) == lua, "nothing else changes");
@@ -499,8 +499,8 @@ void TestStartScript()
 	Check(PatchStartScript(lua, 4, true, false, &out, &why) && out.find("OH55_KeepToEBonus, OH55_Mode = 1, 4;") != std::string::npos,
 	      "Random: decided in the script by the game's shared random numbers");
 	Check(PatchStartScript(lua, 3, true, true, &out, &why) && WithoutOurs(out) == lua &&
-	          out.find("print(\"open-homm5: start of player \"") != std::string::npos &&
-	          out.find("-- open-homm5: [rules] trace=1\r\n\tH55_DEBUG = {103,") != std::string::npos,
+	          out.find("print(\"H5 Together: start of player \"") != std::string::npos &&
+	          out.find("-- H5 Together: [rules] trace=1\r\n\tH55_DEBUG = {103,") != std::string::npos,
 	      "trace: one print line just before the next part");
 	Check(PatchStartScript(lua, 0, false, true, &out, &why) && out.find("OH55_Mode") == std::string::npos && WithoutOurs(out) == lua,
 	      "trace alone: only the print line");

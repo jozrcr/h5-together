@@ -229,13 +229,13 @@ If the original file isn't the one we expect, we skip the patch and draw the but
 | Name in the game's list | Shown, not typed: made from the choices, with a `*` for "built in game" | No typing, so no keyboard handling. A typed name would make the recipe long. |
 | Zone map, legend | Drawn live with ImGui: circles, lines thicker for stronger guards, dashed when open | |
 | Stats (players, zones, neutral zones, size, tiles per zone, zones by distance) and warnings | Text under the map | |
-| Download / copy XML | **Not needed.** The template exists in the game as soon as it is used. "Save as file" writes it to `open-homm5\templates\` for the map editor or for sharing. | |
+| Download / copy XML | **Not needed.** The template exists in the game as soon as it is used. "Save as file" writes it to `h5-together\templates\` for the map editor or for sharing. | |
 
 The game's own options stay on the game's screen: monster level, water, resources, experience, minimap, random towns, grail and the factions. The panel doesn't duplicate them.
 
 **Presets:**
 - **Built in:** the page's 8 presets.
-- **Remembered:** the last choices, kept in `open-homm5.ini` (`[rmg] builder_last=<recipe>`).
+- **Remembered:** the last choices, kept in `h5-together.ini` (`[rmg] builder_last=<recipe>`).
 - **Not needed:** "save as template file" for multiplayer, since the name already is the template. It stays only as a convenience for the map editor or sharing.
 - **Later, if wanted:** named favourites, a list of label + recipe (Q2).
 
@@ -313,7 +313,7 @@ The parts sit where the game's own parts are: the zone map on the minimap, the c
 - **The name in the game's list** is the maker's own name plus `*`.
 - **`X1` is the recipe version.** What an `X1` name builds must never change, the same rule as the ready templates. New features get `X2`, and the DLL keeps building `X1` forever.
 
-**Settings** (`open-homm5.ini` `[rmg]`):
+**Settings** (`h5-together.ini` `[rmg]`):
 - `builder=1` (default): 0 means no button, no panel; recipe names are still served, so this PC can still join.
 - `builder_last=`: the last recipe, filled in by the DLL.
 
@@ -419,7 +419,7 @@ Written on 2026-10-25, while building the C++ maker (`src/mods/rmg_maker.cpp`) a
 - **The name in the game's list is the maker's name plus `*`.** Otherwise the served file is the maker's file for the same choices. So `OH-X1-321110nnxxxxxxxa` and the ready `OH-2v2v2-Lu-Normal.xdb` differ in one line only, `<Name>OH-2v2v2-Lu-Normal*</Name>`. The ready templates' file names never look like recipe names (one is made from the layout, the other from every choice): the table in [tools/rmg/README.md](../../tools/rmg/README.md) pairs them.
 - **"X1 never changes" is enforced:** `tools/rmg/x1_fingerprints.txt` records what 302 `X1` names build; `build.ps1 -Test` fails if one changes. The DLL also checks itself at start: it builds three of those names and serves no recipe if one differs (a compiler or runtime surprise would otherwise give one PC different bytes).
 - **The format is two tables** at the top of `rmg_recipe.cpp`, by the JavaScript choice names, so the page can copy them (the owner's answer 3).
-- **A recipe name is always built from the name**, even when a file of that name is in `open-homm5\templates\` (skipped, with a log line) or in the game's data.
+- **A recipe name is always built from the name**, even when a file of that name is in `h5-together\templates\` (skipped, with a log line) or in the game's data.
 - **`templates=0` turns off both** the folder's files and the recipes. With `templates=1` the file system hooks now go in even when there is no template file, so a PC without files can still serve a joined game's recipe.
 - **The list adds at most 64 recipes** (`recipes=` first, then those the game opened). Any recipe is still served when asked for.
 

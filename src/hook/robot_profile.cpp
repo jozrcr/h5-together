@@ -5,7 +5,7 @@
 // ai_trace.cpp), a sampling thread pauses the main thread every few
 // milliseconds, notes its instruction pointer and the game's return addresses
 // on its stack, and lets it go on. Each sample is one line of
-// open-homm5-profile[-<instance>].txt next to the exe:
+// h5-together-profile[-<instance>].txt next to the exe:
 //   <eip> <return address> <return address> ...
 // tools/robot/profile_report.py turns the samples into a list of the game
 // functions the AI spends its time in (self and inclusive), using the inventory.
@@ -90,7 +90,7 @@ DWORD WINAPI Sampler(LPVOID)
 void StartAiProfiler()
 {
 	wchar_t path[MAX_PATH];
-	hooklog::PathNextToExe(L"open-homm5-profile", L".txt", path, MAX_PATH);
+	hooklog::PathNextToExe(L"h5-together-profile", L".txt", path, MAX_PATH);
 	g_out = _wfsopen(path, L"w", _SH_DENYWR);
 	if (!g_out) {
 		hooklog::Write("robot: AI profiler: cannot write %ls", path);

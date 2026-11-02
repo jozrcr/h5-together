@@ -134,8 +134,8 @@ def main():
                    help="[skins] setting for both copies, e.g. trace=1 (src/mods/hero_skins.cpp)")
     p.add_argument("--host-skins", action="append", default=[], metavar="KEY=VALUE", help="[skins] setting, host only")
     p.add_argument("--client-skins", action="append", default=[], metavar="KEY=VALUE", help="[skins] setting, client only")
-    p.add_argument("--host-skins-file", metavar="PATH", help="the host's hero looks (open-homm5-skins.ini format)")
-    p.add_argument("--client-skins-file", metavar="PATH", help="the client's hero looks (open-homm5-skins.ini format)")
+    p.add_argument("--host-skins-file", metavar="PATH", help="the host's hero looks (h5-together-skins.ini format)")
+    p.add_argument("--client-skins-file", metavar="PATH", help="the client's hero looks (h5-together-skins.ini format)")
     p.add_argument("--host-debug", action="append", default=[], metavar="KEY=VALUE",
                    help="[debug] setting, host only, e.g. hang_test_at=120 (src/hook/watchdog.cpp)")
     p.add_argument("--client-debug", action="append", default=[], metavar="KEY=VALUE", help="[debug] setting, client only")

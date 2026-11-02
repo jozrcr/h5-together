@@ -3,7 +3,7 @@
 
 namespace mods {
 
-// With the settings of open-homm5.ini: [net] lan_all_adapters=1 (default) and
+// With the settings of h5-together.ini: [net] lan_all_adapters=1 (default) and
 // lan_peers=a.b.c.d,... (default none).
 void ApplyLanDiscoveryFromSettings();
 

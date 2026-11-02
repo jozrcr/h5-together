@@ -222,4 +222,4 @@ About **4 sessions** (3 to 5):
 1. **The trade-offs of B(a):** a longer start, only when someone picks another faction than the one the map was made with; and the map's contents can differ from the host's preview. OK?
 2. **Players left on "Random" in the lobby** keep the faction the map was made with, so they cause no rebuild. OK?
 3. **The faction arrows in the lobby:** with "Random towns" off, the game locks each player's faction to the town the generator placed. Should our setting unlock them on random maps? Proposal: yes. Otherwise you must tick "Random towns", which also makes every neutral town random.
-4. **Default:** off, as a setting in `open-homm5.ini` (`[rmg] faction_terrain=0`). Proposal: yes, per the "original by default" rule.
+4. **Default:** off, as a setting in `h5-together.ini` (`[rmg] faction_terrain=0`). Proposal: yes, per the "original by default" rule.

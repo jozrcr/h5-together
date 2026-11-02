@@ -73,7 +73,7 @@
 // The panel (host_rules_panel.cpp): the host chooses in the waiting room; the
 // clients see the host's rules read-only; in a game, everyone sees this game's.
 //
-// Settings, open-homm5.ini [rules]:
+// Settings, h5-together.ini [rules]:
 //   enabled=1      0 = take no part (no hello, no rules served), as without the DLL
 //   key=F2         the panel's key (lobby and adventure map); none = no key
 //   button=1       our "Rules..." button in the waiting room (0 = the key only)
@@ -304,7 +304,7 @@ DWORD Read(const void *base, DWORD offset)
 std::wstring IniPath()
 {
 	wchar_t path[MAX_PATH];
-	hooklog::PathNextToExe(L"open-homm5", L".ini", path, MAX_PATH);
+	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
 	return path;
 }
 
@@ -906,8 +906,8 @@ int __fastcall ClientMessageHook(void *logic, void *edx, int sender, BYTE *messa
 				g_lobby_flags = flags;
 				if (changed)
 					hooklog::Write("rules: the host's rules (lobby): %s; %s", ValueList(values).c_str(),
-					               (g_lobby_flags & rules::kWillApply) ? "every player has open-homm5's rules: they will be used"
-					                                                   : "a player lacks open-homm5's rules: the files' rules will be used");
+					               (g_lobby_flags & rules::kWillApply) ? "every player has H5 Together's rules: they will be used"
+					                                                   : "a player lacks H5 Together's rules: the files' rules will be used");
 			}
 			else
 				hooklog::Write("rules: a lobby message from the host that this PC cannot read (\"%s\"): another version?",
@@ -1099,7 +1099,7 @@ void __fastcall HostStartHook(void *logic, void *edx)
 				names += (names.empty() ? "" : ", ") + n;
 			g_start_text.clear();
 			g_armed = false;
-			hooklog::Write("rules: START: %s without open-homm5's rules: every PC uses its own H55-Settings.lua (the "
+			hooklog::Write("rules: START: %s without H5 Together's rules: every PC uses its own H55-Settings.lua (the "
 			               "host's choices are not used in this game)",
 			               names.c_str());
 		}
@@ -1110,7 +1110,7 @@ void __fastcall HostStartHook(void *logic, void *edx)
 			std::string differ;
 			for (const std::string &d : g_differ)
 				differ += "; files differ: " + d;
-			hooklog::Write("rules: START: every player has open-homm5's rules: this game uses %s (the host's choices: %s)%s",
+			hooklog::Write("rules: START: every player has H5 Together's rules: this game uses %s (the host's choices: %s)%s",
 			               ValueList(values).c_str(), ValueList(g_chosen).c_str(), differ.c_str());
 		}
 	}
@@ -1374,7 +1374,7 @@ void SetChoices(const Values &chosen)
 		const std::wstring value(clean[r].begin(), clean[r].end());
 		WritePrivateProfileStringW(L"rules", key.c_str(), clean[r].empty() ? nullptr : value.c_str(), ini.c_str());
 	}
-	hooklog::Write("rules: the host's choices: %s (saved in open-homm5.ini [rules])", list.c_str());
+	hooklog::Write("rules: the host's choices: %s (saved in h5-together.ini [rules])", list.c_str());
 }
 
 int PanelKey()

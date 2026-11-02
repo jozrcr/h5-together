@@ -2,7 +2,7 @@
 //
 // The question: inside the game's own process, under the game's own Steam app
 // id (15370, a game that never used Steamworks), does Steam start, accept a
-// lobby and carry relayed messages? Everything it learns goes to open-homm5.log
+// lobby and carry relayed messages? Everything it learns goes to h5-together.log
 // (lines starting with "steam:").
 //
 //   [online]
@@ -17,7 +17,7 @@
 //
 // How:
 // - steam_api.dll (32-bit, from Valve's Steamworks SDK) is loaded from
-//   bin\open-homm5\ at run time. Without it the add-on runs as usual.
+//   bin\h5-together\ at run time. Without it the add-on runs as usual.
 // - SteamAppId and SteamGameId are set in this process (nothing on disk) before
 //   SteamAPI_InitFlat, so Steam knows the app even when Steam did not start the
 //   game (GameRanger, a shortcut, the robot). SteamAPI_RestartAppIfNecessary is
@@ -39,6 +39,7 @@
 #include "steam_api_flat.h"
 #include "steam_spike_logic.h"
 #include "../hook/log.h"
+#include "../hook/old_names.h"
 #include "../hook/version.h"
 
 namespace mods {
@@ -652,7 +653,7 @@ DWORD WINAPI SpikeThread(LPVOID)
 void ReadSettings()
 {
 	wchar_t path[MAX_PATH];
-	hooklog::PathNextToExe(L"open-homm5", L".ini", path, MAX_PATH);
+	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
 	wchar_t text[64];
 	GetPrivateProfileStringW(L"online", L"spike", L"0", text, 64, path);
 	g_set.mode = steamspike::ParseMode(text);
@@ -696,12 +697,10 @@ void ApplySteamSpikeFromSettings()
 		return;
 	hooklog::Write("steam: spike %s, app id %u, %d s, lobby %s", steamspike::ModeName(g_set.mode), g_set.app_id,
 	               g_set.seconds, g_set.lobby_type_name);
-	// bin\open-homm5\steam_api.dll (one file for every robot instance, so not PathNextToExe)
+	// bin\h5-together\steam_api.dll (one file for every robot instance, so not PathNextToExe;
+	// bin\open-homm5\steam_api.dll, the folder's name until 0.2.7, while only that one is there)
 	wchar_t dll_path[MAX_PATH];
-	DWORD n = GetModuleFileNameW(nullptr, dll_path, MAX_PATH);
-	while (n > 0 && dll_path[n - 1] != L'\\')
-		--n;
-	lstrcpynW(dll_path + n, L"open-homm5\\steam_api.dll", MAX_PATH - n);
+	oldnames::PathInOurFolder(L"steam_api.dll", dll_path, MAX_PATH);
 	HMODULE dll = LoadLibraryExW(dll_path, nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
 	if (!dll) {
 		hooklog::Write("steam: cannot load %ls (error %lu): spike off", dll_path, GetLastError());

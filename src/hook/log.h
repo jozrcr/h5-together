@@ -1,4 +1,4 @@
-// Tiny thread-safe logger: open-homm5.log next to the game exe.
+// Tiny thread-safe logger: h5-together.log next to the game exe.
 #pragma once
 #include <windows.h>
 
@@ -11,7 +11,7 @@ namespace hooklog {
 void PathNextToExe(const wchar_t *stem, const wchar_t *ext, wchar_t *out, DWORD size);
 
 // The log is kept to a size. At start-up a log over kMaxLogBytes becomes
-// open-homm5.old.log (the one older log that is kept; an earlier .old.log goes) and a
+// h5-together.old.log (the one older log that is kept; an earlier .old.log goes) and a
 // new log starts. Without this the file grew for ever (1.4 MB after a few weeks of play).
 const unsigned long long kMaxLogBytes = 5ull * 1024 * 1024;
 

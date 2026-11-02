@@ -3,7 +3,7 @@
 
 namespace mods {
 
-// With the settings of open-homm5.ini: [coop] guard=1, fast_segments=1,
+// With the settings of h5-together.ini: [coop] guard=1, fast_segments=1,
 // segment_ms=100 (the defaults). Only after DetectGameBuild() said the build is
 // hookable.
 void ApplyCoopGuardFromSettings();

@@ -1,4 +1,4 @@
-// open-homm5 hook DLL, loaded by the game as a proxy for dinput8.dll.
+// H5 Together hook DLL, loaded by the game as a proxy for dinput8.dll.
 //
 // The game imports one function from DINPUT8.dll: DirectInput8Create. Windows
 // looks for the DLL in the game folder first, so our dinput8.dll is loaded at
@@ -15,6 +15,7 @@
 #include "game_build.h"
 #include "hooks.h"
 #include "log.h"
+#include "old_names.h"
 #include "robot.h"
 #include "version.h"
 
@@ -109,8 +110,13 @@ BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID)
 {
 	if (reason == DLL_PROCESS_ATTACH) {
 		DisableThreadLibraryCalls(inst);
+		// Files of the add-on's old name (open-homm5, until 0.2.7): before the log is
+		// opened (the old log may become our older log) and before any setting is read.
+		const std::vector<std::string> moved = oldnames::MoveOldFiles();
 		hooklog::Open(inst);
-		hooklog::Write("open-homm5 hook DLL " OPEN_HOMM5_VERSION " loaded (built " __DATE__ " " __TIME__ ")");
+		hooklog::Write("H5 Together hook DLL " OPEN_HOMM5_VERSION " loaded (built " __DATE__ " " __TIME__ ")");
+		for (const std::string &line : moved)
+			hooklog::Write("%s", line.c_str());
 		robot::Init();  // before the game reads its profile
 		hooks::InstallEarly();  // before the game reads its data
 	}

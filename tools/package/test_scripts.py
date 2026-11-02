@@ -27,7 +27,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 GAME = "Heroes of Might and Magic 5 Tribes of the East"
-OURS_MARK = b"open-homm5 hook DLL"
+OURS_MARK = b"H5 Together hook DLL"
 
 failures = []
 checks = 0
@@ -103,7 +103,7 @@ TEMPLATES_SRC = REPO / "src" / "mods" / "rmg" / "templates"
 
 
 def template_dir(pkg):
-    return Path(pkg) / "open-homm5" / "templates"
+    return Path(pkg) / "h5-together" / "templates"
 
 
 def same_bytes(folder, src_folder, names):
@@ -118,15 +118,15 @@ def package_checks(pkg, zip_path):
     wanted = sorted(p.name for p in TEMPLATES_SRC.glob("*.xdb"))
     packed = sorted(p.name for p in template_dir(pkg).iterdir()) if template_dir(pkg).is_dir() else []
     check(len(wanted) >= 16, f"src/mods/rmg/templates holds {len(wanted)} templates (16 or more)")
-    check(packed == wanted, "package: open-homm5/templates holds every src/mods/rmg/templates/*.xdb and nothing else", f"{packed}\n{wanted}")
+    check(packed == wanted, "package: h5-together/templates holds every src/mods/rmg/templates/*.xdb and nothing else", f"{packed}\n{wanted}")
     check(same_bytes(template_dir(pkg), TEMPLATES_SRC, wanted), "package: the templates are byte for byte the source files")
     data = [(template_dir(pkg) / n).read_bytes() for n in packed]
     check(all(d.startswith(b"\xef\xbb\xbf") and b"\r\n" in d and b"\n" not in d.replace(b"\r\n", b"") for d in data),
           "package: the templates keep their UTF-8 BOM and CRLF line endings")
     with zipfile.ZipFile(zip_path) as z:
-        entries = [i for i in z.infolist() if "/open-homm5/templates/" in i.filename]
+        entries = [i for i in z.infolist() if "/h5-together/templates/" in i.filename]
         check(len(entries) == len(wanted) and all(i.filename.count("/") == 3 for i in entries),
-              "package: the templates sit in the zip under <top folder>/open-homm5/templates/")
+              "package: the templates sit in the zip under <top folder>/h5-together/templates/")
         check(all(((i.external_attr >> 16) & 0o777) == 0o644 for i in entries), "package: the templates are plain data files (mode 644)")
 
 
@@ -166,7 +166,7 @@ def template_tests(who, pkg, game_bin, install, uninstall):
     src = template_dir(pkg)
     ours = sorted(p.name for p in src.iterdir())
     n = len(ours)
-    tdir = game_bin / "open-homm5" / "templates"
+    tdir = game_bin / "h5-together" / "templates"
     before = tree(game_bin)
 
     def names():
@@ -174,7 +174,7 @@ def template_tests(who, pkg, game_bin, install, uninstall):
 
     code, out = install()
     check(code == 0, "templates: fresh install: exit 0", out)
-    check(names() == ours and same_bytes(tdir, src, ours), "templates: fresh install: exactly our templates, byte for byte, in bin/open-homm5/templates")
+    check(names() == ours and same_bytes(tdir, src, ours), "templates: fresh install: exactly our templates, byte for byte, in bin/h5-together/templates")
     check(f"installed {n} random map templates" in out, "templates: fresh install: the summary says how many were installed", out)
 
     # a player's own files, and ours changed or missing
@@ -203,17 +203,17 @@ def template_tests(who, pkg, game_bin, install, uninstall):
         (tdir / name).unlink()
     code, out = install()
     code2, out2 = uninstall()
-    check(code == 0 and code2 == 0 and not (game_bin / "open-homm5").exists(), "templates: uninstall removes the empty open-homm5 folders", out2)
+    check(code == 0 and code2 == 0 and not (game_bin / "h5-together").exists(), "templates: uninstall removes the empty h5-together folders", out2)
     check(tree(game_bin) == before, "templates: after install and uninstall the game folder is exactly as it was")
 
-    # a folder open-homm5 that holds something else stays
-    other = game_bin / "open-homm5" / "other.txt"
+    # a folder h5-together that holds something else stays
+    other = game_bin / "h5-together" / "other.txt"
     other.parent.mkdir()
     other.write_bytes(b"not ours")
     install()
     code, out = uninstall()
     check(code == 0 and other.read_bytes() == b"not ours" and not tdir.exists(),
-          "templates: a folder open-homm5 with other things in it stays; the empty templates folder goes", out)
+          "templates: a folder h5-together with other things in it stays; the empty templates folder goes", out)
     other.unlink()
     other.parent.rmdir()
 
@@ -224,9 +224,9 @@ def template_tests(who, pkg, game_bin, install, uninstall):
 
 # ---------------------------------------------------------------- the settings file
 
-# A player's open-homm5.ini from 0.2.3 (that version's file, with a few values set by
-# hand, builder_last as the DLL writes it, a setting this version does not know, and
-# two sections added by hand).
+# A player's settings file from 0.2.3, then called open-homm5.ini (that version's file,
+# with a few values set by hand, builder_last as the DLL writes it, a setting this
+# version does not know, and two sections added by hand).
 OLD_INI = REPO / "tools" / "package" / "test_data" / "open-homm5-0.2.3.ini"
 KEPT = "; kept from your previous file:"
 
@@ -263,9 +263,9 @@ def settings_tests(who, pkg, game_bin, install, uninstall):
     install() and uninstall(answer) run the scripts for game_bin and return (exit code,
     output). Returns {case: the refreshed file's bytes}, to compare Windows with Linux."""
     print(f"\nThe settings file ({who})")
-    ini = game_bin / "open-homm5.ini"
-    bak = [game_bin / f"open-homm5.ini.{e}" for e in ("bak", "bak2", "bak3")]
-    tpl_bytes = (pkg / "open-homm5.ini").read_bytes()
+    ini = game_bin / "h5-together.ini"
+    bak = [game_bin / f"h5-together.ini.{e}" for e in ("bak", "bak2", "bak3")]
+    tpl_bytes = (pkg / "h5-together.ini").read_bytes()
     tpl = tpl_bytes.decode("ascii").replace("\r\n", "\n")
     results = {}
 
@@ -278,7 +278,7 @@ def settings_tests(who, pkg, game_bin, install, uninstall):
     # fresh install: the package's file, no backup
     code, out = install()
     check(code == 0 and ini.read_bytes() == tpl_bytes and backups() == [None] * 3,
-          "settings: fresh install: the package's open-homm5.ini, no backup", out)
+          "settings: fresh install: the package's h5-together.ini, no backup", out)
     code, out = install()
     check(code == 0 and ini.read_bytes() == tpl_bytes and backups() == [None] * 3 and "already up to date (every setting at its default)" in out,
           "settings: install again over the untouched file: nothing changes, no backup", out)
@@ -303,9 +303,9 @@ def settings_tests(who, pkg, game_bin, install, uninstall):
     check(plain(got), "settings: the refreshed file is plain ASCII with CRLF line endings, like the package's")
     check(f"settings file refreshed: 8 of your settings kept, {new} new settings available (see the comments)" in out and new > 30,
           "settings: the summary counts the settings kept and the new ones", out)
-    check("2 settings not listed in this version" in out and "open-homm5.ini.bak" in out,
+    check("2 settings not listed in this version" in out and "h5-together.ini.bak" in out,
           "settings: the summary names the unknown settings and the backup", out)
-    check(backups() == [old, None, None], "settings: the previous file is saved as open-homm5.ini.bak, byte for byte")
+    check(backups() == [old, None, None], "settings: the previous file is saved as h5-together.ini.bak, byte for byte")
 
     # again: nothing to do, no second backup
     code, out = install()
@@ -331,7 +331,7 @@ def settings_tests(who, pkg, game_bin, install, uninstall):
           f"{out}\n--- got:\n{got.decode('ascii', 'replace')}")
     check(f"4 of your settings kept, {len(mentioned(tpl)) - 2} new settings available" in out and "1 setting not listed" in out,
           "settings: odd file: the counts", out)
-    check(backups() == [odd, old, None], "settings: a second refresh keeps the older backup as open-homm5.ini.bak2")
+    check(backups() == [odd, old, None], "settings: a second refresh keeps the older backup as h5-together.ini.bak2")
 
     # more refreshes: only the last three backups stay
     ini.write_bytes(b"")
@@ -345,7 +345,7 @@ def settings_tests(who, pkg, game_bin, install, uninstall):
     results["one setting"] = ini.read_bytes()
     check(code == 0 and ini.read_bytes() == crlf(replaced(tpl, [("\n;tuning=1\n", "\ntuning=0\n")])),
           "settings: a file with one setting: refreshed", out)
-    check(backups() == [one, b"", odd] and not (game_bin / "open-homm5.ini.bak4").exists(),
+    check(backups() == [one, b"", odd] and not (game_bin / "h5-together.ini.bak4").exists(),
           "settings: a fourth refresh drops the oldest backup (three are kept)")
 
     # a "Unicode" (UTF-16) file is left alone
@@ -365,20 +365,167 @@ def settings_tests(who, pkg, game_bin, install, uninstall):
     check(code == 0 and not ini.exists() and backups() == [None] * 3, "settings: uninstall (y): the file and its backups are removed", out)
     bak[1].write_bytes(b"old copy")
     code, out = uninstall("y\n")
-    check(code == 0 and not bak[1].exists() and "removed open-homm5.ini.bak2" in out, "settings: uninstall (y) with only a backup left: removed", out)
+    check(code == 0 and not bak[1].exists() and "removed h5-together.ini.bak2" in out, "settings: uninstall (y) with only a backup left: removed", out)
+    return results
+
+
+# ---------------------------------------------------------------- the old name (open-homm5, until 0.2.7)
+
+# A dinput8.dll of 0.2.7, when the add-on was called open-homm5 (only its marker text matters).
+V027_DLL = b"MZ pretend dll ... open-homm5 hook DLL 0.2.7 loaded (built Nov  1 2026) ..."
+V027_INI = b"[net]\r\ntuning=0\r\n"  # a setting the player changed
+V027_SKINS = b"[skins]\r\nGodric=Freyda\r\n"
+
+
+def make_old_install(pkg, game_bin, extra_template=True):
+    """A 0.2.7 install in game_bin, with the old names: the DLL, the settings and an older copy of
+    them, the hero looks, two logs, and the folder open-homm5 with a French pack, an old copy of one
+    of our templates and a template of the player's own. Returns {path below bin: bytes}."""
+    ours = sorted(p.name for p in template_dir(pkg).iterdir())
+    files = {
+        "dinput8.dll": V027_DLL,
+        "open-homm5.ini": V027_INI,
+        "open-homm5.ini.bak": b"an older copy of the settings",
+        "open-homm5-skins.ini": V027_SKINS,
+        "open-homm5.log": b"the last log of 0.2.7\n",
+        "open-homm5.old.log": b"an even older log\n",
+        "open-homm5/lang/fr/x.pak": b"PK a French pack",
+        f"open-homm5/templates/{ours[0]}": b"an old copy of one of ours",
+    }
+    if extra_template:
+        files["open-homm5/templates/OH-mine.xdb"] = b"the player's own template"
+    for rel, data in files.items():
+        (game_bin / rel).parent.mkdir(parents=True, exist_ok=True)
+        (game_bin / rel).write_bytes(data)
+    return files
+
+
+def migration_tests(who, pkg, game_bin, install, uninstall):
+    """An install over a 0.2.7 one (the old names) moves the player's files to the new names.
+
+    install() and uninstall(answer) run the scripts for game_bin and return (exit code, output).
+    Returns {case: the settings file's bytes}, to compare Windows with Linux."""
+    print(f"\nThe old name: install over open-homm5 0.2.7 ({who})")
+    results = {}
+    src = template_dir(pkg)
+    ours = sorted(p.name for p in src.iterdir())
+    tpl = (pkg / "h5-together.ini").read_bytes()
+    want_ini = tpl.replace(b"\r\n;tuning=1\r\n", b"\r\ntuning=0\r\n")
+    before = tree(game_bin)
+    make_old_install(pkg, game_bin)
+
+    code, out = install()
+    check(code == 0 and "open-homm5 is now called H5 Together: your files got the new name, h5-together "
+          "(the settings, the hero looks, the log, the folder)" in out,
+          "old name: install over 0.2.7: exit 0, and one line says the files got the new name", out)
+    check((game_bin / "dinput8.dll").read_bytes() == (pkg / "dinput8.dll").read_bytes() and "replaced the older" in out,
+          "old name: the 0.2.7 dinput8.dll is recognised as ours and replaced", out)
+    got = (game_bin / "h5-together.ini").read_bytes()
+    results["0.2.7 file, moved"] = got
+    check(got == want_ini and "settings file refreshed: 1 of your settings kept" in out,
+          "old name: open-homm5.ini became h5-together.ini, refreshed, the player's value kept", out)
+    check((game_bin / "h5-together.ini.bak").read_bytes() == V027_INI
+          and (game_bin / "h5-together.ini.bak2").read_bytes() == b"an older copy of the settings"
+          and not (game_bin / "h5-together.ini.bak3").exists(),
+          "old name: the backups follow: the moved file is h5-together.ini.bak, its older copy .bak2")
+    check((game_bin / "h5-together-skins.ini").read_bytes() == V027_SKINS, "old name: the hero looks are h5-together-skins.ini, byte for byte")
+    check((game_bin / "h5-together.old.log").read_bytes() == b"the last log of 0.2.7\n" and not (game_bin / "h5-together.log").exists(),
+          "old name: the last log is h5-together.old.log (the older log); a new log starts with the game")
+    left = sorted(p.name for p in game_bin.iterdir() if p.name.lower().startswith("open-homm5"))
+    check(left == [], "old name: no file or folder of the old name is left in bin", str(left))
+    new_dir = game_bin / "h5-together"
+    check((new_dir / "lang" / "fr" / "x.pak").read_bytes() == b"PK a French pack", "old name: the French pack moved with the folder, byte for byte")
+    names = sorted(p.name for p in (new_dir / "templates").iterdir())
+    check(names == sorted(ours + ["OH-mine.xdb"]) and same_bytes(new_dir / "templates", src, ours)
+          and (new_dir / "templates" / "OH-mine.xdb").read_bytes() == b"the player's own template",
+          "old name: the templates: ours are this version's, the player's own one stays", str(names))
+
+    # again: nothing to move, nothing changes
+    after = tree(game_bin)
+    code, out = install()
+    check(code == 0 and "is now called H5 Together" not in out and "already up to date" in out and tree(game_bin) == after,
+          "old name: a second install moves nothing and changes nothing", out)
+
+    # uninstall: the new names go, the player's own files stay
+    code, out = uninstall("y\n")
+    gone = [n for n in ("dinput8.dll", "h5-together.ini", "h5-together.ini.bak", "h5-together.ini.bak2", "h5-together.old.log")
+            if (game_bin / n).exists()]
+    check(code == 0 and not gone and (game_bin / "h5-together-skins.ini").exists()
+          and (new_dir / "lang" / "fr" / "x.pak").exists() and sorted(p.name for p in (new_dir / "templates").iterdir()) == ["OH-mine.xdb"],
+          "old name: uninstall after the move: ours removed; the hero looks, the French pack and the player's template stay", out)
+    for p in sorted(game_bin.rglob("*"), reverse=True):
+        if p.relative_to(game_bin).as_posix() not in before:
+            p.unlink() if p.is_file() else p.rmdir()
+
+    # both names there: the new ones are kept, what the new folder lacks moves into it
+    print(f"\nThe old name: both names there ({who})")
+    install()
+    (new_dir / "templates" / "OH-new-own.xdb").write_bytes(b"a template made with the new version")
+    (new_dir / "notes.txt").write_bytes(b"new notes")
+    make_old_install(pkg, game_bin)
+    (game_bin / "open-homm5" / "notes.txt").write_bytes(b"old notes")
+    (game_bin / "open-homm5.log").unlink()
+    (game_bin / "h5-together.log").write_bytes(b"a log of the new version\n")
+    ini_before = (game_bin / "h5-together.ini").read_bytes()
+    code, out = install()
+    check(code == 0 and "kept open-homm5.ini as it is: there is already a h5-together.ini, which is the one used" in out
+          and (game_bin / "open-homm5.ini").read_bytes() == V027_INI and (game_bin / "h5-together.ini").read_bytes() == ini_before
+          and (game_bin / "open-homm5.ini.bak").exists() and not (game_bin / "h5-together.ini.bak").exists(),
+          "both: open-homm5.ini and its copy stay as they are; h5-together.ini is the one used, unchanged", out)
+    check((game_bin / "h5-together-skins.ini").read_bytes() == V027_SKINS, "both: the hero looks (only under the old name) moved")
+    check(not (game_bin / "open-homm5.old.log").exists() and not (game_bin / "h5-together.old.log").exists()
+          and (game_bin / "h5-together.log").read_bytes() == b"a log of the new version\n",
+          "both: the old older log is removed; the new log stays as it is")
+    names = sorted(p.name for p in (new_dir / "templates").iterdir())
+    check(names == sorted(ours + ["OH-mine.xdb", "OH-new-own.xdb"]) and same_bytes(new_dir / "templates", src, ours),
+          "both: the templates of both folders are in h5-together\\templates, ours this version's", str(names))
+    check((new_dir / "lang" / "fr" / "x.pak").read_bytes() == b"PK a French pack" and (new_dir / "notes.txt").read_bytes() == b"new notes",
+          "both: the French pack moved into h5-together; a file both folders have keeps the new folder's copy")
+    old_left = tree(game_bin / "open-homm5") if (game_bin / "open-homm5").is_dir() else None
+    check(old_left == {"notes.txt": sha(game_bin / "open-homm5" / "notes.txt")} if old_left else False,
+          "both: only that file stays in the old folder, the rest of it is gone", str(old_left))
+    check("left 1 file(s) in the folder open-homm5: the folder h5-together has them too" in out, "both: the summary says a file stayed in open-homm5", out)
+    code, out = uninstall("y\n")
+    check(code == 0 and not (game_bin / "open-homm5.ini").exists() and not (game_bin / "h5-together.ini").exists()
+          and not (game_bin / "open-homm5.ini.bak").exists() and "removed h5-together.ini" in out and "removed open-homm5.ini.bak" in out,
+          "both: uninstall asks once for both settings files and removes them and their copies", out)
+    for p in sorted(game_bin.rglob("*"), reverse=True):
+        if p.relative_to(game_bin).as_posix() not in before:
+            p.unlink() if p.is_file() else p.rmdir()
+
+    # an install of 0.2.7 never updated, removed with this package's uninstaller
+    print(f"\nThe old name: uninstall of a 0.2.7 install ({who})")
+    make_old_install(pkg, game_bin)
+    code, out = uninstall("n\n")
+    check(code == 0 and not (game_bin / "dinput8.dll").exists() and not (game_bin / "open-homm5.log").exists()
+          and not (game_bin / "open-homm5.old.log").exists() and (game_bin / "open-homm5.ini").exists()
+          and (game_bin / "open-homm5.ini.bak").exists() and "kept open-homm5.ini and its old copies" in out,
+          "old install: uninstall (n): the 0.2.7 DLL and the logs go, the settings stay", out)
+    old_tpl = game_bin / "open-homm5" / "templates"
+    check(sorted(p.name for p in old_tpl.iterdir()) == ["OH-mine.xdb"] and f"removed 1 random map templates from open-homm5" in out
+          and (game_bin / "open-homm5" / "lang" / "fr" / "x.pak").exists(),
+          "old install: our templates in open-homm5\\templates go; the player's own and the French pack stay", out)
+    code, out = uninstall("y\n")
+    check(code == 0 and not (game_bin / "open-homm5.ini").exists() and not (game_bin / "open-homm5.ini.bak").exists()
+          and "removed open-homm5.ini" in out and (game_bin / "open-homm5-skins.ini").exists(),
+          "old install: uninstall (y): open-homm5.ini and its copy go; the hero looks stay (as with the new name)", out)
+    for p in sorted(game_bin.rglob("*"), reverse=True):
+        if p.relative_to(game_bin).as_posix() not in before:
+            p.unlink() if p.is_file() else p.rmdir()
+    check(tree(game_bin) == before, "old name: the test game folder is back as it was")
     return results
 
 
 # ---------------------------------------------------------------- the bug report script
 
 # What the report may hold: these four files and system.txt, nothing else.
-REPORT_FILES = ("open-homm5.log", "open-homm5.old.log", "open-homm5.ini", "open-homm5-skins.ini")
+REPORT_FILES = ("h5-together.log", "h5-together.old.log", "h5-together.ini", "h5-together-skins.ini")
 RC19K_DOC = REPO / "docs" / "plans" / "mmh55-rc19k.md"
 
 
 def package_version(pkg):
     """The version the package's dinput8.dll says in its text, like 0.2.7."""
-    return re.search(rb"open-homm5 hook DLL (\S+) loaded", (Path(pkg) / "dinput8.dll").read_bytes()).group(1).decode("ascii")
+    return re.search(rb"H5 Together hook DLL (\S+) loaded", (Path(pkg) / "dinput8.dll").read_bytes()).group(1).decode("ascii")
 
 
 def make_report_game(pkg, library, add_on=True, pak_version="19k"):
@@ -391,14 +538,14 @@ def make_report_game(pkg, library, add_on=True, pak_version="19k"):
     root = b.parent
     if add_on:
         shutil.copy(Path(pkg) / "dinput8.dll", b / "dinput8.dll")
-        shutil.copy(Path(pkg) / "open-homm5.ini", b / "open-homm5.ini")
-        (b / "open-homm5.log").write_bytes(b"       0 [ 1234] open-homm5 hook DLL test loaded\n    1000 [ 1234] a line of the log\n")
-        (b / "open-homm5.old.log").write_bytes(b"       0 [ 4321] an older log\n")
-        (b / "open-homm5-skins.ini").write_bytes(b"[skins]\nhero=1\n")
+        shutil.copy(Path(pkg) / "h5-together.ini", b / "h5-together.ini")
+        (b / "h5-together.log").write_bytes(b"       0 [ 1234] H5 Together hook DLL test loaded\n    1000 [ 1234] a line of the log\n")
+        (b / "h5-together.old.log").write_bytes(b"       0 [ 4321] an older log\n")
+        (b / "h5-together-skins.ini").write_bytes(b"[skins]\nhero=1\n")
     (b / "55u.dll").write_bytes(b"pretend 55u.dll")
     (b / "other-mod.asi").write_bytes(b"pretend asi")
     (b / "secret.txt").write_bytes(b"not for the report")
-    (b / "open-homm5.ini.bak").write_bytes(b"an old copy of the settings")
+    (b / "h5-together.ini.bak").write_bytes(b"an old copy of the settings")
     (root / "Profiles").mkdir(exist_ok=True)
     (root / "Profiles" / "game1.sav").write_bytes(b"a save")
     (root / "Maps").mkdir(exist_ok=True)
@@ -422,7 +569,7 @@ def read_report(path):
         return {m.name: t.extractfile(m).read() for m in t.getmembers() if m.isfile()}
 
 
-def report_files(folder, prefix="open-homm5-bug-report-"):
+def report_files(folder, prefix="h5-together-bug-report-"):
     return sorted(p for p in Path(folder).iterdir() if p.name.startswith(prefix)) if Path(folder).is_dir() else []
 
 
@@ -481,8 +628,8 @@ def bug_report_tests(who, pkg, work, run_report, fmt=".zip", home_short=False):
     check(str(made[0]) in text.replace("\r", "") or made[0].name in text, "bug report: says where the file is", text)
     check("Nothing was sent anywhere" in text and "player names" in text, "bug report: says it sends nothing, and that the log has player names", text)
     s = system_text(files)
-    check(f"dinput8.dll in the game folder: open-homm5 {version}" in s, "bug report: system.txt names the add-on version in the game folder", s)
-    check(f"the package this script came from: {version}" in s, "bug report: system.txt names the version of the package it came from")
+    check(f"dinput8.dll in the game folder: H5 Together {version}" in s, "bug report: system.txt names the add-on version in the game folder", s)
+    check(f"the package this script came from: H5 Together {version}" in s, "bug report: system.txt names the version of the package it came from")
     check('H55_Version in data' in s and s.split("H55_Version in data", 1)[1].split("\n", 1)[0].strip().endswith("19k"),
           "bug report: system.txt has MMH5.5's H55_Version (read from the zip MMH55-Index.pak)", s)
     check(f"55u.dll: a version we have not tested (sha256 {sha(b / '55u.dll')})" in s, "bug report: system.txt names 55u.dll with its hash, and says when it is not a tested version", s)
@@ -508,10 +655,26 @@ def bug_report_tests(who, pkg, work, run_report, fmt=".zip", home_short=False):
     code, text = run_report(b2, out2)
     made = report_files(out2)
     check(code == 0 and len(made) == 1 and sorted(read_report(made[0])) == ["system.txt"], "bug report: without the add-on or a log: only system.txt", text)
-    check("There is no open-homm5.log" in text, "bug report: without a log it says so", text)
+    check("There is no h5-together.log" in text, "bug report: without a log it says so", text)
     if made:
         s = system_text(read_report(made[0]))
-        check("none (the add-on is not installed here)" in s and "there is no open-homm5.log" in s, "bug report: system.txt says the add-on is not installed", s)
+        check("none (the add-on is not installed here)" in s and "there is no h5-together.log" in s, "bug report: system.txt says the add-on is not installed", s)
+
+    # an install of 0.2.7, not updated yet: its files under the old name (open-homm5)
+    b7 = make_report_game(pkg, work / "report lib 7", add_on=False)
+    old_files = {"open-homm5.log": b"       0 [ 1234] open-homm5 hook DLL 0.2.7 loaded\n", "open-homm5.old.log": b"an older log\n",
+                 "open-homm5.ini": V027_INI, "open-homm5-skins.ini": V027_SKINS}
+    (b7 / "dinput8.dll").write_bytes(V027_DLL)
+    for name, data in old_files.items():
+        (b7 / name).write_bytes(data)
+    out7 = work / "reports7"
+    code, text = run_report(b7, out7)
+    made = report_files(out7)
+    files = read_report(made[0]) if made else {}
+    check(code == 0 and sorted(files) == sorted(list(old_files) + ["system.txt"]) and all(files[n] == d for n, d in old_files.items()),
+          "bug report: a 0.2.7 install: its four files under the old name are packed, byte for byte", text)
+    check("There is no" not in text and "dinput8.dll in the game folder: open-homm5 0.2.7" in (system_text(files) if files else ""),
+          "bug report: a 0.2.7 install: its log counts, and system.txt names the add-on by its old name and version", text)
 
     # another mod's dinput8.dll
     b3 = make_report_game(pkg, work / "report lib 3", add_on=False)
@@ -519,7 +682,7 @@ def bug_report_tests(who, pkg, work, run_report, fmt=".zip", home_short=False):
     out3 = work / "reports3"
     code, text = run_report(b3, out3)
     made = report_files(out3)
-    check(code == 0 and made and "NOT the open-homm5 one" in system_text(read_report(made[0])) and (b3 / "dinput8.dll").read_bytes() == b"MZ some other mod",
+    check(code == 0 and made and "NOT the H5 Together one" in system_text(read_report(made[0])) and (b3 / "dinput8.dll").read_bytes() == b"MZ some other mod",
           "bug report: another mod's dinput8.dll is named as such and left alone", text)
 
     # MMH5.5 not there, or a pak without the version script
@@ -565,14 +728,14 @@ def bug_report_windows_extra(pkg, work, run_report):
     b = make_report_game(pkg, work / "lib")
 
     # the game is running: its log is open and others may only read it
-    close = hold_open_like_the_game(b / "open-homm5.log")
+    close = hold_open_like_the_game(b / "h5-together.log")
     try:
         out = work / "running"
         code, text = run_report(b, out)
     finally:
         close()
     made = report_files(out)
-    check(code == 0 and len(made) == 1 and read_report(made[0]).get("open-homm5.log") == (b / "open-homm5.log").read_bytes(),
+    check(code == 0 and len(made) == 1 and read_report(made[0]).get("h5-together.log") == (b / "h5-together.log").read_bytes(),
           "bug report: a log that the running game holds open is read and packed", text)
 
     # no -OutDir: on the Desktop (also when OneDrive moved it), else in the home folder
@@ -584,10 +747,10 @@ def bug_report_windows_extra(pkg, work, run_report):
     made = Path(m.group(1)) if m else None
     try:
         check(code == 0 and made is not None and made.is_file() and made.parent.resolve() == desktop.resolve()
-              and re.fullmatch(r"open-homm5-bug-report-\d{4}-\d\d-\d\d-\d{4}\.zip", made.name) is not None,
-              f"bug report: without -OutDir the file lands on the Desktop ({desktop}), named open-homm5-bug-report-<date>.zip", text)
+              and re.fullmatch(r"h5-together-bug-report-\d{4}-\d\d-\d\d-\d{4}\.zip", made.name) is not None,
+              f"bug report: without -OutDir the file lands on the Desktop ({desktop}), named h5-together-bug-report-<date>.zip", text)
     finally:
-        if made is not None and made.parent.resolve() == desktop.resolve() and made.name.startswith("open-homm5-bug-report-"):
+        if made is not None and made.parent.resolve() == desktop.resolve() and made.name.startswith("h5-together-bug-report-"):
             made.unlink(missing_ok=True)
 
     # an output folder that cannot be made
@@ -615,20 +778,20 @@ def windows_tests(pkg, work):
         return run(bat(str(pkg / "uninstall.bat"), "-NoPause", *args), stdin)
 
     our_dll = (pkg / "dinput8.dll").read_bytes()
-    our_ini = (pkg / "open-homm5.ini").read_bytes()
+    our_ini = (pkg / "h5-together.ini").read_bytes()
     before = snapshot(bin2)
 
     # fresh install, game found through the fake libraryfolders.vdf
     code, out = install("-SteamDir", str(steam_only))
     check(code == 0, "fresh install: exit 0", out)
     check((bin2 / "dinput8.dll").read_bytes() == our_dll, "fresh install: dinput8.dll copied")
-    check((bin2 / "open-homm5.ini").read_bytes() == our_ini, "fresh install: open-homm5.ini copied")
+    check((bin2 / "h5-together.ini").read_bytes() == our_ini, "fresh install: h5-together.ini copied")
     after = snapshot(bin2)
     check({k: v for k, v in after.items() if k in before} == before, "fresh install: game files unchanged")
-    check(set(after) - set(before) == {"dinput8.dll", "open-homm5.ini"}, "fresh install: only our 2 files added")
-    check("open-homm5.log" in out and "added dinput8.dll" in out, "fresh install: says what it did and how to check", out)
-    check(sorted(p.name for p in (bin2 / "open-homm5" / "templates").iterdir()) == sorted(p.name for p in template_dir(pkg).iterdir()),
-          "fresh install: the templates are installed in bin/open-homm5/templates")
+    check(set(after) - set(before) == {"dinput8.dll", "h5-together.ini"}, "fresh install: only our 2 files added")
+    check("h5-together.log" in out and "added dinput8.dll" in out, "fresh install: says what it did and how to check", out)
+    check(sorted(p.name for p in (bin2 / "h5-together" / "templates").iterdir()) == sorted(p.name for p in template_dir(pkg).iterdir()),
+          "fresh install: the templates are installed in bin/h5-together/templates")
 
     # install again over our own DLL
     code, out = install("-SteamDir", str(steam_only))
@@ -639,11 +802,11 @@ def windows_tests(pkg, work):
     check((bin2 / "dinput8.dll").read_bytes() == our_dll, "re-install: new DLL in place")
 
     # an existing ini is refreshed: this version's file, with the player's values
-    (bin2 / "open-homm5.ini").write_bytes(b"[net]\r\ntuning=0\r\n")
+    (bin2 / "h5-together.ini").write_bytes(b"[net]\r\ntuning=0\r\n")
     code, out = install("-SteamDir", str(steam_only))
-    check(code == 0 and (bin2 / "open-homm5.ini").read_bytes() == our_ini.replace(b"\r\n;tuning=1\r\n", b"\r\ntuning=0\r\n")
-          and (bin2 / "open-homm5.ini.bak").read_bytes() == b"[net]\r\ntuning=0\r\n",
-          "existing open-homm5.ini: refreshed, the player's value kept, the old file in .bak", out)
+    check(code == 0 and (bin2 / "h5-together.ini").read_bytes() == our_ini.replace(b"\r\n;tuning=1\r\n", b"\r\ntuning=0\r\n")
+          and (bin2 / "h5-together.ini.bak").read_bytes() == b"[net]\r\ntuning=0\r\n",
+          "existing h5-together.ini: refreshed, the player's value kept, the old file in .bak", out)
     check("settings file refreshed: 1 of your settings kept" in out, "existing ini: says it refreshed it", out)
 
     # a foreign dinput8.dll is refused
@@ -652,24 +815,24 @@ def windows_tests(pkg, work):
     check(code == 3 and "Stopped" in out, "foreign dinput8.dll: refused with exit 3", out)
     check((bin2 / "dinput8.dll").read_bytes() == b"MZ some other mod's dinput8", "foreign dinput8.dll: left untouched")
     code, out = uninstall("-SteamDir", str(steam_only), stdin="y\n")
-    check(code == 0 and "NOT the open-homm5 one" in out, "uninstall leaves a foreign dinput8.dll alone", out)
+    check(code == 0 and "NOT the H5 Together one" in out, "uninstall leaves a foreign dinput8.dll alone", out)
     check((bin2 / "dinput8.dll").read_bytes() == b"MZ some other mod's dinput8", "uninstall: foreign dll still there")
     (bin2 / "dinput8.dll").unlink()
-    (bin2 / "open-homm5.ini").unlink(missing_ok=True)
+    (bin2 / "h5-together.ini").unlink(missing_ok=True)
 
     # uninstall: ours removed, log removed, ini only after asking
     code, out = install("-SteamDir", str(steam_only))
-    (bin2 / "open-homm5.log").write_bytes(b"log")
-    (bin2 / "open-homm5.old.log").write_bytes(b"older log")
+    (bin2 / "h5-together.log").write_bytes(b"log")
+    (bin2 / "h5-together.old.log").write_bytes(b"older log")
     code, out = uninstall("-SteamDir", str(steam_only), stdin="n\n")
     check(code == 0, "uninstall (answer n): exit 0", out)
-    check(not (bin2 / "dinput8.dll").exists() and not (bin2 / "open-homm5.log").exists() and not (bin2 / "open-homm5.old.log").exists(),
-          "uninstall: dinput8.dll, open-homm5.log and the old log (open-homm5.old.log) removed")
-    check((bin2 / "open-homm5.ini").exists(), "uninstall (answer n): ini kept")
+    check(not (bin2 / "dinput8.dll").exists() and not (bin2 / "h5-together.log").exists() and not (bin2 / "h5-together.old.log").exists(),
+          "uninstall: dinput8.dll, h5-together.log and the old log (h5-together.old.log) removed")
+    check((bin2 / "h5-together.ini").exists(), "uninstall (answer n): ini kept")
     code, out = uninstall("-SteamDir", str(steam_only), stdin="y\n")
-    check(code == 0 and not (bin2 / "open-homm5.ini").exists(), "uninstall (answer y): ini removed", out)
+    check(code == 0 and not (bin2 / "h5-together.ini").exists(), "uninstall (answer y): ini removed", out)
     check(snapshot(bin2) == before, "uninstall: folder back to exactly how it was")
-    check(not (bin2 / "open-homm5").exists(), "uninstall: the (empty) open-homm5 folder is gone too")
+    check(not (bin2 / "h5-together").exists(), "uninstall: the (empty) h5-together folder is gone too")
 
     # the game folder or its bin folder can be given directly
     game_folder = bin2.parent
@@ -762,6 +925,12 @@ def windows_tests(pkg, work):
                              lambda: install("-GameDir", str(ini_bin)),
                              lambda answer: uninstall("-GameDir", str(ini_bin), stdin=answer))
 
+    # an install over open-homm5 0.2.7 (the old name): the files get the new names
+    old_bin = make_game(work / "old name lib")
+    results.update(migration_tests("Windows", pkg, old_bin,
+                                   lambda: install("-GameDir", str(old_bin)),
+                                   lambda answer: uninstall("-GameDir", str(old_bin), stdin=answer)))
+
     # random map templates: install, a player's own files, reinstall, uninstall
     tpl_bin = make_game(work / "tpl lib")
     template_tests("Windows", pkg, tpl_bin,
@@ -770,9 +939,9 @@ def windows_tests(pkg, work):
 
     # a package without its templates folder is incomplete: exit 7, nothing installed
     no_tpl = work / "pkg without templates"
-    shutil.copytree(pkg, no_tpl, ignore=shutil.ignore_patterns("open-homm5"))
+    shutil.copytree(pkg, no_tpl, ignore=shutil.ignore_patterns("h5-together"))
     code, out = run(bat(str(no_tpl / "install.bat"), "-NoPause", "-GameDir", str(tpl_bin)))
-    check(code == 7 and "extract the whole zip" in out and not (tpl_bin / "dinput8.dll").exists() and not (tpl_bin / "open-homm5").exists(),
+    check(code == 7 and "extract the whole zip" in out and not (tpl_bin / "dinput8.dll").exists() and not (tpl_bin / "h5-together").exists(),
           "package without the templates folder: exit 7, nothing installed", out)
 
     # the bug report script
@@ -822,14 +991,14 @@ def linux_tests(pkg, work, bash):
     our_dll = (pkg / "dinput8.dll").read_bytes()
     code, out = sh("install.sh")
     check(code == 0, "fresh install (Steam in ~/.local/share/Steam): exit 0", out)
-    check((bin2 / "dinput8.dll").read_bytes() == our_dll and (bin2 / "open-homm5.ini").exists(), "fresh install: files copied")
+    check((bin2 / "dinput8.dll").read_bytes() == our_dll and (bin2 / "h5-together.ini").exists(), "fresh install: files copied")
     after = snapshot(bin2)
-    check({k: v for k, v in after.items() if k in before} == before and set(after) - set(before) == {"dinput8.dll", "open-homm5.ini"},
+    check({k: v for k, v in after.items() if k in before} == before and set(after) - set(before) == {"dinput8.dll", "h5-together.ini"},
           "fresh install: game files unchanged, only our 2 files added")
-    check('WINEDLLOVERRIDES="dinput8=n,b" %command%' in out and "MMH55_Utility_64.exe" in out and "open-homm5.log" in out,
+    check('WINEDLLOVERRIDES="dinput8=n,b" %command%' in out and "MMH55_Utility_64.exe" in out and "h5-together.log" in out,
           "prints the Steam launch option, the exe to start and how to check", out)
-    check(sorted(p.name for p in (bin2 / "open-homm5" / "templates").iterdir()) == sorted(p.name for p in template_dir(pkg).iterdir()),
-          "fresh install: the templates are installed in bin/open-homm5/templates")
+    check(sorted(p.name for p in (bin2 / "h5-together" / "templates").iterdir()) == sorted(p.name for p in template_dir(pkg).iterdir()),
+          "fresh install: the templates are installed in bin/h5-together/templates")
 
     code, out = sh("install.sh")
     check(code == 0 and "up to date" in out, "re-install over our DLL: up to date", out)
@@ -837,31 +1006,31 @@ def linux_tests(pkg, work, bash):
     code, out = sh("install.sh")
     check(code == 0 and "replaced the older" in out and (bin2 / "dinput8.dll").read_bytes() == our_dll, "re-install over an older build: replaced", out)
 
-    (bin2 / "open-homm5.ini").write_bytes(b"[net]\ntuning=0\n")
+    (bin2 / "h5-together.ini").write_bytes(b"[net]\ntuning=0\n")
     code, out = sh("install.sh")
-    our_ini = (pkg / "open-homm5.ini").read_bytes()
-    check(code == 0 and (bin2 / "open-homm5.ini").read_bytes() == our_ini.replace(b"\r\n;tuning=1\r\n", b"\r\ntuning=0\r\n")
-          and (bin2 / "open-homm5.ini.bak").read_bytes() == b"[net]\ntuning=0\n" and "settings file refreshed: 1 of your settings kept" in out,
+    our_ini = (pkg / "h5-together.ini").read_bytes()
+    check(code == 0 and (bin2 / "h5-together.ini").read_bytes() == our_ini.replace(b"\r\n;tuning=1\r\n", b"\r\ntuning=0\r\n")
+          and (bin2 / "h5-together.ini.bak").read_bytes() == b"[net]\ntuning=0\n" and "settings file refreshed: 1 of your settings kept" in out,
           "existing ini: refreshed, the player's value kept, the old file in .bak", out)
 
     (bin2 / "dinput8.dll").write_bytes(b"MZ some other mod")
     code, out = sh("install.sh")
     check(code == 3 and (bin2 / "dinput8.dll").read_bytes() == b"MZ some other mod", "foreign dinput8.dll: refused (exit 3), untouched", out)
     code, out = sh("uninstall.sh", stdin="y\n")
-    check(code == 0 and (bin2 / "dinput8.dll").exists() and "NOT the open-homm5 one" in out, "uninstall leaves a foreign dll alone", out)
+    check(code == 0 and (bin2 / "dinput8.dll").exists() and "NOT the H5 Together one" in out, "uninstall leaves a foreign dll alone", out)
     (bin2 / "dinput8.dll").unlink()
-    (bin2 / "open-homm5.ini").unlink(missing_ok=True)
+    (bin2 / "h5-together.ini").unlink(missing_ok=True)
 
     sh("install.sh")
-    (bin2 / "open-homm5.log").write_bytes(b"log")
-    (bin2 / "open-homm5.old.log").write_bytes(b"older log")
+    (bin2 / "h5-together.log").write_bytes(b"log")
+    (bin2 / "h5-together.old.log").write_bytes(b"older log")
     code, out = sh("uninstall.sh", stdin="n\n")
-    check(code == 0 and not (bin2 / "dinput8.dll").exists() and not (bin2 / "open-homm5.log").exists()
-          and not (bin2 / "open-homm5.old.log").exists() and (bin2 / "open-homm5.ini").exists(),
+    check(code == 0 and not (bin2 / "dinput8.dll").exists() and not (bin2 / "h5-together.log").exists()
+          and not (bin2 / "h5-together.old.log").exists() and (bin2 / "h5-together.ini").exists(),
           "uninstall (n): dll, log and old log removed, ini kept", out)
     code, out = sh("uninstall.sh", stdin="y\n")
     check(code == 0 and snapshot(bin2) == before, "uninstall (y): folder back to how it was", out)
-    check(not (bin2 / "open-homm5").exists(), "uninstall: the (empty) open-homm5 folder is gone too")
+    check(not (bin2 / "h5-together").exists(), "uninstall: the (empty) h5-together folder is gone too")
 
     code, out = sh("install.sh", "--game-dir", posix(bin2.parent))
     check(code == 0 and (bin2 / "dinput8.dll").exists(), "--game-dir <game folder>", out)
@@ -929,23 +1098,40 @@ def linux_tests(pkg, work, bash):
 
     # a package without its templates folder is incomplete: exit 7, nothing installed
     no_tpl = work / "pkg_without_templates"
-    shutil.copytree(pkg, no_tpl, ignore=shutil.ignore_patterns("open-homm5"))
+    shutil.copytree(pkg, no_tpl, ignore=shutil.ignore_patterns("h5-together"))
     code, out = run([bash, str(no_tpl / "install.sh"), "--game-dir", posix(tpl_bin)], "", env=env)
-    check(code == 7 and not (tpl_bin / "dinput8.dll").exists() and not (tpl_bin / "open-homm5").exists(),
+    check(code == 7 and not (tpl_bin / "dinput8.dll").exists() and not (tpl_bin / "h5-together").exists(),
           "package without the templates folder: exit 7, nothing installed", out)
 
     # folders that exist under another spelling (Linux file names are case sensitive,
     # Wine finds them anyway): the existing folders and files are reused, none is duplicated
     ci_bin = make_game(work / "ci_lib")
-    old = ci_bin / "Open-Homm5" / "Templates"
+    old = ci_bin / "H5-Together" / "Templates"
     old.mkdir(parents=True)
     first = sorted(p.name for p in template_dir(pkg).iterdir())[0]
     (old / first.lower()).write_bytes(b"an old copy of ours, in lower case")
     code, out = sh("install.sh", "--game-dir", posix(ci_bin))
-    check(code == 0 and [p.name for p in ci_bin.iterdir() if p.is_dir()] == ["Open-Homm5"], "templates: an existing Open-Homm5 folder is reused", out)
+    check(code == 0 and [p.name for p in ci_bin.iterdir() if p.is_dir()] == ["H5-Together"], "templates: an existing H5-Together folder is reused", out)
     check(sorted(p.name for p in old.iterdir()) == sorted([first.lower()] + [p.name for p in template_dir(pkg).iterdir() if p.name != first])
           and (old / first.lower()).read_bytes() == (template_dir(pkg) / first).read_bytes(),
           "templates: an existing file of ours under another spelling is overwritten, not duplicated")
+
+    # the old name's folder under another spelling (Open-Homm5/Templates): it gets the new name
+    ci_old = make_game(work / "ci_old_lib")
+    (ci_old / "Open-Homm5" / "Templates").mkdir(parents=True)
+    (ci_old / "Open-Homm5" / "Templates" / "OH-mine.xdb").write_bytes(b"the player's own")
+    (ci_old / "Open-Homm5.ini").write_bytes(V027_INI)
+    code, out = sh("install.sh", "--game-dir", posix(ci_old))
+    dirs = [p.name for p in ci_old.iterdir() if p.is_dir()]
+    check(code == 0 and dirs == ["h5-together"] and (ci_old / "h5-together" / "Templates" / "OH-mine.xdb").read_bytes() == b"the player's own"
+          and (ci_old / "h5-together.ini").exists() and not (ci_old / "Open-Homm5.ini").exists(),
+          "old name: Open-Homm5 and Open-Homm5.ini under another spelling get the new name too", f"{dirs}\n{out}")
+
+    # an install over open-homm5 0.2.7 (the old name): the files get the new names
+    old_bin = make_game(work / "old_name_lib")
+    results.update(migration_tests("Linux", pkg, old_bin,
+                                   lambda: sh("install.sh", "--game-dir", posix(old_bin)),
+                                   lambda answer: sh("uninstall.sh", "--game-dir", posix(old_bin), stdin=answer)))
 
     # the bug report script. HOME is the folder above the fake game folders, as a player's
     # game folder is below their home (the report writes that part of the path as ~)
@@ -987,19 +1173,19 @@ def main():
     ap.add_argument("--keep", action="store_true", help="do not delete the work folder at the end")
     args = ap.parse_args()
 
-    work = args.work_dir or Path(tempfile.mkdtemp(prefix="open-homm5-test-"))
+    work = args.work_dir or Path(tempfile.mkdtemp(prefix="h5-together-test-"))
     work.mkdir(parents=True, exist_ok=True)
     out_dir = work / "out"
     r = subprocess.run([sys.executable, str(REPO / "tools" / "package" / "make_package.py"), "--version", "0.0.0-test",
                         "--out-dir", str(out_dir)])
     if r.returncode != 0:
         sys.exit("make_package.py failed")
-    with zipfile.ZipFile(out_dir / "open-homm5-0.0.0-test.zip") as z:
+    with zipfile.ZipFile(out_dir / "h5-together-0.0.0-test.zip") as z:
         z.extractall(work / "package")
-    pkg = work / "package" / "open-homm5-0.0.0-test"  # the zip's one top folder
-    package_checks(pkg, out_dir / "open-homm5-0.0.0-test.zip")
-    licence_checks(pkg, out_dir / "open-homm5-0.0.0-test.zip")
-    bug_report_package_checks(pkg, out_dir / "open-homm5-0.0.0-test.zip")
+    pkg = work / "package" / "h5-together-0.0.0-test"  # the zip's one top folder
+    package_checks(pkg, out_dir / "h5-together-0.0.0-test.zip")
+    licence_checks(pkg, out_dir / "h5-together-0.0.0-test.zip")
+    bug_report_package_checks(pkg, out_dir / "h5-together-0.0.0-test.zip")
 
     win = lin = None
     if os.name == "nt":

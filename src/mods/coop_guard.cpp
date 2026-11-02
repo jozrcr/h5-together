@@ -36,7 +36,7 @@
 //     value before the switch and base + 30000 + 200 S + N (n - S) from segment
 //     S on, so the game time never jumps.
 //
-// Settings, open-homm5.ini [coop]:
+// Settings, h5-together.ini [coop]:
 //   guard=1          0 = take no part (no hello, never switch), as without the DLL
 //   fast_segments=1  0 = ask for the game's 200 ms, so nobody switches
 //   segment_ms=50    50 or 100 (50 by default since 0.2.0)
@@ -157,7 +157,7 @@ void Decide(const BYTE *transceiver, int me, int players)
 		if (p == me)
 			continue;
 		if (g_hello[p] == 0) {
-			hooklog::Write("co-op timing: OFF: player %d sent no hello (no open-homm5 DLL, an old one, or [coop] guard=0)", p);
+			hooklog::Write("co-op timing: OFF: player %d sent no hello (no H5 Together DLL, an old one, or [coop] guard=0)", p);
 			return;
 		}
 		if (g_hello[p] != Hello(g_asked_ms)) {
@@ -277,7 +277,7 @@ bool PatchFormulas()
 void ApplyCoopGuardFromSettings()
 {
 	wchar_t path[MAX_PATH];
-	hooklog::PathNextToExe(L"open-homm5", L".ini", path, MAX_PATH);
+	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
 	if (!GetPrivateProfileIntW(L"coop", L"guard", 1, path)) {
 		hooklog::Write("co-op timing: guard off ([coop] guard=0): this PC sends no hello and keeps the game's timing");
 		return;
