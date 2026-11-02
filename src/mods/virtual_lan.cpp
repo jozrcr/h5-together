@@ -196,9 +196,9 @@ int WINAPI VlanSendTo(SOCKET s, const char *buf, int len, int flags, const socka
 	const size_t size = static_cast<size_t>(len);
 	const uint32_t destination = ntohl(in->sin_addr.s_addr);
 	const uint16_t port = ntohs(in->sin_port);
-	const uint32_t now = GetTickCount();
 	char ip[20];
 	EnterCriticalSection(&g_lock);
+	const uint32_t now = GetTickCount();  // (inside the lock: no message is newer than "now")
 	if (Ready()) {
 		g_transport->Poll(now);
 		AddMembers();
@@ -278,8 +278,8 @@ int WINAPI VlanRecvFrom(SOCKET s, char *buf, int len, int flags, sockaddr *from,
 {
 	if (!g_on)
 		return g_recvfrom(s, buf, len, flags, from, from_len);
-	const uint32_t now = GetTickCount();
 	EnterCriticalSection(&g_lock);
+	const uint32_t now = GetTickCount();  // (inside the lock: no message is newer than "now")
 	if (Ready()) {
 		g_transport->Poll(now);
 		AddMembers();
