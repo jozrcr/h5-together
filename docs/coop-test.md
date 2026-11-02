@@ -1,11 +1,11 @@
 # Checklist: a co-op test game with 3 or more players
 
-This is the next big test of open-homm5 (phase 3 of the project): **three or more human players finish a whole game against the AI, with no crash and no desync.**
+This is the next big test of H5 Together (phase 3 of the project): **three or more human players finish a whole game against the AI, with no crash and no desync.**
 
 ## Before the game
 
-1. **Everyone** installs the same open-homm5 version: from the zip, `install.bat` on Windows or `bash install.sh` on Linux.
-2. Everyone starts the game once and checks the first line of `open-homm5.log` in the game's `bin` folder. It must say the same version for all, for example `open-homm5 hook DLL 0.1.0 loaded`.
+1. **Everyone** installs the same H5 Together version: from the zip, `install.bat` on Windows or `bash install.sh` on Linux.
+2. Everyone starts the game once and checks the first line of `h5-together.log` in the game's `bin` folder. It must say the same version for all, for example `H5 Together hook DLL 0.3.0 loaded`.
 3. **How you connect:**
    - **GameRanger:** as usual.
    - **ZeroTier:** everyone joins the host's network. On Windows, the ZeroTier network must be **Private** (the installer tells you if it isn't). Start ZeroTier before the game.
@@ -21,7 +21,7 @@ This is the next big test of open-homm5 (phase 3 of the project): **three or mor
 
 ## After the game
 
-Everyone sends their `open-homm5.log` (from the game's `bin` folder). Logs keep every game since the install, so send them before deleting anything.
+Everyone sends their `h5-together.log` (from the game's `bin` folder). Logs keep every game since the install, so send them before deleting anything.
 
 ## What we look at in the logs
 

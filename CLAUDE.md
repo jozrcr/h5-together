@@ -1,4 +1,4 @@
-# open-homm5: project rules
+# H5 Together: project rules
 
 Read this file at the start of every session. It overrides your defaults for this repo.
 

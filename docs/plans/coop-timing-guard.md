@@ -35,14 +35,14 @@ In co-op each PC runs the whole game itself. Only the players' orders travel ove
 3. **Decision, the same everywhere.** At segment 50 each DLL applies the same rule: "every human player sent a hello with the same version and settings".
    - If yes, all switch at that segment.
    - If no, nobody switches. A PC without the DLL never switches either, so everyone stays on the original timing.
-4. **Telling the players.** A line in `open-homm5.log`, for example "co-op timing: ON (3 players agree)" or "OFF (player 2 has no DLL)". If it's easy, also a chat line.
+4. **Telling the players.** A line in `h5-together.log`, for example "co-op timing: ON (3 players agree)" or "OFF (player 2 has no DLL)". If it's easy, also a chat line.
 
 ## What players need
 
 - The same DLL version on every PC, and the same `[coop]` settings (the defaults are fine).
 - That's all. A missing or different DLL turns the speed-ups off for that game, without a desync.
 
-Settings (`open-homm5.ini`):
+Settings (`h5-together.ini`):
 
 ```ini
 [coop]

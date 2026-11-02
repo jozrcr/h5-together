@@ -169,7 +169,7 @@ So in MMH5.5 the choices mean: Random (a random mode), **Default**, **Savage**, 
 |---|---|---|---|---|
 | `data\texts.pak` (base game, French) | ToE meaning | ToE meaning | ToE meaning (a small gold bonus) | ToE meaning (a few resources) |
 | `MMH55-Texts-EN.pak` (RC19d and RC19k) | MMH5.5's help text | **Default** mode | **Savage** mode | **Nightmare** mode |
-| MMH5.5's official French pack, RC19d (`bin\open-homm5\lang\fr\MMH55-Texts-FR-RC19d.pak`, installed) and RC19i (`build\lang\fr-rc19i\`) | MMH5.5's text, **still in English** | Default, **still in English** | **outdated French**: a gold bonus of a few thousand | **outdated French**: extra creatures of tiers 2 to 4 |
+| MMH5.5's official French pack, RC19d (`bin\h5-together\lang\fr\MMH55-Texts-FR-RC19d.pak`, installed) and RC19i (`build\lang\fr-rc19i\`) | MMH5.5's text, **still in English** | Default, **still in English** | **outdated French**: a gold bonus of a few thousand | **outdated French**: extra creatures of tiers 2 to 4 |
 | our gap pack for RC19d (`open-homm5-fr-rc19d.pak`, installed) | – | – | – | – |
 | our gap pack for RC19k (`open-homm5-fr.pak`, not installed yet) | French | French | – | – |
 
@@ -188,7 +188,7 @@ Today (2026-11-01 14:02) a file `data\MMH55-Texts-FR.pak` appeared in the Steam 
 - Its files are **dated 2026-10-31**, newer than every other pack, so the game prefers it over `MMH55-Texts-EN.pak` for every path it has (see [../subsystems/texts.md](../subsystems/texts.md), "Which archive wins"). Anyone with `texts=game` and this file gets it.
 - Its four bonus tooltips are the **base game's** (ToE meanings), so without our mod all four would be wrong.
 - Its version text holds a placeholder, which explains our log line `languages: version text: ... the game "Version : "`.
-- **Question for the owner:** where does it come from? If it is not wanted, take it out of `data\` (the owner's action; we never write there). A French pack belongs in `bin\open-homm5\lang\fr\`, where only our mod reads it.
+- **Question for the owner:** where does it come from? If it is not wanted, take it out of `data\` (the owner's action; we never write there). A French pack belongs in `bin\h5-together\lang\fr\`, where only our mod reads it.
 
 ### The fix that belongs to us
 
@@ -196,7 +196,7 @@ Today (2026-11-01 14:02) a file `data\MMH55-Texts-FR.pak` appeared in the Steam 
    - French versions of `bonus_tooltip_gold.txt` (Savage) and `bonus_tooltip_resource.txt` (Nightmare), translated from MMH5.5's English;
    - for the RC19d pack, also `bonus_tooltip_random.txt` and `bonus_tooltip_random_minor_artifact.txt`, which the RC19k gap pack already has.
    - Each entry dated after the official pack's files (2025-10-02), so it wins among our packs ("newest wins", `src/mods/languages.cpp`).
-   - Then rebuild the packs with `tools/lang/build_pack.py` and the private zip, and the owner copies them into `bin\open-homm5\lang\fr\`.
+   - Then rebuild the packs with `tools/lang/build_pack.py` and the private zip, and the owner copies them into `bin\h5-together\lang\fr\`.
 
    **0.25 session.**
 2. **A check in our tools** (`tools/lang/inventory.py`, in git): flag the French pack's texts that are probably **outdated**, meaning their markup tags or placeholders differ from MMH5.5's English. Here the English has colour tags and line breaks, and the French has none. The candidates go into `build\lang\rc19k\mmh55-outdated.txt` for a translator to review. This will likely find more texts like these. **0.5 session.**
@@ -359,7 +359,7 @@ Before building, the first session checks two things:
 
 ## Questions for the owner
 
-1. `data\MMH55-Texts-FR.pak` appeared today in the game's `data\` folder: did you put it there? We suggest moving it out (into `bin\open-homm5\lang\fr\` if you want it).
+1. `data\MMH55-Texts-FR.pak` appeared today in the game's `data\` folder: did you put it there? We suggest moving it out (into `bin\h5-together\lang\fr\` if you want it).
 2. Volume: is the "wide" curve (lowest step −40 dB) what you want, or a lower maximum (`music_scale`, `sound_scale`), or both?
 3. ToE bonuses: which ones do you miss, and must each player choose their own, or is one host setting enough?
 4. Hero skills: per session (simpler) or per game from the lobby? Skills only, or attribute growth too?

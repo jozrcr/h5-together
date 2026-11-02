@@ -195,8 +195,8 @@ find_python() {
     return 1
 }
 
-# The name and version a dinput8.dll of ours says in its text: "H5 Together 0.2.8" from
-# "H5 Together hook DLL 0.2.8 loaded" ("open-homm5 0.2.7": the add-on's old name).
+# The name and version a dinput8.dll of ours says in its text: "H5 Together 0.3.0" from
+# "H5 Together hook DLL 0.3.0 loaded" ("open-homm5 0.2.7": the add-on's old name).
 addon_version() {
     grep -a -o -E '(H5 Together|open-homm5) hook DLL [^ ]+ loaded' "$1" 2>/dev/null | head -n 1 |
         sed -E 's/ hook DLL ([^ ]+) loaded$/ \1/'

@@ -23,7 +23,7 @@ Status (2026-10-25, evening):
 - **Good news:** MMH5.5 already has an official French translation, made by the community and published by the MMH5.5 team. So French mostly means "use their pack".
   - We only translate what it leaves out: about **3,800 words** for co-op, **10,000** with the campaigns (measured with the real pack; the first estimate said 5,000 because it counted the 3.1 patch's campaign texts as co-op). Translating MMH5.5 ourselves would have been about **84,000 words**.
   - **All co-op gaps are done.** Of the 3,800 words, about 3,000 do not depend on MMH5.5's version. For RC19k with the RC19i pack, MMH5.5's part became 3,000 words: 962 translated, and 2,040 taken from the RC19d French pack (section 3.3). About 50 words stay as they are on purpose: the product name, internal keys, and proper names.
-- **The switch:** `[lang] texts=game|fr` in `open-homm5.ini`, set by each player. The DLL hands the game the French text files as it reads them, the way the music switch works. No game file changes. `game` (the default) changes nothing.
+- **The switch:** `[lang] texts=game|fr` in `h5-together.ini`, set by each player. The DLL hands the game the French text files as it reads them, the way the music switch works. No game file changes. `game` (the default) changes nothing.
 - **Co-op:** texts are local to each PC. The game objects keep a text's path, never the text itself, and a robot LAN game with only the host on `texts=fr` kept all 1,465 world checksums equal.
 
 ## 1. Findings
@@ -98,7 +98,7 @@ Read from the code, not yet watched in a running game. Details in [../subsystems
 
 - The game's Steam download is split into parts, "depots". The French install has two: `15371` (shared content, 2.07 GB) and `15373` (French, 186.7 MB).
 - **`15372` is English, 173.5 MB.** It holds `data\texts.pak` (5.84 MiB), `data\sound.pak` (English voices, 97.75 MiB) and the manuals. Sources: api.steamcmd.net, and SteamDB through search results.
-- **Way 1 (recommended):** Steam's console command `download_depot 15370 15372`. You open the console with `steam://open/console` in a browser or Windows' Run box. Steam puts the files in `Steam\steamapps\content\app_15370\depot_15372\`, a separate folder, so the installed game is not touched. Then copy only `texts.pak` into `bin\open-homm5\lang\en\`. This is a community-documented command, not an official one.
+- **Way 1 (recommended):** Steam's console command `download_depot 15370 15372`. You open the console with `steam://open/console` in a browser or Windows' Run box. Steam puts the files in `Steam\steamapps\content\app_15370\depot_15372\`, a separate folder, so the installed game is not touched. Then copy only `texts.pak` into `bin\h5-together\lang\en\`. This is a community-documented command, not an official one.
 - **Way 2 (not recommended):** switch the game's language in Steam (Properties, Language). That rewrites the installed game's language files, voices included, for every program that uses that folder.
 - **A bonus:** the English `texts.pak`, paired path by path with the French one, gives the complete official English-French list of names. Ours today (below) is partial.
 
@@ -184,7 +184,7 @@ The 3.1 patch's texts and Ubisoft's map texts do not depend on MMH5.5's version,
 
 ### Setting
 
-`open-homm5.ini`, per player, never sent to the others:
+`h5-together.ini`, per player, never sent to the others:
 
 ```ini
 [lang]
@@ -197,9 +197,9 @@ log_texts=0    ; testing: log the first N texts taken from the packs
 All of them sit next to the DLL, installed by the player, never in `data\`:
 
 ```
-bin\open-homm5\lang\fr\MMH55-Texts-FR.pak     MMH5.5's French pack, as downloaded (any name ending in .pak)
-bin\open-homm5\lang\fr\open-homm5-fr.pak      our translations of what it leaves out (private)
-bin\open-homm5\lang\en\texts.pak              (not built) the English base texts from a player's Steam
+bin\h5-together\lang\fr\MMH55-Texts-FR.pak     MMH5.5's French pack, as downloaded (any name ending in .pak)
+bin\h5-together\lang\fr\open-homm5-fr.pak      our translations of what it leaves out (private)
+bin\h5-together\lang\en\texts.pak              (not built) the English base texts from a player's Steam
 ```
 
 ### How it works (`src/mods/languages.cpp`, built; user notes in [../../src/mods/README.md](../../src/mods/README.md))
@@ -305,9 +305,9 @@ Kept in `build/lang/` of this worktree and copied to the main checkout's `build/
 | `build/lang/rc19k/` | The RC19k inventory, gap lists and the lists of reused and translated paths |
 
 **Install, in short** (the note has the details):
-1. Put MMH5.5's French `.pak` in `bin\open-homm5\lang\fr\`. Take the ModDB add-on for RC19i (the closest to RC19k), unzipped.
+1. Put MMH5.5's French `.pak` in `bin\h5-together\lang\fr\`. Take the ModDB add-on for RC19i (the closest to RC19k), unzipped.
 2. Put `open-homm5-fr.pak` there too.
-3. Set `texts=fr` under `[lang]` in `open-homm5.ini`.
+3. Set `texts=fr` under `[lang]` in `h5-together.ini`.
 4. Restart the game.
 
 Never put either pack in `data\`.
@@ -322,9 +322,9 @@ Done:
 
 Next:
 
-2b. ~~**Robot checks**~~ (done 2026-10-25, 17:18 to 17:25, robot lock held). Test copy `C:\Games\H5_test` with MMH5.5 RC19d; the RC19d pack and `open-homm5-fr.pak` in its `bin\open-homm5\lang\fr\`, removed afterwards. Results in `build/robot/` of this worktree:
+2b. ~~**Robot checks**~~ (done 2026-10-25, 17:18 to 17:25, robot lock held). Test copy `C:\Games\H5_test` with MMH5.5 RC19d; the RC19d pack and `open-homm5-fr.pak` in its `bin\h5-together\lang\fr\`, removed afterwards. Results in `build/robot/` of this worktree:
    - **Single player, a random map** (`20261025-171842`: `--no-map`, `rmg RMG/Templates/2P-Duel-T.xdb`, 1 AI turn, `log_texts=600`):
-     - the log has `6024 French texts from open-homm5\lang\fr: MMH55-Texts-FR-RC19d.pak (5841), open-homm5-fr.pak (183)`, installed at DLL load;
+     - the log has `6024 French texts from h5-together\lang\fr: MMH55-Texts-FR-RC19d.pak (5841), open-homm5-fr.pak (183)`, installed at DLL load;
      - the version line matches: `"Version: 5.69d"` for the pack and for the game;
      - 383 texts given to the game: 366 `Text/Game/...` (heroes, creatures, skills, ...), 8 `GameMechanics/RefTables`, 4 from our pack (3 random map settings `RMG/Params/...`, the Rage message);
      - `player list: French words, as the game's texts ([lang] texts=fr)`;
@@ -341,7 +341,7 @@ Next:
      - a tooltip screenshot.
      The owner will see these in a real game.
 3b. ~~**MMH5.5's gaps for RC19k**~~ (done: section 1.7 and 3.3; batches `b4`, `b5`).
-2c. ~~**Robot checks on RC19k**~~ (done 2026-10-25, 21:14 to 21:24, robot lock held; RC19i pack and the new gap pack in `C:\Games\H5_test_k\bin\open-homm5\lang\fr\`, removed afterwards):
+2c. ~~**Robot checks on RC19k**~~ (done 2026-10-25, 21:14 to 21:24, robot lock held; RC19i pack and the new gap pack in `C:\Games\H5_test_k\bin\h5-together\lang\fr\`, removed afterwards):
    - **random map** (`20261025-211432`):
      - 6,083 French texts (RC19i 5,603, ours 480, 272 of ours replacing RC19i's English);
      - 375 texts given to the game, 10 of them from our pack;

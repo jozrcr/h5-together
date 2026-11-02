@@ -33,7 +33,7 @@ Status: **RC19k in the test copy `C:\Games\H5_test_k`, first robot runs pass** (
   - `data\`: the 10 `MMH55-*.pak` files;
   - `music\MMH55\` (about 32 `.ogg` files), 8 `UserMODs\MMH55-*.h5u`, `video\intro.ogg` and `outro.ogg`;
   - the ARMG manual, plus `unins000.exe` / `unins000.dat`.
-- It never touches `um.dll` or our `dinput8.dll`, `open-homm5.ini` or `bin\open-homm5\`.
+- It never touches `um.dll` or our `dinput8.dll`, `h5-together.ini` or `bin\h5-together\`.
 - Correction (setup log): RC19k **does** ship a `bin\H5_Game.exe` (the 2008 vanilla 3.1 exe without Steam DRM, v3.1.2.98). Inno Setup keeps an existing file with a newer version, so the Steam folder's 2025 rebuild (v3.1.2.99) should stay.
 - It adds desktop and Start menu shortcuts and an "uninstall" entry in Windows.
 
@@ -170,7 +170,7 @@ robocopy C:\Games\H5_test C:\Games\H5_test_k /E
 - `MMH55Stats.xml` (PEST, Movement, camera), `H55-Settings.lua`, `MMH55-Templates.pak`, `UI/UIGameRoot` in `MMH55-Frame.pak`;
 - `H55_Version = "19k"`. (Setup log: RC19k's file still says `"19e"`, so it cannot tell RC19e from RC19k.)
 
-**7. The DLL's start-up log.** `python tools\robot\run_ai_test.py --game C:\Games\H5_test_k --turns 1`. Then `bin\open-homm5.log` must show:
+**7. The DLL's start-up log.** `python tools\robot\run_ai_test.py --game C:\Games\H5_test_k --turns 1`. Then `bin\h5-together.log` must show:
 ```
 game build: ToE 3.1 + MMH5.5 patches (MMH55_Utility)
 hooked AI turn driver (CPlayerAI vftable slot 0 at 00e4c8bc)
@@ -250,7 +250,7 @@ Your current edited file has SHA-256 `3C986E034D7D1156F17BD2367040517F9A88902F73
 1. Close the game and GameRanger. Finish or drop running RC19d games: start new games in RC19k.
 2. Back up to a folder outside the game folder:
    - `data\MMH55-Settings.pak`;
-   - `bin\open-homm5.ini`;
+   - `bin\h5-together.ini`;
    - any of your own maps in `Maps\`.
 3. Move `data\MMH55-Settings - Copie.pak` out of `data\` (owner only).
 4. Run `Uninstal.exe` in the game folder. Then check that these 3 files are gone: `bin\MMH55_64.exe`, `bin\H5_AIProcess_31j.exe`, `data\MMH55-Stats.pak`. If not, delete the files in the appendix by hand.
@@ -259,7 +259,7 @@ Your current edited file has SHA-256 `3C986E034D7D1156F17BD2367040517F9A88902F73
 7. Put the group's RC19k `MMH55-Settings.pak` (from the owner) into `data\`, replacing the new one.
 8. Start `MMH55_Utility_64.exe` once:
    - the main menu shows "5.69k";
-   - `bin\open-homm5.log` says `game build: ToE 3.1 + MMH5.5 patches (MMH55_Utility)`. If it says `unknown`, wait for the new open-homm5 DLL.
+   - `bin\h5-together.log` says `game build: ToE 3.1 + MMH5.5 patches (MMH55_Utility)`. If it says `unknown`, wait for the new H5 Together DLL.
 9. If you made a copy of the exe named `H5_Game.exe` (the GameRanger guide's trick, or the Linux fallback), **make that copy again** from the new `MMH55_Utility_64.exe`. Otherwise you run the old exe with the new data.
 10. **Linux friend:** delete the files in the appendix from the Linux game folder, then copy the host's new folder as in [linux.md](../linux.md).
 11. Play a short co-op game with AI before a long one.
@@ -303,7 +303,7 @@ The owner approved download 1 and running the installer on a test copy only. The
 
 - `C:\Games\H5_test` was copied to `C:\Games\H5_test_k` (robocopy, 2,182 files, 3.94 GB, no errors), under the robot lock. No game was running.
 - RC19d removed by hand, as in the [appendix](#appendix-files-rc19d-installed). The files were **moved**, not deleted, to `C:\Games\downloads\mmh55-rc19k\rc19d_removed\` (same folder layout; list in `..\rc19d_removed.log`). That covers the 12 `bin\` files, the 10 `MMH55-*.pak`, `MMH55-Settings - Copie.pak`, `data\index.bin`, `data\RMGTemp\`, `music\MMH55\`, the 8 `UserMODS\MMH55-*.h5u`, `video\outro.ogg`, `video\robot_disabled\intro.ogg` (the robot had parked it there), `ARMG Manual V2.7.pdf` and `Uninstal.exe`.
-- Kept: `bin\dinput8.dll`, `bin\open-homm5\`, the logs, `UserMODS\All_campaigns.*`, `Maps\`, the `robot_home*` profiles.
+- Kept: `bin\dinput8.dll`, `bin\h5-together\`, the logs, `UserMODS\All_campaigns.*`, `Maps\`, the `robot_home*` profiles.
 - The installer's three "already installed" files are gone from the copy. **It has no MMH5.5 now and cannot run MMH5.5 games** until RC19k goes in.
 - Steam folder check: every file and folder's size, modification and creation time was listed before and after: 2,380 entries, **0 differences**. `dir /s` of `bin\` and `data\` was also identical.
 
@@ -417,4 +417,4 @@ From the file list inside RC19d's `Uninstal.exe`; it matches what is in the game
 - `video\intro.ogg`, `video\outro.ogg` (RC19k puts them back);
 - `ARMG Manual V2.7.pdf`, `Uninstal.exe`.
 
-Not MMH5.5's, keep them: `bin\dinput8.dll`, `bin\open-homm5.ini`, `bin\open-homm5.log`, `bin\open-homm5\`, and the `UserMODS\All_campaigns.*` files.
+Not MMH5.5's, keep them: `bin\dinput8.dll`, `bin\h5-together.ini`, `bin\h5-together.log`, `bin\h5-together\`, and the `UserMODS\All_campaigns.*` files.

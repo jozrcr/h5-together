@@ -38,7 +38,7 @@ Both PCs must run exactly the same game files: the same MMH5.5 version and the s
 3. Copy everything **inside** its `Heroes of Might and Magic 5 Tribes of the East` folder into the folder Steam opened. Choose **Replace** / **Overwrite all**.
 4. Check that the `bin` folder now holds `MMH55_Utility_64.exe` and `dinput8.dll`.
 
-To install or update **only our DLL** later (a new open-homm5 version), use the package instead: extract `open-homm5-<version>.zip` and run `bash install.sh` in its folder. It finds the game, copies `dinput8.dll` into `bin`, and prints the launch option of step 3.
+To install or update **only our DLL** later (a new H5 Together version), use the package instead: extract `h5-together-<version>.zip` and run `bash install.sh` in its folder. It finds the game, copies `dinput8.dll` into `bin`, and prints the launch option of step 3.
 
 From now on, never click **Verify integrity of game files** in Steam: it would undo MMH5.5. If Steam ever updates the game, copy the host's files again.
 
@@ -63,7 +63,7 @@ WINEDLLOVERRIDES="dinput8=n,b" bash -c 'exec "${@/H5_Game.exe/MMH55_Utility_64.e
 
 ### 4. Check that the mod is on
 
-Start the game from Steam, wait for the main menu, and quit. Then open `bin/open-homm5.log` in a text editor. It should contain:
+Start the game from Steam, wait for the main menu, and quit. Then open `bin/h5-together.log` in a text editor. It should contain:
 
 ```
 game build: ToE 3.1 + MMH5.5 patches (MMH55_Utility)
@@ -154,7 +154,7 @@ All players should keep the mod on (the default). Each PC speeds up only what it
 | What you see | What to check |
 |---|---|
 | The game doesn't start or crashes at start | Remove the launch options and try again. If the plain game starts, the problem is our line: send the log. If it still fails, try another Proton version in **Compatibility**. |
-| No `bin/open-homm5.log` | Wine is not loading our DLL: check the `WINEDLLOVERRIDES` part of the launch options. |
+| No `bin/h5-together.log` | Wine is not loading our DLL: check the `WINEDLLOVERRIDES` part of the launch options. |
 | The log says `unknown build` | The game didn't start through `MMH55_Utility_64.exe`: use the file swap in step 3. |
 | The host's game is not in the LAN list | `sudo zerotier-cli listnetworks` must say `OK` on your side; in the host's ZeroTier console both PCs must be ticked **Auth** and show as online. Check your firewall (step 7) and that the host marked the ZeroTier network as **Private** in Windows. Start the game only after ZeroTier says `OK`. |
 | You can join but the game says it's out of sync, or players see different things | Both PCs must have the same files: copy the host's folder again. Send both logs. |
@@ -162,8 +162,8 @@ All players should keep the mod on (the default). Each PC speeds up only what it
 | The mouse wheel zooms in but never out | A Wine quirk (the game expects the wheel's position, Wine gives its steps). Our DLL fixes it under Wine by itself (`[camera] wheel_fix=auto`): the log says `wheel: Wine reports the mouse wheel as steps ...` after a few notches. Page Down / Page Up always zoom out / in. If the wheel still fails: set `wheel_fix=1` and `[debug] trace_wheel=1`, play a minute, send the log. |
 
 If the list stays empty with the new DLL on both PCs:
-- Look in your `open-homm5.log` for the line `lan: game queries also go to ...`. It must list the ZeroTier network (`... (zt...)`).
-- If it does and the list is still empty, add the host's ZeroTier address to `open-homm5.ini`. The DLL then also asks the host directly:
+- Look in your `h5-together.log` for the line `lan: game queries also go to ...`. It must list the ZeroTier network (`... (zt...)`).
+- If it does and the list is still empty, add the host's ZeroTier address to `h5-together.ini`. The DLL then also asks the host directly:
 
 ```ini
 [net]
@@ -174,7 +174,7 @@ lan_peers=10.21.174.28
 
 ## What to send back
 
-- `bin/open-homm5.log` from your PC, and the host's `bin\open-homm5.log`, from the same session.
+- `bin/h5-together.log` from your PC, and the host's `bin\h5-together.log`, from the same session.
 - Your Linux distribution and Proton version.
 - The output of `sudo zerotier-cli listnetworks`.
 - A screenshot of anything strange, and roughly how long AI turns took.

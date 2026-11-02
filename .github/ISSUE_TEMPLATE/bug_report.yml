@@ -16,7 +16,7 @@ body:
     id: addon-version
     attributes:
       label: H5 Together version
-      description: The first line of `h5-together.log` (in the game's `bin` folder) says it, like `H5 Together hook DLL 0.2.7 loaded`.
+      description: The first line of `h5-together.log` (in the game's `bin` folder) says it, like `H5 Together hook DLL <version> loaded`. Until 0.2.7 the add-on was called open-homm5, and the file is `open-homm5.log`.
       placeholder: "0.2.7"
     validations:
       required: true

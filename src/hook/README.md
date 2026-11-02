@@ -4,11 +4,11 @@ A DLL the game loads at start-up. It lets our code run inside the game, so impro
 
 **What it does today:** forwards DirectInput to the real Windows DLL (so the game works normally). If the exe is a build we know, it also:
 
-- logs every step of every AI turn with its timing to `open-homm5.log` next to the exe;
-- applies our mods from `src/mods/`: the co-op speed-ups, the fixes, the panels (player list, template builder, hero looks, game rules) and the camera, sound and text options. Each one is switched in `open-homm5.ini` next to the exe; the list, with every setting, is in [src/mods/README.md](../mods/README.md);
+- logs every step of every AI turn with its timing to `h5-together.log` next to the exe;
+- applies our mods from `src/mods/`: the co-op speed-ups, the fixes, the panels (player list, template builder, hero looks, game rules) and the camera, sound and text options. Each one is switched in `h5-together.ini` next to the exe; the list, with every setting, is in [src/mods/README.md](../mods/README.md);
 - watches for freezes ([the hang watchdog](#the-hang-watchdog-watchdogcpp)).
 
-Robot mode (`robot*.cpp`, used by `tools/robot/`) only turns on when an `open-homm5-robot.ini` file sits next to the exe, i.e. in the test copy during robot runs.
+Robot mode (`robot*.cpp`, used by `tools/robot/`) only turns on when an `h5-together-robot.ini` file sits next to the exe, i.e. in the test copy during robot runs.
 
 **Contents:** [how it gets into the game](#how-it-gets-into-the-game), [drawing over the game](#drawing-over-the-game-d3d9_hookcpp), [the overlay](#the-overlay-overlaycpp-our-panels-over-the-game), [which exes it hooks](#which-exes-it-hooks), [the AI trace](#the-ai-trace), [the hang watchdog](#the-hang-watchdog-watchdogcpp), [build](#build), [owner test](#owner-test-phase-0-gate-dll-loads-and-logs-ai-turns-game-runs-normally), [files](#files).
 
@@ -104,6 +104,25 @@ On 2026-10-25 the owner's game froze during an AI turn (the window "not respondi
 - **Hand test:** `[debug] hang_test=1`, then F12 while the game is in front freezes it on purpose for 25 s (a busy loop in `HangTestSpin`). Robot runs use `[debug] hang_test_at=<s>` instead (once, that many seconds after the game first took its messages): `run_ai_test.py --debug-setting hang_test_at=60`, `run_lan_test.py --host-debug ...`. Also for robot runs: `hang_test_frame_ms=N` (every frame N ms longer: a slow PC) and `hang_test_ai_step=N` (3 s once, instead of the first AI call that starts a turn from the N-th call on).
 - **AI pacing:** the turn driver hook first asks `src/mods/ai_pacing.cpp` whether the AI may decide now (at most once per frame in multiplayer, and only once its last commands have run); a held call is not made, and gets no `ai-step` line.
 
+## The old name (`old_names.cpp`)
+
+Until 0.2.7 the add-on was called open-homm5, and so were its files next to the exe. The installer gives them the new names ([tools/package/README.md](../../tools/package/README.md#the-old-name)). For a player who only copies the new `dinput8.dll` over an old install, the DLL does the part it needs itself:
+
+- **At start-up**, in `DllMain` before the log is opened: `open-homm5.ini` becomes `h5-together.ini` and `open-homm5-skins.ini` becomes `h5-together-skins.ini`, only when the new name is not there yet (otherwise the old file stays and the new one is used). The old log becomes `h5-together.old.log` while there is no log of the new name yet. Each robot copy (`OPEN_HOMM5_INSTANCE`) has its own names. The log says what moved, just after its first line:
+
+  ```
+  H5 Together hook DLL 0.2.7 loaded (built Nov  2 2026 13:22:54)
+  old names: open-homm5.ini is now h5-together.ini (the add-on was called open-homm5 until 0.2.7)
+  old names: the log open-homm5.log is now h5-together.old.log (the add-on was called open-homm5 until 0.2.7)
+  old names: our folder is still open-homm5 (there is no h5-together yet): its files are used from there
+  ```
+
+- **Our folder:** a file or folder of ours (`lang\fr`, `steam_api.dll`, where "Save as file" writes) is looked for in `bin\h5-together\`, else in `bin\open-homm5\` (`PathInOurFolder`). The templates are read from both folders (a name in both counts once). The DLL never moves the folder itself; the installer does.
+- `open-homm5.nohooks` still switches the hooks off, like `h5-together.nohooks`.
+- The pure rules (when a file moves) and the moves themselves are tested by `test/old_names_test.cpp`.
+
+Kept on purpose under the old name (they are identifiers, not names a player sees): the `OPEN_HOMM5_VERSION` macro, the `OPEN_HOMM5_INSTANCE` variable of the robot, the `OpenHomm5-*` names of the files the DLL serves to the game, the network and save tags, and the `Editor` line of the templates (`open-homm5 template maker`: every PC must build the same bytes from a template's name).
+
 ## Build
 
 Needs Visual Studio 2019 or 2022 (C++ build tools, x86). Already on the owner's PC.
@@ -119,6 +138,7 @@ This builds `build\hook\dinput8.dll` (with its version information: `dinput8.rc`
 - `test/original_music_test.cpp`: the "original music" mod's text work (`src/mods/original_music_xdb.cpp`) on small made-up data files: which music lines change and which stay.
 - `test/languages_test.cpp`: the French texts mod's work on bytes (`src/mods/languages_text.cpp`): paths, text encodings and a small zip archive made in the test.
 - `test/log_test.cpp`: the log's size limit (`log.cpp`): a log over the limit becomes the old log and the next one starts empty; a small one is kept and the next run is appended after a separator; a log that another copy of the game holds open is not moved.
+- `test/old_names_test.cpp`: the move from the old name (`old_names.cpp`): the rules, then a 0.2.7-style set of files next to the test exe (settings, hero looks, logs) moved byte for byte, nothing moved at the next start or when both names are there, and the folder looked for under its old name only while the new one is missing.
 - `test/rmg_maker_test.cpp`: the C++ template maker (`src/mods/rmg_maker.cpp`) against the JavaScript one. First `node tools/rmg/test_template_maker.js --expected build/rmg_parity` writes what the page's maker builds for the 24 ready templates, 400 random choices and a few special ones; the test must build the same bytes, names, warnings and numbers, and refuse bad choices with the same message. Needs Node.js.
 - `test/rmg_recipe_test.cpp`: recipe names (`src/mods/rmg_recipe.cpp`): choices → `OH-X1-...` → the same choices, every bad name and path refused, reading a template link the way the game keeps it (`src/mods/rmg_join.cpp`), the teams of a recipe map, and each ready template built from its recipe name, compared with the file in `src/mods/rmg/templates/`. It also checks that 302 recorded `X1` names still build what they built when recorded (`tools/rmg/x1_fingerprints.txt`): what an `X1` name builds must never change.
 - `test/rmg_builder_test.cpp`: the template builder's data (`src/mods/rmg_builder_data.cpp`): each preset builds its ready file byte for byte and every ready file has a preset; every choice the panel offers has a recipe name, and the maker's check (`CheckChoices`) answers as `MakeTemplate`; the zone map's positions equal the web page's (numbers from Node); the French warnings; the game's text format; a UI file we do not know is left alone.
@@ -137,8 +157,8 @@ Use a **separate copy** of the game, never the Steam folder (CLAUDE.md).
 
 1. Copy `build\hook\dinput8.dll` into the copy's `bin\` folder, next to `MMH55_Utility_64.exe`.
 2. Start a single-player skirmish **with `MMH55_Utility_64.exe`** (the 3.1j `MMH55_64.exe` is not hooked) against 1–2 AI players, and play 2–3 turns.
-3. Check `bin\open-homm5.log`. It should say `game build: ToE 3.1 + MMH5.5 patches (MMH55_Utility)`, then `hooked AI turn driver`, then many `ai-step` lines during AI turns.
-4. If anything goes wrong: delete `dinput8.dll` (or create an empty file `open-homm5.nohooks` in `bin\` to keep only forwarding), and send me the log.
+3. Check `bin\h5-together.log`. It should say `game build: ToE 3.1 + MMH5.5 patches (MMH55_Utility)`, then `hooked AI turn driver`, then many `ai-step` lines during AI turns.
+4. If anything goes wrong: delete `dinput8.dll` (or create an empty file `h5-together.nohooks` in `bin\` to keep only forwarding), and send me the log.
 
 On **Linux** (Wine/Proton) Wine prefers its own built-in `dinput8.dll`. Tell it to use ours first: Steam launch option `WINEDLLOVERRIDES="dinput8=n,b" %command%`, or in `winecfg` → Libraries → add `dinput8` as "native, builtin" (for GameRanger's Wine prefix).
 
@@ -149,9 +169,10 @@ On **Linux** (Wine/Proton) Wine prefers its own built-in `dinput8.dll`. Tell it 
 | `dllmain.cpp` | DLL entry, the forwarded exports, lazy hook installation |
 | `dinput8.def` | export names (same as the real `dinput8.dll`) |
 | `game_build.cpp/.h` | which exe are we in? |
-| `hooks.cpp/.h` | installs all hooks (honours `open-homm5.nohooks`); `InstallEarly` for the few that must be in before the game reads its data |
+| `hooks.cpp/.h` | installs all hooks (honours `h5-together.nohooks`, or the old `open-homm5.nohooks`); `InstallEarly` for the few that must be in before the game reads its data |
+| `old_names.cpp/.h` | the add-on's old name (open-homm5, until 0.2.7): moves its files to the new names at start-up, finds our folder under either name |
 | `ai_trace.cpp` | the AI turn trace |
-| `log.cpp/.h` | `open-homm5.log` writer. At start-up a log over 5 MB becomes `open-homm5.old.log` (one older log is kept) and a new one starts; a log that goes on from earlier runs gets a `---- new run ----` line before the new run's first line |
+| `log.cpp/.h` | `h5-together.log` writer. At start-up a log over 5 MB becomes `h5-together.old.log` (one older log is kept) and a new one starts; a log that goes on from earlier runs gets a `---- new run ----` line before the new run's first line |
 | `d3d9_hook.cpp/.h` | the shared Direct3D 9 hooks (overlay, robot screenshots) |
 | `version.h` | the version number, the one place that holds it (log's first line, install package, the DLL's version information) |
 | `dinput8.rc` | the DLL's version information (file properties > Details: product name, description, version, copyright). `build.ps1` compiles it with `rc.exe` (found through `vcvarsall`, like `cl`) and links it in; the version text comes from `version.h`, the numbers are cut from it by the build script |
@@ -164,6 +185,6 @@ On **Linux** (Wine/Proton) Wine prefers its own built-in `dinput8.dll`. Tell it 
 | `overlay_textures.cpp` | pictures from the game's data, as textures |
 | `overlay_test_panel.cpp` | the test panel (`[ui] overlay_test_panel=1`) |
 | `third_party/imgui/` | Dear ImGui v1.91.9b (MIT): core + DirectX 9 renderer, for the overlay |
-| `robot.cpp/.h`, `robot_*.cpp` | robot mode for unattended test runs; only active when `open-homm5-robot.ini` is next to the exe (see [tools/robot/README.md](../../tools/robot/README.md)) |
+| `robot.cpp/.h`, `robot_*.cpp` | robot mode for unattended test runs; only active when `h5-together-robot.ini` is next to the exe (see [tools/robot/README.md](../../tools/robot/README.md)) |
 | `test/` | the tests that `build.ps1 -Test` runs ([Build](#build)) |
 | `build.ps1` | build script |

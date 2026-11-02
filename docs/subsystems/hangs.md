@@ -6,7 +6,7 @@ Status: one real freeze, cause not proven (2026-10-25). **Leading hypothesis:** 
 
 A 3-human co-op game with release 0.2.3, the owner's PC hosting (`MMH55_Utility_64.exe`). Only the host froze: its window went "not responding", one core at 100% for minutes, until it was killed. In co-op only the host computes the AI turns and sends their commands (`ai-turn.md`), so a loop in the AI, or in our code running on the host during AI turns, freezes only the host.
 
-What the host's log (`open-homm5.log`, thread `[28588]`) shows:
+What the host's log (`h5-together.log`, thread `[28588]`) shows:
 
 - **When:** day 15, the third AI player's turn (`ai=1FBCDB00`), 7.6 s into it, about 2.5 minutes after the day-15 autosave.
 - **The last line**, `3219141 ai-step ... stage 1->13 calls=24 cmds=9 ... gap=0.1ms types=00e0fbd8,00e0db8c x7`: the AI left `MOVE_HERO` (stage 1) for `STEP_REARRANGE_TOWN_HEROES` (13) and sent the threat info plus 7 `CSetPlayerMoneyCmd` (one per resource: a market trade) and one more command (the log shows 8 of the 9). The step before it, `1->1 cmds=4` (a hero move plus `CUpdateHeroRoleLinkTownCmd`), returned **in the same frame** (gap 0.1 ms).
@@ -70,7 +70,7 @@ On by default (`[debug] hang_watchdog=1`). How it works is in `src/hook/README.m
 ```
 watchdog: the game's main thread (28588) has not taken its window messages for 20 s ...
 watchdog: the main thread used 1990 ms of CPU in those 2016 ms: busy (it is running: an endless or very long loop)
-watchdog: EIP by place (of 20 samples): pathfinder search loop (0x00c08890) 14; dinput8.dll (open-homm5)+0x5300..53ff 6
+watchdog: EIP by place (of 20 samples): pathfinder search loop (0x00c08890) 14; dinput8.dll (H5 Together)+0x5300..53ff 6
 watchdog: EIP 12/20 at MMH55_Utility_64.exe+0x8089a (0x00c0889a, pathfinder search loop+0xa) ...
 watchdog: stack 20/20 at 0019f2a4: MMH55_Utility_64.exe+0x46e0a5 (0x0086e0a5, AI turn driver+0x365)
 ...
@@ -85,7 +85,7 @@ watchdog: our DLL is at 6f340000 (link time stamp 6ade25e8): ...
 
 - **busy or waiting:** ~2000 ms of CPU = a loop (like the owner's freeze); ~0 = blocked on a lock or a wait (a deadlock); then EIP is in `ntdll` and the stack shows who waits.
 - **EIP by place:** a loop's instructions together. Exe addresses are the vanilla 3.1 exe's (the same in `MMH55_Utility`), named when they are in a function our docs know (`kKnown` in `watchdog.cpp`).
-- **stack:** values on the stack that point just after a call instruction, found in at least half of the looks, innermost first. Some are stale (left over from earlier calls), but the callers of the loop are there. Our DLL's offsets: `python tools\hang\symbolize.py <open-homm5.log>` names them with `build\hook\dinput8.map` of the same build (check the link time stamp; CI keeps each package build's map as the `open-homm5-<version>-map` artifact) and the exe's with Ghidra's `analysis/export/functions.tsv`.
+- **stack:** values on the stack that point just after a call instruction, found in at least half of the looks, innermost first. Some are stale (left over from earlier calls), but the callers of the loop are there. Our DLL's offsets: `python tools\hang\symbolize.py <h5-together.log>` names them with `build\hook\dinput8.map` of the same build (check the link time stamp; CI keeps each package build's map as the `h5-together-<version>-map` artifact) and the exe's with Ghidra's `analysis/export/functions.tsv`.
 - **AI / lockstep / d3d9:** our own record of where the main thread was in our hooks: inside the AI turn driver (and since when, at which stage), inside the multiplayer pump, inside Present or a device reset; the last 20 AI steps.
 - **"takes its messages again, after N s":** the game came back by itself: a long load or a long step, not a hang.
 

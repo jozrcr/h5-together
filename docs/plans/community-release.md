@@ -16,16 +16,16 @@ A "session" below means one focused working block of a few hours.
 - **The exe comes later** (after online play), with Inno Setup on GitHub's machines (OK'd), signed through **SignPath** (the owner applies then).
 - **Update check:** yes, opt-in, contacting only GitHub.
 - **Still to ask:** the settings menu sketches (block 3), the 7 pages and the hotkey, translators on the MMH5.5 Discord, announcements. Decided by Claude unless the owner objects: crash dumps kept on the PC; no Start-menu folder.
-- **The add-on's name** is open: the owner wants a better one before the community release. Renaming touches the repo, the DLL's log and ini names (`open-homm5.ini`, `bin\open-homm5\`) and the installer, which must then move an existing install's files.
+- **The add-on's name:** **H5 Together** (the owner's choice, 2026-11-02; it was open-homm5 until 0.2.7). Done in the branch `rename-h5-together`: the DLL's log and ini names (`h5-together.ini`, `bin\h5-together\`), the package and the installer, which moves an existing install's files to the new names (and the DLL does the same for a DLL copied by hand). The owner renames the GitHub repo to `jozrcr/h5-together`; GitHub redirects the old links. The plans below use the new names.
 
 ## Short version
 
-- **Installer:** use **Inno Setup** (free, the tool MMH5.5's own installer is made with), built by GitHub's machines, so nothing is installed on your PC. One `open-homm5-setup-0.3.0.exe`: it finds the game, checks MMH5.5 and its version, installs, and shows up in Windows "Apps" for uninstalling. The file work stays in our tested `install.ps1`. Linux keeps `install.sh`, made friendlier. **About 4 sessions.**
+- **Installer:** use **Inno Setup** (free, the tool MMH5.5's own installer is made with), built by GitHub's machines, so nothing is installed on your PC. One `h5-together-setup-0.3.0.exe`: it finds the game, checks MMH5.5 and its version, installs, and shows up in Windows "Apps" for uninstalling. The file work stays in our tested `install.ps1`. Linux keeps `install.sh`, made friendlier. **About 4 sessions.**
 - **Unsigned exe warnings:** Windows will say "Windows protected your PC" for a while whatever we do, unless the setup is signed. **Free option:** apply to the SignPath Foundation (free code signing for open source projects, if they accept us). **Paid options** cost about €70 to €500 a year. You decide.
-- **Settings menu:** a new panel in the game's look, with 7 pages. It shows the 28 settings a player cares about, plus 16 more on an "Advanced" page. The other 59 stay out of the menu: the 20 game rules, which already have their own panel (F2), and 39 that stay in the file only (35 for testing, the builder's memory, and 3 rarely needed). It saves into `open-homm5.ini` as today. It opens from a button in the game's Options screen, a small button in the main menu (which also shows our version), and a hotkey. About 20 settings can apply at once; the others say "restart the game" or "from the next game". **About 5 sessions.**
-- **Languages:** move our **~215 panel texts** (×2 today: English and French) out of the C++ code into one text file per language (`open-homm5\texts\en.txt`, `fr.txt`, ...). English is built into the DLL as the fallback. A translator copies `en.txt`, translates the right-hand sides, and sends it to us. The DLL picks the language from Steam's own setting for the game. **About 4 sessions.**
+- **Settings menu:** a new panel in the game's look, with 7 pages. It shows the 28 settings a player cares about, plus 16 more on an "Advanced" page. The other 59 stay out of the menu: the 20 game rules, which already have their own panel (F2), and 39 that stay in the file only (35 for testing, the builder's memory, and 3 rarely needed). It saves into `h5-together.ini` as today. It opens from a button in the game's Options screen, a small button in the main menu (which also shows our version), and a hotkey. About 20 settings can apply at once; the others say "restart the game" or "from the next game". **About 5 sessions.**
+- **Languages:** move our **~215 panel texts** (×2 today: English and French) out of the C++ code into one text file per language (`h5-together\texts\en.txt`, `fr.txt`, ...). English is built into the DLL as the fallback. A translator copies `en.txt`, translates the right-hand sides, and sends it to us. The DLL picks the language from Steam's own setting for the game. **About 4 sessions.**
 - **Language audit:** nothing in our code finds a game widget by its text. Screens are recognised by their internal class names, which are the same in every language. The weak spots are a French-only "is the game French?" check, a French translation done by matching English sentences, two buttons placed using French/English screenshots, and panels that cut long words. All are listed in part 3.
-- **Community kit:** an English-first README and FAQ, a compatibility table, GitHub bug-report forms that ask for `open-homm5.log`, a "make a bug report" button (and script), crash dumps, a warning in the lobby when friends have another version, an opt-in "new version available" check, and working alongside another `dinput8.dll` mod. **About 5 sessions.**
+- **Community kit:** an English-first README and FAQ, a compatibility table, GitHub bug-report forms that ask for `h5-together.log`, a "make a bug report" button (and script), crash dumps, a warning in the lobby when friends have another version, an opt-in "new version available" check, and working alongside another `dinput8.dll` mod. **About 5 sessions.**
 - **Licences:** our code is MIT. The only bundled third-party code is Dear ImGui (MIT, with stb parts that are MIT or public domain). The zip must carry its notice (it doesn't today).
 - **Order:** quick wins → texts in files → settings menu → installer → safety nets → docs and release. **About 19 sessions in total**, or about 14 for a smaller cut (see the end).
 - **Left out on purpose (your choice):** plain ToE without MMH5.5 and Steam's 2025 exe. The plan leaves room for both (see "Leaving room for later").
@@ -37,7 +37,7 @@ A "session" below means one focused working block of a few hours.
 ### Today
 
 - A zip with `install.bat` → `install.ps1` (Windows) and `install.sh` (Linux), and matching uninstallers ([tools/package/README.md](../../tools/package/README.md)).
-- They find the game through Steam, copy `dinput8.dll`, refresh `open-homm5.ini` (keeping the player's values: `Merge-Settings` / `merge_ini`, byte-for-byte equal on Windows and Linux, tested by `test_scripts.py`) and copy 24 templates.
+- They find the game through Steam, copy `dinput8.dll`, refresh `h5-together.ini` (keeping the player's values: `Merge-Settings` / `merge_ini`, byte-for-byte equal on Windows and Linux, tested by `test_scripts.py`) and copy 24 templates.
 - Weak spots for strangers:
   - "Extract All" first. Double-clicking `install.bat` inside the zip fails with exit code 7.
   - A black console window with text.
@@ -58,7 +58,7 @@ A "session" below means one focused working block of a few hours.
 ### Recommendation: Inno Setup, built on GitHub
 
 - GitHub's Windows build machines list Inno Setup among their ready tools (to confirm in step 0). If it is missing, the workflow would install it there with Chocolatey, which is a download on GitHub's machine: **your OK first**. Nothing is installed on your PC.
-- One file: `open-homm5-setup-0.3.0.exe`, next to the zip on the Releases page. The zip stays, for Linux and for manual installs.
+- One file: `h5-together-setup-0.3.0.exe`, next to the zip on the Releases page. The zip stays, for Linux and for manual installs.
 - **The file work stays in `install.ps1` and `uninstall.ps1`**, so the settings refresh keeps exactly one tested Windows version. The setup passes the folder (`-GameDir`, `-NoPause`) and shows what the script printed on its last page.
   - Fallback, only if antivirus tests (VirusTotal) dislike "a setup that starts PowerShell": port the work to Inno's own Pascal script. `test_scripts.py` would then check that the setup writes the same bytes as the scripts.
 - Why not our own exe: more work, and no gain against SmartScreen (the warning is about the missing signature, not the tool).
@@ -94,8 +94,8 @@ In order:
 
 ### Uninstall from Windows "Apps"
 
-- Inno registers "open-homm5 (Heroes V add-on)" with its version.
-- **Our uninstaller must not live in the game folder.** Inno names its uninstaller `unins000.exe`, which is MMH5.5's own uninstaller name since RC19e. MMH5.5's upgrade guide tells players to run `unins000.exe`, so a second one there would be a trap. Ours goes in `%LOCALAPPDATA%\Programs\open-homm5\`, with a copy of `uninstall.ps1`, the list of our template names, and the game folder(s) it installed into.
+- Inno registers "H5 Together (Heroes V add-on)" with its version.
+- **Our uninstaller must not live in the game folder.** Inno names its uninstaller `unins000.exe`, which is MMH5.5's own uninstaller name since RC19e. MMH5.5's upgrade guide tells players to run `unins000.exe`, so a second one there would be a trap. Ours goes in `%LOCALAPPDATA%\Programs\h5-together\`, with a copy of `uninstall.ps1`, the list of our template names, and the game folder(s) it installed into.
 - Uninstalling runs `uninstall.ps1 -GameDir <folder>`. The "also delete your settings?" question becomes a normal Windows message box (a new switch for the script, so it doesn't wait for typing).
 
 ### Admin rights
@@ -172,7 +172,7 @@ None of them removes the warning on day one: reputation grows with downloads. **
 
 - OK to use Inno Setup, built on GitHub's machines only?
 - OK to apply to SignPath (free; the signature would say "SignPath Foundation")? Any budget for a paid certificate, or none for now?
-- The name in "Apps": "open-homm5 (Heroes V add-on)"? A Start-menu folder (settings help, uninstall) or nothing?
+- The name in "Apps": "H5 Together (Heroes V add-on)"? A Start-menu folder (settings help, uninstall) or nothing?
 
 ---
 
@@ -180,7 +180,7 @@ None of them removes the warning on day one: reputation grows with downloads. **
 
 ### Today
 
-- Players edit `open-homm5.ini` in Notepad: 103 settings in 13 sections, all commented out, each with a comment. Then they restart the game.
+- Players edit `h5-together.ini` in Notepad: 103 settings in 13 sections, all commented out, each with a comment. Then they restart the game.
 - Some panels already write there: the template builder (`[rmg] builder_last`) and the game rules panel (`[rules]`, with `WritePrivateProfileStringW`).
 - The DLL reads almost every setting **once at start-up** (each mod's `Apply...FromSettings()` in `src/hook/hooks.cpp`, or `Install...Early()` for the few that must act before the game reads its first data). That is why "restart the game" is the rule today.
 
@@ -202,7 +202,7 @@ The full table is in [Appendix A](#appendix-a-every-setting). In short:
 1. **Interface:** player list (on, key, position), "your turn" notification (on, sound, pop-up), the panels' keys (game rules F2, hero looks F7, builder F11), the rules button in the waiting room, the hero-screen "Look" button.
 2. **Camera and visuals:** zoom out (adventure map, battles), start zoom, black map edges, mouse wheel fix (shown only under Wine/Linux).
 3. **Sound:** original Heroes V music, wider volume range.
-4. **Language:** the add-on's language (part 3), the game's texts (`[lang] texts`: shown only when the packs are in `open-homm5\lang\fr`).
+4. **Language:** the add-on's language (part 3), the game's texts (`[lang] texts`: shown only when the packs are in `h5-together\lang\fr`).
 5. **Random maps:** template builder (on, key), our templates in the game's list.
 6. **Host:** teams on maps without teams, team arrows in the lobby, recipe-map teams, start terrain by faction. A line: "The game rules are in the waiting room: Rules... (F2)."
 7. **Advanced (co-op and speed):** a banner "Everyone in the same game should use the same values here". Then:
@@ -232,7 +232,7 @@ The menu marks each row ("restart" / "next game"). After OK it says "2 changes a
 
 Proposed: all three below (one panel, three ways in).
 - **A button in the game's Options screen.** The screen's files are in `data.pak` under `UI/GameOptions/` (buttons Accept, Back, Default, Combat replay, a category list), and it is reachable from the main menu and from the map's menu. We add a native button there, the way the builder's "Template..." button is added to the random map screen (`rmg_screen.cpp` hands the game an edited copy of the screen's file). Step 0: find the screen's class name with the robot, and a free spot.
-- **A small "open-homm5 0.3.0" button in a corner of the main menu.** It shows everyone's version (useful before a co-op game; already wished for in [install-and-join.md](install-and-join.md)) and opens the menu.
+- **A small "H5 Together 0.3.0" button in a corner of the main menu.** It shows everyone's version (useful before a co-op game; already wished for in [install-and-join.md](install-and-join.md)) and opens the menu.
 - **A hotkey**, for example F8 (the game's own keys and MMH5.5's must be checked; ours are F2, F7, F9, F10 (testing), F11, F12 (testing)).
 
 Not in the waiting room: it already has the Rules button, and the settings that matter for a game are the host's.
@@ -243,7 +243,7 @@ The same frame, fonts and buttons as the template builder and the game rules pan
 
 ```
 +----------------------------------------------------------------------+
-|  open-homm5 settings                         0.3.0 . MMH5.5 RC19k    |
+|  H5 Together settings                        0.3.0 . MMH5.5 RC19k    |
 +------------------+---------------------------------------------------+
 | > Interface      |  Player list on the map            [x]            |
 |   Camera         |     Key to hide or show it         [ F9     v]    |
@@ -270,7 +270,7 @@ The same frame, fonts and buttons as the template builder and the game rules pan
 - **In place, the installer's way:** a changed setting fills its own commented line `;key=...` in the same section (the same rule as `Merge-Settings`), so the file stays tidy and the next install keeps it. "Default" puts the `;` back. Other lines and comments are never touched.
   - Today's `WritePrivateProfileStringW` would add `key=value` at the end of the section and leave `;key=default` above it. That works, but it is untidy.
   - A small C++ "edit in place" function, tested with the same cases as `test_scripts.py`.
-- **One table for every setting** in the C++ code: section, key, default, type, limits, page, who, when it applies, text id. The menu is drawn from it. A test checks that it matches the shipped `open-homm5.ini` (same keys, same defaults), so the file and the menu can't drift apart.
+- **One table for every setting** in the C++ code: section, key, default, type, limits, page, who, when it applies, text id. The menu is drawn from it. A test checks that it matches the shipped `h5-together.ini` (same keys, same defaults), so the file and the menu can't drift apart.
 - Values are checked with the same limits the mods use (for example zoom 100 to 400, `segment_ms` 50 or 100).
 - If the file can't be written (a protected folder, see part 1), the menu says so.
 
@@ -316,14 +316,14 @@ The same frame, fonts and buttons as the template builder and the game rules pan
 
 ### The plan: one text file per language
 
-- **Where:** `bin\open-homm5\texts\en.txt`, `fr.txt`, `de.txt`, ... (not `open-homm5\lang\`, which holds the game-text packs of `[lang] texts=fr`).
+- **Where:** `bin\h5-together\texts\en.txt`, `fr.txt`, `de.txt`, ... (not `h5-together\lang\`, which holds the game-text packs of `[lang] texts=fr`).
 - **Format:** plain UTF-8 text (a byte-order mark is allowed), easy in Notepad:
 
   ```
-  # open-homm5 texts: Deutsch
+  # H5 Together texts: Deutsch
   # language: de
   # translated by: (name)
-  # for open-homm5: 0.3.0
+  # for H5 Together: 0.3.0
 
   [player_list]
   day = Tag
@@ -343,7 +343,7 @@ The same frame, fonts and buttons as the template builder and the game rules pan
 - **A translator's steps** (in `docs/translating.md`):
   1. copy `en.txt` to `de.txt`;
   2. translate the right-hand sides, keeping `{...}` and `<...>`;
-  3. put it in `bin\open-homm5\texts\` and choose the language in the menu (or `[ui] language=de`);
+  3. put it in `bin\h5-together\texts\` and choose the language in the menu (or `[ui] language=de`);
   4. send it to us (a GitHub issue form "Translation", or Discord).
 - **A tool:** `tools/lang/ui_texts.py check` lists, for each language, the missing lines, the lines English no longer has, and placeholder mistakes. CI runs it. `ui_texts.py new de` writes a starter file.
 - Later, if many translators come: the same files can be loaded into a free translation website (Weblate hosts open-source projects for free). Not needed for v0.3.
@@ -380,7 +380,7 @@ What must change, or be checked:
 | 8 | Every panel (`Fit()`) | Fixed widths in the 1024×768 layout; a text too long is cut with "...". German and Russian are often 30–40% longer than English | A **test language** `[ui] language=xx` (every text 40% longer, with accents) and robot screenshots of every panel |
 | 9 | `notify.cpp` | The pop-up ("Heroes V: your turn", "Your turn (day N).") is English only | In the text files |
 | 10 | `languages.cpp` | `[lang] texts=` knows only `fr` | Optional extra below |
-| 11 | `open-homm5.ini` comments, installer scripts | English only | The ini stays English (the menu replaces it); the setup's own pages come translated by Inno, and our ~40 setup messages get English and French |
+| 11 | `h5-together.ini` comments, installer scripts | English only | The ini stays English (the menu replaces it); the setup's own pages come translated by Inno, and our ~40 setup messages get English and French |
 
 The log stays English: it is for us.
 
@@ -409,7 +409,7 @@ Moving them is mechanical work, a good fit for Sonnet, with a test that every id
 
 ### Optional extra: the whole game in another language
 
-`[lang] texts=fr` serves MMH5.5's French pack from `open-homm5\lang\fr\` ([languages.md](languages.md)). The code works by folder, so `texts=de` with MMH5.5's German pack would be a small change: the MMH5.5 team hosts German, Spanish, Hungarian, Italian, Polish, Russian, Czech and Chinese translations. It is not needed for our own texts. About 0.5 session plus a test by a player of that language.
+`[lang] texts=fr` serves MMH5.5's French pack from `h5-together\lang\fr\` ([languages.md](languages.md)). The code works by folder, so `texts=de` with MMH5.5's German pack would be a small change: the MMH5.5 team hosts German, Spanish, Hungarian, Italian, Polish, Russian, Czech and Chinese translations. It is not needed for our own texts. About 0.5 session plus a test by a player of that language.
 
 ### Steps and effort
 
@@ -504,7 +504,7 @@ In `.github/ISSUE_TEMPLATE/`:
   - Windows or Linux (Proton version);
   - how many PCs, and whether everyone had the same version;
   - what happened, and the steps;
-  - **the report zip, or `open-homm5.log`, attached** (required);
+  - **the report zip, or `h5-together.log`, attached** (required);
   - a tick box "after a freeze I waited 30 s before closing".
 - `feature_request.yml`, `translation.yml`.
 - `config.yml`: a link to MMH5.5's Discord "for problems of MMH5.5 itself".
@@ -512,20 +512,20 @@ In `.github/ISSUE_TEMPLATE/`:
 ### "Make a bug report" helper
 
 - A button on the menu's "Help and logs" page, and `report.bat` / `report.sh` in the package (for when the game won't start).
-- It makes `open-homm5-report-<date>.zip` on the Desktop with:
-  - `open-homm5.log` and the previous one;
-  - `open-homm5.ini`;
+- It makes `h5-together-report-<date>.zip` on the Desktop with:
+  - `h5-together.log` and the previous one;
+  - `h5-together.ini`;
   - a short `system.txt`: Windows version, the game build, MMH5.5 version and file hashes, the add-on version, the other DLLs in `bin`;
   - the crash file, if there is one.
 
   It never sends anything itself. A note tells the player that the log holds player names and LAN addresses.
-- **The log grows forever today:** it is opened in "append" mode and never trimmed; yours is 1.4 MB. Plan: at start-up, if it is over 5 MB it becomes `open-homm5.old.log` (one kept). Each run starts with a clear separator line.
+- **The log grows forever today:** it is opened in "append" mode and never trimmed; yours is 1.4 MB. Plan: at start-up, if it is over 5 MB it becomes `h5-together.old.log` (one kept). Each run starts with a clear separator line.
 
 ### Crash information
 
 - Today: the freeze detector (`src/hook/watchdog.cpp`) writes where a frozen game is stuck. Nothing catches a **crash**.
 - Plan:
-  - on a crash, write a small "minidump" (`open-homm5-crash-<date>.dmp`, usually under 1 MB) with Windows' own `dbghelp.dll`, taken from `System32`: the game ships a 2002 copy in `bin`;
+  - on a crash, write a small "minidump" (`h5-together-crash-<date>.dmp`, usually under 1 MB) with Windows' own `dbghelp.dll`, taken from `System32`: the game ships a 2002 copy in `bin`;
   - and a log line with the crash address in the watchdog's format (module + offset, the function name where we know it).
 - The game's or MMH5.5's own crash handler, if any, is called after ours, as before.
 - Privacy: a dump holds part of the game's memory (player names, paths). It stays on the PC; the bug report zip includes it only with a tick box.
@@ -534,22 +534,22 @@ In `.github/ISSUE_TEMPLATE/`:
 
 - Off by default (`[update] check=0`).
 - At the first start after install, a small welcome panel:
-  - "open-homm5 0.3.0 is running. Settings: F8.";
+  - "H5 Together 0.3.0 is running. Settings: F8.";
   - "Check for new versions? [Yes] [No]".
-- When on: at most once a day, at the main menu, one HTTPS request to GitHub's public "latest release" address for our repo (`api.github.com/repos/jozrcr/open-homm5/releases/latest`). It sends nothing about the player; GitHub sees the address it comes from, as with any website.
+- When on: at most once a day, at the main menu, one HTTPS request to GitHub's public "latest release" address for our repo (`api.github.com/repos/jozrcr/h5-together/releases/latest`). It sends nothing about the player; GitHub sees the address it comes from, as with any website.
 - A new version shows as one line under the version button, with a link to the Releases page. Nothing is downloaded or installed by the DLL.
 
 ### Version check in the lobby (more useful than the update check)
 
 - Co-op only works when everyone has the same version. The DLL already sends small hellos at the start of a game (co-op guard, game rules).
-- Add the version to the hello. The waiting room then shows "Bob: open-homm5 0.2.7 (you: 0.3.0)" before the game starts, instead of a silent "co-op timing OFF" in the log.
+- Add the version to the hello. The waiting room then shows "Bob: H5 Together 0.2.7 (you: 0.3.0)" before the game starts, instead of a silent "co-op timing OFF" in the log.
 - About 0.5 session.
 
 ### Other `dinput8.dll` mods (chain-loading)
 
 - Today the installer refuses (exit code 3) when a `dinput8.dll` that isn't ours is there. Other mods use the same name, for example "ASI loaders" that load widescreen fixes.
 - Plan:
-  - the setup offers "keep the other mod working": it moves the other file to `bin\open-homm5\chain\dinput8.dll` (with the player's OK; the uninstaller puts it back);
+  - the setup offers "keep the other mod working": it moves the other file to `bin\h5-together\chain\dinput8.dll` (with the player's OK; the uninstaller puts it back);
   - our DLL loads that file instead of Windows' own `dinput8.dll` (one change in `dllmain.cpp`'s `Real()`), and that file then loads Windows' one.
   - The log says "chained: <file>".
 - Risk: two mods changing the same game code. The log and the FAQ say how to undo it.
@@ -652,7 +652,7 @@ The language detection, the long test language, the Options-screen button and al
 6. **Update check:** OK as opt-in (a question at first start), contacting only GitHub? Or no internet at all?
 7. **Crash dumps:** OK to write them on a crash (kept on the PC, sent only by the player)?
 8. **Other mods:** do you know any other `dinput8.dll` mod used with Heroes V (widescreen fix, ASI loader)? Any GOG player in reach for a test?
-9. **"Apps" entry and shortcuts:** "open-homm5 (Heroes V add-on)"? A Start-menu folder or none?
+9. **"Apps" entry and shortcuts:** "H5 Together (Heroes V add-on)"? A Start-menu folder or none?
 10. **Announcements:** shall I draft the posts (English, and French)? OK to tell the MMH5.5 team first?
 11. **Full plan or the smaller cut?**
 
@@ -660,7 +660,7 @@ The language detection, the long test language, the Options-screen button and al
 
 ## Appendix A: every setting
 
-All 103 settings of the shipped `tools/package/files/open-homm5.ini` (0.2.7), section by section. Checked against the code on 2026-11-02 (`GetPrivateProfile*` calls in `src/hook` and `src/mods`): every one is read by the code, all of them at start-up.
+All 103 settings of the shipped `tools/package/files/h5-together.ini` (0.2.7), section by section. Checked against the code on 2026-11-02 (`GetPrivateProfile*` calls in `src/hook` and `src/mods`): every one is read by the code, all of them at start-up.
 
 - **Who:** Player = each player for themselves. Host = only the host's value counts. Group = each PC, but everyone in a game should have the same. Panel = written by a panel. Tester = logs, experiments, parts of a feature.
 - **Menu:** Show = a normal page. Adv = the Advanced page. Rules = the Game rules panel (F2). No = file only.
@@ -762,7 +762,7 @@ All 103 settings of the shipped `tools/package/files/open-homm5.ini` (0.2.7), se
 
 | Key | Default | What it does | Who | Menu | v0.3 |
 |---|---|---|---|---|---|
-| `texts` | game | `fr` = the game's texts from the French packs in `open-homm5\lang\fr` | Player | Show (only when packs are there) | Restart |
+| `texts` | game | `fr` = the game's texts from the French packs in `h5-together\lang\fr` | Player | Show (only when packs are there) | Restart |
 | `log_texts` | 0 | log the first N texts served | Tester | No | Restart |
 
 ### [camera] (`camera.cpp`, `wheel.cpp`, `edge_sky.cpp`)
@@ -776,7 +776,7 @@ All 103 settings of the shipped `tools/package/files/open-homm5.ini` (0.2.7), se
 | `edge_sky` | game | `none` = black past the map's edge | Player | Show | Restart |
 | `edge_sky_test_light` | (empty) | test one more light file | Tester | No | Restart |
 
-### [skins]: hero looks (`hero_skins*.cpp`; the choices are in `open-homm5-skins.ini`)
+### [skins]: hero looks (`hero_skins*.cpp`; the choices are in `h5-together-skins.ini`)
 
 | Key | Default | What it does | Who | Menu | v0.3 |
 |---|---|---|---|---|---|
@@ -822,8 +822,8 @@ All 103 settings of the shipped `tools/package/files/open-homm5.ini` (0.2.7), se
   - `[debug] hang_test_at`, `hang_test_ai_step`, `hang_test_frame_ms`;
   - `[rmg] templates_selftest`;
   - `[skins] test_ai_heroes`, `test_button_on_map`.
-- `open-homm5-skins.ini`: the hero look choices, written by the looks panel.
-- `open-homm5-robot.ini` and the `OPEN_HOMM5_INSTANCE` variable: the robot's own settings, and per-copy file names (`open-homm5-<instance>.ini` / `.log`) when two copies of the game run on one PC. The settings menu must use the same file-name function (`hooklog::PathNextToExe`) so it edits the right file in robot runs.
+- `h5-together-skins.ini`: the hero look choices, written by the looks panel.
+- `h5-together-robot.ini` and the `OPEN_HOMM5_INSTANCE` variable: the robot's own settings, and per-copy file names (`h5-together-<instance>.ini` / `.log`) when two copies of the game run on one PC. The settings menu must use the same file-name function (`hooklog::PathNextToExe`) so it edits the right file in robot runs.
 
 ## Sources (signing, checked 2026-11-02)
 

@@ -189,8 +189,8 @@ function Get-Sha256Hex([string]$Path) {
     }
 }
 
-# The name and version a dinput8.dll of ours says in its text, or $null: "H5 Together 0.2.8"
-# from "H5 Together hook DLL 0.2.8 loaded" ("open-homm5 0.2.7": the add-on's old name).
+# The name and version a dinput8.dll of ours says in its text, or $null: "H5 Together 0.3.0"
+# from "H5 Together hook DLL 0.3.0 loaded" ("open-homm5 0.2.7": the add-on's old name).
 function Get-AddonVersion([string]$Path) {
     try {
         $text = $Latin1.GetString([System.IO.File]::ReadAllBytes($Path))

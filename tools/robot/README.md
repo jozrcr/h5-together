@@ -9,7 +9,7 @@ python tools\robot\run_ai_test.py --turns 12 --setvar "ai_time_limit = 20000"
 python tools\robot\run_ai_test.py --restore-intro     # put the intro videos back in the test copy
 ```
 
-Results go to `build/robot/<date-time>/` (gitignored): `summary.json`, the DLL log `open-homm5.log`, the game's own console `console.txt`, and screenshots (`frame-*.png`, the game's own frames saved by the DLL).
+Results go to `build/robot/<date-time>/` (gitignored): `summary.json`, the DLL log `h5-together.log`, the game's own console `console.txt`, and screenshots (`frame-*.png`, the game's own frames saved by the DLL).
 
 `run_lan_test.py` runs **two copies of the game at once** on this PC, a LAN host and a LAN client (see "LAN games" below):
 
@@ -23,7 +23,7 @@ python tools\robot\lan_report.py --last 2                                   # co
 
 Results go to `build/robot/<date-time>-lan/host/` and `.../client/`. The host creates a game on the chosen map, the client joins, both press "ready", the host sets the third slot to a computer player and starts; then the robot ends both humans' turns and the DLL times every AI step on both copies.
 
-Both copies run the LAN link tuning mod (`src/mods/README.md`) unless `--net-tuning off`; the runner writes its settings to `bin/open-homm5-<host|client>.ini` and removes them afterwards.
+Both copies run the LAN link tuning mod (`src/mods/README.md`) unless `--net-tuning off`; the runner writes its settings to `bin/h5-together-<host|client>.ini` and removes them afterwards.
 
 ## Checking the AI and its speed-ups (saves, battles, virtual clock)
 
@@ -170,7 +170,7 @@ python tools\robot\run_lan_test.py --game C:\Games\H5_test_k --seconds 150 --tur
 python tools\robot\lan_report.py --last 1
 ```
 
-- **Game mode and ToE start bonuses** (step 2): with `trace=1` the console gets one line per player and copy, `open-homm5: start of player 1 (computer 0): gold 20900 wood 20 ... ; minor artifacts: ...; game mode 1`, after MMH5.5's `H55 Players chose Default mode`. The DLL logs each lobby row's bonus (`rules: the lobby's row 0: start bonus 2 (gold)`) and the served start script (`rules: the scripts read scripts/H55-AdvMap.lua: served with game mode Default, ... hash ...`, the same on both copies).
+- **Game mode and ToE start bonuses** (step 2): with `trace=1` the console gets one line per player and copy, `H5 Together: start of player 1 (computer 0): gold 20900 wood 20 ... ; minor artifacts: ...; game mode 1`, after MMH5.5's `H55 Players chose Default mode`. The DLL logs each lobby row's bonus (`rules: the lobby's row 0: start bonus 2 (gold)`) and the served start script (`rules: the scripts read scripts/H55-AdvMap.lua: served with game mode Default, ... hash ...`, the same on both copies).
 
 - `--host-rules KEY=VALUE` / `--client-rules` / `--rules-setting` (both): `[rules]` settings. The host's choices are keys such as `governance=0`; `enabled=0` makes a copy behave as a PC without the rules; `trace=1` logs every script file the game opens. `run_ai_test.py` has `--rules-setting`.
 - `key|F2` opens the panel (setup screen, waiting room, adventure map); `panel|rules <command>` gives it what a click would: `open`, `set <key> <value>`, `file` (MMH5.5's values), `ok`, `cancel` / `close`, `scroll <units>|end`. Commands that start with `rules ` go to this panel only (`robot::TakePanelCommand` with a prefix).
@@ -215,7 +215,7 @@ When the game hangs, the DLL logs where: if the main loop stops calling `PeekMes
 
 The runner prepares the test copy (default `C:\Games\H5_test`, never the Steam folder):
 
-- copies `build/hook/dinput8.dll` into `bin/` and writes `bin/open-homm5-robot.ini`, which turns on robot mode in the DLL (`src/hook/robot*.cpp`). The ini is deleted after the run, so the copy stays playable by hand;
+- copies `build/hook/dinput8.dll` into `bin/` and writes `bin/h5-together-robot.ini`, which turns on robot mode in the DLL (`src/hook/robot*.cpp`). The ini is deleted after the run, so the copy stays playable by hand;
 - moves the intro videos (`video/logo-ubi6.ogg`, `logo-nival.ogg`, `intro.ogg`) to `video/robot_disabled/`;
 - writes a robot profile in `<test copy>/robot_home/My Games/...`: windowed 1024×768, muted, no "press any key" on the loading screen (`pwl_press_any_key_enabled = 0`), console log on (`game_writelog = 1`).
 
@@ -234,7 +234,7 @@ In robot mode the DLL:
 
 ## LAN games (two copies on one PC)
 
-Each copy gets `OPEN_HOMM5_INSTANCE=host` or `client` in its environment; the DLL then uses `open-homm5-robot-<instance>.ini` and `open-homm5-<instance>.log`, the runner gives it its own profile (`robot_home-<instance>`), and the DLL renames the game's "already running" mutex (`NIVAL_H5`).
+Each copy gets `OPEN_HOMM5_INSTANCE=host` or `client` in its environment; the DLL then uses `h5-together-robot-<instance>.ini` and `h5-together-<instance>.log`, the runner gives it its own profile (`robot_home-<instance>`), and the DLL renames the game's "already running" mutex (`NIVAL_H5`).
 
 LAN games are found through UDP broadcasts on the discovery port (`net_lan_match_maker_port`, default 8889): every copy sends a 5-byte "02" packet each second, and a host also sends its game (an 826-byte "03" packet) to the copies it heard from. Two copies cannot both bind port 8889 ("address in use", the second copy's LAN screen never opened), and with a shared port (`SO_REUSEADDR`) they could not tell each other apart. So each copy gets its own discovery port (host 8889, client 8891) and the DLL also sends every discovery broadcast to the other copy's port on 127.0.0.1 (`net_lan_relay_ports`, `robot_net.cpp`). The game ports are 8888 (host) and 8890 (client). `net_log=1` logs the socket calls and the first packets.
 
