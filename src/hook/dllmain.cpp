@@ -8,9 +8,15 @@
 // install our hooks only for a build we know. The few hooks that must see the
 // game's first data reads (hooks::InstallEarly) go in when the DLL is loaded,
 // if the exe can already be recognized then (not the Steam-wrapped one).
+//
+// Another dinput8.dll mod, renamed dinput8_next.dll (chain.h): we forward to it
+// instead of to the system DLL. When it calls "dinput8.dll" by name it gets us
+// again: those calls (made from inside one of ours, on the same thread) go to
+// the system DLL.
 #include <windows.h>
 #include <unknwn.h>
 
+#include "chain.h"
 #include "crash.h"
 #include "dinput_hook.h"
 #include "game_build.h"
@@ -24,8 +30,18 @@ namespace {
 
 HMODULE g_real = nullptr;
 bool g_hooks_done = false;
+// How deep this thread is in our forwarded calls: above 0, the chained mod is
+// calling us back (it asked for "dinput8.dll" and got ours).
+__declspec(thread) int t_depth = 0;
 
-FARPROC Real(const char *name)
+struct Forwarding {
+	Forwarding() { ++t_depth; }
+	~Forwarding() { --t_depth; }
+	Forwarding(const Forwarding &) = delete;
+	Forwarding &operator=(const Forwarding &) = delete;
+};
+
+FARPROC System(const char *name)
 {
 	if (!g_real) {
 		wchar_t path[MAX_PATH];
@@ -38,6 +54,16 @@ FARPROC Real(const char *name)
 		}
 	}
 	return GetProcAddress(g_real, name);
+}
+
+// Where a call goes: the chained mod's function, else the system DLL's (also
+// when the chained mod is the caller).
+FARPROC Real(const char *name)
+{
+	if (HMODULE chained = t_depth == 0 ? chain::Module() : nullptr)
+		if (FARPROC f = GetProcAddress(chained, name))
+			return f;
+	return System(name);
 }
 
 void InstallHooksOnce()
@@ -60,11 +86,14 @@ extern "C" {
 
 HRESULT WINAPI Proxy_DirectInput8Create(HINSTANCE inst, DWORD version, REFIID riid, LPVOID *out, LPUNKNOWN outer)
 {
-	InstallHooksOnce();
+	const bool from_game = t_depth == 0;  // (not the chained mod calling us back)
+	if (from_game)
+		InstallHooksOnce();
 	typedef HRESULT(WINAPI * Fn)(HINSTANCE, DWORD, REFIID, LPVOID *, LPUNKNOWN);
 	Fn fn = reinterpret_cast<Fn>(Real("DirectInput8Create"));
+	Forwarding forwarding;
 	const HRESULT hr = fn ? fn(inst, version, riid, out, outer) : E_FAIL;
-	if (SUCCEEDED(hr) && out) {
+	if (from_game && SUCCEEDED(hr) && out) {
 		robot::OnDirectInputCreated(*out);   // no-op unless robot mode is on
 		dihook::OnDirectInputCreated(*out);  // no-op unless the robot or a modal panel needs it
 	}
@@ -75,6 +104,7 @@ HRESULT WINAPI Proxy_DllCanUnloadNow()
 {
 	typedef HRESULT(WINAPI * Fn)();
 	Fn fn = reinterpret_cast<Fn>(Real("DllCanUnloadNow"));
+	Forwarding forwarding;
 	return fn ? fn() : S_FALSE;
 }
 
@@ -82,6 +112,7 @@ HRESULT WINAPI Proxy_DllGetClassObject(REFCLSID clsid, REFIID riid, LPVOID *out)
 {
 	typedef HRESULT(WINAPI * Fn)(REFCLSID, REFIID, LPVOID *);
 	Fn fn = reinterpret_cast<Fn>(Real("DllGetClassObject"));
+	Forwarding forwarding;
 	return fn ? fn(clsid, riid, out) : CLASS_E_CLASSNOTAVAILABLE;
 }
 
@@ -89,6 +120,7 @@ HRESULT WINAPI Proxy_DllRegisterServer()
 {
 	typedef HRESULT(WINAPI * Fn)();
 	Fn fn = reinterpret_cast<Fn>(Real("DllRegisterServer"));
+	Forwarding forwarding;
 	return fn ? fn() : E_FAIL;
 }
 
@@ -96,6 +128,7 @@ HRESULT WINAPI Proxy_DllUnregisterServer()
 {
 	typedef HRESULT(WINAPI * Fn)();
 	Fn fn = reinterpret_cast<Fn>(Real("DllUnregisterServer"));
+	Forwarding forwarding;
 	return fn ? fn() : E_FAIL;
 }
 
@@ -103,6 +136,7 @@ LPCVOID WINAPI Proxy_GetdfDIJoystick()
 {
 	typedef LPCVOID(WINAPI * Fn)();
 	Fn fn = reinterpret_cast<Fn>(Real("GetdfDIJoystick"));
+	Forwarding forwarding;
 	return fn ? fn() : nullptr;
 }
 
@@ -121,6 +155,7 @@ BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID)
 			hooklog::Write("%s", line.c_str());
 		robot::Init();  // before the game reads its profile
 		hooks::InstallEarly();  // before the game reads its data
+		chain::Load(inst);  // another dinput8.dll mod (dinput8_next.dll): loaded now, as the game would have loaded it
 	}
 	else if (reason == DLL_PROCESS_DETACH) {
 		hooklog::Write("process exiting");

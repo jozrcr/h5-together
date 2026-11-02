@@ -924,11 +924,19 @@ def windows_tests(pkg, work):
     (bin2 / "dinput8.dll").write_bytes(b"MZ some other mod's dinput8")
     code, out = install("-SteamDir", str(steam_only))
     check(code == 3 and "Stopped" in out, "foreign dinput8.dll: refused with exit 3", out)
+    check("dinput8_next.dll" in out, "foreign dinput8.dll: says how to keep it (rename it dinput8_next.dll)", out)
     check((bin2 / "dinput8.dll").read_bytes() == b"MZ some other mod's dinput8", "foreign dinput8.dll: left untouched")
     code, out = uninstall("-SteamDir", str(steam_only), stdin="y\n")
     check(code == 0 and "NOT the H5 Together one" in out, "uninstall leaves a foreign dinput8.dll alone", out)
     check((bin2 / "dinput8.dll").read_bytes() == b"MZ some other mod's dinput8", "uninstall: foreign dll still there")
-    (bin2 / "dinput8.dll").unlink()
+    # the other mod renamed dinput8_next.dll (chain-loading): installed beside it, and the uninstaller says how to put it back
+    (bin2 / "dinput8.dll").rename(bin2 / "dinput8_next.dll")
+    code, out = install("-SteamDir", str(steam_only))
+    check(code == 0 and (bin2 / "dinput8_next.dll").read_bytes() == b"MZ some other mod's dinput8", "dinput8_next.dll: installed beside it, untouched", out)
+    code, out = uninstall("-SteamDir", str(steam_only), stdin="y\n")
+    check(code == 0 and "rename it back to dinput8.dll" in out and (bin2 / "dinput8_next.dll").exists(),
+          "uninstall with dinput8_next.dll: left alone, and says to rename it back", out)
+    (bin2 / "dinput8_next.dll").unlink()
     (bin2 / "h5-together.ini").unlink(missing_ok=True)
 
     # uninstall: ours removed, log removed, ini only after asking
@@ -1136,9 +1144,16 @@ def linux_tests(pkg, work, bash):
     (bin2 / "dinput8.dll").write_bytes(b"MZ some other mod")
     code, out = sh("install.sh")
     check(code == 3 and (bin2 / "dinput8.dll").read_bytes() == b"MZ some other mod", "foreign dinput8.dll: refused (exit 3), untouched", out)
+    check("dinput8_next.dll" in out, "foreign dinput8.dll: says how to keep it (rename it dinput8_next.dll)", out)
     code, out = sh("uninstall.sh", stdin="y\n")
     check(code == 0 and (bin2 / "dinput8.dll").exists() and "NOT the H5 Together one" in out, "uninstall leaves a foreign dll alone", out)
-    (bin2 / "dinput8.dll").unlink()
+    (bin2 / "dinput8.dll").rename(bin2 / "dinput8_next.dll")
+    code, out = sh("install.sh")
+    check(code == 0 and (bin2 / "dinput8_next.dll").read_bytes() == b"MZ some other mod", "dinput8_next.dll: installed beside it, untouched", out)
+    code, out = sh("uninstall.sh", stdin="y\n")
+    check(code == 0 and "rename it back to dinput8.dll" in out and (bin2 / "dinput8_next.dll").exists(),
+          "uninstall with dinput8_next.dll: left alone, and says to rename it back", out)
+    (bin2 / "dinput8_next.dll").unlink()
     (bin2 / "h5-together.ini").unlink(missing_ok=True)
 
     sh("install.sh")
