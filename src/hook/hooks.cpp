@@ -28,6 +28,7 @@
 #include "../mods/rmg_factions.h"
 #include "../mods/rmg_teams.h"
 #include "../mods/rmg_templates.h"
+#include "../mods/settings_menu.h"
 #include "../mods/steam_spike.h"
 #include "../mods/update_check.h"
 #include "../mods/virtual_lan.h"
@@ -85,6 +86,7 @@ void InstallEarly()
 	mods::InstallHeroSkinsPanelEarly();  // the overlay's Direct3D import, for the looks' panel
 	mods::InstallHostRulesEarly();  // its panel: the Direct3D import
 	mods::InstallUpdateCheckEarly();  // [update] check=1: its notice in the main menu
+	mods::InstallSettingsMenuEarly();  // our page in the Options screen: before the game reads its list
 	overlay::InstallTestPanelEarly();
 }
 
@@ -122,6 +124,7 @@ void InstallAll()
 	mods::ApplyAudioVolumeFromSettings();
 	mods::ApplyHeroSkinsFromSettings();  // after notify and the co-op guard: it stacks on their hooks
 	mods::ApplyUpdateCheckFromSettings();  // [update] check (off by default)
+	mods::ApplySettingsMenuFromSettings();  // Options, H5 Together: Accept writes h5-together.ini; F3; the first-start question
 }
 
 void InstallUnknownBuild()

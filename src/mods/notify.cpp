@@ -450,6 +450,16 @@ void __fastcall UpdateHook(void *controller, void *edx, DWORD a, DWORD b, DWORD 
 
 }  // namespace
 
+void ReloadNotifySettings()
+{
+	wchar_t path[MAX_PATH];
+	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
+	g_sound = GetPrivateProfileIntW(L"notify", L"sound", 1, path) != 0;
+	g_popup = GetPrivateProfileIntW(L"notify", L"popup", 1, path) != 0;
+	hooklog::Write("notify: from the settings menu: sound %s, pop-up %s%s", g_sound ? "on" : "off", g_popup ? "on" : "off",
+	               g_update_next ? "" : " (the notification itself is off)");
+}
+
 void ApplyNotifyFromSettings()
 {
 	wchar_t path[MAX_PATH];

@@ -209,6 +209,18 @@ python tools\robot\run_ai_test.py --game C:\Games\H5_test_k --no-map --seconds 2
 - **Chain-loading:** copy `build\hook\chain_dummy.dll` (made by `build.ps1 -Test`) to the test copy's `bin\dinput8_next.dll`; the log says `chained: dinput8_next.dll ...` and `bin\chain_dummy.txt` says `loaded`, `called`. Remove both files afterwards.
 - `--setting SECTION.KEY=VALUE` (`run_lan_test.py`: `--setting`, `--host-setting`, `--client-setting`) writes a setting of any section the runner has no option for (`[update]`, `[chain]`); not for a section it writes itself (the DLL reads only the first section of a name).
 
+## Checking the settings menu (Options, H5 Together; `src/mods/settings_menu.cpp`)
+
+```
+python tools\robot\run_ai_test.py --game C:\Games\H5_test_k --no-map --seconds 30 --shot-every 0 --step "9|key|F3" --step "13|shot|ours" --step "14|panel|settings set rmg.builder_key F1" --step "15|ui|NUI::CGameOptionsScreen accept" --step "16|shot|accepted"
+python tools\robot\run_ai_test.py --game C:\Games\H5_test_k --no-map --seconds 30 --shot-every 0 --setting update.welcome_test=1 --ui-setting language=en --step "7|shot|welcome" --step "8|panel|settings welcome close" --step "10|msg|options" --step "13|panel|settings open" --step "15|panel|settings scroll 1 14" --step "15|panel|settings scroll 2 14" --step "17|shot|middle"
+```
+
+- `key|F3` (or `msg|options` then `panel|settings open`) shows our page of the game's Options screen; `panel|settings set <section>.<key> <value>` gives a row a value as a click would (the row shows it); the game's own `ui|NUI::CGameOptionsScreen accept` (Apply) then writes `h5-together.ini`; `panel|settings default` is the Default box's Yes; `panel|settings scroll <page 1|2> <line>` scrolls a page until that line shows (for screenshots); `panel|settings category 0` shows the game's own first category.
+- `--setting update.welcome_test=1` shows the first-start question in a robot run; `panel|settings welcome yes|no|close` answers it.
+- Look for `settings: h5-together.ini: N line(s) changed; Windows reads ...` and each mod's `... from the settings menu: ...` line. The runner puts the player's `h5-together.ini` back afterwards.
+- Not possible with the robot: clicks, the mouse wheel on a page, and the tooltips (its window is in the background).
+
 ## Robot script
 
 Besides starting a map, the DLL runs a script of timed steps (`--step`, or `--host-step` / `--client-step`), `"<seconds>|<kind>|<text>"`, seconds counted from the first main-loop call:

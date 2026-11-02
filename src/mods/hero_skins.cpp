@@ -1394,6 +1394,15 @@ bool CodeAsExpected()
 
 }  // namespace
 
+void ReloadHeroSkinsSettings()
+{
+	wchar_t path[MAX_PATH];
+	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
+	g_live_screen = GetPrivateProfileIntW(L"skins", L"live_hero_screen", 1, path) != 0;
+	hooklog::Write("hero skins: from the settings menu: after Apply the hero screen %s",
+	               g_live_screen ? "opens again with a new look" : "keeps its figure");
+}
+
 void ApplyHeroSkinsFromSettings()
 {
 	wchar_t path[MAX_PATH];

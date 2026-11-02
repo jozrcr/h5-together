@@ -48,6 +48,8 @@
 #include <windows.h>
 #include <string.h>
 
+#include <string>
+
 #include "../hook/log.h"
 #include "../hook/patch.h"
 
@@ -101,6 +103,7 @@ ArenaFarthestFn g_arena_next = nullptr;
 float g_map_scale = 1.0f;     // [camera] zoom_out / 100
 float g_combat_scale = 1.0f;  // [camera] combat_zoom_out / 100
 float g_start_zoom = 0.0f;    // [camera] start_zoom, 0 = the game's own
+float g_game_start = 0.0f;    // the game's start distance before we changed it (0: not changed)
 
 // mission_camera_def_pos: distance, tilt +4, turn +8, field of view +0x10 (0x0058a930)
 float *const kStartDistance = reinterpret_cast<float *>(0x00f339f0);
@@ -170,6 +173,8 @@ const float *__fastcall SoftLimitsHook(int mode)
 			hooklog::Write("camera: adventure map: the camera starts at distance %g (the game: %g; start_zoom)", g_start_zoom,
 			               *kStartDistance);
 		}
+		if (g_game_start == 0.0f)
+			g_game_start = *kStartDistance;  // the game's own, for the settings menu's "the game's" later
 		*kStartDistance = g_start_zoom;  // read right after this call (0x007d3360)
 	}
 	return Farther(g_soft_limits_next(mode));
@@ -213,23 +218,54 @@ float Factor(const wchar_t *ini, const wchar_t *key, const char *name)
 	return percent / 100.0f;
 }
 
-}  // namespace
-
-void ApplyCameraFromSettings()
+void ReadValues()
 {
 	wchar_t ini[MAX_PATH];
 	hooklog::PathNextToExe(L"h5-together", L".ini", ini, MAX_PATH);  // h5-together-<instance>.ini for the robot
 	g_map_scale = Factor(ini, L"zoom_out", "zoom_out");
 	g_combat_scale = Factor(ini, L"combat_zoom_out", "combat_zoom_out");
 	const int start = static_cast<int>(GetPrivateProfileIntW(L"camera", L"start_zoom", 0, ini));
+	g_start_zoom = 0.0f;
 	if (start > 0) {
 		g_start_zoom = static_cast<float>(start < kMinStart ? kMinStart : start > kMaxStart ? kMaxStart : start);
 		if (g_start_zoom != static_cast<float>(start))
 			hooklog::Write("camera: start_zoom=%d is not between %d and %d: %g is used", start, kMinStart, kMaxStart,
 			               g_start_zoom);
 	}
+}
 
-	if (g_map_scale == 1.0f && g_start_zoom == 0.0f) {
+}  // namespace
+
+// From the settings menu: the zoom limits and the start distance, from the next map or
+// battle (the game asks for its limits when a map or a battle starts). The hooks go in
+// if a limit now needs them (the main thread: the camera is set up there too).
+void ReloadCameraSettings()
+{
+	ReadValues();
+	if (g_start_zoom == 0.0f && g_game_start != 0.0f) {
+		*kStartDistance = g_game_start;  // the game's own start distance back
+		g_game_start = 0.0f;
+	}
+	hooklog::Write("camera: from the settings menu: zoom out %d%% (map), %d%% (battles), start distance %s; from the next map or battle",
+	               static_cast<int>(g_map_scale * 100.0f + 0.5f), static_cast<int>(g_combat_scale * 100.0f + 0.5f),
+	               g_start_zoom > 0.0f ? std::to_string(static_cast<int>(g_start_zoom)).c_str() : "the game's");
+	if ((g_map_scale != 1.0f || g_start_zoom != 0.0f) && !g_limits_next)
+		InstallCameraHooks(true, false);
+	if (g_combat_scale != 1.0f && !g_arena_next)
+		InstallCameraHooks(false, true);
+}
+
+void ApplyCameraFromSettings()
+{
+	ReadValues();
+	InstallCameraHooks(true, true);
+}
+
+void InstallCameraHooks(bool map, bool battles)
+{
+	if (!map) {
+	}
+	else if (g_map_scale == 1.0f && g_start_zoom == 0.0f) {
 		hooklog::Write("camera: adventure map: the game's own zoom limit (zoom_out=100)");
 	}
 	else {
@@ -257,7 +293,9 @@ void ApplyCameraFromSettings()
 		}
 	}
 
-	if (g_combat_scale == 1.0f) {
+	if (!battles) {
+	}
+	else if (g_combat_scale == 1.0f) {
 		hooklog::Write("camera: battles: the game's own zoom limit (combat_zoom_out=100)");
 	}
 	else {

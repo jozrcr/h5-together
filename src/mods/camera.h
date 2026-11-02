@@ -9,4 +9,10 @@ namespace mods {
 // nothing is installed. Only after DetectGameBuild() said the build is hookable.
 void ApplyCameraFromSettings();
 
+// From the settings menu: zoom_out, combat_zoom_out and start_zoom again, used from
+// the next map or battle; the hooks go in if a limit now needs them.
+void ReloadCameraSettings();
+// The hooks the limits need (map: the adventure map's, battles: the battles').
+void InstallCameraHooks(bool map, bool battles);
+
 }  // namespace mods

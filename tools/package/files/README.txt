@@ -24,13 +24,15 @@ Double-click uninstall.bat (Windows) or run: bash uninstall.sh (Linux). Only our
 
 SETTINGS (you can skip this)
 
-h5-together.ini in the game's bin folder. Every line is commented out and shows the default. The defaults keep the original game: the speed-ups, fixes and panels are on, and anything that changes how the game plays, looks or sounds is off until you turn it on. Restart the game after a change.
+In the game: main menu, Options, then "H5 Together" (or press F3). The page is part of the game's own Options screen: change a setting, then Apply (Default puts all of them back). A name that ends in * applies after a restart of the game, ** from the next game; the others apply at once. During a multiplayer game the host's and the advanced settings are read only.
+The settings are saved in h5-together.ini in the game's bin folder; you can also edit it with Notepad (then restart the game). Every line that starts with ";" is not changed and shows the default. The defaults keep the original game: the speed-ups, fixes and panels are on, and anything that changes how the game plays, looks or sounds is off until you turn it on.
+The main menu shows your H5 Together version under the game's own version.
 Your hero look choices are kept in h5-together-skins.ini, next to it.
 
 
 LANGUAGES
 
-The add-on's panels and messages are in English or French: one file per language in the game's bin\h5-together\texts folder (en.txt, fr.txt). The add-on uses the game's language by itself (Steam's language for the game, else the game's own texts, else Windows'). To choose, set [ui] language=en or fr in h5-together.ini. Any text a file lacks shows in English.
+The add-on's panels and messages are in English or French: one file per language in the game's bin\h5-together\texts folder (en.txt, fr.txt). The add-on uses the game's language by itself (Steam's language for the game, else the game's own texts, else Windows'). To choose: Options, H5 Together, Language (or [ui] language=en or fr in h5-together.ini). Any text a file lacks shows in English.
 Translations are welcome: copy en.txt to the code of your language (de.txt, ru.txt, pl.txt...), translate the text right of each "=" (the top of en.txt says how), put it in the same folder, set [ui] language=de, and send it to us: https://github.com/jozrcr/h5-together/issues/new/choose
 
 
@@ -44,7 +46,7 @@ WHAT IT DOES
 - Template builder: the "Template..." button ("Modeles..." in French) on the random map screen, or F11. Friends rebuild the same map from its name: nothing to share.
 - Hero looks: the small button on the hero screen, or F7. Another hero's 3D figure, same faction.
 - Game rules (host): the "Rules..." button ("Regles..." in French) in the multiplayer waiting room, or F2. Used only when every player has this version.
-- Off by default, in h5-together.ini: a "new version available" notice in the main menu ([update] check=1: at most once a day it asks GitHub for the latest version number; nothing is downloaded), farther camera zoom, black map edges, a quieter volume range, the original Heroes V music, French texts, start terrain that matches each faction on random maps.
+- Off by default (Options, H5 Together, or h5-together.ini): a "new version available" notice in the main menu (the first start asks; at most once a day it asks GitHub for the latest version number; nothing is downloaded), farther camera zoom, black map edges, a quieter volume range, the original Heroes V music, French texts, start terrain that matches each faction on random maps.
 - Linux: the mouse wheel zooms out again (automatic).
 
 
