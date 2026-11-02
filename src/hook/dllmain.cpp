@@ -76,8 +76,10 @@ void InstallHooksOnce()
 	crash::SetGameBuild(GameBuildName(build), IsHookable(build));  // (and this is the game's main thread)
 	if (IsHookable(build))
 		hooks::InstallAll();
-	else
+	else {
 		hooklog::Write("unknown build: no hooks installed, forwarding only");
+		hooks::InstallUnknownBuild();  // only the Steam test, when it is switched on
+	}
 }
 
 }  // namespace
