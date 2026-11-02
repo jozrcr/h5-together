@@ -34,7 +34,7 @@
 //
 // Also here:
 //   - F3 opens the Options screen on our page (main menu: game message "options";
-//     adventure map: "GameOptions"; the Options screen: our category);
+//     adventure map: the screen's own "GameOptions" handler; the Options screen: our category);
 //   - the main menu's version line (MMH5.5's "Version: 5.69k", UI/MainMenu2/Version.txt)
 //     gets a second line, "H5 Together 0.3.0", in the game's own font;
 //   - the first-start question about the update check (welcome, in the game's
@@ -99,6 +99,13 @@ const DWORD kCategoryRows = 0x0075bac0;    // __thiscall(screen, category, int m
 const DWORD kDefaultsYes = 0x0075c680;     // __thiscall(screen): the "restore the defaults?" box's Yes
 const DWORD kVarGet = 0x00c11860;
 const DWORD kVarSet = 0x00c11900;
+// The adventure screen's handler of its "GameOptions" message (its Options button, and the
+// game's F4): it sets the screen's disable_* variables (disable_options_by_multiplayer...)
+// and opens the Options screen (0x0075c7c0). Called as the message dispatch calls it
+// (this = the screen, the message on the stack, ret 4); it reads neither. Posting the
+// message does not work: the screen's observer drops a message without a sender.
+const DWORD kMapOptions = 0x00593520;
+const BYTE kMapOptionsBytes[] = {0x55, 0x8b, 0xec, 0x83, 0xe4, 0xf8, 0x83, 0xec, 0x34, 0x53, 0x8d, 0x44, 0x24, 0x28, 0x50, 0xe8};
 const DWORD kCategoriesBegin = 0x1a4, kCategoriesEnd = 0x1a8;  // vector of SCategory *
 const DWORD kCategoryIdBegin = 0x0c, kCategoryIdEnd = 0x10;    // its ID, nstl::string
 
@@ -417,6 +424,12 @@ void Sync()
 	std::vector<st::Change> changes;
 	std::vector<const st::Setting *> changed;
 	int restart = 0, next_game = 0;
+	// During a multiplayer game the game greys the host's and the advanced rows out (it sets
+	// this variable when it opens the Options screen from the map); a change that got there
+	// anyway is not written, so this PC never disagrees with the others halfway.
+	int multiplayer = 0;
+	if (!GetVar("disable_options_by_multiplayer", &multiplayer))
+		multiplayer = 0;
 	for (const st::MenuRow &r : g_rows) {
 		int index = 0;
 		const auto shown = g_shown.find(r.var);
@@ -424,6 +437,11 @@ void Sync()
 			continue;
 		if (index < 0 || index >= static_cast<int>(r.items.size()))
 			continue;
+		if (multiplayer && (r.group == st::kHostGroup || r.group == st::kAdvanced)) {
+			hooklog::Write("settings: [%s] %s not changed: read only during a multiplayer game", r.s->section, r.s->key);
+			SetVar(r.var, shown->second);
+			continue;
+		}
 		const std::string value = r.items[static_cast<size_t>(index)].value;
 		if (IsSteps(*r.s)) {  // one row, two settings
 			const st::Setting *fast = st::Find("coop", "fast_segments");
@@ -613,6 +631,19 @@ bool OpenOurPage(const char *why)
 	const bool ok = SafeShow(screen, index);
 	hooklog::Write("settings: our page opened (%s)%s", why, ok ? "" : ": crashed (caught)");
 	return ok;
+}
+
+bool SafeMapOptions(void *screen)
+{
+	if (memcmp(reinterpret_cast<const void *>(kMapOptions), kMapOptionsBytes, sizeof(kMapOptionsBytes)) != 0)
+		return false;
+	__try {
+		reinterpret_cast<void(__fastcall *)(void *, void *, DWORD)>(kMapOptions)(screen, nullptr, 0);
+		return true;
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER) {
+		return false;
+	}
 }
 
 bool __fastcall ReactHook(void *self, void *edx, void *sender, const GameString *command, void *c)
@@ -1004,17 +1035,27 @@ bool Wanted()
 	if (overlay::KeyPressed(VK_F3, &g_f3_was)) {
 		if (options)
 			OpenOurPage("F3");
-		else if (strcmp(top, kMainMenu) == 0 || strcmp(top, kMapScreen) == 0) {
+		else if (strcmp(top, kMainMenu) == 0) {
 			g_open_pending = GetTickCount();
-			robot::PostGameMessage(strcmp(top, kMainMenu) == 0 ? "options" : "GameOptions", 0);
+			robot::PostGameMessage("options", 0);  // as the main menu's Options button
+		}
+		else if (strcmp(top, kMapScreen) == 0) {
+			g_open_pending = GetTickCount();
+			if (!SafeMapOptions(overlay::TopScreenObject())) {
+				g_open_pending = 0;
+				hooklog::Write("settings: F3: the adventure screen's Options code is not as expected (or crashed): use the game's own Options");
+			}
 		}
 	}
 	if (g_open_pending && options) {
 		g_open_pending = 0;
 		OpenOurPage("F3, the Options screen opened");
 	}
-	else if (g_open_pending && GetTickCount() - g_open_pending > 4000)
+	else if (g_open_pending && GetTickCount() - g_open_pending > 4000) {
 		g_open_pending = 0;
+		hooklog::Write("settings: F3: the Options screen did not open (on the map the game opens it only when it waits for "
+		               "you, as with its own F4)");
+	}
 	// the words are ready before the Options screen asks for its texts (they may read the game's own)
 	if (strcmp(top, kMainMenu) == 0 || options)
 		texts::Get("settings.category");

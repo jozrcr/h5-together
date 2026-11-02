@@ -971,7 +971,7 @@ asked=         ; written by the add-on: 1 once the first-start question was answ
 
 **What it is for:** changing the add-on's settings in the game, instead of editing `h5-together.ini` in Notepad (docs/plans/community-release.md, part 2). The owner asked for it to be "as diegetic as possible": so it is not a panel of ours but a page of the game's own **Options** screen, with the game's own rows, check boxes, lists, sliders, scroll bar, tooltips and buttons.
 
-**Where:** main menu, **Options**: the game's scroll lists `Game`, `Video & audio`, **`H5 Together`**, `Combat replays`, `Back`. From the adventure map: the game's own Options (its F4 key, or the Esc menu). **F3** opens the Options screen straight on our page (main menu, adventure map, or the Options screen itself). The game uses F4 to F8 and F10 itself (F8 is quick load), so F3 it is.
+**Where:** main menu, **Options**: the game's scroll lists `Game`, `Video & audio`, **`H5 Together`**, `Combat replays`, `Back`. From the adventure map: the game's own Options (its F4 key, or the Esc menu). **F3** opens the Options screen straight on our page (main menu, adventure map, or the Options screen itself; on the map through the map's own Options code, so, as with the game's F4, only when the game lets you open it). The game uses F4 to F8 and F10 itself (F8 is quick load), so F3 it is.
 
 **What it shows:** like the game's categories, two pages side by side, each a list with headers:
 - **On this PC:** Interface (player list, "your turn", the panels' keys and buttons, hero looks), Camera and visuals, Sound, Language, Random maps. The rows for the mouse wheel fix and the game's texts only show when they matter (under Wine; with the French packs, or `[lang] texts` already set).
@@ -989,7 +989,7 @@ asked=         ; written by the add-on: 1 once the first-start question was answ
 
 Each "at once" setting is read again by its own mod (`settings_reload.cpp`, a `Reload...Settings()` in each mod: plain values the mod reads when it uses them, changed on the main thread). Checked with the robot: a new builder key opens the builder at once, the camera hook goes in for the next map, the rules key, the freeze detector's wait (log lines `... from the settings menu: ...`). The plan hoped for more (the co-op timing, the view delay, the team arrows, the language at once): those install hooks or patch the game's code at start-up, or hold texts other code keeps pointers to, so they stay "after a restart" (when in doubt, restart).
 
-**During a multiplayer game** the Host and Advanced rows are greyed out by the game itself (its `disable_options_by_multiplayer`, as for its own "quick combat"): changing them halfway would only make this PC disagree with the others.
+**During a multiplayer game** the Host and Advanced rows are greyed out by the game itself (its `disable_options_by_multiplayer`, set by the map's Options code, as for its own "quick combat"): changing them halfway would only make this PC disagree with the others. As a second net, Apply does not write a Host or Advanced change while that variable is on (robot check: `[coop] guard not changed: read only during a multiplayer game`).
 
 **Buttons:** the game's own. **Apply** writes the changed settings; **Default** (after the game's own "restore the defaults?" box) puts every setting of our category back to its default; **Back** forgets the changes. Nothing is written before Apply or Default.
 
