@@ -100,12 +100,13 @@ void InstallAll()
 	}
 	crash::Install("at the game's first DirectInput call");  // (done at the DLL's load in an unwrapped exe)
 	watchdog::Install();  // first: the others register their state for its reports
-	mods::ApplySteamSpikeFromSettings();  // [online] spike (test only, off by default): early, before the game's Direct3D device
+	mods::InstallVirtualLan();  // [online] mode (off by default); done already at the DLL's load in an unwrapped exe
+	mods::StartVirtualLan();  // mode=steam: Steam starts here, early (before the LAN screen and the Direct3D device)
+	mods::ApplySteamSpikeFromSettings();  // [online] spike (test only, off by default; not with mode=steam): early too
 	InstallAiTrace();
 	mods::ApplyNetTuningFromSettings();
 	mods::ApplyFastPathsFromSettings();
-	mods::InstallVirtualLan();  // [online] mode (off by default); done already at the DLL's load in an unwrapped exe
-	mods::ApplyLanDiscoveryFromSettings();
+	mods::ApplyLanDiscoveryFromSettings();  // (after InstallVirtualLan: its hooks stack on the virtual LAN's)
 	mods::ApplyCoopGuardFromSettings();
 	mods::ApplyLockstepFromSettings();
 	mods::ApplyAiPacingFromSettings();

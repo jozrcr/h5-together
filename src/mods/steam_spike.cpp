@@ -16,13 +16,9 @@
 //   spike_ping_bytes=300
 //
 // How:
-// - steam_api.dll (32-bit, from Valve's Steamworks SDK) is loaded from
-//   bin\h5-together\ at run time. Without it the add-on runs as usual.
-// - SteamAppId and SteamGameId are set in this process (nothing on disk) before
-//   SteamAPI_InitFlat, so Steam knows the app even when Steam did not start the
-//   game (GameRanger, a shortcut, the robot). SteamAPI_RestartAppIfNecessary is
-//   never called: it would restart the game through Steam, which runs Steam's
-//   own H5_Game.exe, not MMH5.5's.
+// - Steam starts as in steam_runtime.h (steam_api.dll from bin\h5-together\,
+//   SteamAppId set in this process, never SteamAPI_RestartAppIfNecessary). Not
+//   with [online] mode=steam: the virtual LAN uses Steam then.
 // - Init runs on the game's thread at the first DirectInput8Create, early, so
 //   that Steam's overlay can still hook the Direct3D device. Everything else
 //   runs on a thread of our own, every 20 ms: Steam's callbacks (manual
@@ -37,9 +33,10 @@
 #include "steam_spike.h"
 
 #include "steam_api_flat.h"
+#include "steam_runtime.h"
 #include "steam_spike_logic.h"
+#include "virtual_lan.h"
 #include "../hook/log.h"
-#include "../hook/old_names.h"
 #include "../hook/version.h"
 
 namespace mods {
@@ -51,43 +48,6 @@ using steamspike::Mode;
 const int kChannel = 7;  // the test messages' channel
 const int kTickMs = 20;
 
-struct Api {
-	InitFlatFn init;
-	GetPipeFn get_pipe;
-	VoidFn dispatch_init;
-	RunFrameFn run_frame;
-	GetNextCallbackFn next_callback;
-	RunFrameFn free_last_callback;
-	GetApiCallResultFn call_result;
-	AccessorFn user, friends, utils, matchmaking, messages, net_utils;
-	GetSteamIdFn get_steam_id;
-	GetAppIdFn get_app_id;
-	IfaceBoolFn overlay_enabled;
-	GetPersonaNameFn persona_name;
-	GetFriendCountFn friend_count;
-	GetFriendByIndexFn friend_by_index;
-	GetFriendRelationshipFn friend_relationship;
-	GetFriendPersonaNameFn friend_name;
-	GetFriendGamePlayedFn friend_game;
-	CreateLobbyFn create_lobby;
-	JoinLobbyFn join_lobby;
-	LeaveLobbyFn leave_lobby;
-	SetLobbyDataFn set_lobby_data;
-	GetLobbyDataFn get_lobby_data;
-	GetNumLobbyMembersFn lobby_members;
-	GetLobbyOwnerFn lobby_owner;
-	RequestLobbyListFn request_lobby_list;
-	AddStringFilterFn add_string_filter;
-	AddDistanceFilterFn add_distance_filter;
-	GetLobbyByIndexFn lobby_by_index;
-	SendMessageToUserFn send;
-	ReceiveMessagesFn receive;
-	SessionFn accept_session;
-	GetSessionInfoFn session_info;
-	InitRelayFn init_relay;
-	GetRelayStatusFn relay_status;
-	ReleaseMessageFn release;
-};
 
 struct Settings {
 	Mode mode;
@@ -99,7 +59,7 @@ struct Settings {
 	int ping_bytes;
 };
 
-Api g_api = {};
+steamrt::Api g_api = {};
 Settings g_set = {};
 Pipe g_pipe = 0;
 Iface g_user = nullptr, g_friends = nullptr, g_utils = nullptr, g_mm = nullptr, g_msgs = nullptr, g_netu = nullptr;
@@ -135,65 +95,6 @@ DWORD g_next_peer_log = 30000;
 DWORD Now()
 {
 	return GetTickCount() - g_start;
-}
-
-template <typename T>
-void Load(HMODULE dll, const char *name, T *out, char *missing, size_t size)
-{
-	*out = reinterpret_cast<T>(GetProcAddress(dll, name));
-	if (!*out) {
-		strncat_s(missing, size, " ", _TRUNCATE);
-		strncat_s(missing, size, name, _TRUNCATE);
-	}
-}
-
-bool LoadApi(HMODULE dll)
-{
-	char missing[1024] = "";
-	const size_t n = sizeof(missing);
-	Load(dll, "SteamAPI_InitFlat", &g_api.init, missing, n);
-	Load(dll, "SteamAPI_GetHSteamPipe", &g_api.get_pipe, missing, n);
-	Load(dll, "SteamAPI_ManualDispatch_Init", &g_api.dispatch_init, missing, n);
-	Load(dll, "SteamAPI_ManualDispatch_RunFrame", &g_api.run_frame, missing, n);
-	Load(dll, "SteamAPI_ManualDispatch_GetNextCallback", &g_api.next_callback, missing, n);
-	Load(dll, "SteamAPI_ManualDispatch_FreeLastCallback", &g_api.free_last_callback, missing, n);
-	Load(dll, "SteamAPI_ManualDispatch_GetAPICallResult", &g_api.call_result, missing, n);
-	Load(dll, "SteamAPI_SteamUser_v023", &g_api.user, missing, n);
-	Load(dll, "SteamAPI_SteamFriends_v018", &g_api.friends, missing, n);
-	Load(dll, "SteamAPI_SteamUtils_v011", &g_api.utils, missing, n);
-	Load(dll, "SteamAPI_SteamMatchmaking_v009", &g_api.matchmaking, missing, n);
-	Load(dll, "SteamAPI_SteamNetworkingMessages_SteamAPI_v002", &g_api.messages, missing, n);
-	Load(dll, "SteamAPI_SteamNetworkingUtils_SteamAPI_v004", &g_api.net_utils, missing, n);
-	Load(dll, "SteamAPI_ISteamUser_GetSteamID", &g_api.get_steam_id, missing, n);
-	Load(dll, "SteamAPI_ISteamUtils_GetAppID", &g_api.get_app_id, missing, n);
-	Load(dll, "SteamAPI_ISteamUtils_IsOverlayEnabled", &g_api.overlay_enabled, missing, n);
-	Load(dll, "SteamAPI_ISteamFriends_GetPersonaName", &g_api.persona_name, missing, n);
-	Load(dll, "SteamAPI_ISteamFriends_GetFriendCount", &g_api.friend_count, missing, n);
-	Load(dll, "SteamAPI_ISteamFriends_GetFriendByIndex", &g_api.friend_by_index, missing, n);
-	Load(dll, "SteamAPI_ISteamFriends_GetFriendRelationship", &g_api.friend_relationship, missing, n);
-	Load(dll, "SteamAPI_ISteamFriends_GetFriendPersonaName", &g_api.friend_name, missing, n);
-	Load(dll, "SteamAPI_ISteamFriends_GetFriendGamePlayed", &g_api.friend_game, missing, n);
-	Load(dll, "SteamAPI_ISteamMatchmaking_CreateLobby", &g_api.create_lobby, missing, n);
-	Load(dll, "SteamAPI_ISteamMatchmaking_JoinLobby", &g_api.join_lobby, missing, n);
-	Load(dll, "SteamAPI_ISteamMatchmaking_LeaveLobby", &g_api.leave_lobby, missing, n);
-	Load(dll, "SteamAPI_ISteamMatchmaking_SetLobbyData", &g_api.set_lobby_data, missing, n);
-	Load(dll, "SteamAPI_ISteamMatchmaking_GetLobbyData", &g_api.get_lobby_data, missing, n);
-	Load(dll, "SteamAPI_ISteamMatchmaking_GetNumLobbyMembers", &g_api.lobby_members, missing, n);
-	Load(dll, "SteamAPI_ISteamMatchmaking_GetLobbyOwner", &g_api.lobby_owner, missing, n);
-	Load(dll, "SteamAPI_ISteamMatchmaking_RequestLobbyList", &g_api.request_lobby_list, missing, n);
-	Load(dll, "SteamAPI_ISteamMatchmaking_AddRequestLobbyListStringFilter", &g_api.add_string_filter, missing, n);
-	Load(dll, "SteamAPI_ISteamMatchmaking_AddRequestLobbyListDistanceFilter", &g_api.add_distance_filter, missing, n);
-	Load(dll, "SteamAPI_ISteamMatchmaking_GetLobbyByIndex", &g_api.lobby_by_index, missing, n);
-	Load(dll, "SteamAPI_ISteamNetworkingMessages_SendMessageToUser", &g_api.send, missing, n);
-	Load(dll, "SteamAPI_ISteamNetworkingMessages_ReceiveMessagesOnChannel", &g_api.receive, missing, n);
-	Load(dll, "SteamAPI_ISteamNetworkingMessages_AcceptSessionWithUser", &g_api.accept_session, missing, n);
-	Load(dll, "SteamAPI_ISteamNetworkingMessages_GetSessionConnectionInfo", &g_api.session_info, missing, n);
-	Load(dll, "SteamAPI_ISteamNetworkingUtils_InitRelayNetworkAccess", &g_api.init_relay, missing, n);
-	Load(dll, "SteamAPI_ISteamNetworkingUtils_GetRelayNetworkStatus", &g_api.relay_status, missing, n);
-	Load(dll, "SteamAPI_SteamNetworkingMessage_t_Release", &g_api.release, missing, n);
-	if (missing[0])
-		hooklog::Write("steam: steam_api.dll lacks:%s (an older SDK?): spike off", missing);
-	return missing[0] == 0;
 }
 
 const char *FriendName(SteamId id)
@@ -678,16 +579,6 @@ void ReadSettings()
 		g_set.pings = 100;
 }
 
-void SetAppIdVariable(const wchar_t *name)
-{
-	wchar_t before[32] = L"";
-	const DWORD n = GetEnvironmentVariableW(name, before, 32);
-	wchar_t value[16];
-	_snwprintf_s(value, 16, _TRUNCATE, L"%u", g_set.app_id);
-	SetEnvironmentVariableW(name, value);
-	hooklog::Write("steam: %ls was %ls, now %ls", name, n && n < 32 ? before : L"(not set)", value);
-}
-
 }  // namespace
 
 void ApplySteamSpikeFromSettings()
@@ -697,47 +588,25 @@ void ApplySteamSpikeFromSettings()
 		return;
 	hooklog::Write("steam: spike %s, app id %u, %d s, lobby %s", steamspike::ModeName(g_set.mode), g_set.app_id,
 	               g_set.seconds, g_set.lobby_type_name);
-	// bin\h5-together\steam_api.dll (one file for every robot instance, so not PathNextToExe;
-	// bin\open-homm5\steam_api.dll, the folder's name until 0.2.7, while only that one is there)
-	wchar_t dll_path[MAX_PATH];
-	oldnames::PathInOurFolder(L"steam_api.dll", dll_path, MAX_PATH);
-	HMODULE dll = LoadLibraryExW(dll_path, nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
-	if (!dll) {
-		hooklog::Write("steam: cannot load %ls (error %lu): spike off", dll_path, GetLastError());
+	if (mods::VirtualLanOn()) {
+		// (both would take Steam's callbacks from the same queue)
+		hooklog::Write("steam: [online] mode=steam uses Steam already: spike off");
 		return;
 	}
-	if (!LoadApi(dll))
-		return;
-	wchar_t cwd[MAX_PATH] = L"";
-	GetCurrentDirectoryW(MAX_PATH, cwd);
-	wchar_t appid_txt[MAX_PATH];
-	_snwprintf_s(appid_txt, MAX_PATH, _TRUNCATE, L"%s\\steam_appid.txt", cwd);
-	if (GetFileAttributesW(appid_txt) != INVALID_FILE_ATTRIBUTES)
-		hooklog::Write("steam: note: %ls exists and overrides our app id", appid_txt);
-	SetAppIdVariable(L"SteamAppId");
-	SetAppIdVariable(L"SteamGameId");
-	char err[kErrMsgSize] = "";
-	const DWORD t0 = GetTickCount();
-	const int r = g_api.init(err);
-	hooklog::Write("steam: SteamAPI_InitFlat -> %d (%s) in %lu ms%s%s", r, steamspike::InitResultName(r),
-	               GetTickCount() - t0, err[0] ? ": " : "", err);
-	if (r != kInitOk)
-		return;
-	g_api.dispatch_init();
-	g_pipe = g_api.get_pipe();
-	g_user = g_api.user();
-	g_friends = g_api.friends();
-	g_utils = g_api.utils();
-	g_mm = g_api.matchmaking();
-	g_msgs = g_api.messages();
-	g_netu = g_api.net_utils();
-	if (!g_user || !g_friends || !g_utils || !g_mm || !g_msgs || !g_netu) {
-		hooklog::Write("steam: an interface is missing (user %p, friends %p, utils %p, matchmaking %p, messages %p, "
-		               "networking utils %p): spike off",
-		               g_user, g_friends, g_utils, g_mm, g_msgs, g_netu);
+	const steamrt::Steam *steam = steamrt::Start(g_set.app_id, "steam");
+	if (!steam) {
+		hooklog::Write("steam: Steam did not start: spike off");
 		return;
 	}
-	g_me = g_api.get_steam_id(g_user);
+	g_api = steam->api;
+	g_pipe = steam->pipe;
+	g_user = steam->user;
+	g_friends = steam->friends;
+	g_utils = steam->utils;
+	g_mm = steam->mm;
+	g_msgs = steam->msgs;
+	g_netu = steam->netu;
+	g_me = steam->me;
 	hooklog::Write("steam: logged in as \"%s\" (SteamID %llu); Steam says our app id is %u", g_api.persona_name(g_friends),
 	               static_cast<unsigned long long>(g_me), g_api.get_app_id(g_utils));
 	LogOverlay("at init");
