@@ -1,0 +1,98 @@
+name: Bug report
+description: Something does not work with the open-homm5 add-on (a freeze, a crash, an "out of sync", a wrong panel...)
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for taking the time! A few answers and one file are all we need.
+
+        **The file:** run `bug-report.bat` (Windows) or `bash bug-report.sh` (Linux) from the add-on's folder, the one you installed from. It makes `open-homm5-bug-report-<date>.zip` on your Desktop (on Linux: in the folder you run it from). It sends nothing anywhere: you attach the zip below yourself.
+
+        Problems of MMH5.5 itself (its scripts, its balance, its installer) are best told to the MMH5.5 team.
+
+  - type: input
+    id: addon-version
+    attributes:
+      label: open-homm5 version
+      description: The first line of `open-homm5.log` (in the game's `bin` folder) says it, like `open-homm5 hook DLL 0.2.7 loaded`.
+      placeholder: "0.2.7"
+    validations:
+      required: true
+
+  - type: input
+    id: game-version
+    attributes:
+      label: Game exe and MMH5.5 version
+      description: For example "MMH5.5 RC19k, MMH55_Utility_64.exe" (also when it was renamed H5_Game.exe for GameRanger). If you do not know, say so; the bug report zip tells us.
+      placeholder: "MMH5.5 RC19k, MMH55_Utility_64.exe"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: system
+    attributes:
+      label: Windows or Linux?
+      options:
+        - Windows 11
+        - Windows 10
+        - Linux, Steam with Proton
+        - Steam Deck
+        - Linux, Wine / Lutris / other
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: how-played
+    attributes:
+      label: How were you playing?
+      options:
+        - Alone (single player or hot seat)
+        - Co-op or multiplayer on a LAN, or over ZeroTier / a VPN
+        - Co-op or multiplayer through GameRanger
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: players
+    attributes:
+      label: How many players, and did everyone have the same open-homm5 version?
+      description: In a multiplayer game, everyone needs the same version. Write "alone" if you were playing alone.
+      placeholder: "3 humans + 2 computer players, same version: yes"
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you see? What did you expect instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: How can we see it happen again?
+      description: The steps, if you know them (which map, which screen, what you clicked). "It just happened once" is fine too.
+
+  - type: textarea
+    id: attachments
+    attributes:
+      label: The bug report
+      description: |
+        Drag `open-homm5-bug-report-<date>.zip` here. If you cannot make it (for example the game folder is not found), attach `open-homm5.log` from the game's `bin` folder instead, and `open-homm5.old.log` if there is one.
+
+        The log holds player names and LAN addresses. If you would rather not share them, say so and we will find another way.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: freeze
+    attributes:
+      label: If the game froze
+      options:
+        - label: I waited 30 seconds before closing it, so that the log could say where it was stuck.

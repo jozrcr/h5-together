@@ -1,0 +1,30 @@
+name: Feature request
+description: An idea for the open-homm5 add-on
+title: "[Idea] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for the idea! This is a hobby project made for a small group of friends, so it may take a while, and some ideas will not fit. Every idea is read.
+
+        If it would change how the game plays (the computer's decisions, the rules, the look or the music), it would be a setting that is **off by default**: the add-on keeps the original game unless you turn something on.
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like?
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is the problem today?
+      description: What gets in your way, or what do you miss? How do you play (alone, with friends, with GameRanger...)?
+
+  - type: input
+    id: addon-version
+    attributes:
+      label: open-homm5 version (if you use it)
+      placeholder: "0.2.7"
