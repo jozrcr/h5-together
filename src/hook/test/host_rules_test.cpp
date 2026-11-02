@@ -1,8 +1,9 @@
 // Test of the host rules' pure work (src/mods/host_rules_logic.h; no game
 // needed): reading MMH5.5's settings file, serving it with other values (only
 // the numbers change), the hash without the rules' values, the text carried in
-// the start message and the lobby, the lobby hello's number codes, and the
-// class table's edit for class_skills (and what a save keeps of it).
+// the start message and the lobby, the lobby hello's number codes, the
+// class table's edit for class_skills (and what a save keeps of it), and the
+// files served for the lobby's bonus icons.
 //
 // The settings text below is ours, written in the file's format (MMH5.5's own
 // file is never copied into the repo).
@@ -678,6 +679,96 @@ void TestClassTable()
 	      "another key, a bad value, another version, a key twice or nothing is refused");
 }
 
+// A list of related textures and a texture record in the game's layout (texts of
+// ours: no game file is copied here).
+const char kTextureList[] =
+	"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n"
+	"<WindowRelatedTextures>\r\n"
+	"\t<textures>\r\n"
+	"\t\t<Item>\r\n\t\t\t<TextureName>bonus0</TextureName>\r\n\t\t\t<Texture href=\"/A/Zero.(Texture).xdb#xpointer(/Texture)\"/>\r\n\t\t</Item>\r\n"
+	"\t\t<Item>\r\n\t\t\t<TextureName>bonus1</TextureName>\r\n\t\t\t<Texture href=\"/A/One.(Texture).xdb#xpointer(/Texture)\"/>\r\n\t\t</Item>\r\n"
+	"\t\t<Item>\r\n\t\t\t<TextureName>bonus2</TextureName>\r\n\t\t\t<Texture href=\"/A/Two.(Texture).xdb#xpointer(/Texture)\"/>\r\n\t\t</Item>\r\n"
+	"\t\t<Item>\r\n\t\t\t<TextureName>bonus3</TextureName>\r\n\t\t\t<Texture href=\"/A/Three.(Texture).xdb#xpointer(/Texture)\"/>\r\n\t\t</Item>\r\n"
+	"\t</textures>\r\n"
+	"</WindowRelatedTextures>\r\n";
+const char kGoldRecord[] =
+	"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Texture>\n\t<SrcName href=\"/Some/Gold.tga\"/>\n"
+	"\t<DestName href=\"Gold.(Texture).dds\"/>\n\t<Width>55</Width>\n</Texture>\n";
+
+void TestBonusIcons()
+{
+	Check(BonusTextureName(2, false) == "bonus2" && BonusTextureName(0, true) == "oh_toe_bonus0", "the pictures' names in the list");
+	Check(BonusPicturePath(1, false, true) == "textures/interface/mpwait/playerslist/item/bonuses/randomartifact.(texture).dds",
+	      "the game's picture of the minor artifact");
+	Check(BonusPicturePath(3, true, false) == "textures/interface/mpwait/playerslist/item/bonuses/openhomm5-toe-resource.(texture).xdb",
+	      "our record of the resources' picture");
+	bool dds = false;
+	bool all = true;
+	for (int b = 0; b < 4; ++b)
+		for (int d = 0; d < 2; ++d)
+			all = all && OurBonusPicture(BonusPicturePath(b, true, d == 1), &dds) == b && dds == (d == 1);
+	Check(all, "each of our eight files is recognised (bonus, picture or record)");
+	Check(OurBonusPicture(BonusPicturePath(2, false, true), &dds) == -1 && OurBonusPicture("textures/x.(texture).dds", &dds) == -1 &&
+	          OurBonusPicture(BonusPicturePath(2, true, true) + "x", &dds) == -1,
+	      "the game's own pictures and other paths are not ours");
+
+	// the list
+	const std::string list = kTextureList;
+	std::string out;
+	Check(BonusTexturesWithToe(list, &out), "the list takes our four names");
+	const std::string item2 =
+		"\t\t<Item>\r\n\t\t\t<TextureName>oh_toe_bonus2</TextureName>\r\n\t\t\t<Texture "
+		"href=\"/Textures/Interface/MPWait/PlayersList/Item/Bonuses/OpenHomm5-ToE-Gold.(Texture).xdb#xpointer(/Texture)\"/>\r\n"
+		"\t\t</Item>\r\n";
+	Check(out.find(item2) != std::string::npos && out.find("OpenHomm5-ToE-Resource.(Texture).xdb#xpointer(/Texture)\"/>\r\n"
+	                                                       "\t\t</Item>\r\n\t</textures>\r\n") != std::string::npos,
+	      "an item in the file's layout (indent, CRLF), naming our record of ToE's gold; the last one before the list's end");
+	Check(out.compare(0, list.find("\t</textures>"), list, 0, list.find("\t</textures>")) == 0 &&
+	          out.compare(out.size() - strlen("\t</textures>\r\n</WindowRelatedTextures>\r\n"), std::string::npos,
+	                      "\t</textures>\r\n</WindowRelatedTextures>\r\n") == 0,
+	      "the game's items come first, unchanged; the end is unchanged");
+	size_t ours = 0;
+	for (size_t p = out.find("oh_toe_bonus"); p != std::string::npos; p = out.find("oh_toe_bonus", p + 1))
+		++ours;
+	Check(ours == 4 && out.size() > list.size() && out.find("oh_toe_bonus0") < out.find("oh_toe_bonus3"), "four names, in order");
+	std::string untouched = "x";
+	Check(!BonusTexturesWithToe(out, &untouched) && untouched == "x", "a list that has our names already is refused");
+	std::string missing = list;
+	missing.replace(missing.find("bonus3"), 6, "bonus4");
+	std::string twice = list;
+	twice.insert(twice.find("\t</textures>"), "\t\t<Item>\r\n\t\t\t<TextureName>bonus1</TextureName>\r\n\t\t</Item>\r\n");
+	std::string no_end = list;
+	no_end.erase(no_end.find("\t</textures>"), strlen("\t</textures>\r\n"));
+	std::string same_line = list;
+	same_line.replace(same_line.find("</Item>\r\n\t</textures>"), strlen("</Item>\r\n\t</textures>"), "</Item></textures>");
+	Check(!BonusTexturesWithToe(missing, &untouched) && !BonusTexturesWithToe(twice, &untouched) &&
+	          !BonusTexturesWithToe(no_end, &untouched) && !BonusTexturesWithToe(same_line, &untouched) && untouched == "x",
+	      "a missing or doubled name, no end of the list, or the end not on its own line: refused");
+	std::string lf = list;
+	for (size_t p = lf.find("\r\n"); p != std::string::npos; p = lf.find("\r\n", p))
+		lf.erase(p, 1);
+	Check(BonusTexturesWithToe(lf, &out) && out.find('\r') == std::string::npos && out.find("oh_toe_bonus3") != std::string::npos,
+	      "a list with LF line ends gets LF items");
+
+	// the record
+	std::string record;
+	Check(ToeTextureRecord(kGoldRecord, 2, &record) &&
+	          record == std::string(kGoldRecord).replace(std::string(kGoldRecord).find("Gold.(Texture).dds"), 0, "OpenHomm5-ToE-"),
+	      "ToE's gold record names our picture, the rest unchanged");
+	record = "x";
+	std::string two = std::string(kGoldRecord) + "<DestName href=\"Gold.(Texture).dds\"/>";
+	Check(!ToeTextureRecord(kGoldRecord, 3, &record) && !ToeTextureRecord(two, 2, &record) &&
+	          !ToeTextureRecord("<DestName href=\"Gold.(Texture).dds\"/>", 2, &record) && record == "x",
+	      "another bonus's record, two DestNames, or not a texture record: refused");
+	std::string lower = kGoldRecord;
+	lower.replace(lower.find("Gold.(Texture)"), 14, "gold.(texture)");
+	Check(ToeTextureRecord(lower, 2, &record) && record.find("\"OpenHomm5-ToE-Gold.(Texture).dds\"") != std::string::npos,
+	      "the picture's name in any case");
+
+	Check(IsDds(std::string("DDS ") + std::string(124, '\0')) && !IsDds("DDS ") && !IsDds(std::string(200, 'x')),
+	      "a picture is a .dds with its header");
+}
+
 }  // namespace
 
 int main()
@@ -693,6 +784,7 @@ int main()
 	TestStartScript();
 	TestHello();
 	TestClassTable();
+	TestBonusIcons();
 	printf(g_failures ? "%d FAILED\n" : "all host rules tests passed\n", g_failures);
 	return g_failures ? 1 : 0;
 }

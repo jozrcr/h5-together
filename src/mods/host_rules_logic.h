@@ -203,6 +203,34 @@ int ModeUsed(int game_mode, bool toe_bonuses);
 // the expected text is not found exactly once: then nothing may change.
 bool PatchStartScript(const std::string &lua, int game_mode, bool toe_bonuses, bool trace, std::string *out, std::string *why);
 
+// --- the waiting room's bonus icons (host_rules_icons.cpp) ---
+// The pictures of the bonus arrows, by bonus number (0 random, 1 minor
+// artifact, 2 gold, 3 resources): texture records <name>.(Texture).xdb and their
+// pictures <name>.(Texture).dds in Textures/Interface/MPWait/PlayersList/Item/
+// Bonuses/. MMH5.5's pak repaints the pictures for its modes; ToE's are in the
+// game's data.pak.
+extern const char *const kBonusPictures[4];  // "Random", "RandomArtifact", "Gold", "Resource"
+// The icon's list of related textures (the bonus icon finds its pictures by name in it).
+const char kBonusTexturesPath[] = "ui/mpwait/playerslist/item/bonuses.(windowrelatedtextures).xdb";
+// A picture's name in that list: the game's "bonus2", ours "oh_toe_bonus2" (ToE's).
+std::string BonusTextureName(int bonus, bool toe);
+// Paths, as NormalizePath gives them (lower case, '/'): the game's record or
+// picture of a bonus (ours: "openhomm5-toe-gold.(texture).xdb" in the same folder).
+std::string BonusPicturePath(int bonus, bool ours, bool dds);
+// Which of our files is this path: its bonus (0..3) and whether it is the
+// picture (.dds); -1 when none.
+int OurBonusPicture(const std::string &key, bool *dds);
+// The list with our four names after the game's, each naming our record of
+// ToE's picture, in the file's layout. False (`out` untouched) when the list is
+// not as expected: a "bonus0".."bonus3" not there exactly once, no single
+// "</textures>", or our names already in.
+bool BonusTexturesWithToe(const std::string &xdb, std::string *out);
+// data.pak's record of a bonus with its picture (DestName) renamed to ours.
+// False when the record has no single DestName naming that bonus's picture.
+bool ToeTextureRecord(const std::string &xdb, int bonus, std::string *out);
+// A .dds picture: "DDS " and at least its 128-byte header.
+bool IsDds(const std::string &bytes);
+
 // --- the class table (class_skills; host_rules_classes.cpp reads and edits it in memory) ---
 // The game reads GameMechanics/RefTables/HeroClass.xdb once, at start-up, with
 // the rest of its reference tables. Each class's SkillsProbs is a vector of
