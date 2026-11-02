@@ -172,7 +172,7 @@ def main():
             data = d[q + 4 + L["sub"]:q + 4 + L["sub"] + L["size"]]
             ok = hashlib.sha256(data).hexdigest() == L["sha"]
             if ok:
-                path = os.path.join(out_dir, rel)
+                path = os.path.join(out_dir, *rel.split("\\"))  # (the table's paths use backslashes; this also works on Linux)
                 os.makedirs(os.path.dirname(path), exist_ok=True)
                 with open(path, "wb") as f:
                     f.write(data)
