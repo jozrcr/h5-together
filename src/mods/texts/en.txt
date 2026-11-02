@@ -254,3 +254,9 @@ msg.too_many_players = the game allows at most 8 players ({players} asked)
 msg.small_zones = Zones are small ({tiles} tiles each): pick a bigger map or fewer zones.
 msg.big_zones = Zones are very big ({tiles} tiles each): the generator may leave them empty; pick a smaller map or more zones.
 msg.rich_zones = Some zones hold more treasure ({value}) than any shipped template ({shipped}); not tested in the game yet.
+
+# The notice in the main menu when a newer version of H5 Together is out (only with
+# [update] check=1). {new}, {ours}: version numbers; {page}: the add-on's Releases page.
+[update]
+available = H5 Together {new} is out (you have {ours}).
+where = Get it from {page}

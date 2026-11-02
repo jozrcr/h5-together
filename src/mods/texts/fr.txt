@@ -221,3 +221,9 @@ msg.too_many_players = Le jeu permet 8 joueurs au plus ({players} demandés).
 msg.small_zones = Zones petites ({tiles} cases chacune) : carte plus grande ou moins de zones.
 msg.big_zones = Zones très grandes ({tiles} cases chacune) : le générateur peut les laisser vides ; carte plus petite ou plus de zones.
 msg.rich_zones = Des zones ont plus de trésor ({value}) que tout modèle livré ({shipped}) : pas encore testé en jeu.
+
+# The notice in the main menu when a newer version of H5 Together is out (only with
+# [update] check=1). {new}, {ours}: version numbers; {page}: the add-on's Releases page.
+[update]
+available = H5 Together {new} est disponible (vous avez la version {ours}).
+where = À télécharger sur {page}

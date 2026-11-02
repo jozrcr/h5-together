@@ -29,6 +29,7 @@
 #include "../mods/rmg_teams.h"
 #include "../mods/rmg_templates.h"
 #include "../mods/steam_spike.h"
+#include "../mods/update_check.h"
 #include "../mods/wheel.h"
 
 namespace hooks {
@@ -71,6 +72,7 @@ void InstallEarly()
 	mods::InstallRmgBuilderEarly();
 	mods::InstallHeroSkinsPanelEarly();  // the overlay's Direct3D import, for the looks' panel
 	mods::InstallHostRulesEarly();  // its panel: the Direct3D import
+	mods::InstallUpdateCheckEarly();  // [update] check=1: its notice in the main menu
 	overlay::InstallTestPanelEarly();
 }
 
@@ -106,6 +108,7 @@ void InstallAll()
 	mods::ApplyHostRulesFromSettings();  // [rules]: the host's rules, served as H55-Settings.lua
 	mods::ApplyAudioVolumeFromSettings();
 	mods::ApplyHeroSkinsFromSettings();  // after notify and the co-op guard: it stacks on their hooks
+	mods::ApplyUpdateCheckFromSettings();  // [update] check (off by default)
 }
 
 }  // namespace hooks
