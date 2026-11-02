@@ -25,6 +25,8 @@ def settings(run):
             found.append(line.split("EXPERIMENT", 1)[1].strip())
         elif "net tuning:" in line:
             found.append(line.split("net tuning:", 1)[1].strip())
+        elif "vlan: virtual LAN on" in line:
+            found.append("virtual LAN on (%s)" % line.split("([online] ", 1)[1].split(")", 1)[0])
     return found or ["game's own network timings"]
 
 

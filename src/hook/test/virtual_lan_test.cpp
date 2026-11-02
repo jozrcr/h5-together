@@ -112,6 +112,21 @@ void TestPeers()
 	b.Reset(LoopbackId(47102));
 	Check(b.SelfAddress() == b_ip && b.AddressOf(LoopbackId(47101)) == a.SelfAddress(),
 	      "two PCs agree on both addresses (robot ports 47101, 47102)");
+	// Three PCs that hear of each other in different orders still agree (no clash).
+	PeerTable h, c1, c2;
+	h.Reset(LoopbackId(47101));
+	c1.Reset(LoopbackId(47102));
+	c2.Reset(LoopbackId(47103));
+	h.AddressOf(LoopbackId(47103));
+	h.AddressOf(LoopbackId(47102));
+	c1.AddressOf(LoopbackId(47101));
+	c1.AddressOf(LoopbackId(47103));
+	c2.AddressOf(LoopbackId(47102));
+	c2.AddressOf(LoopbackId(47101));
+	Check(h.AddressOf(LoopbackId(47102)) == c1.SelfAddress() && c2.AddressOf(LoopbackId(47102)) == c1.SelfAddress() &&
+	          c1.AddressOf(LoopbackId(47103)) == c2.SelfAddress() && h.AddressOf(LoopbackId(47103)) == c2.SelfAddress() &&
+	          c1.AddressOf(LoopbackId(47101)) == h.SelfAddress() && c2.AddressOf(LoopbackId(47101)) == h.SelfAddress(),
+	      "three PCs, met in different orders, agree on every address");
 	bool distinct = true;
 	for (uint16_t p = 47100; p < 47120; ++p)
 		for (uint16_t q = p + 1; q < 47120; ++q)
