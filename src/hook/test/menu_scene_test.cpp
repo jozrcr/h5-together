@@ -76,7 +76,8 @@ int main()
 		Check(ParseChoice("RANDOM", &known) == Choice::Random && known, "any case: RANDOM");
 		Check(ParseChoice("hof", &known) == Choice::Default && !known, "hof is not a scene: default, not known");
 		Check(ParseChoice("", &known) == Choice::Default && !known, "empty: default, not known");
-		Check(ParseChoice("toe ", &known) == Choice::Default && !known, "a space after the word is not the word");
+		Check(ParseChoice(" toe\t", &known) == Choice::Toe && known, "spaces around the word do not matter");
+		Check(ParseChoice("to e", &known) == Choice::Default && !known, "a space inside the word does");
 		Check(ParseChoice("heroes5", nullptr) == Choice::Default, "no known flag asked for");
 		Check(std::string(ChoiceName(Choice::Homm5)) == "homm5" && std::string(SceneName(Scene::None)) == "none" &&
 		          std::string(SceneName(Scene::Toe)) == "toe",

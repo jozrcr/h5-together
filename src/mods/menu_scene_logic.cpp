@@ -58,7 +58,12 @@ const char kArenaFolder[] = "arenas/interface/mainmenu/";
 
 Choice ParseChoice(const std::string &text, bool *known)
 {
-	const std::string t = LowerCopy(text);
+	size_t first = 0, last = text.size();  // spaces around the word do not matter
+	while (first < last && (text[first] == ' ' || text[first] == '\t'))
+		++first;
+	while (last > first && (text[last - 1] == ' ' || text[last - 1] == '\t' || text[last - 1] == '\r'))
+		--last;
+	const std::string t = LowerCopy(text.substr(first, last - first));
 	if (known)
 		*known = true;
 	if (t == "default")

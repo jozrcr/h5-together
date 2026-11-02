@@ -403,10 +403,14 @@ volatile LONG g_told_a2 = 0;
 GameStream *Serve(File file, const std::string &key, GameStream *s)
 {
 	switch (file) {
-	case File::Arena:
+	case File::Arena: {
 		if (key != kArenaKey || !Ready())
 			return s;
+		static LONG served = 0;
+		if (InterlockedIncrement(&served) <= 3)
+			hooklog::Write("menu scene: %s served (%s's scene)", kArenaKey, menuscene::SceneName(g_scene));
 		return Replace(s, g_arena);
+	}
 	case File::Root: {
 		if (key != kRootKey || !Ready())
 			return s;
@@ -531,8 +535,8 @@ void ApplyMenuSceneFromSettings()
 		return;
 	Ready();  // the pick and its log lines now, not when the game first asks
 	if (!g_early)
-		hooklog::Write("menu scene: installed late: if the game read its root table of music before now, the menu's "
-		               "theme is served as a2-MainMenu.xdb instead");
+		hooklog::Write("menu scene: installed late (the game was already running): files it read before now keep their "
+		               "content; if that was the root table of music, the theme is served as a2-MainMenu.xdb instead");
 }
 
 }  // namespace mods
