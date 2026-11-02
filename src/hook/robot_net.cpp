@@ -18,7 +18,17 @@
 //                           every broadcast is also sent to 127.0.0.1:P, Q (the
 //                           other copies' ports), so they see each other as
 //                           separate machines and can answer.
+// Two more for research (docs/plans/online-steam.md, the packet map):
+//   net_log_bytes=N         each logged packet's first N bytes too (2048 = whole
+//                           packets), 64 bytes per line after the packet's line.
+//   net_scan_addresses=1    look inside EVERY packet the game sends or receives
+//                           (not only the logged ones) for this PC's own IPv4
+//                           addresses, in network and in reversed byte order; log
+//                           where each one sits (the first 40) and a count every
+//                           10 s. With the virtual LAN on (src/mods/virtual_lan.cpp)
+//                           the count must stay at 0.
 #include <winsock2.h>
+#include <iphlpapi.h>
 #include <windows.h>
 #include <intrin.h>
 #include <stdio.h>
@@ -112,6 +122,162 @@ void Bytes(const char *buf, int len, char *out, size_t size)
 	}
 }
 
+// net_log_bytes: the packet's first N bytes, 64 per line ("+offset hex").
+int g_log_bytes = 0;
+
+void Dump(const char *buf, int len, int limit)
+{
+	const int n = len < limit ? len : limit;
+	for (int offset = 0; buf && offset < n; offset += 64) {
+		char hex[160];
+		int used = 0;
+		for (int i = offset; i < n && i < offset + 64; ++i)
+			used += _snprintf_s(hex + used, sizeof(hex) - used, _TRUNCATE, "%02x", static_cast<BYTE>(buf[i]));
+		hex[used] = 0;
+		hooklog::Write("robot: net:   +%04x %s", offset, hex);
+	}
+}
+
+// --- net_scan_addresses: this PC's own addresses inside the game's packets ---------
+bool g_scan = false;
+CRITICAL_SECTION g_scan_lock;
+struct OwnAddress {
+	DWORD ip;  // network byte order
+	char name[40];
+};
+const int kMaxOwn = 24;
+OwnAddress g_own[kMaxOwn];
+int g_own_count = 0;
+DWORD g_own_at = 0;
+struct ScanCount {
+	long packets, with_address, only_reversed;
+	long by_type[256];  // packets with an address (in network order), by their first byte
+};
+ScanCount g_scan_sent = {}, g_scan_received = {};
+int g_dumped_by_type[256];  // packets with an address logged whole, by their first byte
+DWORD g_scan_logged_at = 0;
+long g_scan_logged_packets = 0;
+
+// Every IPv4 address of this PC's adapters (up or not, loopback included), every 10 s.
+void RefreshOwnAddresses()
+{
+	ULONG size = 16 * 1024;
+	IP_ADAPTER_ADDRESSES *list = static_cast<IP_ADAPTER_ADDRESSES *>(malloc(size));
+	if (!list)
+		return;
+	const ULONG flags = GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER;
+	ULONG r = GetAdaptersAddresses(AF_INET, flags, nullptr, list, &size);
+	if (r == ERROR_BUFFER_OVERFLOW) {
+		free(list);
+		list = static_cast<IP_ADAPTER_ADDRESSES *>(malloc(size));
+		r = list ? GetAdaptersAddresses(AF_INET, flags, nullptr, list, &size) : ERROR_NOT_ENOUGH_MEMORY;
+	}
+	int count = 0;
+	for (IP_ADAPTER_ADDRESSES *a = r == NO_ERROR ? list : nullptr; a && count < kMaxOwn; a = a->Next) {
+		for (IP_ADAPTER_UNICAST_ADDRESS *u = a->FirstUnicastAddress; u && count < kMaxOwn; u = u->Next) {
+			const sockaddr_in *in = reinterpret_cast<const sockaddr_in *>(u->Address.lpSockaddr);
+			if (!in || in->sin_family != AF_INET || in->sin_addr.s_addr == 0)
+				continue;
+			bool known = false;
+			for (int i = 0; i < count; ++i)
+				known = known || g_own[i].ip == in->sin_addr.s_addr;
+			if (known)
+				continue;
+			g_own[count].ip = in->sin_addr.s_addr;
+			WideCharToMultiByte(CP_UTF8, 0, a->FriendlyName, -1, g_own[count].name, sizeof(g_own[count].name), nullptr,
+			                    nullptr);
+			++count;
+		}
+	}
+	free(list);
+	const bool first = g_own_at == 0;
+	g_own_count = count;
+	g_own_at = GetTickCount();
+	if (first) {
+		char text[900] = "";
+		for (int i = 0; i < count; ++i) {
+			char one[80];
+			const BYTE *b = reinterpret_cast<const BYTE *>(&g_own[i].ip);
+			_snprintf_s(one, sizeof(one), _TRUNCATE, "%s%u.%u.%u.%u (%s)", i ? ", " : "", b[0], b[1], b[2], b[3],
+			            g_own[i].name);
+			strncat_s(text, sizeof(text), one, _TRUNCATE);
+		}
+		hooklog::Write("robot: net: address scan: this PC's addresses: %s", count ? text : "none found");
+	}
+}
+
+// Every 10 s while packets come and go (the last line holds the run's totals).
+void LogScanCounts(bool force)
+{
+	const long packets = g_scan_sent.packets + g_scan_received.packets;
+	const DWORD now = GetTickCount();
+	if (!force && (now - g_scan_logged_at < 10000 || packets == g_scan_logged_packets))
+		return;
+	g_scan_logged_at = now;
+	g_scan_logged_packets = packets;
+	char types[400] = "";
+	for (int t = 0; t < 256; ++t) {
+		const long n = g_scan_sent.by_type[t] + g_scan_received.by_type[t];
+		if (!n)
+			continue;
+		char one[24];
+		_snprintf_s(one, sizeof(one), _TRUNCATE, "%s%02x x%ld", types[0] ? ", " : "", t, n);
+		strncat_s(types, sizeof(types), one, _TRUNCATE);
+	}
+	hooklog::Write("robot: net: address scan: %ld packets sent, %ld received; %ld hold an address of this PC%s%s%s; %ld "
+	               "more only in reversed byte order",
+	               g_scan_sent.packets, g_scan_received.packets, g_scan_sent.with_address + g_scan_received.with_address,
+	               types[0] ? " (by first byte: " : "", types, types[0] ? ")" : "",
+	               g_scan_sent.only_reversed + g_scan_received.only_reversed);
+}
+
+// Looks for each address of this PC in the packet, in network byte order (as the
+// game writes them) and reversed. The first 3 packets of each kind (first byte)
+// that hold one are logged whole, with where each address sits.
+void Scan(const char *buf, int len, bool sent, SOCKET s, const sockaddr *peer)
+{
+	if (!g_scan || !buf || len <= 0)
+		return;
+	EnterCriticalSection(&g_scan_lock);
+	if (g_own_at == 0 || GetTickCount() - g_own_at > 10000)
+		RefreshOwnAddresses();
+	ScanCount &count = sent ? g_scan_sent : g_scan_received;
+	++count.packets;
+	bool straight_found = false, reversed_found = false;
+	char hits[700] = "";
+	for (int i = 0; i < g_own_count; ++i) {
+		const BYTE *ip = reinterpret_cast<const BYTE *>(&g_own[i].ip);
+		const BYTE reversed[4] = {ip[3], ip[2], ip[1], ip[0]};
+		for (int at = 0; at + 4 <= len; ++at) {
+			const bool straight = memcmp(buf + at, ip, 4) == 0;
+			if (!straight && memcmp(buf + at, reversed, 4) != 0)
+				continue;
+			(straight ? straight_found : reversed_found) = true;
+			char one[96];
+			_snprintf_s(one, sizeof(one), _TRUNCATE, "%s%u.%u.%u.%u (%s)%s at byte %d", hits[0] ? "; " : "", ip[0], ip[1],
+			            ip[2], ip[3], g_own[i].name, straight ? "" : " reversed", at);
+			strncat_s(hits, sizeof(hits), one, _TRUNCATE);
+		}
+	}
+	const BYTE type = static_cast<BYTE>(buf[0]);
+	if (straight_found) {
+		++count.with_address;
+		++count.by_type[type];
+	} else if (reversed_found) {
+		++count.only_reversed;
+	}
+	if ((straight_found || reversed_found) && g_dumped_by_type[type] < 3) {
+		++g_dumped_by_type[type];
+		char where[32];
+		Address(peer, where, sizeof(where));
+		hooklog::Write("robot: net: address scan: a %d-byte %02x packet %s %s (socket %u) holds %s", len, type,
+		               sent ? "sent to" : "received from", where, static_cast<unsigned>(s), hits);
+		Dump(buf, len, 2048);
+	}
+	LogScanCounts(false);
+	LeaveCriticalSection(&g_scan_lock);
+}
+
 SOCKET WINAPI RobotSocket(int af, int type, int protocol)
 {
 	const SOCKET s = g_socket(af, type, protocol);
@@ -198,7 +364,9 @@ int WINAPI RobotSendTo(SOCKET s, const char *buf, int len, int flags, const sock
 		}
 		hooklog::Write("robot: net: sendto(%u, %d bytes %s, %s) -> %d (error %d) from %p%s%s", static_cast<unsigned>(s),
 		               len, bytes, where, r, r < 0 ? Error() : 0, _ReturnAddress(), stack[0] ? ", stack" : "", stack);
+		Dump(buf, len, g_log_bytes);
 	}
+	Scan(buf, len, true, s, to);
 	return r;
 }
 
@@ -211,15 +379,30 @@ int WINAPI RobotRecvFrom(SOCKET s, char *buf, int len, int flags, sockaddr *from
 		Bytes(buf, r, bytes, sizeof(bytes));
 		hooklog::Write("robot: net: recvfrom(%u) -> %d bytes %s from %s, called from %p", static_cast<unsigned>(s), r, bytes,
 		               where, _ReturnAddress());
+		Dump(buf, r, g_log_bytes);
 	}
+	if (r > 0)
+		Scan(buf, r, false, s, from);
 	return r;
 }
 
 }  // namespace
 
-void InstallNetLog(bool share_udp_ports, const char *relay_ports, int logged_packets)
+void LogNetSummary()
+{
+	if (!g_scan)
+		return;
+	EnterCriticalSection(&g_scan_lock);
+	LogScanCounts(true);
+	LeaveCriticalSection(&g_scan_lock);
+}
+
+void InstallNetLog(bool share_udp_ports, const char *relay_ports, int logged_packets, int log_bytes, bool scan_addresses)
 {
 	g_share_udp_ports = share_udp_ports;
+	g_log_bytes = log_bytes > 0 ? log_bytes : 0;
+	g_scan = scan_addresses;
+	InitializeCriticalSection(&g_scan_lock);
 	if (logged_packets >= 0)
 		g_logged_packets = logged_packets;
 	for (const char *p = relay_ports; p && *p && g_relay_count < kMaxRelays;) {
@@ -239,10 +422,10 @@ void InstallNetLog(bool share_udp_ports, const char *relay_ports, int logged_pac
 	g_sendto = reinterpret_cast<SendToFn>(PatchImport("WSOCK32.dll", "sendto", reinterpret_cast<void *>(&RobotSendTo)));
 	g_recvfrom = reinterpret_cast<RecvFromFn>(PatchImport("WSOCK32.dll", "recvfrom", reinterpret_cast<void *>(&RobotRecvFrom)));
 	hooklog::Write("robot: net log: socket %s, bind %s, connect %s, setsockopt %s, sendto %s, recvfrom %s; "
-	               "shared UDP ports %s, broadcast relays %d (%s)",
+	               "shared UDP ports %s, broadcast relays %d (%s); packet bytes logged %d; address scan %s",
 	               g_socket ? "yes" : "no", g_bind ? "yes" : "no", g_connect ? "yes" : "no", g_setsockopt ? "yes" : "no",
 	               g_sendto ? "yes" : "no", g_recvfrom ? "yes" : "no", g_share_udp_ports ? "yes" : "no", g_relay_count,
-	               relay_ports ? relay_ports : "");
+	               relay_ports ? relay_ports : "", g_log_bytes ? g_log_bytes : 12, g_scan ? "on" : "off");
 }
 
 }  // namespace robot

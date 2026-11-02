@@ -70,6 +70,8 @@ bool g_net_log = false;  // robot_net.cpp
 bool g_share_udp_ports = false;
 char g_relay_ports[64] = {};
 int g_net_log_packets = -1;  // -1 = robot_net.cpp's default
+int g_net_log_bytes = 0;     // net_log_bytes: whole packets (robot_net.cpp)
+bool g_net_scan = false;     // net_scan_addresses (robot_net.cpp)
 volatile LONG g_overlay_key = 0;  // a "key" step's key, until the overlay takes it
 char g_panel_command[512];          // a "panel" step's text, until a panel takes it
 volatile LONG g_panel_pending = 0;
@@ -654,6 +656,7 @@ DWORD WINAPI Watchdog(LPVOID)
 		}
 	}
 	hooklog::Write("robot: time limit of %lu s reached after %ld AI turns, closing the game", g_quit_after_seconds, g_turns);
+	LogNetSummary();  // the address scan's totals (robot_net.cpp)
 	hooklog::Close();
 	TerminateProcess(GetCurrentProcess(), 2);  // no game shutdown code: it can crash mid-turn
 	return 0;
@@ -778,6 +781,10 @@ bool ReadConfig(const wchar_t *path)
 			lstrcpynA(g_relay_ports, value, sizeof(g_relay_ports));
 		else if (strcmp(line, "net_log_packets") == 0)
 			g_net_log_packets = atoi(value);
+		else if (strcmp(line, "net_log_bytes") == 0)
+			g_net_log_bytes = atoi(value);
+		else if (strcmp(line, "net_scan_addresses") == 0)
+			g_net_scan = atol(value) != 0;
 	}
 	fclose(f);
 	return true;
@@ -845,8 +852,8 @@ void Init()
 		InstallScreenshots(g_shot_dir);
 	if (g_profile_ai)
 		StartAiProfiler();
-	if (g_net_log || g_share_udp_ports || g_relay_ports[0])
-		InstallNetLog(g_share_udp_ports, g_relay_ports, g_net_log_packets);
+	if (g_net_log || g_share_udp_ports || g_relay_ports[0] || g_net_scan)
+		InstallNetLog(g_share_udp_ports, g_relay_ports, g_net_log_packets, g_net_log_bytes, g_net_scan);
 	// The main loop hook runs the script and keeps the game active.
 	g_real_PeekMessageA = reinterpret_cast<PeekMessageAFn>(
 		PatchImport("USER32.dll", "PeekMessageA", reinterpret_cast<void *>(&RobotPeekMessageA)));
@@ -923,6 +930,7 @@ void OnAiTurnStart(void *ai)
 	hooklog::Write("robot: AI turn %ld started (ai=%p)", turns, ai);
 	if (g_quit_after_turns && turns > g_quit_after_turns) {
 		hooklog::Write("robot: %ld AI turns done, closing the game", g_quit_after_turns);
+		LogNetSummary();  // the address scan's totals (robot_net.cpp)
 		hooklog::Close();
 		TerminateProcess(GetCurrentProcess(), 0);  // no game shutdown code: it can crash mid-turn
 	}

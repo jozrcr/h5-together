@@ -15,4 +15,8 @@ void InstallUnknownBuild();
 // place before the game reads its data. Checks the build itself.
 void InstallEarly();
 
+// When the DLL is loaded, before robot::Init(): the virtual LAN's Winsock hooks
+// ([online] mode, off by default), under the robot's network log. Checks the build itself.
+void InstallNetEarly();
+
 }  // namespace hooks

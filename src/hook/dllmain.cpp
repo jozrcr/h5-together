@@ -155,6 +155,7 @@ BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID)
 		hooklog::Write("H5 Together hook DLL " OPEN_HOMM5_VERSION " loaded (built " __DATE__ " " __TIME__ ")");
 		for (const std::string &line : moved)
 			hooklog::Write("%s", line.c_str());
+		hooks::InstallNetEarly();  // [online] mode (off by default): under the robot's network log
 		robot::Init();  // before the game reads its profile
 		hooks::InstallEarly();  // before the game reads its data
 		chain::Load(inst);  // another dinput8.dll mod (dinput8_next.dll): loaded now, as the game would have loaded it

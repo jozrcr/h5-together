@@ -9,6 +9,7 @@ Everything here changes how the original game behaves, on purpose. It is kept ap
 - Random maps: [teams](#teams-on-random-maps-rmg_teamscpp-on-by-default-only-for-recipe-maps), [templates and recipe names](#random-map-templates-rmg_templatescpp-rmg_makercpp-rmg_recipecpp-on-by-default), [template builder](#template-builder-rmg_buildercpp-rmg_screencpp-on-by-default), [start terrain that matches the factions](#start-terrain-that-matches-the-factions-rmg_factionscpp-off-by-default)
 - Rules: [game rules from the host](#game-rules-from-the-host-host_rulescpp-on-and-nothing-changes-unless-the-host-changes-something), with [H5 Together's version in the waiting room](#h5-togethers-version-in-the-waiting-room-030)
 - [New version available](#new-version-available-update_checkcpp-off-by-default) (opt-in)
+- Online play (being built, off by default): [Steam test](#steam-test-steam_spikecpp-off-by-default-for-tests-only), [virtual LAN](#virtual-lan-virtual_lancpp-off-by-default-being-built)
 - [The settings menu](#the-settings-menu-settings_cpp-options-h5-together): the add-on's settings in the game's own Options screen (Options, H5 Together; F3)
 - Camera, sound and visuals: [original music](#original-music-original_musiccpp-off-by-default), [camera zoom and start distance](#farther-camera-zoom-start-distance-cameracpp-off-by-default), [the mouse wheel under Wine](#the-mouse-wheel-under-wine--proton-wheelcpp-wheel_logiccpp-on-under-wine-only), [wider volume range](#wider-volume-range-audio_volumecpp-off-by-default), [black past the map's edge](#black-past-the-maps-edge-edge_skycpp-off-by-default), [the main menu's scene and music](#the-main-menus-scene-and-music-menu_scenecpp-off-by-default)
 - The freeze detector (hang watchdog), the crash reports and chain-loading another `dinput8.dll` mod are part of the DLL itself: [src/hook/README.md](../hook/README.md#the-hang-watchdog-watchdogcpp).
@@ -1094,3 +1095,29 @@ spike_lobby=friends  ; the test lobby: friends | public | invisible
 spike_pings=100      ; join: test messages sent to the host and answered
 spike_ping_bytes=300
 ```
+
+## Virtual LAN (`virtual_lan*.cpp`; off by default, being built)
+
+The core of online play over Steam ([docs/plans/online-steam.md](../../docs/plans/online-steam.md), step 2). The game keeps its own LAN play; the add-on carries its LAN packets somewhere else. For now that "somewhere" is only a **loopback transport** for the robot's tests (two copies of the game on one PC); Steam comes in step 3. With `mode=off` (the default) nothing is hooked and nothing changes.
+
+How it works, in plain words:
+
+- **Fake addresses.** Every player gets a made-up address in `198.18.0.0/15` (a range set aside for network tests, so it never clashes with a real network or ZeroTier), computed from their id (a SteamID later; the loopback makes one up from its port). Every PC computes the same address for the same player.
+- **The game only ever sees fake addresses.** When it asks for its own addresses (`gethostbyname` of its own host name), the add-on answers with this PC's fake address only. The game writes its addresses into its packets itself (the join request `01`, the game description `03`, the player records of the lobby; see [multiplayer-sync.md](../../docs/subsystems/multiplayer-sync.md#addresses-inside-the-packets-2026-11-02)), so they all hold the fake one: no packet is rewritten.
+- **Sending** (`sendto`): a packet to a fake address goes to that player through the transport, with the game's destination port as the "channel" and a 2-byte header holding the source port. An "any games here?" query (`02`) to a broadcast goes to every host the transport knows. Everything else (real addresses, other broadcasts, `lan_discovery`'s copies to the network adapters) is dropped: **the real network is not used** while the virtual LAN is on.
+- **Receiving** (`recvfrom`): the next message for the socket's port, as if it came from the sender's fake address and source port. What the real network brings is read and dropped.
+- **Who hosts.** Once a second the game's discovery socket gets a copy of its own last query, as if from `198.18.0.1` (an address nobody has). A game that hosts answers with its game description; the add-on swallows that answer and tells the others (the loopback's stand-in for a Steam lobby).
+- The hooks sit under `lan_discovery`'s and the robot's (they go in when the DLL loads), so the robot's network log shows the packets exactly as the game sends and gets them.
+
+The log says what it does (lines starting with `vlan:`): this PC's fake address, each new peer, when this PC starts or stops hosting, and every 30 s the packets carried and dropped.
+
+**Settings** (`h5-together.ini`):
+
+```ini
+[online]
+mode=off             ; off (default) | loopback (robot tests only); steam comes later
+loopback_port=47100  ; loopback: this copy's own port on 127.0.0.1
+loopback_peers=      ; loopback: the other copies' ports, e.g. 47102
+```
+
+`python tools\robot\run_lan_test.py --vlan` sets these for the robot's host and client (ports 47101 and 47102) and turns off the robot's own broadcast copies, so the client can only find the host through the virtual LAN. `tools/robot/packet_map.py` then shows where the addresses sit in the packets, and the robot's address scan (`--net-scan`) counts packets holding a real address of this PC (it must be 0).

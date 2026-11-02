@@ -1,6 +1,6 @@
 # Plan: online play over Steam (a "virtual LAN")
 
-Status: **the spike passed (2026-11-02): two Steam accounts' games talk through Steam under app 15370.** Solo: Steam starts in the game's process, the relay network comes up, and a friends-only lobby is created ([results](#solo-spike-results-2026-11-02)), even when the robot, not Steam, started the game. Two PCs: a Linux laptop under Proton, on a phone's 4G connection, found the Windows host's friends-only lobby through the friends list, joined it, and 100 of 100 messages came back (median round trip 82 ms) ([results](#two-pc-test-results-2026-11-02)). Next: step 1. Code: `src/mods/steam_spike.cpp` (`[online] spike`, off by default). SDK 1.65 is at `ref\steamworks_sdk_165\` (never committed).
+Status: **the spike passed (2026-11-02): two Steam accounts' games talk through Steam under app 15370.** Solo: Steam starts in the game's process, the relay network comes up, and a friends-only lobby is created ([results](#solo-spike-results-2026-11-02)), even when the robot, not Steam, started the game. Two PCs: a Linux laptop under Proton, on a phone's 4G connection, found the Windows host's friends-only lobby through the friends list, joined it, and 100 of 100 messages came back (median round trip 82 ms) ([results](#two-pc-test-results-2026-11-02)). **Steps 1 and 2 done too (2026-11-02):** the packet map shows every address in the game's packets comes from one Winsock call, and the virtual LAN core carried a whole robot LAN game (two copies on one PC, through a local stand-in for Steam) with all checksums equal and no real address in any packet ([results](#steps-1-and-2-the-packet-map-and-the-virtual-lan-core-2026-11-02)). Next: step 3, the Steam transport. Code: `src/mods/steam_spike.cpp` (`[online] spike`, off by default). SDK 1.65 is at `ref\steamworks_sdk_165\` (never committed).
 
 Goal: friends join each other's games **from inside the game**, with no GameRanger and no ZeroTier. This is phase 6 of the project ("built-in online play"). This plan picks Steam as the first way to do it. The older idea (our own lobby server plus GameNetworkingSockets) becomes the fallback.
 
@@ -41,14 +41,17 @@ From the robot's two copies on one PC (host ports 8889/8888, client ports 8891/8
 | Byte 0 | Size | Socket | Direction | Meaning |
 |---|---|---|---|---|
 | `02` | 5 | discovery | everyone, broadcast, once a second | "Any games here?" plus 4 bytes that change each time. |
-| `03` | 826 | discovery | host → asker, unicast | The game's description (what the LAN list shows). |
-| `01` | 31 | discovery | joiner → host | Probably the join request. It contains the joiner's discovery port (`bb 22` = 8891), probably followed by its address list. |
-| `00` | 18–273 | both | both ways | The reliable link: data and acknowledgements (see [multiplayer-sync.md](../subsystems/multiplayer-sync.md), "The LAN link"). |
+| `03` | 826 | discovery | host → asker, unicast | The game's description (what the LAN list shows), in the game's tagged serialization. It holds the host's **address record twice** (step 1, below). |
+| `01` | 31 | discovery | joiner → host | The join request. Bytes 9–28: the joiner's discovery port (`bb 22` = 8891, little endian) and its **4 addresses**. |
+| `04` | 33 | discovery | host → joiner | The join answer (probably `SEnterGameAllowedPacket`). Bytes 9–28: the host's discovery port and its **4 addresses**. |
+| `00` | 18–273 | both | both ways | The reliable link: data and acknowledgements (see [multiplayer-sync.md](../subsystems/multiplayer-sync.md), "The LAN link"). In the lobby its data carries every player's **address record** (the host sends the player list to everyone). |
 | `07` | 9 | game | both ways | Address probe. `07 00` + a 4-byte token goes to **each** address of the other PC; `07 01` + the same token is the answer. The first address that answers wins. |
+
+**Step 1, the packet map (2026-11-02):** where each address sits, byte by byte, is in [multiplayer-sync.md, "Addresses inside the packets"](../subsystems/multiplayer-sync.md#addresses-inside-the-packets-2026-11-02). In short: every address in every packet comes from `gethostbyname(gethostname())` (through `0x00484ac0`), in two forms: the raw list of `01`/`04` (port + 4 addresses), and a player's record in `03` and the lobby's `00` data (a `sockaddr_in` with the first address and the game port, plus the list). A robot run scanned all 10,792 packets of the host for the PC's own addresses: 119 held some (`03` ×100, `00` ×17, `01`, `04`), all before the first AI turn; none came from anywhere else.
 
 ### Address-dependent things (what a virtual LAN must get right)
 
-- **The game sends its own IPs inside packets.** Each PC tells the others its addresses (from `0x00484ac0`, via `gethostbyname`). The other PC sends its `07` probes to all of them. In the robot logs the host probed the client's 4 addresses (ZeroTier, WSL, Ethernet, Hyper-V), and the client probed the host's 4.
+- **The game sends its own IPs inside packets.** Each PC tells the others its addresses (from `0x00484ac0`, via `gethostbyname`): in `01`, `03`, `04` and the lobby's `00` data (step 1 above). The other PC sends its `07` probes to all of them. In the robot logs the host probed the client's 4 addresses (ZeroTier, WSL, Ethernet, Hyper-V), and the client probed the host's 4.
 - **A link is the other PC's IP:port.** Received packets are matched to links by their sender address. So a friend's fake address must stay the same for the whole game, and their packets must always arrive from that address **and from the same port**.
 - **Every PC talks to every other PC.** The "segment done" reports go directly between all PCs, not through the host ([responsiveness.md](responsiveness.md)). So in a 4-player game each client also needs a path to the other clients. The host passes their addresses along.
 - **Versions.** The game has a `NetGameVersion` check on connect (`0x00402c60`, next to "request for connect is sent"). Our co-op guard also compares add-on versions in its hello.
@@ -165,7 +168,7 @@ From the robot's two copies on one PC (host ports 8889/8888, client ports 8891/8
   - Unreliable, because the game already does its own acks and resends; reliable Steam sends would add a second, conflicting layer.
   - No Nagle, so packets are not held back.
   - We don't use `NoDelay`: it drops packets while the session is still being set up, and that would lose the first join packets.
-- **Sizes:** game packets are 5–826 bytes and the receive buffer is 2048. Steam's packet payload is around 1,200 bytes, so our packets fit in one Steam packet. The game sends at most one packet per link per send tick (now 10 ms with `net_tuning`), a few KB/s.
+- **Sizes:** game packets are 5–984 bytes (984: the game description once a player has joined; step 2) and the receive buffer is 2048. Steam's packet payload is around 1,200 bytes, so our packets fit in one Steam packet. The game sends at most one packet per link per send tick (now 10 ms with `net_tuning`), a few KB/s.
 - **Order and loss:** the same as UDP, which the game's link layer already expects.
 - **Disconnects:** when a friend leaves the lobby or the Steam session fails, packets simply stop. The game's own timeout (`net_timeout`, 20 s) drops the player, as on a LAN. We change nothing there.
 
@@ -223,6 +226,8 @@ keep_lan=0        ; later: also accept plain LAN/ZeroTier players in a Steam gam
 log=1             ; log lobby events and each new peer (fake address <-> SteamID)
 ```
 
+Built so far (step 2): `mode=off|loopback` (`steam` is read but says "not built yet" and stays off), and for the loopback `loopback_port` / `loopback_peers`. The shipped `h5-together.ini` has only `;mode=off`, in an `[online]` section of its own. The peer log is always on (a few lines per game), so `log` is not needed yet.
+
 - **Off by default** at first. It changes no gameplay (only gameplay changes must default to the original), so it can be turned on by default once it has proven itself.
 - **Picking Steam or LAN:** a small ImGui box on the game's LAN screen: "Play over: Steam / LAN", with Steam's status ("Steam: 3 friends online with H5 Together"). It applies the next time the LAN screen opens, because the game creates its sockets then.
 - **The list:** the games stay in the game's own LAN list. Our box beside it lists Steam games with problems ("needs H5 Together 0.3.1") and has "Invite friends...".
@@ -232,7 +237,7 @@ log=1             ; log lobby events and each new peer (fake address <-> SteamID
 
 - **The robot can't use Steam:** it runs two game copies on **one** PC, and one PC runs only one Steam account. So the virtual LAN code gets a **transport interface** with two versions:
   - **Steam:** the real one.
-  - **Loopback** (`mode=loopback`): the two copies exchange the same messages over a local UDP socket of our own (127.0.0.1, one port per robot instance), with fake SteamIDs from `OPEN_HOMM5_INSTANCE`. A tiny fake lobby (the host announces itself to the other copy) stands in for Steam's.
+  - **Loopback** (`mode=loopback`): the two copies exchange the same messages over a local UDP socket of our own (127.0.0.1, one port per robot instance), with made-up SteamIDs (built from that port: `LoopbackId`). A tiny fake lobby (every copy tells the others once a second whether it hosts) stands in for Steam's.
   - All the address mapping, broadcast fan-out, hosting detection and port handling is the **same code** in both.
 - **Robot checks (loopback):**
   - the client finds the host's game through the virtual LAN only (real broadcasts off);
@@ -348,6 +353,47 @@ What this settles:
 - **Linux friends start the game from Steam with `WINEDLLOVERRIDES="dinput8=n,b" %command%`**, as for the add-on today; nothing more for Steam's networking.
 - **Not yet seen:** a relayed connection (both ends got a direct path), 3 PCs, a long session, and the overlay inside the game.
 
+## Steps 1 and 2: the packet map and the virtual LAN core (2026-11-02)
+
+**Step 1, the packet map:** see [the packet table above](#the-packets-when-you-join-a-lan-game) and [multiplayer-sync.md](../subsystems/multiplayer-sync.md#addresses-inside-the-packets-2026-11-02). Every address the game puts in a packet comes from `gethostbyname(gethostname())`, so the design's single `gethostbyname` answer is enough: no packet is rewritten, and no fallback (vtable slot 11) is needed.
+
+**Step 2, what was built** (`[online] mode=loopback`; `mode=off`, the default, hooks nothing):
+
+- `src/mods/virtual_lan.cpp`: the hooks on the exe's `gethostbyname`, `sendto` and `recvfrom` imports, as in "The design" above. They go in when the DLL loads, before the robot's (`hooks::InstallNetEarly`), so they sit **under** `lan_discovery`'s and the robot's hooks: the robot's network log shows the packets exactly as the game sends and gets them. (A Steam-wrapped exe, which can't be recognized at that time, gets them from `InstallAll`.)
+- `src/mods/virtual_lan_logic.cpp`: the pure parts, with 87 unit checks in `src/hook/test/virtual_lan_test.cpp`: the setting, fake addresses (all valid for 200,000 ids, never `.0`, `.255` or `198.18.0.1`), clashes, three PCs agreeing, the 2-byte header, where each packet goes, the hosting probe (with `GetTickCount` wrapping), known hosts, the query copies, the loopback datagrams.
+- `src/mods/virtual_lan_transport.h`: the transport interface, shaped like `ISteamNetworkingMessages` plus a lobby (`SelfId`, `Start`, `Poll`, `Send(id, channel, message)`, `Receive(channel)`, `SetHosting(port)`, `Hosts`, `Members`). `virtual_lan_loopback.cpp` is its first version: a UDP socket of its own on 127.0.0.1 per copy, ids made up from its port, and an "I host on port P" message to the other copies once a second.
+- Details that differ from or add to the design: the probe is a copy of the game's **own** last query (so we never build a `02` ourselves), and any `03` the game sends also counts as "hosting"; packets from the real network are read and dropped (as `keep_lan=0`); a message older than 3 s when the game asks for it is dropped; the game's two copies of each query (classful broadcast and 255.255.255.255) go out once; until the transport knows our id, the game's own-address question gets no answer rather than a real address.
+- The robot: `run_lan_test.py --net-log-bytes 2048 --net-scan --vlan`, and `tools/robot/packet_map.py` ([tools/robot/README.md](../../tools/robot/README.md)).
+
+**The robot's proof.** Two copies of the game on this PC (test copy `C:\Games\H5_test`, MMH5.5 RC19d), A1M4, 8 AI turns, link tuning on, same settings both times; the only difference is `--vlan`. The virtual LAN ran twice. Runs in `build/robot/` of the branch's worktree.
+
+| | Game's own LAN (`20261102-192943-lan`) | Virtual LAN (`20261102-202355-lan`) | Virtual LAN again (`20261102-203056-lan`) |
+|---|---|---|---|
+| Client finds the host's game | yes, at 127.0.0.1:8889 (the robot's broadcast copies) | **yes, at 198.18.161.134:8889**: the host was detected as hosting 1 s after creating its game (the next probe), its announcement reached the client, the client's queries went to it (10 queries, one per second, each sent once) | yes, the same way |
+| Joins, game starts | yes | **yes** | **yes** |
+| AI turns, AI steps (host) | 8, 94 | 8, 99 | 8, 87 |
+| World checksums | 1,461 checks, all equal | **1,359 checks, all equal (no desync)** | **1,362 checks, all equal** |
+| Wait before an AI step | median 204 ms (p90 402) | median 200 ms (p90 839) | median 206 ms (p90 433) |
+| AI hero move | median 154 ms | median 174 ms | median 153 ms |
+| Host's packets (sent + received) | 6,012 + 4,780 | 5,775 + 4,393 | 5,786 + 4,392 |
+| **Packets holding an address of this PC** (scan of every packet, both copies) | host 119, client 119 | **0 and 0** | **0 and 0** |
+| Virtual LAN counters (client, end) | | 4,476 packets to the host, 5,568 from it; 0 that could not be sent, 0 stale, 0 to unknown addresses; 144 real broadcasts (`lan_discovery`'s copies) dropped | 4,470 to the host, 5,579 from it; the same zeros |
+
+- **No real address in any packet**: the address scan looked at all 20,513 packets of the two copies (20,934 in the second run) for the PC's 10 addresses. None held one in network byte order. A few per copy (3, then 7) held `01 00 00 7f` (127.0.0.1 backwards) by chance, as without the virtual LAN, inside acknowledgement bits and AI command data; the robot logs those packets whole. The packets show the fake addresses exactly where the packet map has the real ones (`03` bytes 355, 375, 772, 792; `01` and `04` byte 13; the lobby's records).
+- **The game sent no `07` address probes at all** (24 in the run without it). It seems to probe only when the address its partner's packets come from is not in that partner's list; with the virtual LAN, it always is. One less thing to carry.
+- **The host keeps answering queries during the game** (80 of 90 probes answered by the end), so "hosting" lasts as long as the game: the Steam lobby (step 3) can follow it.
+- Once the client joined, the host's game description grew to **984 bytes** (it then lists the client too). Still under one Steam packet (~1,200 bytes).
+- Timing: **no difference**. The second virtual LAN run matches the run without it (median wait 206 vs 204 ms, p90 433 vs 402, AI hero move 153 vs 154 ms, 0.21 vs 0.20 s per AI step). The first run's higher p90 was one slow AI turn: the AI does not play the same game twice (an earlier run without the virtual LAN had a p90 of 638 ms). Each message adds one hop through a local socket, read every time the game polls (every few ms).
+
+**What step 3 (the Steam transport) needs from this:**
+
+- A second `vlan::Transport`, on `ISteamNetworkingMessages`: `Send` = `SendMessageToUser` on channel = port with `UnreliableNoNagle | AutoRestartBrokenSession`; `Receive(channel)` = `ReceiveMessagesOnChannel(channel)`; `SelfId` = our SteamID (only known after Steam's start: the core already waits for it, and gives the game no address until then); `SetHosting(port)` = create or leave the friends-only lobby and put the discovery port and our versions in its data; `Hosts` = friends' lobbies whose data says they host (`GetFriendGamePlayed`), refreshed every few seconds; `Members` = the lobby's members, **in the lobby's order**, so every PC gives the same addresses when two ids clash (the core adds them in that order).
+- The session requests (accept only lobby members and friends with the add-on), Steam's callback thread, and the same lock as the hooks (the core's `g_lock`).
+- `[online] mode=steam` in `InstallVirtualLan` (today it logs "not built yet"), loading `steam_api.dll` as the spike does.
+- Keep the lobby while the game runs, even if a query goes unanswered for a moment.
+
+**Not covered yet:** three or more PCs (the runner starts two copies; the unit test checks that three PCs agree on the addresses, and the transport's member list gives every PC every address before a first packet), a saved game loaded in multiplayer, other maps, and a real network between two PCs (step 5).
+
 ## Steps and effort
 
 A session is one focused working block of a few hours.
@@ -355,8 +401,8 @@ A session is one focused working block of a few hours.
 | Step | What | Sessions |
 |---|---|---|
 | 0 | The spike (above), then reading the logs. **Done 2026-11-02** (solo and two PCs) | 1 + 0.5 |
-| 1 | Packet map: the robot's `net_log` logs whole packets; find the address lists inside `01` and `03`; write it up in [multiplayer-sync.md](../subsystems/multiplayer-sync.md) | 0.5 |
-| 2 | Virtual LAN core with the loopback transport: Winsock hooks (stacked with `lan_discovery`), fake addresses, `gethostbyname` answer, hosting detection, unit tests, robot LAN game (checksums, no real IP in packets) | 2 |
+| 1 | Packet map: the robot's `net_log` logs whole packets; find the address lists inside `01` and `03`; write it up in [multiplayer-sync.md](../subsystems/multiplayer-sync.md). **Done 2026-11-02** ([results](#steps-1-and-2-the-packet-map-and-the-virtual-lan-core-2026-11-02)) | 0.5 |
+| 2 | Virtual LAN core with the loopback transport: Winsock hooks (stacked with `lan_discovery`), fake addresses, `gethostbyname` answer, hosting detection, unit tests, robot LAN game (checksums, no real IP in packets). **Done 2026-11-02** ([results](#steps-1-and-2-the-packet-map-and-the-virtual-lan-core-2026-11-02)) | 2 |
 | 3 | Steam transport: lazy loading, init, our callback thread, lobbies, known hosts, sessions, version data; logs | 2 |
 | 4 | UI: the box on the LAN screen (Steam/LAN choice, status, games with problems), "Invite friends...", invite toast, French texts | 2 |
 | 5 | Real tests with the owner and friends (Windows, Linux, 3 PCs) and fixes | 1–2 |
@@ -372,7 +418,7 @@ About **10 sessions** after a successful spike. Steps 1 and 2 need no SDK and co
 | Valve or Ubisoft object to using 15370 | We must stop using it | The transport is swappable: 480, our own server, or ZeroTier. |
 | `SteamAppId` doesn't work when the game isn't started by Steam | Shortcut and GameRanger players get no Steam | Start the game from Steam (launch option to MMH5.5's exe), or a `steam_appid.txt` in the player's `bin\` (one small file; Valve says not to ship it). |
 | A Linux friend outside Steam (Lutris, plain Wine) | No Steam | ZeroTier, as today. |
-| Some packet carries real addresses we didn't catch | The `07` probes go nowhere for those; joining still works through the fake address, but a real IP could leak to friends | Found by the packet scan in step 2; then the vtable slot 11 fallback or a packet rewrite. |
+| Some packet carries real addresses we didn't catch | The `07` probes go nowhere for those; joining still works through the fake address, but a real IP could leak to friends | Checked in steps 1 and 2: every address comes from `gethostbyname`, and with the virtual LAN on the robot's scan found none of this PC's addresses in any packet. Left to watch: other maps, save games loaded in multiplayer, 3+ players (not run yet). The robot's `--net-scan` checks again; the fallbacks stay the vtable slot 11 or a packet rewrite. |
 | The overlay and our ImGui fight over `Present` | Crashes or flicker | Test in the spike; the overlay is optional (our own invite list). |
 | Licence grey area | Valve may end the licence | Players copy `steam_api.dll` themselves; or fallback (c). |
 
@@ -384,4 +430,4 @@ About **10 sessions** after a successful spike. Steps 1 and 2 need no SDK and co
 4. Does anyone in the group play from a GOG copy? Then that group's games stay on ZeroTier, or we use Spacewar 480.
 5. OK to ship Valve's `steam_api.dll` inside our package (allowed by the SDK agreement as we read it, but a grey area because the app id isn't ours)? Or should each player copy it?
 6. How do the Linux friends start the game: as the Steam game with a launch option, as a non-Steam shortcut, or with Lutris/Wine? (The Steam game with the launch option works for Steam's networking: the two-PC test.)
-7. Steps 1 and 2 (packet map, virtual LAN with the robot) need no SDK. Start them before the spike?
+7. ~~Steps 1 and 2 need no SDK. Start them before the spike?~~ Done after the spike (2026-11-02).

@@ -238,6 +238,8 @@ const Setting kSettings[] = {
 	// [chain]
 	ROW("chain", "dll", "dinput8_next.dll", kChoice, 0, 0, kChain, COUNT(kChain), nullptr, kPlayer, kRestart, kAdvanced, kList,
 	    "settings.chain.dll", "settings.chain.dll.help"),
+	// [online]
+	FILE_ONLY("online", "mode", "off", kText, 0, 0, kTester, kRestart),  // the virtual LAN, being built (off | loopback)
 
 	// read by the code, not in the shipped file (appendix B): for testing
 	HIDDEN("audio", "log_data_files", "0", kInt, 0, 1000000),
@@ -256,6 +258,8 @@ const Setting kSettings[] = {
 	HIDDEN("online", "spike_lobby", "friends", kText, 0, 0),
 	HIDDEN("online", "spike_pings", "100", kInt, 0, 100000),
 	HIDDEN("online", "spike_ping_bytes", "300", kInt, 0, 1200),
+	HIDDEN("online", "loopback_port", "47100", kInt, 1, 65535),  // the virtual LAN's robot tests
+	HIDDEN("online", "loopback_peers", "", kText, 0, 0),
 };
 
 #undef ROW
