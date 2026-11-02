@@ -111,4 +111,11 @@ void InstallAll()
 	mods::ApplyUpdateCheckFromSettings();  // [update] check (off by default)
 }
 
+void InstallUnknownBuild()
+{
+	if (NoHooks())
+		return;
+	mods::ApplySteamSpikeFromSettings();  // calls only Steam's library, no address in the game
+}
+
 }  // namespace hooks
