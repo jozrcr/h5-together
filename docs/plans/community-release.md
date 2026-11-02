@@ -10,6 +10,14 @@ The goal: share the add-on with the wider Heroes V / MMH5.5 community. Someone w
 
 A "session" below means one focused working block of a few hours.
 
+## The owner's decisions (2026-11-02)
+
+- **The full plan**, except the installer exe: **no `setup.exe` for v0.3.** The zip with `install.bat` / `install.sh` stays and gets better instead (about 1 session): clearer messages, the MMH5.5 version and the game's language shown, GOG folders found, a folder picker when the game isn't found, the licence notices. Why: the scripts already find the game and refresh the settings safely; an exe would bring the "unsigned" warning, the `unins000.exe` clash and about 3 more sessions, for a nicer look and an "Apps" entry. **Total: about 16 sessions.**
+- **The exe comes later** (after online play), with Inno Setup on GitHub's machines (OK'd), signed through **SignPath** (the owner applies then).
+- **Update check:** yes, opt-in, contacting only GitHub.
+- **Still to ask:** the settings menu sketches (block 3), the 7 pages and the hotkey, translators on the MMH5.5 Discord, announcements. Decided by Claude unless the owner objects: crash dumps kept on the PC; no Start-menu folder.
+- **The add-on's name** is open: the owner wants a better one before the community release. Renaming touches the repo, the DLL's log and ini names (`open-homm5.ini`, `bin\open-homm5\`) and the installer, which must then move an existing install's files.
+
 ## Short version
 
 - **Installer:** use **Inno Setup** (free, the tool MMH5.5's own installer is made with), built by GitHub's machines, so nothing is installed on your PC. One `open-homm5-setup-0.3.0.exe`: it finds the game, checks MMH5.5 and its version, installs, and shows up in Windows "Apps" for uninstalling. The file work stays in our tested `install.ps1`. Linux keeps `install.sh`, made friendlier. **About 4 sessions.**
