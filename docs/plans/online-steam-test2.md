@@ -1,13 +1,13 @@
 # Steam test 3: a real LAN game between two PCs over Steam
 
-Status: **ready to run (2026-11-02).** The kit is `h5-together-steam-test3.zip` (in the session's scratchpad, never in the repo).
+Status: **ready to run (2026-11-02).** Both PCs use **the same `dinput8.dll`: the one in the package zip GitHub builds for the pull request** (the Actions run's artifact `h5-together-<version>`; downloading it needs a GitHub login: the owner, in a browser, or `gh run download`). The laptop's helper is `tools/robot/laptop_test.py` in the repo (`git pull`). The first kit, `h5-together-steam-test3.zip` in the session's scratchpad, could not reach the laptop (no DLLs in git, no file sharing over the LAN), so the test moved to the next day.
 
 This is the first real test of step 3 of [online-steam.md](online-steam.md): the virtual LAN with its **Steam transport** (`[online] mode=steam`). The earlier two-PC test (the spike) only sent test messages between the two games. This time the **game's own LAN play** goes through Steam: the host creates a LAN game, and the other PC sees it in the game's own LAN list, joins it, and they play.
 
 ## In short
 
 - **Desktop (Windows) = host:** the test copy `C:\Games\H5_test_k` (MMH5.5 RC19k), driven by the robot. It creates a LAN game on A1M4 and waits about 7 minutes for the laptop, then starts.
-- **Laptop (Ubuntu 25.04, Snap Steam, Proton 11) = joiner:** the Steam game folder with MMH5.5 RC19k. A Claude session on the laptop installs the kit and starts the game. The in-DLL robot can do the joining by itself (no human needed), or a person clicks.
+- **Laptop (Ubuntu 25.04, Snap Steam, Proton 11) = joiner:** the Steam game folder with MMH5.5 RC19k. A Claude session on the laptop installs the test DLL and starts the game. The in-DLL robot can do the joining by itself (no human needed), or a person clicks.
 - Both PCs use their own Steam account; the two accounts are Steam friends (as in the spike).
 - **It worked if:** the laptop's LAN list shows the host's game, the laptop joins, the game starts, a few AI turns play on both PCs, the world checksums stay equal, and nothing crashes.
 
@@ -16,21 +16,18 @@ This is the first real test of step 3 of [online-steam.md](online-steam.md): the
 | | Desktop (host) | Laptop (joiner) |
 |---|---|---|
 | Game | `C:\Games\H5_test_k`, MMH5.5 RC19k, `MMH55_Utility_64.exe` | `/home/joz/snap/steam/common/.local/share/Steam/steamapps/common/Heroes of Might and Magic 5 Tribes of the East`, MMH5.5 RC19k (`bin/55u.dll` sha256 `a28663da…`), Steam's launch option starts `MMH55_Utility_64.exe` |
-| Our DLL | the branch's build (`build\hook\dinput8.dll`; the robot copies it in) | the kit's `dinput8.dll` → `bin/dinput8.dll` |
-| Valve's `steam_api.dll` (SDK 1.65, 32-bit) | `bin\h5-together\steam_api.dll`, from `ref\steamworks_sdk_165\sdk\redistributable_bin\` (copied in for the run, removed after) | the kit's `steam_api.dll` → `bin/h5-together/steam_api.dll` |
-| `bin\h5-together.ini` | the robot writes `[online]` `mode=steam` | `[online]` `mode=steam` (the kit's script adds it and removes an old `spike=` line) |
+| Our DLL | the PR package's `dinput8.dll` (`run_ai_test.py --dll <path>` copies it in) | the same file → `bin/dinput8.dll` (`laptop_test.py install --dll <path>`) |
+| Valve's `steam_api.dll` (SDK 1.65, 32-bit) | `bin\h5-together\steam_api.dll`, from `ref\steamworks_sdk_165\sdk\redistributable_bin\` (copied in for the run, removed after) | already in `bin/h5-together/` since the spike (kept) |
+| `bin\h5-together.ini` | the robot writes `[online]` `mode=steam` | `[online]` `mode=steam` (`laptop_test.py install` adds it and removes an old `spike=` line) |
 | Steam | running, logged in | running, logged in; launch option `WINEDLLOVERRIDES="dinput8=n,b" %command%` |
 
 Nothing else changes in either game: `mode=steam` only changes how the game's LAN packets travel. Without `steam_api.dll` or without Steam, the add-on says so in its log and the game plays its own LAN, as without the setting.
 
-## The kit
+## What to get
 
-`h5-together-steam-test3.zip` holds:
-
-- `dinput8.dll`: H5 Together built from the branch `online-steam-transport` (version string still 0.2.7);
-- `steam_api.dll`: Valve's, from the Steamworks SDK 1.65 (`redistributable_bin`);
-- `laptop_test.py`: the laptop's helper (Python 3, no extra packages): `install`, `robot`, `collect`, `clean`, `uninstall`. It keeps everything it replaces in `bin/h5-together-test3-backup/` first;
-- `README.md`: this document.
+- **`dinput8.dll`:** from the package zip of the pull request's GitHub Actions run (artifact `h5-together-<version>`, inside `h5-together-<version>/dinput8.dll`). Both PCs use this one file; its SHA-256 is checked on both sides before the run. (Two different builds of one version would show as "another build" in the waiting room.)
+- **`tools/robot/laptop_test.py`:** the laptop's helper (Python 3, no extra packages): `install [--dll PATH]`, `robot`, `collect`, `clean`, `uninstall`. It keeps everything it replaces in `bin/h5-together-test3-backup/` first. It comes with the repo (`git pull`).
+- **`steam_api.dll`:** Valve's, Steamworks SDK 1.65; the laptop has it since the spike, the desktop copies it from `ref\`.
 
 ## Steps
 
@@ -47,7 +44,7 @@ From the repo's worktree of the branch (PowerShell). Before the run: no game run
 (`$scratch` = the session's scratchpad folder.) Then the host run (one line):
 
 ```powershell
-python tools\robot\run_ai_test.py --game C:\Games\H5_test_k --no-map --turns 8 --seconds 1200 --shot-every 0 --online-setting mode=steam --trace-crc --net-log --net-scan --setvar "lan_last_login = Robot-host" --setvar "mp_check_crc = 1" --step "8|menu|multi lan" --step "12|ui|NUI::CLobbyScreen create" --step "16|map|A1M4/" --step "18|msg|create" --step "24|shot|host-waiting" --step "240|slots|" --step "360|slots|" --step "400|arrow|0 ready" --step "402|arrow|2 right" --step "405|slots|" --step "406|shot|host-ready" --step "410|msg|start" --step "430|shot|host-started"
+python tools\robot\run_ai_test.py --game C:\Games\H5_test_k --dll <the PR package's dinput8.dll> --no-map --turns 8 --seconds 1200 --shot-every 0 --online-setting mode=steam --trace-crc --net-log --net-scan --setvar "lan_last_login = Robot-host" --setvar "mp_check_crc = 1" --step "8|menu|multi lan" --step "12|ui|NUI::CLobbyScreen create" --step "16|map|A1M4/" --step "18|msg|create" --step "24|shot|host-waiting" --step "240|slots|" --step "360|slots|" --step "400|arrow|0 ready" --step "402|arrow|2 right" --step "405|slots|" --step "406|shot|host-ready" --step "410|msg|start" --step "430|shot|host-started"
 ```
 
 What the robot does: Multiplayer > LAN > Create, map A1M4, create the game (about 25 s after the window opens). Then it waits. At 400 s it gets ready and makes the map's third player a computer player, at 410 s it starts the game, and it closes the game after 8 AI turns. The player's human turns are ended by the robot.
@@ -65,8 +62,8 @@ It puts `dinput8.dll` back, removes `steam_api.dll` and the files the run added,
 Do these in order. `GAME` below is the game folder: `/home/joz/snap/steam/common/.local/share/Steam/steamapps/common/Heroes of Might and Magic 5 Tribes of the East`.
 
 1. **Check that no game is running** (`pgrep -fa MMH55` shows nothing). Quit the game if it is.
-2. **Unpack the kit** somewhere outside the game folder, for example `~/h5-steam-test3/`, and go there: `cd ~/h5-steam-test3`.
-3. **Install:** `python3 laptop_test.py install`
+2. **Get the files:** `git pull` in the repo clone (for `tools/robot/laptop_test.py`); unpack the package zip the owner downloaded into `~/h5-steam-test3/` (outside the game folder) and check `dinput8.dll`'s SHA-256 against the one the desktop session sends. Then go to the repo clone's `tools/robot/` folder.
+3. **Install:** `python3 laptop_test.py install --dll ~/h5-steam-test3/h5-together-<version>/dinput8.dll`
    - It copies our `dinput8.dll` into `GAME/bin/`, `steam_api.dll` into `GAME/bin/h5-together/` (if it is not there yet), and puts `[online]` `mode=steam` in `GAME/bin/h5-together.ini`. The old files go to `GAME/bin/h5-together-test3-backup/`.
    - Check that Steam's launch option for the game is still `WINEDLLOVERRIDES="dinput8=n,b" %command%` (plus whatever starts `MMH55_Utility_64.exe`).
 4. **Choose who joins:**
