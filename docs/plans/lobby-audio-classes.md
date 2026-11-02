@@ -16,7 +16,7 @@ The owner asked for five things:
 | 1. Volume | "Wider range": `[audio] volume_curve=wide`, off by default; no scale settings. | **Built and robot-checked:** `src/mods/audio_volume.cpp`. The owner's ears still to check. |
 | 2. Lobby labels | (the fix is ours, no choice needed) | **Done and robot-checked:** 4 tooltips in the private packs; outdated-text check in `tools/lang/inventory.py`. |
 | 3. ToE bonuses | "Each player picks": option A (a mode chooser in the lobby, the bonus arrows back to ToE). | **Built and robot-checked** (2026-11-01): host rules step 2, `game_mode` and `toe_bonuses` in the Game rules panel ([host-rules.md](host-rules.md), "Step 2"). |
-| 4. Hero skills | "Per game in the lobby" (option 2). | Later. |
+| 4. Hero skills | "Per game in the lobby" (option 2). | **Built and robot-checked** (2026-11-02): host rules step 3, `class_skills` "Unlocked" in the Game rules panel ([host-rules.md](host-rules.md), "Step 3"): MMH5.5's classes and chances, the other skills at chance 2; the table is edited in memory (the game reads `HeroClass.xdb` once, at start-up) and a save keeps the rule. "Vanilla classes" not built. |
 | 5. Map edges | "Black": `[camera] edge_sky=none`, off by default. | **Built and robot-checked:** `src/mods/edge_sky.cpp`. |
 | The French pack in `data\` | The coordinator asks the owner. | Open. |
 

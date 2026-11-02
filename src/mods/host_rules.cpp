@@ -1175,15 +1175,16 @@ void __fastcall RunMpHook(void *self, void *edx)
 			chance = g_serving_values[rules::kClassChance];
 		}
 	}
-	// the class table before the world is made (a hero's level-ups may come with it); a save
-	// read just before (a game being loaded) set it from the save already
-	if (g_enabled && !rules::WorldReadRecently(60000))
+	// the class table before the world is made (a hero's level-ups may come with it). This is
+	// always a new game: a multiplayer load goes through NMP::CMPLoad, not CRunMPGame (and a
+	// save's world, when it is read, sets the class skills itself)
+	if (g_enabled) {
 		rules::SetClassSkills(classes, chance, false, "a multiplayer game starts");
+		rules::ForgetWorldRead();
+	}
 	InterlockedExchange(&g_mp_world, 1);  // the world is made inside (0x00820830 -> 0x00c9fa80)
 	g_run_mp_next(self, edx);
 	InterlockedExchange(&g_mp_world, 0);
-	if (g_enabled)
-		rules::ForgetWorldRead();
 }
 
 // --- 6. the world starts its scripts (map_scripts) ----------------------------------------------
@@ -1251,13 +1252,14 @@ void __fastcall RunSingleHook(void *self, void *edx)
 			chance = g_chosen[rules::kClassChance];
 		}
 	}
-	if (g_enabled && !rules::WorldReadRecently(60000))
+	// a new game (a single-player load does not come here: robot run 20261102-011559)
+	if (g_enabled) {
 		rules::SetClassSkills(classes, chance, false,
 		                      g_class_single ? "a single-player game starts (class_skills_single=1: this PC's choice)"
 		                                     : "a single-player game starts");
-	g_run_single_next(self, edx);
-	if (g_enabled)
 		rules::ForgetWorldRead();
+	}
+	g_run_single_next(self, edx);
 }
 
 void ReadChoices()

@@ -150,7 +150,7 @@ const Words kEnglish = {
 	"your file: %s",
 	"MMH5.5 alone: %s",
 	"Every player has open-homm5: these rules will be used.",
-	"Without open-homm5: %s. Then every PC uses its own MMH5.5 file.",
+	"Without open-homm5 (or with an older one): %s. Then every PC uses its own MMH5.5 file.",
 	"MMH5.5 files differ: %s. The game may not stay in step.",
 	"The players will see these rules in the waiting room.",
 	"The host sent no rules (no open-homm5 there, or another version): every PC uses its own MMH5.5 file.",
@@ -219,7 +219,7 @@ const Words kFrench = {
 	"votre fichier" NBSP ": %s",
 	"MMH5.5 seul" NBSP ": %s",
 	"Tous les joueurs ont open-homm5" NBSP ": ces r" E_GRAVE "gles seront utilis" E_ACUTE "es.",
-	"Sans open-homm5" NBSP ": %s. Chaque PC utilise alors son propre fichier MMH5.5.",
+	"Sans open-homm5 (ou avec une version plus ancienne)" NBSP ": %s. Chaque PC utilise alors son propre fichier MMH5.5.",
 	"Fichiers MMH5.5 diff" E_ACUTE "rents" NBSP ": %s. La partie risque de se d" E_ACUTE "synchroniser.",
 	"Les joueurs verront ces r" E_GRAVE "gles dans la salle d'attente.",
 	"L'h" O_CIRC "te n'a pas envoy" E_ACUTE " de r" E_GRAVE "gles (pas d'open-homm5 chez lui, ou une autre version)" NBSP

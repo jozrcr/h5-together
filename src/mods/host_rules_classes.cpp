@@ -362,9 +362,12 @@ int __fastcall WorldSerializeHook(void *self, void *edx, void *saver)
 			return r;
 		memcpy(buf, text.c_str(), text.size());
 		chunk(saver, nullptr, kWorldChunk, buf, kWorldChunkSize, 1);
-		static LONG logged = 0;
-		if (InterlockedIncrement(&logged) <= 3)
-			hooklog::Write("rules: class skills: the world is written with \"%s\" (a save, or the multiplayer checksum)", text.c_str());
+		static LONG written = 0;
+		const LONG n = InterlockedIncrement(&written);
+		if (n <= 3 || n % 500 == 0)
+			hooklog::Write("rules: class skills: the world is written with \"%s\" (%ld times so far: saves, the multiplayer "
+			               "checksums)",
+			               text.c_str(), n);
 		return r;
 	}
 	chunk(saver, nullptr, kWorldChunk, buf, kWorldChunkSize, 1);  // all zeros when the save has none
