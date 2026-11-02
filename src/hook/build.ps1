@@ -24,7 +24,9 @@ $sources = "dllmain.cpp", "log.cpp", "game_build.cpp", "hooks.cpp", "ai_trace.cp
 # Dear ImGui (third_party\imgui, for the player list overlay): the same settings
 # for its files and for ours. NDEBUG: its internal checks never stop the game.
 $imgui_defs = "/DNDEBUG /DIMGUI_DISABLE_OBSOLETE_FUNCTIONS /DIMGUI_DISABLE_DEMO_WINDOWS /DIMGUI_DISABLE_DEBUG_TOOLS /DIMGUI_DISABLE_WIN32_DEFAULT_IME_FUNCTIONS /DIMGUI_DISABLE_DEFAULT_SHELL_FUNCTIONS /Ithird_party\imgui"
-$flags = "/nologo /O2 /MT /W4 /WX /EHsc /std:c++17 /DUNICODE /D_UNICODE /DWIN32_LEAN_AND_MEAN $imgui_defs"
+# /utf-8: our files are UTF-8. Without it, cl reads them in Windows' code page and an
+# accent typed in an L"..." text became two letters in the game (lobby tooltips, 0.2.7).
+$flags = "/nologo /O2 /MT /W4 /WX /EHsc /std:c++17 /utf-8 /DUNICODE /D_UNICODE /DWIN32_LEAN_AND_MEAN $imgui_defs"
 # ImGui itself is built apart, at its authors' warning level (not /W4 /WX).
 $imgui_out = Join-Path $out "imgui"
 New-Item -ItemType Directory -Force $imgui_out | Out-Null
@@ -42,7 +44,7 @@ $cmd = "call `"$vcvars`" x86 >nul 2>&1 && cd /d `"$src`" && $imgui && $dll"
 if ($Test) {
     $cmd += " && cl $flags test\proxy_test.cpp /Fo`"$out\\`" /Fe`"$out\proxy_test.exe`" dxguid.lib"
     # calling-convention test of the AI hook: debug build with runtime stack checks (/RTCs)
-    $tflags = "/nologo /Od /RTCs /MTd /W4 /WX /EHsc /std:c++17 /DUNICODE /D_UNICODE /DWIN32_LEAN_AND_MEAN /DAI_TRACE_TEST"
+    $tflags = "/nologo /Od /RTCs /MTd /W4 /WX /EHsc /std:c++17 /utf-8 /DUNICODE /D_UNICODE /DWIN32_LEAN_AND_MEAN /DAI_TRACE_TEST"
     # the "original music" mod's text work (no game needed)
     $cmd += " && cl $flags test\original_music_test.cpp ..\mods\original_music_xdb.cpp /Fo`"$out\\`" /Fe`"$out\original_music_test.exe`""
     # the "languages" mod's work on bytes: paths, text encodings, zip directories

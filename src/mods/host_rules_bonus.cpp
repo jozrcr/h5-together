@@ -95,17 +95,17 @@ const Words kEnglish = {
 };
 
 const Words kFrench = {
-	{L"<color=yellow>Bonus de départ : aléatoire<color_default><br>De l'or, des ressources ou un artefact mineur, comme "
+	{L"<color=yellow>Bonus de d\u00e9part : al\u00e9atoire<color_default><br>De l'or, des ressources ou un artefact mineur, comme "
 	 L"dans Tribes of the East.",
-	 L"<color=yellow>Bonus de départ : artefact mineur<color_default><br>Votre premier héros commence avec un artefact "
-	 L"mineur aléatoire.",
-	 L"<color=yellow>Bonus de départ : or<color_default><br>500 à 1000 pièces d'or de plus au départ.",
-	 L"<color=yellow>Bonus de départ : ressources<color_default><br>3 à 6 unités d'une ressource "
-	 L"aléatoire de plus au départ."},
-	L"<color=yellow>Pas de bonus de départ à choisir<color_default><br>MMH5.5 donne au premier héros de chaque "
-	L"joueur humain un artefact mineur aléatoire.",
-	L"<br><br>Mode de jeu : %ls (règles de la partie choisies par l'hôte).",
-	{L"", L"Par défaut", L"Sauvage", L"Cauchemar", L"Aléatoire (Par défaut, Sauvage ou Cauchemar, tiré au début)"},
+	 L"<color=yellow>Bonus de d\u00e9part : artefact mineur<color_default><br>Votre premier h\u00e9ros commence avec un artefact "
+	 L"mineur al\u00e9atoire.",
+	 L"<color=yellow>Bonus de d\u00e9part : or<color_default><br>500 \u00e0 1000 pi\u00e8ces d'or de plus au d\u00e9part.",
+	 L"<color=yellow>Bonus de d\u00e9part : ressources<color_default><br>3 \u00e0 6 unit\u00e9s d'une ressource "
+	 L"al\u00e9atoire de plus au d\u00e9part."},
+	L"<color=yellow>Pas de bonus de d\u00e9part \u00e0 choisir<color_default><br>MMH5.5 donne au premier h\u00e9ros de chaque "
+	L"joueur humain un artefact mineur al\u00e9atoire.",
+	L"<br><br>Mode de jeu : %ls (r\u00e8gles de la partie choisies par l'h\u00f4te).",
+	{L"", L"Par d\u00e9faut", L"Sauvage", L"Cauchemar", L"Al\u00e9atoire (Par d\u00e9faut, Sauvage ou Cauchemar, tir\u00e9 au d\u00e9but)"},
 	{"random", "minor artifact", "gold", "resources"},
 };
 
