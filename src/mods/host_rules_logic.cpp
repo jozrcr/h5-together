@@ -1,6 +1,7 @@
 // Host rules: the pure work (see host_rules_logic.h).
 #include "host_rules_logic.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -26,6 +27,8 @@ const RuleDef kRules[kRuleCount] = {
 	{"game_mode", nullptr, kChoice, 0, 4, kStart},       // kGameModeRule
 	{"toe_bonuses", nullptr, kBool, 0, 1, kStart},       // kToeBonusRule
 	{"map_scripts", nullptr, kBool, 0, 1, kRandomMaps},  // kMapScripts: not in the file
+	{"class_skills", nullptr, kChoice, 0, 1, kHeroes},   // kClassSkills: 0 MMH5.5's lock, 1 unlocked
+	{"class_chance", nullptr, kInt, 1, 50, kHeroes, true},  // kClassChance: hidden (testing)
 };
 
 const char *const kMultipliers[kMultiplierCount] = {"0.5", "0.75", "1", "1.25", "1.5", "2", "3"};
@@ -275,16 +278,16 @@ uint32_t HashWithoutRuleValues(const std::string &lua)
 
 std::string Encode(const Values &values)
 {
-	std::string text = "OHR3";
+	std::string text = "OHR4";
 	for (int r = 0; r < kRuleCount; ++r)
 		if (static_cast<size_t>(r) < values.size() && ValidValue(kRules[r], values[r]))
 			text += std::string(";") + kRules[r].key + "=" + values[r];
-	return text.size() <= static_cast<size_t>(kTextMax) ? text : std::string("OHR3");
+	return text.size() <= static_cast<size_t>(kTextMax) ? text : std::string("OHR4");
 }
 
 bool Decode(const std::string &text, Values *values)
 {
-	if (text.compare(0, 4, "OHR3") != 0 || text.size() > static_cast<size_t>(kTextMax))
+	if (text.compare(0, 4, "OHR4") != 0 || text.size() > static_cast<size_t>(kTextMax))
 		return false;
 	Values v = NoValues();
 	size_t p = 4;
@@ -309,7 +312,7 @@ bool Decode(const std::string &text, Values *values)
 
 std::string LobbyText(int flags, const Values &values)
 {
-	std::string text = "L3|" + std::to_string(flags & 0xff) + "|";
+	std::string text = "L4|" + std::to_string(flags & 0xff) + "|";
 	for (int r = 0; r < kRuleCount; ++r) {
 		if (r)
 			text += ",";
@@ -321,7 +324,7 @@ std::string LobbyText(int flags, const Values &values)
 
 bool ReadLobbyText(const std::string &text, int *flags, Values *values)
 {
-	if (text.compare(0, 3, "L3|") != 0)
+	if (text.compare(0, 3, "L4|") != 0)
 		return false;
 	const size_t bar = text.find('|', 3);
 	if (bar == std::string::npos || bar == 3 || bar > 6)
@@ -612,10 +615,146 @@ void HashRequest(char mark, uint32_t hash, uint32_t *type, uint8_t *byte)
 bool ReadHashRequest(uint32_t type, uint8_t byte, char *mark, uint32_t *hash)
 {
 	const char m = static_cast<char>(type >> 24);
-	if (m != kMarkSettingsRest && m != kMarkSettingsWhole && m != kMarkStats && m != kMarkStartScript)
+	if (m != kMarkSettingsRest && m != kMarkSettingsWhole && m != kMarkStats && m != kMarkStartScript && m != kMarkClassTable)
 		return false;
 	*mark = m;
 	*hash = static_cast<uint32_t>(byte) << 24 | (type & 0x00ffffffu);
+	return true;
+}
+
+// --- the class table ---------------------------------------------------------------------------------
+std::string CheckClassTable(const ClassTable &table)
+{
+	if (table.empty())
+		return "no class has a skill list";
+	int last = -1;
+	for (const ClassSkillList &c : table) {
+		char head[48];
+		snprintf(head, sizeof(head), "class %d: ", c.id);
+		if (c.id <= last)
+			return std::string(head) + "not after the class before it";
+		last = c.id;
+		if (c.probs.empty() || c.probs.size() > 64)
+			return std::string(head) + std::to_string(c.probs.size()) + " skills";
+		long sum = 0;
+		for (size_t i = 0; i < c.probs.size(); ++i) {
+			const SkillProb &p = c.probs[i];
+			if (p.skill < 1 || p.skill > 1000)
+				return std::string(head) + "skill " + std::to_string(p.skill);
+			if (p.prob < 0 || p.prob > 1000)
+				return std::string(head) + "chance " + std::to_string(p.prob);
+			for (size_t j = 0; j < i; ++j)
+				if (c.probs[j].skill == p.skill)
+					return std::string(head) + "skill " + std::to_string(p.skill) + " twice";
+			sum += p.prob;
+		}
+		if (sum <= 0)
+			return std::string(head) + "its chances add up to 0";
+	}
+	return std::string();
+}
+
+uint32_t ClassTableHash(const ClassTable &table)
+{
+	uint32_t hash = 2166136261u;
+	for (const ClassSkillList &c : table) {
+		const int32_t head[2] = {c.id, static_cast<int32_t>(c.probs.size())};
+		hash = Fnv1a(head, sizeof(head), hash);
+		for (const SkillProb &p : c.probs) {
+			const int32_t item[2] = {p.skill, p.prob};
+			hash = Fnv1a(item, sizeof(item), hash);
+		}
+	}
+	return hash;
+}
+
+std::vector<int> OfferedSkills(const ClassTable &table)
+{
+	std::vector<int> skills;
+	for (const ClassSkillList &c : table)
+		for (const SkillProb &p : c.probs) {
+			size_t at = 0;
+			while (at < skills.size() && skills[at] < p.skill)
+				++at;
+			if (at == skills.size() || skills[at] != p.skill)
+				skills.insert(skills.begin() + at, p.skill);
+		}
+	return skills;
+}
+
+std::vector<SkillProb> UnlockedList(const std::vector<SkillProb> &own, const std::vector<int> &skills, int chance)
+{
+	std::vector<SkillProb> out = own;
+	const uint32_t head = own.empty() ? 0 : own[0].head;
+	for (int s : skills) {
+		bool has = false;
+		for (const SkillProb &p : own)
+			has = has || p.skill == s;
+		if (!has)
+			out.push_back(SkillProb{head, s, chance});
+	}
+	return out;
+}
+
+int ClassChance(const std::string &chance)
+{
+	return ValidValue(kRules[kClassChance], chance) ? atoi(chance.c_str()) : atoi(kClassChanceVanilla);
+}
+
+bool ClassTableFor(const ClassTable &mmh55, const std::string &mode, const std::string &chance, ClassTable *out, std::string *why)
+{
+	if (mode.empty() || mode == kClassLocked)
+		return false;
+	if (mode != kClassUnlocked) {
+		*why = "class_skills=" + mode + " is not known to this version";
+		return false;
+	}
+	const std::string problem = CheckClassTable(mmh55);
+	if (!problem.empty()) {
+		*why = "the class table: " + problem;
+		return false;
+	}
+	const std::vector<int> skills = OfferedSkills(mmh55);
+	const int c = ClassChance(chance);
+	ClassTable t = mmh55;
+	for (ClassSkillList &list : t)
+		list.probs = UnlockedList(list.probs, skills, c);
+	*out = t;
+	return true;
+}
+
+// --- what a save keeps ---------------------------------------------------------------------------------
+std::string EncodeWorld(const Values &values)
+{
+	std::string text = "OHW1";
+	for (int r = 0; r < kRuleCount; ++r)
+		if (IsClassRule(r) && static_cast<size_t>(r) < values.size() && ValidValue(kRules[r], values[r]))
+			text += std::string(";") + kRules[r].key + "=" + values[r];
+	return text;
+}
+
+bool DecodeWorld(const std::string &text, Values *values)
+{
+	if (text.compare(0, 4, "OHW1") != 0 || text.size() > 200)
+		return false;
+	Values v = NoValues();
+	size_t p = 4;
+	while (p < text.size()) {
+		if (text[p] != ';')
+			return false;
+		const size_t end = text.find(';', p + 1);
+		const std::string item = text.substr(p + 1, end == std::string::npos ? std::string::npos : end - p - 1);
+		const size_t eq = item.find('=');
+		if (eq == std::string::npos)
+			return false;
+		const int r = RuleIndex(item.substr(0, eq));
+		const std::string value = item.substr(eq + 1);
+		if (r < 0 || !IsClassRule(r) || !v[r].empty() || !ValidValue(kRules[r], value))
+			return false;
+		v[r] = value;
+		p = end == std::string::npos ? text.size() : end;
+	}
+	*values = v;
 	return true;
 }
 
