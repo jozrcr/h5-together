@@ -37,13 +37,14 @@ Translations are welcome: copy en.txt to the code of your language (de.txt, ru.t
 WHAT IT DOES
 
 - Faster co-op: quicker AI turns and clicks, less AI thinking on big maps, no long autosave freeze, LAN games over ZeroTier.
-- Stability: a fix for a rare host freeze during computer turns, and a freeze detector (see below).
+- Stability: a fix for a rare host freeze during computer turns, a freeze detector, and a short report when the game crashes (see below).
+- Multiplayer waiting room: a line at the bottom says whether every player has the same H5 Together version, and who does not.
 - Player list on the adventure map: who is playing, who has ended the turn. F9 hides it.
 - "Your turn" notification when the game is in the background.
 - Template builder: the "Template..." button ("Modeles..." in French) on the random map screen, or F11. Friends rebuild the same map from its name: nothing to share.
 - Hero looks: the small button on the hero screen, or F7. Another hero's 3D figure, same faction.
 - Game rules (host): the "Rules..." button ("Regles..." in French) in the multiplayer waiting room, or F2. Used only when every player has this version.
-- Off by default, in h5-together.ini: farther camera zoom, black map edges, a quieter volume range, the original Heroes V music, French texts, start terrain that matches each faction on random maps.
+- Off by default, in h5-together.ini: a "new version available" notice in the main menu ([update] check=1: at most once a day it asks GitHub for the latest version number; nothing is downloaded), farther camera zoom, black map edges, a quieter volume range, the original Heroes V music, French texts, start terrain that matches each faction on random maps.
 - Linux: the mouse wheel zooms out again (automatic).
 
 
@@ -61,6 +62,12 @@ Windows: double-click bug-report.bat. Linux: run: bash bug-report.sh
 It makes h5-together-bug-report-<date>.zip on your Desktop (Linux: in the folder you ran it from). The zip holds h5-together.log (and the older h5-together.old.log), your settings, and a short list of versions (the add-on, MMH5.5, Windows or Linux, the game's exes and DLLs). No saves, no maps. It sends nothing anywhere: the zip is a normal zip, so you can open it and look first. The log lists player names and LAN addresses.
 Attach the zip to a new report at https://github.com/jozrcr/h5-together/issues/new/choose. It also works when the game does not start.
 If a game freezes: wait 30 seconds before closing it (so the log can say where it was stuck), then make the report.
+If the game crashes, the add-on writes h5-together-crash-<date>-<time>.txt (what crashed) and a small .dmp file next to the log (the 3 newest are kept; nothing is sent anywhere). The report adds the newest. The .dmp holds part of the game's memory at the crash (player names, folder names): bug-report.bat -NoDump (Linux: bash bug-report.sh --no-dump) leaves it out.
+
+
+ANOTHER MOD THAT IS ALSO A DINPUT8.DLL
+
+Some mods (ASI loaders, widescreen fixes) also come as a dinput8.dll in the game's bin folder, and the installer will not replace it. To use both: rename the other mod's dinput8.dll to dinput8_next.dll, then install H5 Together. H5 Together loads dinput8_next.dll when the game starts and passes DirectInput on to it; h5-together.log says "chained". To undo, delete or rename dinput8_next.dll.
 
 LICENCES
 

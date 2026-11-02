@@ -254,3 +254,24 @@ msg.too_many_players = the game allows at most 8 players ({players} asked)
 msg.small_zones = Zones are small ({tiles} tiles each): pick a bigger map or fewer zones.
 msg.big_zones = Zones are very big ({tiles} tiles each): the generator may leave them empty; pick a smaller map or more zones.
 msg.rich_zones = Some zones hold more treasure ({value}) than any shipped template ({shipped}); not tested in the game yet.
+
+# The notice in the main menu when a newer version of H5 Together is out (only with
+# [update] check=1). {new}, {ours}: version numbers; {page}: the add-on's Releases page.
+[update]
+available = H5 Together {new} is out (you have {ours}).
+where = Get it from {page}
+
+# The line at the bottom of the waiting room about H5 Together's version on each PC.
+# {ours}: this PC's version; {players}: a list of item* texts, with ", " between them;
+# {player}: a player's name; {version}: a version number.
+[versions]
+same = Every player has H5 Together {ours}.
+differ = Not the same H5 Together on every PC (yours: {ours}): {players}.
+item = {player} {version}
+item_build = {player} {version} (another build)
+item_older = {player}: older than 0.3.0
+item_none = {player}: no H5 Together
+needed = For co-op, every PC needs the same H5 Together version: update before you start.
+host_older = The host has an older H5 Together than yours ({ours}).
+host_none = The host has no H5 Together (or its game rules are off).
+host_newer = The host has another, newer H5 Together than yours ({ours}).

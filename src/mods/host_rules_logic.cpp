@@ -702,11 +702,112 @@ void HashRequest(char mark, uint32_t hash, uint32_t *type, uint8_t *byte)
 bool ReadHashRequest(uint32_t type, uint8_t byte, char *mark, uint32_t *hash)
 {
 	const char m = static_cast<char>(type >> 24);
-	if (m != kMarkSettingsRest && m != kMarkSettingsWhole && m != kMarkStats && m != kMarkStartScript && m != kMarkClassTable)
+	if (m != kMarkSettingsRest && m != kMarkSettingsWhole && m != kMarkStats && m != kMarkStartScript && m != kMarkClassTable &&
+	    m != kMarkVersion && m != kMarkBuild)
 		return false;
 	*mark = m;
 	*hash = static_cast<uint32_t>(byte) << 24 | (type & 0x00ffffffu);
 	return true;
+}
+
+// --- H5 Together's version in the waiting room ------------------------------------------------------
+uint32_t PackVersion(const char *version)
+{
+	int part[3] = {0, 0, 0};
+	int count = 0;
+	const char *p = version;
+	while (count < 3) {
+		if (*p < '0' || *p > '9')
+			return 0;
+		int n = 0;
+		while (*p >= '0' && *p <= '9' && n <= 255)
+			n = n * 10 + (*p++ - '0');
+		if (n > 255)
+			return 0;
+		part[count++] = n;
+		if (count < 3) {
+			if (*p != '.')
+				return 0;
+			++p;
+		}
+	}
+	if (*p && *p != '-' && *p != '+')
+		return 0;
+	return static_cast<uint32_t>(part[0]) << 16 | static_cast<uint32_t>(part[1]) << 8 | static_cast<uint32_t>(part[2]);
+}
+
+std::string UnpackVersion(uint32_t packed)
+{
+	return std::to_string((packed >> 16) & 0xff) + "." + std::to_string((packed >> 8) & 0xff) + "." + std::to_string(packed & 0xff);
+}
+
+std::string VersionsText(const std::vector<Peer> &peers)
+{
+	std::string text = "V1";
+	for (const Peer &p : peers) {
+		char build[16];
+		snprintf(build, sizeof(build), "%08x", p.build);
+		std::string name = p.name.substr(0, 48);
+		for (char &c : name)
+			if (c == '\n' || c == '\r')
+				c = ' ';
+		text += "\n" + std::string(1, p.kind) + "|" + (p.kind == Peer::kKnown ? p.version : std::string()) + "|" + build + "|" + name;
+	}
+	return text;
+}
+
+bool IsVersionsText(const std::string &text)
+{
+	return text.size() >= 2 && text[0] == 'V' && Digit(text[1]);
+}
+
+bool ReadVersionsText(const std::string &text, std::vector<Peer> *peers)
+{
+	if (text.compare(0, 2, "V1") != 0 || (text.size() > 2 && text[2] != '\n'))
+		return false;
+	std::vector<Peer> out;
+	size_t p = 3;
+	while (p < text.size() + 1 && text.size() > 2) {
+		const size_t end = text.find('\n', p);
+		const std::string line = text.substr(p, end == std::string::npos ? std::string::npos : end - p);
+		const size_t a = line.find('|'), b = a == std::string::npos ? a : line.find('|', a + 1),
+		             c = b == std::string::npos ? b : line.find('|', b + 1);
+		if (c == std::string::npos || a != 1)
+			return false;
+		Peer peer;
+		peer.kind = line[0];
+		if (peer.kind != Peer::kKnown && peer.kind != Peer::kOlder && peer.kind != Peer::kNone && peer.kind != Peer::kWaiting)
+			return false;
+		peer.version = line.substr(a + 1, b - a - 1);
+		if ((peer.kind == Peer::kKnown) != !peer.version.empty() ||
+		    (peer.kind == Peer::kKnown && UnpackVersion(PackVersion(peer.version.c_str())) != peer.version))
+			return false;
+		const std::string build = line.substr(b + 1, c - b - 1);
+		if (build.size() != 8)
+			return false;
+		for (char ch : build)
+			if (!Digit(ch) && !(ch >= 'a' && ch <= 'f'))
+				return false;
+		peer.build = static_cast<uint32_t>(strtoul(build.c_str(), nullptr, 16));
+		peer.name = line.substr(c + 1);
+		out.push_back(peer);
+		if (end == std::string::npos)
+			break;
+		p = end + 1;
+	}
+	if (out.empty() || out.size() > 8)
+		return false;
+	*peers = out;
+	return true;
+}
+
+std::vector<Peer> Differing(const std::vector<Peer> &peers, const Peer &mine)
+{
+	std::vector<Peer> out;
+	for (const Peer &p : peers)
+		if (p.kind != Peer::kWaiting && (p.kind != Peer::kKnown || p.version != mine.version || p.build != mine.build))
+			out.push_back(p);
+	return out;
 }
 
 // --- the class table ---------------------------------------------------------------------------------

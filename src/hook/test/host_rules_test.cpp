@@ -568,6 +568,57 @@ void TestHello()
 	      "the hellos (ours, the faction mod's) and the game's types are not hashes");
 }
 
+// H5 Together's version in the waiting room: the requests, the host's list, who differs.
+void TestVersions()
+{
+	Check(PackVersion("0.3.0") == 0x000300u && PackVersion("1.2.3") == 0x010203u && PackVersion("0.2.7-test") == 0x000207u &&
+	          PackVersion("255.255.255") == 0xffffffu,
+	      "versions: packed in 24 bits (8 each), a suffix left out");
+	Check(PackVersion("") == 0 && PackVersion("0.3") == 0 && PackVersion("0.3.x") == 0 && PackVersion("0.256.0") == 0 &&
+	          PackVersion("1.2.3.4") == 0 && PackVersion("v0.3.0") == 0,
+	      "versions: anything else packs to 0");
+	Check(UnpackVersion(0x000300u) == "0.3.0" && UnpackVersion(PackVersion("12.0.99")) == "12.0.99", "versions: and back");
+	uint32_t type = 0, hash = 0;
+	uint8_t byte = 0;
+	char mark = 0;
+	HashRequest(kMarkVersion, PackVersion("0.3.0"), &type, &byte);
+	Check(type == 0x56000300u && byte == 0 && ReadHashRequest(type, byte, &mark, &hash) && mark == kMarkVersion && hash == 0x000300u,
+	      "versions: the version request ('V'), far above the game's types");
+	HashRequest(kMarkBuild, 0x6a5b4c3du, &type, &byte);
+	Check(ReadHashRequest(type, byte, &mark, &hash) && mark == kMarkBuild && hash == 0x6a5b4c3du, "versions: the build request ('B')");
+
+	Peer host;
+	host.kind = Peer::kKnown, host.version = "0.3.0", host.build = 0x6a5b4c3du, host.name = "Joz";
+	Peer bob = host, ann = host, eve, max, new_one, old_build = host;
+	bob.name = "Bob", bob.version = "0.3.1";
+	ann.name = "Ann | the second";  // a name with the separator
+	eve.kind = Peer::kOlder, eve.name = "Ève";
+	max.kind = Peer::kNone, max.name = "Max";
+	new_one.kind = Peer::kWaiting, new_one.name = "Neo";
+	old_build.name = "Tim", old_build.build = 0x11111111u;
+	const std::vector<Peer> list = {host, bob, ann, eve, max, new_one, old_build};
+	const std::string text = VersionsText(list);
+	Check(text.compare(0, 3, "V1\n") == 0 && text.find("\nV|0.3.1|6a5b4c3d|Bob") != std::string::npos &&
+	          text.find("\nO||00000000|\xc3\x88ve") != std::string::npos && text.size() <= static_cast<size_t>(kLobbyTextMax),
+	      "versions: the host's list, one line per player, the host first");
+	std::vector<Peer> back;
+	Check(ReadVersionsText(text, &back) && back == list, "versions: read back the same (a '|' in a name is kept)");
+	Check(IsVersionsText(text) && IsVersionsText("V2\nanything") && !IsVersionsText(LobbyText(1, NoValues())) && !IsVersionsText("V"),
+	      "versions: a list is told from the rules' lobby text, also a later format");
+	Check(!ReadVersionsText("V2\nV|0.4.0|00000000|Joz", &back) && !ReadVersionsText("V1", &back) && !ReadVersionsText("V1\n", &back) &&
+	          !ReadVersionsText("V1\nX|0.3.0|00000000|Joz", &back) && !ReadVersionsText("V1\nV||00000000|Joz", &back) &&
+	          !ReadVersionsText("V1\nN|0.3.0|00000000|Joz", &back) && !ReadVersionsText("V1\nV|0.3|00000000|Joz", &back) &&
+	          !ReadVersionsText("V1\nV|0.3.0|0000000|Joz", &back) && !ReadVersionsText("V1\nV|0.3.0|0000000g|Joz", &back) &&
+	          !ReadVersionsText("V1\nV|0.3.0|00000000", &back),
+	      "versions: a later format, an empty list or a broken line is not read");
+	const std::vector<Peer> differ = Differing(list, host);
+	Check(differ.size() == 4 && differ[0].name == "Bob" && differ[1].name == "\xc3\x88ve" && differ[2].name == "Max" && differ[3].name == "Tim",
+	      "versions: who differs: another version, an older one, none, another build; not the same one, not one still waiting");
+	Check(Differing({host, ann}, host).empty(), "versions: all the same: nobody differs");
+	Peer guest = bob;
+	Check(Differing(list, guest).size() == 5, "versions: seen from a client with another version: everyone else differs");
+}
+
 // A class table in MMH5.5's shape (our own numbers, not MMH5.5's): three
 // classes of 4 skills each, the chances adding up to 100.
 ClassTable SampleClasses()
@@ -783,6 +834,7 @@ int main()
 	TestMapScript();
 	TestStartScript();
 	TestHello();
+	TestVersions();
 	TestClassTable();
 	TestBonusIcons();
 	printf(g_failures ? "%d FAILED\n" : "all host rules tests passed\n", g_failures);

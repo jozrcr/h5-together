@@ -678,8 +678,9 @@ if [ -n "$existing" ]; then
         echo
         echo "Stopped. There is already a file called dinput8.dll in the game folder,"
         echo "and it is not the H5 Together one (another add-on may use it)."
-        echo "I did not change anything. If you want H5 Together, move that file away"
-        echo "yourself and run this installer again."
+        echo "I did not change anything. To use H5 Together and that add-on together,"
+        echo "rename that file to dinput8_next.dll (H5 Together then loads it, and the"
+        echo "log says \"chained\"), or move it away; then run this installer again."
         exit 3
     fi
     dst_dll="$existing"

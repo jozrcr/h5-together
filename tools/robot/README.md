@@ -9,7 +9,7 @@ python tools\robot\run_ai_test.py --turns 12 --setvar "ai_time_limit = 20000"
 python tools\robot\run_ai_test.py --restore-intro     # put the intro videos back in the test copy
 ```
 
-Results go to `build/robot/<date-time>/` (gitignored): `summary.json`, the DLL log `h5-together.log`, the game's own console `console.txt`, and screenshots (`frame-*.png`, the game's own frames saved by the DLL).
+Results go to `build/robot/<date-time>/` (gitignored): `summary.json`, the DLL log `h5-together.log`, the game's own console `console.txt`, screenshots (`frame-*.png`, the game's own frames saved by the DLL), and the crash reports the copy wrote, if it crashed (`h5-together-crash-*.txt` / `.dmp`, moved out of the test copy).
 
 `run_lan_test.py` runs **two copies of the game at once** on this PC, a LAN host and a LAN client (see "LAN games" below):
 
@@ -194,6 +194,20 @@ python tools\robot\run_ai_test.py --game C:\Games\H5_test_k --texts-dir <folder 
 ```
 
 Look for the `texts:` lines in the log (written when a panel first asks for a word): the language, which clue chose it, and each line of the file that was not used.
+
+## Checking the safety nets (crash reports, versions in the lobby, update check, chain-loading)
+
+```
+python tools\robot\run_ai_test.py --game C:\Games\H5_test_k --debug-setting crash_test_at=30 --seconds 80 --turns 100 --quick-combat --shot-every 0
+python tools\robot\run_lan_test.py --game C:\Games\H5_test_k --seconds 100 --turns 2 --start-at 58 --client-rules test_version=0.2.9 --host-step "52|shot|host-versions" --client-step "53|shot|client-versions"
+python tools\robot\run_ai_test.py --game C:\Games\H5_test_k --no-map --seconds 20 --shot-every 0 --setting update.check=1 --setting update.last_check=<seconds since 1970, now> --setting update.latest=0.9.0 --step "12|shot|menu-notice"
+```
+
+- **Crash:** `crash_test_at=<s>` crashes the main thread on purpose that many seconds after its main loop starts. The run ends "other (crash or closed)" with exit code 3221225477 (`c0000005`), and the results hold the report and its minidump. The runner deletes the log before each run, so the next run's "the last run crashed" line cannot show here (`test/crash_test.cpp` checks it).
+- **Versions in the lobby:** both copies run the same DLL, so `[rules] test_version=0.2.9` makes one of them say another version, and `test_version=old` none (as a PC before 0.3.0); `--client-rules enabled=0` is a client without the rules (shown as "no H5 Together"). A client's "the host has an older H5 Together" comes 15 s after it joined: start later (`--start-at 60`). Look for `rules: versions:` and `rules panel: versions line` in both logs.
+- **Update check:** `--setting update.check=1` alone makes one real request to GitHub (keep it to one now and then). With `last_check=` now and a newer `latest=`, the notice shows without a request. The runner restores the player's own `h5-together.ini` afterwards, so what the DLL wrote there goes.
+- **Chain-loading:** copy `build\hook\chain_dummy.dll` (made by `build.ps1 -Test`) to the test copy's `bin\dinput8_next.dll`; the log says `chained: dinput8_next.dll ...` and `bin\chain_dummy.txt` says `loaded`, `called`. Remove both files afterwards.
+- `--setting SECTION.KEY=VALUE` (`run_lan_test.py`: `--setting`, `--host-setting`, `--client-setting`) writes a setting of any section the runner has no option for (`[update]`, `[chain]`); not for a section it writes itself (the DLL reads only the first section of a name).
 
 ## Robot script
 

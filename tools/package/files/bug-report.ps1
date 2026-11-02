@@ -5,6 +5,9 @@
 #   h5-together.log and h5-together.old.log   what the add-on wrote
 #   h5-together.ini, h5-together-skins.ini    your settings
 #   the same four under the add-on's old name (open-homm5, until 0.2.7), if they are there
+#   the newest crash report, if there is one: h5-together-crash-<date>-<time>.txt (what
+#                                             crashed) and its .dmp (a small minidump; it holds
+#                                             part of the game's memory: -NoDump leaves it out)
 #   system.txt                                the add-on, MMH5.5 and Windows versions, a few file
 #                                             sizes and hashes, the other DLLs in the game folder
 # No saves, no maps, no game files. It sends nothing anywhere: the zip is yours to look at
@@ -20,6 +23,7 @@
 #   -GameDir <folder>   use this game folder (or its bin folder), skip the search
 #   -SteamDir <folder>  look in this Steam folder instead of the one in the registry
 #   -OutDir <folder>    put the zip here instead of on the Desktop
+#   -NoDump             leave the crash report's .dmp out (its .txt still goes in)
 #   -NoPause            do not wait for Enter at the end, and do not open the folder
 #   -TestRegistry <key>   look for GOG and MMH5.5's installer in this registry key (laid out
 #                         like HKLM:\SOFTWARE) instead of in HKLM; tests only
@@ -31,6 +35,7 @@ param(
     [string]$GameDir = "",
     [string]$SteamDir = "",
     [string]$OutDir = "",
+    [switch]$NoDump,
     [switch]$NoPause,
     # Tests only (see above).
     [string]$TestRegistry = "",
@@ -530,6 +535,22 @@ try {
     }
     $hasLog = $false
     foreach ($item in $pack) { if ($item[0] -eq "h5-together.log" -or $item[0] -eq "open-homm5.log") { $hasLog = $true } }
+    # The add-on's newest crash report (h5-together-crash-<date>-<time>.txt and its .dmp, next to
+    # the log; the names sort as the time does). The add-on keeps the 3 newest.
+    $crashes = @(Get-ChildItem -LiteralPath $bin -File -ErrorAction SilentlyContinue |
+                 Where-Object { $_.Name -match '^h5-together-crash-\d{8}-\d{6}\.txt$' } | Sort-Object Name)
+    $crashText = $null
+    $crashDump = $null
+    if ($crashes.Count -gt 0) {
+        $crashText = $crashes[$crashes.Count - 1].Name
+        [void]$pack.Add(@($crashText, $crashes[$crashes.Count - 1].FullName))
+        $dmpName = $crashText.Substring(0, $crashText.Length - 4) + ".dmp"
+        $dmpPath = Join-Path $bin $dmpName
+        if (Test-Path -LiteralPath $dmpPath -PathType Leaf) {
+            $crashDump = $dmpName
+            if (-not $NoDump) { [void]$pack.Add(@($dmpName, $dmpPath)) }
+        }
+    }
 
     # system.txt
     $t = New-Object System.Collections.Generic.List[string]
@@ -614,6 +635,15 @@ try {
     foreach ($f in $others) { $t.Add("  " + $f.Name + "  " + $f.Length) }
     if ($others.Count -eq 0) { $t.Add("  none") }
     $t.Add("")
+    $t.Add("Crash reports of the add-on (written next to the log when the game crashes)")
+    if (-not $crashText) {
+        $t.Add("  none")
+    } else {
+        $dumpNote = " (no .dmp with it)"
+        if ($crashDump -and $NoDump) { $dumpNote = " (its .dmp left out: -NoDump)" } elseif ($crashDump) { $dumpNote = " and " + $crashDump }
+        $t.Add("  " + $crashes.Count + " kept; the newest is in this zip: " + $crashText + $dumpNote)
+    }
+    $t.Add("")
     $t.Add("Files in this zip")
     foreach ($item in $pack) { $t.Add("  " + $item[0] + "  " + (Get-Item -LiteralPath $item[1]).Length + " bytes") }
     if (-not $hasLog) { $t.Add("  (there is no h5-together.log in the game folder: the game was not started since the add-on was installed, or the add-on is not installed)") }
@@ -673,6 +703,16 @@ try {
         Write-Host ""
         Write-Host "There is no h5-together.log in the game folder, so the report only tells about your installation." -ForegroundColor Yellow
         Write-Host "(Either the add-on is not installed here, or the game was not started since.)" -ForegroundColor Yellow
+    }
+    if ($crashText) {
+        Write-Host ""
+        if ($crashDump -and -not $NoDump) {
+            Write-Host ("It holds the newest crash report too: " + $crashText + " and " + $crashDump + ".")
+            Write-Host "The .dmp holds part of the game's memory at the crash (player names, folder names)."
+            Write-Host "To leave it out, run this again with -NoDump."
+        } else {
+            Write-Host ("It holds the newest crash report too: " + $crashText + ".")
+        }
     }
     Write-Host ""
     Write-Host "Attach that file to your report on GitHub: https://github.com/jozrcr/h5-together/issues/new/choose"

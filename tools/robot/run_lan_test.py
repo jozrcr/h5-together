@@ -65,6 +65,7 @@ def instance_args(args, name, steps):
         skins_setting=args.skins_setting + (args.host_skins if name == "host" else args.client_skins),
         skins_file=args.host_skins_file if name == "host" else args.client_skins_file,
         rules_setting=args.rules_setting + (args.host_rules if name == "host" else args.client_rules),
+        setting=args.setting + (args.host_setting if name == "host" else args.client_setting),
         resolution=args.resolution,
         fast_paths=args.fast_paths, ai_setting=args.ai_setting,
         # the client never runs the AI (the host does), so "no AI step for 4
@@ -179,6 +180,10 @@ def main():
     p.add_argument("--quick-combat-state", type=int, default=0,
                    help="state of the setup screen's quick combat checkbox (0 = on, so battles resolve by "
                         "themselves; -1 = leave it)")
+    p.add_argument("--setting", action="append", default=[], metavar="SECTION.KEY=VALUE",
+                   help="a setting of another section of h5-together.ini (both copies), as run_ai_test.py")
+    p.add_argument("--host-setting", action="append", default=[], metavar="SECTION.KEY=VALUE", help="the same, host only")
+    p.add_argument("--client-setting", action="append", default=[], metavar="SECTION.KEY=VALUE", help="the same, client only")
     p.add_argument("--host-step", action="append", default=[], help="extra host script step (see run_ai_test.py)")
     p.add_argument("--client-step", action="append", default=[], help="extra client script step")
     p.add_argument("--texts-dir", help="language files for bin/h5-together/texts (default src/mods/texts), as run_ai_test.py")

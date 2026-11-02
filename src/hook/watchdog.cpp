@@ -58,6 +58,10 @@ volatile LONG g_beats = 0;
 DWORD g_exe_base = 0, g_dll_base = 0;
 char g_exe_name[64] = "exe";
 bool g_vanilla_layout = false;  // the exe has the vanilla 3.1 layout (addresses as in our docs)
+bool g_layout_known = false;
+// The code and module tables below are shared by a look and a crash report: one at a time.
+volatile LONG g_tables_busy = 0;
+volatile LONG g_quiet = 0;  // the game crashed: no more looks
 
 // --- the mods' state and our function names --------------------------------------------
 const int kReporters = 8;
@@ -517,7 +521,17 @@ DWORD g_test_expect = 0;
 DWORD g_test_lo = 0, g_test_hi = 0;
 #endif
 
+void ReportLocked(DWORD stalled_ms);
+
 void Report(DWORD stalled_ms)
+{
+	if (InterlockedCompareExchange(&g_tables_busy, 1, 0) != 0)
+		return;  // a crash report is being written
+	ReportLocked(stalled_ms);
+	InterlockedExchange(&g_tables_busy, 0);
+}
+
+void ReportLocked(DWORD stalled_ms)
 {
 	const DWORD id = static_cast<DWORD>(g_main_id);
 	hooklog::Write("watchdog: the game's main thread (%lu) has not taken its window messages for %lu s (Windows calls "
@@ -722,7 +736,7 @@ DWORD WINAPI WatchThread(void *)
 			armed = true;
 			continue;
 		}
-		if (!armed || reported || now - since < g_stall_ms)
+		if (!armed || reported || now - since < g_stall_ms || g_quiet)
 			continue;
 		reported = true;
 		Report(now - since);
@@ -776,6 +790,8 @@ DWORD g_first_beat = 0;
 LONG g_hang_test_ai_step = 0;  // [debug] hang_test_ai_step (robot tests): a 3 s freeze at that AI call
 LONG g_ai_steps = 0;
 DWORD g_slow_frame_ms = 0;  // [debug] hang_test_frame_ms (robot tests): a slow PC (long frames, as in the owner's game)
+DWORD g_main_loop_at_ms = 0;  // RunOnMainLoopAt: once, this long after the first beat
+void (*g_main_loop_fn)() = nullptr;
 
 void OnMessages()
 {
@@ -788,9 +804,16 @@ void OnMessages()
 		HangTestKey();
 	if (g_slow_frame_ms)
 		Sleep(g_slow_frame_ms);  // [debug] hang_test_frame_ms: every frame this much longer (a slow PC)
-	if (g_hang_test_at_ms && GetTickCount() - g_first_beat >= g_hang_test_at_ms) {
+	// (signed: g_first_beat may be 1 ms ahead of the clock, "| 1"; unsigned, that read as 49 days)
+	const LONG since_first = static_cast<LONG>(GetTickCount() - g_first_beat);
+	if (g_hang_test_at_ms && since_first >= static_cast<LONG>(g_hang_test_at_ms)) {
 		g_hang_test_at_ms = 0;
 		HangTest("[debug] hang_test_at");
+	}
+	if (g_main_loop_fn && since_first >= static_cast<LONG>(g_main_loop_at_ms)) {
+		void (*fn)() = g_main_loop_fn;
+		g_main_loop_fn = nullptr;
+		fn();
 	}
 }
 
@@ -811,9 +834,10 @@ BOOL WINAPI GetHook(LPMSG msg, HWND window, UINT first, UINT last)
 	return g_get_next(msg, window, first, last);
 }
 
-void Common()
+void Bases()
 {
-	g_exe_base = reinterpret_cast<DWORD>(GetModuleHandleW(nullptr));
+	if (g_exe_base)
+		return;
 	g_dll_base = reinterpret_cast<DWORD>(&__ImageBase);
 	wchar_t path[MAX_PATH];
 	const DWORD n = GetModuleFileNameW(nullptr, path, MAX_PATH);
@@ -822,6 +846,29 @@ void Common()
 		--start;
 	if (n && !WideCharToMultiByte(CP_UTF8, 0, path + start, -1, g_exe_name, sizeof(g_exe_name), nullptr, nullptr))
 		lstrcpynA(g_exe_name, "exe", sizeof(g_exe_name));
+	g_exe_base = reinterpret_cast<DWORD>(GetModuleHandleW(nullptr));
+}
+
+// Is the exe of the vanilla 3.1 layout (then its addresses get our names)? Asked from a
+// crash too: an exe we do not know must not crash the question.
+bool VanillaLayout()
+{
+	if (!g_layout_known) {
+		__try {
+			const GameBuild build = DetectGameBuild();
+			g_vanilla_layout = build == GameBuild::Vanilla31 || build == GameBuild::Mmh55Utility;
+		}
+		__except (EXCEPTION_EXECUTE_HANDLER) {
+			g_vanilla_layout = false;
+		}
+		g_layout_known = true;
+	}
+	return g_vanilla_layout;
+}
+
+void Common()
+{
+	Bases();
 	NameFunction(&WatchThread, "watchdog thread");
 	NameFunction(&HangTestSpin, "watchdog hang test");
 	NameFunction(&PeekHook, "watchdog PeekMessageA hook");
@@ -871,6 +918,54 @@ void NameFunction(const void *function, const char *name)
 		InterlockedDecrement(&g_named_count);
 }
 
+void RunOnMainLoopAt(DWORD ms_after_first_beat, void (*fn)())
+{
+	g_main_loop_at_ms = ms_after_first_beat;
+	g_main_loop_fn = fn;
+}
+
+bool DescribeAddress(DWORD address, char *out, int size)
+{
+	if (InterlockedCompareExchange(&g_tables_busy, 1, 0) != 0)
+		return false;
+	Bases();
+	VanillaLayout();
+	FindCode();
+	Where(address, out, size);
+	InterlockedExchange(&g_tables_busy, 0);
+	return true;
+}
+
+int CallersOnStack(DWORD esp, DWORD *out, int max)
+{
+	if (InterlockedCompareExchange(&g_tables_busy, 1, 0) != 0)
+		return -1;
+	Bases();
+	FindCode();
+	int found = 0;
+	MEMORY_BASIC_INFORMATION m;
+	if (VirtualQuery(reinterpret_cast<const void *>(esp), &m, sizeof(m)) == sizeof(m) && m.State == MEM_COMMIT &&
+	    !(m.Protect & (PAGE_GUARD | PAGE_NOACCESS))) {
+		const DWORD end = reinterpret_cast<DWORD>(m.BaseAddress) + static_cast<DWORD>(m.RegionSize);
+		DWORD n = end - esp;
+		n = (n < 16 * 1024 ? n : 16 * 1024) & ~3u;
+		SIZE_T got = 0;
+		if (ReadProcessMemory(GetCurrentProcess(), reinterpret_cast<const void *>(esp), g_stack, n, &got)) {
+			const DWORD *v = reinterpret_cast<const DWORD *>(g_stack);
+			for (DWORD i = 0; i < got / 4 && found < max; ++i)
+				if (CodeAt(v[i]) && AfterCall(v[i]))
+					out[found++] = v[i];
+		}
+	}
+	InterlockedExchange(&g_tables_busy, 0);
+	return found;
+}
+
+void Quiet()
+{
+	InterlockedExchange(&g_quiet, 1);
+}
+
 void Install()
 {
 	wchar_t path[MAX_PATH];
@@ -900,6 +995,7 @@ void Install()
 	g_main_id = static_cast<LONG>(GetCurrentThreadId());
 	const GameBuild build = DetectGameBuild();
 	g_vanilla_layout = build == GameBuild::Vanilla31 || build == GameBuild::Mmh55Utility;
+	g_layout_known = true;
 	g_peek_next = reinterpret_cast<PeekFn>(hookpatch::PatchImport("USER32.dll", "PeekMessageA", reinterpret_cast<void *>(&PeekHook)));
 	g_get_next = reinterpret_cast<GetFn>(hookpatch::PatchImport("USER32.dll", "GetMessageA", reinterpret_cast<void *>(&GetHook)));
 	if (!g_peek_next || !g_get_next) {

@@ -847,8 +847,9 @@ try {
             Write-Host ""
             Write-Host "Stopped. There is already a file called dinput8.dll in the game folder," -ForegroundColor Red
             Write-Host "and it is not the H5 Together one (another add-on may use it)." -ForegroundColor Red
-            Write-Host "I did not change anything. If you want H5 Together, move that file away" -ForegroundColor Red
-            Write-Host "yourself and run this installer again." -ForegroundColor Red
+            Write-Host "I did not change anything. To use H5 Together and that add-on together," -ForegroundColor Red
+            Write-Host "rename that file to dinput8_next.dll (H5 Together then loads it, and the" -ForegroundColor Red
+            Write-Host "log says ""chained""), or move it away; then run this installer again." -ForegroundColor Red
             Wait-AndExit 3
         }
         $same = (Get-Sha256Hex $srcDll) -eq (Get-Sha256Hex $dstDll)

@@ -1,6 +1,6 @@
 # Plan: v0.3, the community release
 
-Status: proposal for the owner (2026-11-02), being built. Block 1 (quick wins) is in `main`. **Block 2 (texts in files, part 3) is built in the branch `v03-texts`**: see "Built" at the start of part 3. **The install scripts (part 1, without a setup.exe) are made friendlier in the branch `v03-install`**: see "Built" at the start of part 1.
+Status: proposal for the owner (2026-11-02), being built. In `main`: block 1 (quick wins), block 2 (texts in files, part 3), **the friendlier install scripts** (part 1, without a setup.exe: see "Built" at the start of part 1) and **block 5, the safety nets** (crash reports, the version check in the lobby, the opt-in update check, chain-loading: see "Built" at the start of part 4). The welcome panel that asks about the update check waits for the settings menu (block 3).
 
 The goal: share the add-on with the wider Heroes V / MMH5.5 community. Someone who has never heard of us should be able to:
 1. download one file and double-click it;
@@ -465,6 +465,12 @@ Moving them is mechanical work, a good fit for Sonnet, with a test that every id
 
 ## Part 4: community kit
 
+**Built (block 5, branch `v03-safety`, 2026-11-02):**
+- **Crash reports** (`src/hook/crash.cpp`): on a crash, `h5-together-crash-<date>-<time>.txt` (what, where as module + offset, the callers, our version, the last log lines) and a small minidump (30 to 100 KB) next to the log; the 3 newest kept; the next start's log names the newest. The game's own filter (`0x00c67a50`, which recovers from some access violations) sits in front of ours and passes the real crashes on; ours then calls the filter before it, so the game closes as before. `[debug] crash_report=1`. The bug report scripts add the newest report (`-NoDump` / `--no-dump`). Robot: a deliberate crash (`crash_test_at`) was reported and the game closed by itself; normal play and the hang watchdog unchanged.
+- **Versions in the lobby** (`src/mods/host_rules*.cpp`): a line at the bottom of the waiting room on every PC: all the same, or who has another version, another build, an older one, or none. Two more requests in the rules' hello ('V', 'B'), and the host's list to clients that said theirs; nothing changes for 0.2.7. Robot: same version (607 checksums equal), another version, an older host, a client without the rules.
+- **Update check** (`src/mods/update_check.cpp`): `[update] check=0` by default; when on, at most once a day at the main menu, one request to GitHub's latest-release address; a newer version shows two lines in the main menu and the log. The settings menu will show the switch (and a first-start question, block 3). Robot: one real request, and the notice from a stored newer version.
+- **Chain-loading** (`src/hook/chain.cpp`): the other mod's `dinput8.dll` renamed `dinput8_next.dll` (or `[chain] dll=`) is loaded and DirectInput goes through it; its calls back to "dinput8.dll" go to Windows' DLL. Not the installer's "move it for you" option: the installer's refusal now says how to rename it, the uninstaller says to rename it back. Robot: a stand-in mod DLL chained in a single-player game.
+
 ### Docs (English first)
 
 - **README:**
@@ -838,17 +844,32 @@ All 103 settings of the shipped `tools/package/files/h5-together.ini` (0.2.7), s
 | `hang_seconds` | 20 | seconds without an answer before it looks (5–600) | Player | Adv | Live |
 | `hang_test` | 0 | F12 freezes the game on purpose | Tester | No | Restart |
 | `trace_wheel` | 0 | log the mouse wheel's input | Tester | No | Restart |
+| `crash_report` | 1 | a crash report and a small minidump next to the log when the game crashes (0.3.0) | Player | Adv | Restart |
+
+### [update] (`update_check.cpp`, 0.3.0)
+
+| Key | Default | What it does | Who | Menu | v0.3 |
+|---|---|---|---|---|---|
+| `check` | 0 | at most once a day, ask GitHub for the latest version; a notice in the main menu if newer | Player | Show | Restart |
+| `last_check`, `latest` | | written by the add-on: when it last asked, and what it was told | Panel | No | |
+
+### [chain] (`chain.cpp`, 0.3.0)
+
+| Key | Default | What it does | Who | Menu | v0.3 |
+|---|---|---|---|---|---|
+| `dll` | (dinput8_next.dll) | another `dinput8.dll` mod to load and pass DirectInput to; none = never | Player | Adv | Restart |
 
 ### Totals
 
-- 35 Player, 5 Host, 7 Group, 21 Panel (the 20 rules and `builder_last`), 35 Tester = 103.
+- 35 Player, 5 Host, 7 Group, 21 Panel (the 20 rules and `builder_last`), 35 Tester = 103 in 0.2.7; 0.3.0 adds `crash_report`, `[update] check` (and the two values it writes) and `[chain] dll`.
 - In the menu: 28 Show + 16 Advanced = 44. The other 59: 20 in the Game rules panel, 39 file only.
 
 ## Appendix B: hidden settings and other files
 
 - **Read by the code, not in the shipped file** (all for testing; keep them out of the menu):
   - `[audio] log_data_files`;
-  - `[debug] hang_test_at`, `hang_test_ai_step`, `hang_test_frame_ms`;
+  - `[debug] hang_test_at`, `hang_test_ai_step`, `hang_test_frame_ms`, `crash_test_at` (0.3.0: crashes on purpose);
+  - `[rules] test_version` (0.3.0: another version, or none, in the waiting room);
   - `[rmg] templates_selftest`;
   - `[skins] test_ai_heroes`, `test_button_on_map`.
 - `h5-together-skins.ini`: the hero look choices, written by the looks panel.

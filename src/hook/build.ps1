@@ -18,7 +18,7 @@ if (-not $vcvars) {
 }
 if (-not $vcvars) { throw "no Visual Studio found; set HOOK_VCVARS to vcvarsall.bat" }
 
-$sources = "dllmain.cpp", "log.cpp", "old_names.cpp", "game_build.cpp", "hooks.cpp", "ai_trace.cpp", "robot.cpp", "robot_input.cpp", "robot_endturn.cpp", "robot_trace.cpp", "robot_menu.cpp", "robot_screen.cpp", "robot_ui.cpp", "robot_lobby.cpp", "robot_net.cpp", "robot_profile.cpp", "robot_paths.cpp", "robot_clock.cpp", "patch.cpp", "d3d9_hook.cpp", "watchdog.cpp", "..\mods\net_tuning.cpp", "..\mods\lan_discovery.cpp", "..\mods\coop_guard.cpp", "..\mods\lockstep.cpp", "..\mods\ai_pacing.cpp", "..\mods\autosave.cpp", "..\mods\notify.cpp", "..\mods\rmg_teams.cpp", "..\mods\rmg_templates.cpp", "..\mods\fast_paths.cpp", "..\mods\fast_paths_relax.cpp", "..\mods\fast_paths_search.cpp", "..\mods\fast_paths_expand.cpp", "..\mods\fast_paths_ashore.cpp", "..\mods\original_music.cpp", "..\mods\original_music_xdb.cpp", "..\mods\player_list.cpp", "..\mods\player_list_game.cpp", "..\mods\player_list_draw.cpp", "..\mods\rmg_maker.cpp", "..\mods\rmg_recipe.cpp", "..\mods\rmg_join.cpp", "..\mods\camera.cpp", "..\mods\languages.cpp", "..\mods\languages_text.cpp", "dinput_hook.cpp", "input_mute.cpp", "overlay.cpp", "overlay_input.cpp", "overlay_textures.cpp", "overlay_test_panel.cpp", "texts.cpp", "texts_logic.cpp", "..\mods\rmg_builder.cpp", "..\mods\rmg_builder_data.cpp", "..\mods\rmg_builder_widgets.cpp", "..\mods\rmg_screen.cpp", "..\mods\rmg_factions.cpp", "..\mods\audio_volume.cpp", "..\mods\edge_sky.cpp", "..\mods\wheel.cpp", "..\mods\wheel_logic.cpp", "..\mods\host_rules.cpp", "..\mods\host_rules_logic.cpp", "..\mods\host_rules_panel.cpp", "..\mods\host_rules_bonus.cpp", "..\mods\host_rules_icons.cpp", "..\mods\host_rules_classes.cpp", "..\mods\hero_skins.cpp", "..\mods\hero_skins_logic.cpp", "..\mods\hero_skins_panel.cpp", "..\mods\steam_spike.cpp", "..\mods\steam_spike_logic.cpp"
+$sources = "dllmain.cpp", "chain.cpp", "log.cpp", "old_names.cpp", "game_build.cpp", "hooks.cpp", "ai_trace.cpp", "robot.cpp", "robot_input.cpp", "robot_endturn.cpp", "robot_trace.cpp", "robot_menu.cpp", "robot_screen.cpp", "robot_ui.cpp", "robot_lobby.cpp", "robot_net.cpp", "robot_profile.cpp", "robot_paths.cpp", "robot_clock.cpp", "patch.cpp", "d3d9_hook.cpp", "watchdog.cpp", "crash.cpp", "..\mods\net_tuning.cpp", "..\mods\lan_discovery.cpp", "..\mods\coop_guard.cpp", "..\mods\lockstep.cpp", "..\mods\ai_pacing.cpp", "..\mods\autosave.cpp", "..\mods\notify.cpp", "..\mods\rmg_teams.cpp", "..\mods\rmg_templates.cpp", "..\mods\fast_paths.cpp", "..\mods\fast_paths_relax.cpp", "..\mods\fast_paths_search.cpp", "..\mods\fast_paths_expand.cpp", "..\mods\fast_paths_ashore.cpp", "..\mods\original_music.cpp", "..\mods\original_music_xdb.cpp", "..\mods\player_list.cpp", "..\mods\player_list_game.cpp", "..\mods\player_list_draw.cpp", "..\mods\rmg_maker.cpp", "..\mods\rmg_recipe.cpp", "..\mods\rmg_join.cpp", "..\mods\camera.cpp", "..\mods\languages.cpp", "..\mods\languages_text.cpp", "dinput_hook.cpp", "input_mute.cpp", "overlay.cpp", "overlay_input.cpp", "overlay_textures.cpp", "overlay_test_panel.cpp", "texts.cpp", "texts_logic.cpp", "..\mods\rmg_builder.cpp", "..\mods\rmg_builder_data.cpp", "..\mods\rmg_builder_widgets.cpp", "..\mods\rmg_screen.cpp", "..\mods\rmg_factions.cpp", "..\mods\audio_volume.cpp", "..\mods\edge_sky.cpp", "..\mods\wheel.cpp", "..\mods\wheel_logic.cpp", "..\mods\host_rules.cpp", "..\mods\host_rules_logic.cpp", "..\mods\host_rules_panel.cpp", "..\mods\host_rules_bonus.cpp", "..\mods\host_rules_icons.cpp", "..\mods\host_rules_classes.cpp", "..\mods\hero_skins.cpp", "..\mods\hero_skins_logic.cpp", "..\mods\hero_skins_panel.cpp", "..\mods\steam_spike.cpp", "..\mods\steam_spike_logic.cpp", "..\mods\update_check.cpp", "..\mods\update_check_logic.cpp"
 # Source paths are relative to src\hook (the build runs there): with the full
 # path of a deep folder, the command line grew past cmd's 8191 characters.
 # Dear ImGui (third_party\imgui, for the player list overlay): the same settings
@@ -55,11 +55,13 @@ $rc = "rc /nologo /DOH_VER_MAJOR=$($ver.Groups[1].Value) /DOH_VER_MINOR=$($ver.G
 # The DLL's long argument list goes in a response file: with every mod and its
 # tests on one cmd line, the line grew past cmd's 8191 characters.
 $dll_rsp = Join-Path $out "dinput8.rsp"
-Set-Content -Encoding ascii $dll_rsp "$flags /GL /LD $($sources -join ' ') $imgui_objs `"$res`" /Fo`"$out\\`" /Fe`"$out\dinput8.dll`" /link /LTCG /DEF:dinput8.def /MAP:`"$out\dinput8.map`" user32.lib dxguid.lib iphlpapi.lib winmm.lib shell32.lib advapi32.lib"
+Set-Content -Encoding ascii $dll_rsp "$flags /GL /LD $($sources -join ' ') $imgui_objs `"$res`" /Fo`"$out\\`" /Fe`"$out\dinput8.dll`" /link /LTCG /DEF:dinput8.def /MAP:`"$out\dinput8.map`" user32.lib dxguid.lib iphlpapi.lib winmm.lib shell32.lib advapi32.lib winhttp.lib"
 $dll = "cl @`"$dll_rsp`""
 $cmd = "call `"$vcvars`" x86 >nul 2>&1 && cd /d `"$src`" && $imgui && $rc && $dll"
 if ($Test) {
-    $cmd += " && cl $flags test\proxy_test.cpp /Fo`"$out\\`" /Fe`"$out\proxy_test.exe`" dxguid.lib"
+    # chain-loading: a stand-in for another mod's dinput8.dll (it exports DirectInput8Create undecorated, as the real one)
+    $cmd += " && cl $flags /LD test\chain_dummy.cpp /Fo`"$out\\`" /Fe`"$out\chain_dummy.dll`" /link /EXPORT:DirectInput8Create=_DirectInput8Create@20"
+    $cmd += " && cl $flags test\proxy_test.cpp chain.cpp log.cpp /Fo`"$out\\`" /Fe`"$out\proxy_test.exe`" dxguid.lib"
     # calling-convention test of the AI hook: debug build with runtime stack checks (/RTCs)
     $tflags = "/nologo /Od /RTCs /MTd /W4 /WX /EHsc /std:c++17 /utf-8 /DUNICODE /D_UNICODE /DWIN32_LEAN_AND_MEAN /DAI_TRACE_TEST"
     # the "original music" mod's text work (no game needed)
@@ -87,6 +89,9 @@ if ($Test) {
     $cmd += " && cl $flags test\wheel_test.cpp ..\mods\wheel_logic.cpp /Fo`"$out\\`" /Fe`"$out\wheel_test.exe`""
     # the host rules: H55-Settings.lua read and served with other values, the start script's edits, the carried texts, the hello's codes
     $cmd += " && cl $flags test\host_rules_test.cpp ..\mods\host_rules_logic.cpp /Fo`"$out\\`" /Fe`"$out\host_rules_test.exe`""
+    # the update check's version numbers, GitHub's answer and the once-a-day rule (no network; no
+    # "update" in the exe's name: Windows would take it for an installer and ask for admin rights)
+    $cmd += " && cl $flags test\new_release_test.cpp ..\mods\update_check_logic.cpp /Fo`"$out\\`" /Fe`"$out\new_release_test.exe`""
     # the Steam spike's pure work: its setting, log names, test messages, round trips
     $cmd += " && cl $flags test\steam_spike_test.cpp ..\mods\steam_spike_logic.cpp /Fo`"$out\\`" /Fe`"$out\steam_spike_test.exe`""
     # our Steamworks declarations against Valve's SDK headers, only where the SDK is (ref\ is never
@@ -103,6 +108,10 @@ if ($Test) {
     $wd_out = Join-Path $out "watchdog_test"
     New-Item -ItemType Directory -Force $wd_out | Out-Null
     $cmd += " && cl $flags /DWATCHDOG_TEST test\watchdog_test.cpp watchdog.cpp log.cpp patch.cpp game_build.cpp /Fo`"$wd_out\\`" /Fe`"$out\watchdog_test.exe`" user32.lib"
+    # the crash report: real crashes in a child process (own object folder: built with CRASH_TEST)
+    $crash_out = Join-Path $out "crash_test"
+    New-Item -ItemType Directory -Force $crash_out | Out-Null
+    $cmd += " && cl $flags /DCRASH_TEST test\crash_test.cpp crash.cpp watchdog.cpp log.cpp patch.cpp game_build.cpp /Fo`"$crash_out\\`" /Fe`"$out\crash_test.exe`" user32.lib"
     $cmd += " && cl $tflags test\ai_trace_test.cpp ai_trace.cpp ..\mods\ai_pacing.cpp log.cpp robot.cpp robot_input.cpp robot_endturn.cpp robot_trace.cpp robot_menu.cpp robot_screen.cpp robot_ui.cpp robot_lobby.cpp robot_net.cpp robot_profile.cpp robot_paths.cpp robot_clock.cpp patch.cpp d3d9_hook.cpp watchdog.cpp ..\mods\fast_paths.cpp ..\mods\fast_paths_relax.cpp ..\mods\fast_paths_search.cpp ..\mods\fast_paths_expand.cpp ..\mods\fast_paths_ashore.cpp game_build.cpp dinput_hook.cpp /Fo`"$out\\`" /Fe`"$out\ai_trace_test.exe`" dxguid.lib user32.lib"
 }
 # vcvarsall prints a harmless vswhere warning on stderr (silenced above);
@@ -121,7 +130,7 @@ if ($Test) {
     Push-Location $out
     try {
         Remove-Item -ErrorAction SilentlyContinue h5-together.log
-        & (Join-Path $out "proxy_test.exe") (Join-Path $out "dinput8.dll")
+        & (Join-Path $out "proxy_test.exe") (Join-Path $out "dinput8.dll") (Join-Path $out "chain_dummy.dll")
         if ($LASTEXITCODE -ne 0) { throw "smoke test failed" }
         Get-Content h5-together.log
         Remove-Item -ErrorAction SilentlyContinue h5-together.log
@@ -163,6 +172,8 @@ if ($Test) {
         if ($LASTEXITCODE -ne 0) { throw "mouse wheel test failed" }
         & (Join-Path $out "host_rules_test.exe")
         if ($LASTEXITCODE -ne 0) { throw "host rules test failed" }
+        & (Join-Path $out "new_release_test.exe")
+        if ($LASTEXITCODE -ne 0) { throw "update check test failed" }
         & (Join-Path $out "steam_spike_test.exe")
         if ($LASTEXITCODE -ne 0) { throw "Steam spike test failed" }
         if ($sdk) {
@@ -173,5 +184,7 @@ if ($Test) {
         & (Join-Path $out "watchdog_test.exe")
         if ($LASTEXITCODE -ne 0) { Get-Content h5-together.log; throw "watchdog test failed" }
         Remove-Item -ErrorAction SilentlyContinue h5-together.log
+        & (Join-Path $out "crash_test.exe")
+        if ($LASTEXITCODE -ne 0) { throw "crash report test failed" }
     } finally { Pop-Location }
 }

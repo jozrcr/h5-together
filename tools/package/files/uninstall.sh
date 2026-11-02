@@ -557,4 +557,9 @@ fi
 echo "Done: H5 Together is removed. No other file was touched."
 echo "To put it back later, run: bash install.sh"
 echo "If you set Steam launch options for this game, clear them by hand (Properties > General)."
+if [ -n "$(find_ci "$bin" dinput8_next.dll)" ]; then
+    echo
+    echo "dinput8_next.dll is still there: another add-on that H5 Together loaded. To keep using"
+    echo "it without H5 Together, rename it back to dinput8.dll."
+fi
 exit 0

@@ -666,6 +666,11 @@ try {
         Wait-AndExit 5
     }
     Write-Host "Done: H5 Together is removed. No other file was touched." -ForegroundColor Green
+    if (Test-Path -LiteralPath (Join-Path $bin "dinput8_next.dll") -PathType Leaf) {
+        Write-Host ""
+        Write-Host "dinput8_next.dll is still there: another add-on that H5 Together loaded. To keep using"
+        Write-Host "it without H5 Together, rename it back to dinput8.dll."
+    }
     Write-Host "To put it back later, run install.bat again."
     Wait-AndExit 0
 } catch {

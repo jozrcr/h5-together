@@ -6,17 +6,36 @@ A DLL the game loads at start-up. It lets our code run inside the game, so impro
 
 - logs every step of every AI turn with its timing to `h5-together.log` next to the exe;
 - applies our mods from `src/mods/`: the co-op speed-ups, the fixes, the panels (player list, template builder, hero looks, game rules) and the camera, sound and text options. Each one is switched in `h5-together.ini` next to the exe; the list, with every setting, is in [src/mods/README.md](../mods/README.md);
-- watches for freezes ([the hang watchdog](#the-hang-watchdog-watchdogcpp)).
+- watches for freezes ([the hang watchdog](#the-hang-watchdog-watchdogcpp)) and writes a short report and a small minidump when the game crashes ([crash reports](#crash-reports-crashcpp)).
+
+It can also pass DirectInput on to another mod that is a `dinput8.dll` too ([chain-loading](#another-dinput8dll-mod-chain-loading-chaincpp)).
 
 Robot mode (`robot*.cpp`, used by `tools/robot/`) only turns on when an `h5-together-robot.ini` file sits next to the exe, i.e. in the test copy during robot runs.
 
-**Contents:** [how it gets into the game](#how-it-gets-into-the-game), [drawing over the game](#drawing-over-the-game-d3d9_hookcpp), [the overlay](#the-overlay-overlaycpp-our-panels-over-the-game), [which exes it hooks](#which-exes-it-hooks), [the AI trace](#the-ai-trace), [the hang watchdog](#the-hang-watchdog-watchdogcpp), [build](#build), [owner test](#owner-test-phase-0-gate-dll-loads-and-logs-ai-turns-game-runs-normally), [files](#files).
+**Contents:** [how it gets into the game](#how-it-gets-into-the-game), [drawing over the game](#drawing-over-the-game-d3d9_hookcpp), [the overlay](#the-overlay-overlaycpp-our-panels-over-the-game), [which exes it hooks](#which-exes-it-hooks), [the AI trace](#the-ai-trace), [the hang watchdog](#the-hang-watchdog-watchdogcpp), [crash reports](#crash-reports-crashcpp), [another dinput8.dll mod](#another-dinput8dll-mod-chain-loading-chaincpp), [build](#build), [owner test](#owner-test-phase-0-gate-dll-loads-and-logs-ai-turns-game-runs-normally), [files](#files).
 
 ## How it gets into the game
 
 The game imports one function from `DINPUT8.dll` (`DirectInput8Create`). Windows looks for DLLs in the exe's own folder first, so a `dinput8.dll` placed next to the exe is loaded instead of the system one. Ours loads the real `dinput8.dll` from the Windows system folder and passes every call through.
 
 It **adds** one file and replaces none, and it does not collide with MMH5.5 (which uses `55u.dll` in the `um.dll` import slot). It does not replace `d3d9.dll` either (on Linux, Proton/DXVK supply their own): to draw our panels over the game, `d3d9_hook.cpp` only replaces the exe's `Direct3DCreate9` import entry and entries of the Direct3D objects' vtables, whichever `d3d9.dll` made them.
+
+## Another `dinput8.dll` mod (chain-loading, `chain.cpp`)
+
+Other mods also come as a `dinput8.dll` next to the exe ("ASI loaders" for widescreen fixes, for example), and only one file can have that name. The player renames the other mod's file `dinput8_next.dll` ([docs/install.md](../../docs/install.md#another-mod-that-is-also-a-dinput8dll)), or names it in `h5-together.ini`:
+
+```ini
+[chain]
+dll=           ; empty = dinput8_next.dll next to the exe; a file name or a full path; none = never
+```
+
+- **When:** in `DllMain`, after our own start-up, as the game would have loaded that mod itself (an ASI loader does its work when it is loaded). `LoadLibraryEx` with `LOAD_WITH_ALTERED_SEARCH_PATH`, so a mod in a folder of its own finds its own DLLs there.
+- **Forwarding:** every export (`Real()` in `dllmain.cpp`) goes to that mod's function instead of Windows' `dinput8.dll`, and the mod passes it on to Windows'. An export the mod lacks goes to Windows' DLL.
+- **When it calls us back:** a mod that asks for `"dinput8.dll"` by name gets ours (a DLL of that name is already loaded). A thread-local depth counter tells a call from inside one of ours (the mod calling back) from the game's: those go to Windows' DLL, never back to the mod, and our hooks and the robot only look at the game's own call.
+- **Not used** (logged, then Windows' DLL as without it): no such file (silent for the default name), a copy of H5 Together itself (our marker text in it: two copies would hook the game twice), a file that cannot be loaded (not a DLL, 64-bit), one without `DirectInput8Create` (left loaded: its start-up code ran).
+- The log: `chained: dinput8_next.dll (another dinput8.dll mod) is loaded, and DirectInput goes through it; ...`.
+- The installer still refuses to replace a foreign `dinput8.dll`; its message now says to rename it `dinput8_next.dll`. The uninstaller leaves `dinput8_next.dll` alone and says to rename it back.
+- Tests: `test/proxy_test.cpp` with a stand-in mod (`test/chain_dummy.cpp`, below). Robot check (2026-11-02, RC19k test copy): the stand-in as `bin\dinput8_next.dll` was loaded, the game's `DirectInput8Create` went through it to Windows' DLL, our DirectInput hooks went in as usual and a single-player game ran 5 AI turns.
 
 ## Drawing over the game (`d3d9_hook.cpp`)
 
@@ -106,6 +125,26 @@ On 2026-10-25 the owner's game froze during an AI turn (the window "not respondi
 - **Hand test:** `[debug] hang_test=1`, then F12 while the game is in front freezes it on purpose for 25 s (a busy loop in `HangTestSpin`). Robot runs use `[debug] hang_test_at=<s>` instead (once, that many seconds after the game first took its messages): `run_ai_test.py --debug-setting hang_test_at=60`, `run_lan_test.py --host-debug ...`. Also for robot runs: `hang_test_frame_ms=N` (every frame N ms longer: a slow PC) and `hang_test_ai_step=N` (3 s once, instead of the first AI call that starts a turn from the N-th call on).
 - **AI pacing:** the turn driver hook first asks `src/mods/ai_pacing.cpp` whether the AI may decide now (at most once per frame in multiplayer, and only once its last commands have run); a held call is not made, and gets no `ai-step` line.
 
+## Crash reports (`crash.cpp`)
+
+The watchdog writes where a frozen game is stuck; nothing caught a **crash** before 0.3.0. Now, when the game crashes:
+
+- **`h5-together-crash-<date>-<time>.txt`** next to the log: what crashed (the exception, and for an access violation the address read or written), where (module + offset in the watchdog's words: the exe's vanilla 3.1 address and the function name where our docs know it, a system DLL's nearest export, our DLL's nearest named function), the thread (the game's main one or not), the registers, the probable callers (return addresses found on the stack), our version and build time, the game build, and the last 20 log lines;
+- **`h5-together-crash-<date>-<time>.dmp`**: a small minidump (normal, with thread information and unloaded modules: 30 to 100 KB), written with Windows' own `dbghelp.dll` from the system folder, loaded by its full path at start-up (the game's `bin\dbghelp.dll` is from 2002 and stays the game's). It holds part of the game's memory at the crash (player and folder names), so it stays on the PC; the bug report scripts add the newest report, `.txt` and `.dmp` (`-NoDump` / `--no-dump` leave the `.dmp` out);
+- two log lines, `crash: the game crashed: ...` and `crash: wrote ... next to this log`.
+
+At the next start the 3 newest reports are kept (older ones are deleted), and the log names the newest one: `crash: THE LAST RUN OF THE GAME CRASHED: its report h5-together-crash-....txt ...` when it was written at about the time the log last was, else `crash: an older crash report: ...`. A robot copy (`OPEN_HOMM5_INSTANCE`) has its own names, `h5-together-<instance>-crash-...`.
+
+**How:** one top-level exception filter (`SetUnhandledExceptionFilter`), installed when the DLL loads (`hooks::InstallEarly`, before the game's own code runs; for the Steam-wrapped exe, at its first DirectInput call). The game's own filters, read in the exe ([docs/subsystems/hangs.md](../../docs/subsystems/hangs.md#crashes)):
+- `0x00c67b10` sets `0x00c67a50` once, after the renderer made its Direct3D object: an access violation inside one of its memory blocks goes on after the faulting instruction (it recovers from it), anything else goes to the filter that was there before (`[0x010d9e24]`). Ours is there before it, so it hands us the real crashes and keeps the ones it recovers from. Each report says so: `crash filters: the game's own filter (0x00c67a50) is in front of ours and passed this crash on`;
+- MMH5.5's runtime (`msvcr71.dll`) has a filter for C++ exceptions nobody caught, which passes the others on; `55u.dll` and the other DLLs only have the C runtime's `/GS` failure report, which removes every filter and ends the game (no report of ours then). The exe's "exception report" dialog filter (`0x00c2dff0`) is never installed.
+
+After the report, ours calls the filter that was there before it, so what happened after a crash before (Windows' "stopped working", Wine's crash dialog, the game closing) still happens. The report is written by a thread of ours that waits for it from the start: a crashed thread may have no stack left (a stack overflow) or hold a lock; the crashed thread waits for it at most 30 s, and a second crashing thread waits for the first report. The report never allocates memory, and a crash inside it is caught (`crash: the crash report itself failed`). The hang watchdog stays quiet after a crash (the main thread waiting for the report is not a freeze). The log's last lines come from a ring of 20 lines kept by `log.cpp`; while the crashed thread holds the log, the report's log lines are dropped after a second instead of waiting.
+
+**Settings** (`[debug]`): `crash_report=1` (0 = no filter at all); testing: `crash_test_at=<s>`, the game's main thread writes to address 0 once, that many seconds after it first took its messages (needs the hang watchdog on: `watchdog::RunOnMainLoopAt`).
+
+**Tests:** `test/crash_test.cpp` (below). Robot (2026-11-02, RC19k test copy, `run_ai_test.py --debug-setting crash_test_at=30`): the crash came 30 s in, during the AI turns, on the main thread; the game's filter passed it on; the report and an 84 KB minidump were written in 235 ms; the game closed by itself 3 s later with the crash's code (`c0000005`), as without the add-on. A normal single-player run and a hang test (`hang_test_at=28`, one look, "takes its messages again after 25 s") were unchanged.
+
 ## The old name (`old_names.cpp`)
 
 Until 0.2.7 the add-on was called open-homm5, and so were its files next to the exe. The installer gives them the new names ([tools/package/README.md](../../tools/package/README.md#the-old-name)). For a player who only copies the new `dinput8.dll` over an old install, the DLL does the part it needs itself:
@@ -135,7 +174,7 @@ powershell -File src\hook\build.ps1 -Test
 
 This builds `build\hook\dinput8.dll` (with our English texts built in, from `src\mods\texts\en.txt`, and its version information: `dinput8.rc`, compiled by `rc.exe` from the Windows SDK that Visual Studio's C++ tools bring; check it with `(Get-Item build\hook\dinput8.dll).VersionInfo`) and runs these tests outside the game:
 
-- `test/proxy_test.cpp`: loads the DLL, calls `DirectInput8Create`, and checks that a real DirectInput object comes back.
+- `test/proxy_test.cpp`: loads the DLL, calls `DirectInput8Create`, and checks that a real DirectInput object comes back. Then chain-loading (`chain.cpp`), each case in a child process: with `test/chain_dummy.cpp` (a stand-in for another mod's `dinput8.dll`, built as `chain_dummy.dll`) renamed `dinput8_next.dll`, DirectInput goes through it and still gives a real object; when it asks for `"dinput8.dll"` by name it gets ours and its call goes to Windows' DLL (no endless loop); a copy of our own DLL, a broken file, a missing `[chain] dll=` file and `dll=none` are not used; a name from the ini in a folder of its own is.
 - `test/ai_trace_test.cpp`: calls the AI hook exactly the way the game calls the AI (`__thiscall`, command list then flag) on a fake AI object, built with the compiler's runtime stack check (`/RTCs`). It checks that the arguments reach the original function unchanged and that the log line is right. A calling-convention mistake here would crash the game, so this test matters.
 - `test/original_music_test.cpp`: the "original music" mod's text work (`src/mods/original_music_xdb.cpp`) on small made-up data files: which music lines change and which stay.
 - `test/languages_test.cpp`: the French texts mod's work on bytes (`src/mods/languages_text.cpp`): paths, text encodings and a small zip archive made in the test.
@@ -150,7 +189,9 @@ This builds `build\hook\dinput8.dll` (with our English texts built in, from `src
 - `test/audio_edge_test.cpp`: the wider volume curve (`src/mods/audio_volume.h`) and the light file edit of the black map edge (`src/mods/edge_sky.h`).
 - `test/input_mute_test.cpp`: the modal panels' input rules (`input_mute.cpp`): what the game gets of its window messages and of DirectInput while a panel is open and just after (held keys, Alt+F4, the mouse's motion, buffered events).
 - `test/wheel_test.cpp`: the mouse wheel fix for Wine (`src/mods/wheel_logic.cpp`) against a model of the game's own wheel reading, of Windows' mouse (positions) and Wine's (steps): the bug without the fix, every notch both ways with it (also when the game drops "presses"), no jump when it switches on or after an Acquire, positions never converted.
-- `test/host_rules_test.cpp`: the game rules' pure work (`src/mods/host_rules_logic.h`): reading MMH5.5's settings file, serving it with other values (only the numbers change), its hash, the text carried in the start message and the lobby.
+- `test/host_rules_test.cpp`: the game rules' pure work (`src/mods/host_rules_logic.h`): reading MMH5.5's settings file, serving it with other values (only the numbers change), its hash, the text carried in the start message and the lobby, and H5 Together's version in the waiting room (the 'V' and 'B' requests, the host's list, who differs).
+- `test/crash_test.cpp`: the crash report (`crash.cpp`). The names and which old reports go, then real crashes in a child process that installs the filter as the DLL does (after a filter of its own, as the C runtime's): a write to address 0 (the report's lines, the callers in the exe, the log's last lines, a minidump that starts with `MDMP`, the filter before ours called after it), a stack overflow (the report written by our thread), a crash on another thread, a filter set after ours that recovers from an exception (no report), `crash_report=0` (no report), the next start ("the last run crashed"), and only the 3 newest reports kept.
+- `test/new_release_test.cpp`: the update check's pure work (`src/mods/update_check_logic.cpp`): version numbers and their order, the tag in GitHub's answer, the once-a-day rule. (Not called `update_check_test`: Windows takes an exe with "update" in its name for an installer and asks for administrator rights.)
 - `test/watchdog_test.cpp`: the hang watchdog on a thread that freezes on purpose, once in a busy loop and once in a long `Sleep` (1.5 s threshold instead of 20). It checks one look per freeze, 20 samples, EIP in the spinning function, the caller's return address on the stack, ~100% CPU for the busy freeze and ~0 for the blocked one, and that the thread goes on normally afterwards.
 
 The build runs in `src\hook` with relative source paths: with full paths, a deep folder (a git worktree) made the command line longer than `cmd.exe` accepts (8191 characters).
@@ -170,7 +211,9 @@ On **Linux** (Wine/Proton) Wine prefers its own built-in `dinput8.dll`. Tell it 
 
 | File | What |
 |---|---|
-| `dllmain.cpp` | DLL entry, the forwarded exports, lazy hook installation |
+| `dllmain.cpp` | DLL entry, the forwarded exports (to Windows' DLL, or a chained mod's), lazy hook installation |
+| `chain.cpp/.h` | another `dinput8.dll` mod, renamed `dinput8_next.dll`: loaded, and DirectInput passed on to it |
+| `crash.cpp/.h` | crash reports: what crashed and a small minidump next to the log |
 | `dinput8.def` | export names (same as the real `dinput8.dll`) |
 | `game_build.cpp/.h` | which exe are we in? |
 | `hooks.cpp/.h` | installs all hooks (honours `h5-together.nohooks`, or the old `open-homm5.nohooks`); `InstallEarly` for the few that must be in before the game reads its data |

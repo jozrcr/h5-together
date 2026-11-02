@@ -81,6 +81,23 @@ bool InstallPanel();
 // last second)? kNoGame when not in a waiting room.
 View::Role LobbyRole();
 
+// H5 Together's versions in the waiting room (host_rules_logic.h, "H5 Together's
+// version in the waiting room"), for the line the panel draws there.
+struct VersionsView {
+	enum State {
+		kNothing,    // nothing to say (yet): alone, or players just joined
+		kSame,       // every player has this version and build
+		kDiffer,     // `differ` have another one, an older one, or none
+		kHostOlder,  // client: the host has H5 Together before 0.3.0 (its rules came, no list)
+		kHostNone,   // client: the host has no H5 Together (or its game rules are off)
+		kHostNewer,  // client: the host's list is of a later format: another (newer) version
+	} state = kNothing;
+	std::vector<Peer> differ;
+	std::string mine;  // this PC's version ("0.3.0")
+	int players = 0;   // in the list (host: itself included)
+};
+VersionsView GetVersions(View::Role role);
+
 // --- the lobby's bonus tooltips (host_rules_bonus.cpp) ---
 // What the waiting room's bonus tooltips should say. Not ours: the game's own
 // (MMH5.5's texts: its modes). Ours: ToE's bonuses (toe), or that the choice

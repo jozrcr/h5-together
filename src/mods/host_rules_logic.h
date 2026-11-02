@@ -293,5 +293,42 @@ void HashRequest(char mark, uint32_t hash, uint32_t *type, uint8_t *byte);
 // True (and the mark and hash) when the type is one of those marks.
 bool ReadHashRequest(uint32_t type, uint8_t byte, char *mark, uint32_t *hash);
 
+// --- H5 Together's version in the waiting room (0.3.0 on) ---
+// Each client also tells the host its add-on's version and build, as two more of those
+// requests: 'V' (PackVersion) and 'B' (the DLL's link time stamp: two builds of one
+// version differ). A host before 0.3.0 does not know these marks: it ignores them (as
+// the game does), and its clients see that no list comes (below).
+// The host sends the list of every player's version, itself first, to each client that
+// said its version, as one more lobby text (the same pieces as LobbyText):
+//   "V1" then one line per player "\n<kind>|<version>|<build, 8 hex digits>|<name>".
+// A later change of this text gets another first line ("V2"); a client that cannot
+// read the list says "another version" (it never guesses). The rules' own hello
+// ('OR', kProtocol) is unchanged: 0.2.7 and 0.3.0 still agree on the rules.
+const char kMarkVersion = 'V', kMarkBuild = 'B';
+// "0.3.0" -> 0x000300 (8 bits each: major, minor, patch); 0 when it is not 3 numbers 0..255.
+uint32_t PackVersion(const char *version);
+std::string UnpackVersion(uint32_t packed);  // "0.3.0"
+struct Peer {
+	enum Kind : char {
+		kKnown = 'V',    // this H5 Together version and build
+		kOlder = 'O',    // H5 Together before 0.3.0: its rules hello, but no version
+		kNone = 'N',     // no hello: no H5 Together, or its game rules are off ([rules] enabled=0)
+		kWaiting = 'W',  // joined a moment ago: not known yet
+	};
+	char kind = kNone;
+	std::string version;  // kKnown: "0.3.0"
+	uint32_t build = 0;   // kKnown: the link time stamp
+	std::string name;     // the player's name (UTF-8)
+	bool operator==(const Peer &o) const { return kind == o.kind && version == o.version && build == o.build && name == o.name; }
+};
+std::string VersionsText(const std::vector<Peer> &peers);
+// False when the text is not a "V1" list, or a line of it is broken.
+bool ReadVersionsText(const std::string &text, std::vector<Peer> *peers);
+// Is this lobby text a version list (of any format: "V" and a digit)?
+bool IsVersionsText(const std::string &text);
+// The players whose add-on is not `mine` (another version or build, an older one, or
+// none), in the list's order; the ones still waiting are left out.
+std::vector<Peer> Differing(const std::vector<Peer> &peers, const Peer &mine);
+
 }  // namespace rules
 }  // namespace mods

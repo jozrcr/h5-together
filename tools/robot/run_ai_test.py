@@ -151,6 +151,14 @@ def write_mod_settings(game, args, instance):
     online = getattr(args, "online_setting", None) or []  # e.g. spike=1, app_id=480
     if online:
         lines += ["[online]"] + online
+    # any other section: --setting SECTION.KEY=VALUE (e.g. update.check=1, chain.dll=none);
+    # not for a section written above (the DLL reads only the first [section] of a name)
+    extra = {}
+    for item in getattr(args, "setting", None) or []:
+        section, _, key_value = item.partition(".")
+        extra.setdefault(section, []).append(key_value)
+    for section, key_values in extra.items():
+        lines += ["[%s]" % section] + key_values
     keep_player_file(mod_settings_file(game, instance))
     mod_settings_file(game, instance).write_text("\n".join(lines) + "\n", encoding="ascii")
     choices = skins_file(game, instance)
@@ -411,6 +419,11 @@ def collect(game, out, instance, exit_code, elapsed):
         shutil.move(str(profile), str(out / "ai-profile.txt"))
     text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
     (out / "h5-together.log").write_text(text, encoding="utf-8")
+    # crash reports this copy wrote (src/hook/crash.cpp): moved to the results
+    prefix = "h5-together%s-crash-" % ("-" + instance if instance else "")
+    for f in (game / "bin").glob(prefix + "*"):
+        if f.suffix in (".txt", ".dmp"):
+            shutil.move(str(f), str(out / f.name))
     # the game's own console output (game_writelog = 1 writes it to console.txt, UTF-16)
     console = game / "bin" / "console.txt"
     if console.exists():
@@ -487,6 +500,8 @@ def main():
                    help="[rules] setting, e.g. governance=0 or trace=1 (repeatable; src/mods/host_rules.cpp)")
     p.add_argument("--debug-setting", action="append", default=[], metavar="KEY=VALUE",
                    help="[debug] setting, e.g. hang_test_at=60 or hang_seconds=10 (repeatable; src/hook/watchdog.cpp)")
+    p.add_argument("--setting", action="append", default=[], metavar="SECTION.KEY=VALUE",
+                   help="a setting of another section of h5-together.ini, e.g. update.check=1 or chain.dll=none")
     p.add_argument("--online-setting", action="append", default=[], metavar="KEY=VALUE",
                    help="[online] setting, e.g. spike=1 or app_id=480 (repeatable; src/mods/steam_spike.cpp; "
                         "needs bin\\h5-together\\steam_api.dll in the test copy)")
