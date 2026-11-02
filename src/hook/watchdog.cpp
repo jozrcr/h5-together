@@ -966,6 +966,16 @@ void Quiet()
 	InterlockedExchange(&g_quiet, 1);
 }
 
+void ReloadSettings()
+{
+	wchar_t path[MAX_PATH];
+	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
+	const DWORD seconds = GetPrivateProfileIntW(L"debug", L"hang_seconds", 20, path);
+	if (seconds >= 5 && seconds <= 600)
+		InterlockedExchange(reinterpret_cast<volatile LONG *>(&g_stall_ms), static_cast<LONG>(seconds * 1000));
+	hooklog::Write("watchdog: from the settings menu: it looks after %lu s without an answer", g_stall_ms / 1000);
+}
+
 void Install()
 {
 	wchar_t path[MAX_PATH];

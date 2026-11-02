@@ -539,6 +539,13 @@ void ReadSettings()
 
 }  // namespace
 
+void ReloadHeroSkinsPanelSettings()
+{
+	ReadSettings();
+	hooklog::Write("hero skins panel: from the settings menu: key %s, Look button %s",
+	               g_key ? ("F" + std::to_string(g_key - VK_F1 + 1)).c_str() : "none", g_button ? "on" : "off");
+}
+
 void InstallHeroSkinsPanelEarly()
 {
 	ReadSettings();

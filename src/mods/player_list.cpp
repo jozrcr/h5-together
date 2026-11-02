@@ -95,6 +95,18 @@ void ReadSettings()
 	// ([ui] language is read by the texts: src/hook/texts.h)
 }
 
+// From the settings menu: its key and place again (the main thread draws with them).
+void ReadKeyAndPlace()
+{
+	wchar_t path[MAX_PATH];
+	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
+	wchar_t text[32];
+	GetPrivateProfileStringW(L"ui", L"player_list_key", L"F9", text, 32, path);
+	g_key = overlay::ParseKey(text, VK_F9);
+	g_look.top = Percent(path, L"player_list_top", 34.0f, 0.0f, 90.0f) / 100.0f;
+	g_look.left = Percent(path, L"player_list_left", 2.0f, 0.0f, 100.0f) / 100.0f;
+}
+
 // --- the toggle key ------------------------------------------------------------------
 void PollKey()
 {
@@ -196,6 +208,14 @@ void InstallPlayerListEarly()
 		return;
 	g_early = true;
 	overlay::InstallEarly();
+}
+
+void ReloadPlayerListSettings()
+{
+	ReadKeyAndPlace();
+	hooklog::Write("player list: from the settings menu: key %s, place %.0f%% from the top, %.0f%% from the left%s",
+	               g_key ? ("F" + std::to_string(g_key - VK_F1 + 1)).c_str() : "none", g_look.top * 100.0f, g_look.left * 100.0f,
+	               g_enabled ? "" : " (the list itself is off)");
 }
 
 void ApplyPlayerListFromSettings()

@@ -9,6 +9,7 @@ Everything here changes how the original game behaves, on purpose. It is kept ap
 - Random maps: [teams](#teams-on-random-maps-rmg_teamscpp-on-by-default-only-for-recipe-maps), [templates and recipe names](#random-map-templates-rmg_templatescpp-rmg_makercpp-rmg_recipecpp-on-by-default), [template builder](#template-builder-rmg_buildercpp-rmg_screencpp-on-by-default), [start terrain that matches the factions](#start-terrain-that-matches-the-factions-rmg_factionscpp-off-by-default)
 - Rules: [game rules from the host](#game-rules-from-the-host-host_rulescpp-on-and-nothing-changes-unless-the-host-changes-something), with [H5 Together's version in the waiting room](#h5-togethers-version-in-the-waiting-room-030)
 - [New version available](#new-version-available-update_checkcpp-off-by-default) (opt-in)
+- [The settings menu](#the-settings-menu-settings_cpp-options-h5-together): the add-on's settings in the game's own Options screen (Options, H5 Together; F3)
 - Camera, sound and visuals: [original music](#original-music-original_musiccpp-off-by-default), [camera zoom and start distance](#farther-camera-zoom-start-distance-cameracpp-off-by-default), [the mouse wheel under Wine](#the-mouse-wheel-under-wine--proton-wheelcpp-wheel_logiccpp-on-under-wine-only), [wider volume range](#wider-volume-range-audio_volumecpp-off-by-default), [black past the map's edge](#black-past-the-maps-edge-edge_skycpp-off-by-default), [the main menu's scene and music](#the-main-menus-scene-and-music-menu_scenecpp-off-by-default)
 - The freeze detector (hang watchdog), the crash reports and chain-loading another `dinput8.dll` mod are part of the DLL itself: [src/hook/README.md](../hook/README.md#the-hang-watchdog-watchdogcpp).
 
@@ -600,7 +601,7 @@ computer = Computer {n}
 4. Windows' language (only when the game's texts cannot be read yet);
 5. English.
 
-`[ui] language=<code>` chooses directly (any 2 or 3 letter code, maybe with `-xx`: `de`, `pt-br`). A language without a file shows in English. The language is chosen once, at the first text a panel asks for; the settings menu (v0.3, next block) will switch it at once (`texts::Generation`). `overlay::PanelLanguage()` still answers "French or English" for code that needs only that.
+`[ui] language=<code>` chooses directly (any 2 or 3 letter code, maybe with `-xx`: `de`, `pt-br`). A language without a file shows in English. The language is chosen once, at the first text a panel asks for; the settings menu (Options, H5 Together) sets it for the next start (switching at once would leave old text pointers in other code: `texts::Get` promises they stay valid). `overlay::PanelLanguage()` still answers "French or English" for code that needs only that.
 
 **The log** says what was chosen and why:
 
@@ -1018,7 +1019,7 @@ test_version=         ; testing: this PC says another H5 Together version in the
 - **When a newer version is out:** two lines at the bottom left of the main menu, above MMH5.5's "Version" text, in the panels' language: `H5 Together 0.3.1 is out (you have 0.3.0).` / `Get it from github.com/jozrcr/h5-together/releases`. And the log: `update: H5 Together 0.3.1 is out (this is 0.3.0): https://github.com/jozrcr/h5-together/releases (after 297 ms; nothing is downloaded)`. Nothing is ever downloaded, installed or opened.
 - **Once a day:** the time of the check and the version found are written to `[update]` (`last_check=`, `latest=`), so the notice also shows on the days without a request, and a failed request (no internet, GitHub busy) is not retried before the next day. The log says why: `update: no answer from GitHub (WinHTTP error 12007: no internet, or GitHub cannot be reached); the next check is in a day`.
 - **Versions:** `v0.3.1` and `0.3.1` are the same; numbers compare as numbers (`0.3.10` after `0.3.9`); a test build `0.3.1-beta` comes before `0.3.1` (`update_check_logic.cpp`, tested by `src/hook/test/new_release_test.cpp`).
-- A later settings menu (v0.3 block 3) will show the switch; for now it is in the file only.
+- The settings menu shows the switch (Options, H5 Together, Help), and the first start asks once ([the settings menu](#the-settings-menu-settings_cpp-options-h5-together)).
 - **Robot checks** (2026-11-02): one real request (`--setting update.check=1`): `update: this is the newest version (0.2.7; GitHub's latest release: v0.2.7; after 297 ms)`, no notice. With `last_check=<now>` and `latest=0.9.0` in the file: no request ("checked less than a day ago") and the notice in the main menu, in English and French.
 
 **Settings** (`h5-together.ini`):
@@ -1028,6 +1029,54 @@ test_version=         ; testing: this PC says another H5 Together version in the
 check=0        ; 1 = ask GitHub at most once a day for the latest version (off by default)
 last_check=    ; written by the add-on: when it last asked (seconds since 1970)
 latest=        ; written by the add-on: the latest version it was told
+asked=         ; written by the add-on: 1 once the first-start question was answered
+```
+
+## The settings menu (`settings_*.cpp`; Options, H5 Together)
+
+**What it is for:** changing the add-on's settings in the game, instead of editing `h5-together.ini` in Notepad (docs/plans/community-release.md, part 2). The owner asked for it to be "as diegetic as possible": so it is not a panel of ours but a page of the game's own **Options** screen, with the game's own rows, check boxes, lists, sliders, scroll bar, tooltips and buttons.
+
+**Where:** main menu, **Options**: the game's scroll lists `Game`, `Video & audio`, **`H5 Together`**, `Combat replays`, `Back`. From the adventure map: the game's own Options (its F4 key, or the Esc menu). **F3** opens the Options screen straight on our page (main menu, adventure map, or the Options screen itself; on the map through the map's own Options code, so, as with the game's F4, only when the game lets you open it). The game uses F4 to F8 and F10 itself (F8 is quick load), so F3 it is.
+
+**What it shows:** like the game's categories, two pages side by side, each a list with headers:
+- **On this PC:** Interface (player list, "your turn", the panels' keys and buttons, hero looks), Camera and visuals, Sound, Language, Random maps. The rows for the mouse wheel fix and the game's texts only show when they matter (under Wine; with the French packs, or `[lang] texts` already set).
+- **Co-op games:** Host (teams, team arrows, builder maps' teams, faction start terrain, and a line pointing to the game rules, F2), Advanced (co-op timing and steps, view delay, network timings, AI pathfinding, LAN over VPNs, autosaves, our templates, the host's rules, live hero screen, freeze detector, crash reports, another `dinput8.dll` mod), Help (the add-on's and MMH5.5's versions, the update check, where the file and the log are).
+
+47 settings; the other 61 stay in the file (the 20 game rules have their own panel, F2; 39 are for testing or written by the add-on). `lan_peers` (addresses) is shown as a line: the game has no text box, so it is set in the file.
+
+**When a change applies:** a name that ends in ` *` waits for a restart of the game, ` **` for the next game (the line at the top of each page says so; the tooltip says it in words). After **Apply**, a line at the bottom of the screen says, for example, "1 change applies after a restart of the game." The menu never restarts the game.
+
+| When | Settings |
+|---|---|
+| At once | "your turn" sound and pop-up; the player list's key and place; the game rules key and Rules... button; the hero looks key, Look button and live hero screen; the builder's key; save compression; autosave days; LAN over VPNs; the freeze detector's wait; the camera's zooms and start distance (from the next map or battle) |
+| From the next game | the host's teams |
+| After a restart | everything else (the settings that put a hook in at start-up, or that the game reads once) |
+
+Each "at once" setting is read again by its own mod (`settings_reload.cpp`, a `Reload...Settings()` in each mod: plain values the mod reads when it uses them, changed on the main thread). Checked with the robot: a new builder key opens the builder at once, the camera hook goes in for the next map, the rules key, the freeze detector's wait (log lines `... from the settings menu: ...`). The plan hoped for more (the co-op timing, the view delay, the team arrows, the language at once): those install hooks or patch the game's code at start-up, or hold texts other code keeps pointers to, so they stay "after a restart" (when in doubt, restart).
+
+**During a multiplayer game** the Host and Advanced rows are greyed out by the game itself (its `disable_options_by_multiplayer`, set by the map's Options code, as for its own "quick combat"): changing them halfway would only make this PC disagree with the others. As a second net, Apply does not write a Host or Advanced change while that variable is on (robot check: `[coop] guard not changed: read only during a multiplayer game`).
+
+**Buttons:** the game's own. **Apply** writes the changed settings; **Default** (after the game's own "restore the defaults?" box) puts every setting of our category back to its default; **Back** forgets the changes. Nothing is written before Apply or Default.
+
+**How it works** (`settings_menu.cpp`):
+- The Options screen (`NUI::CGameOptionsScreen`) builds its categories from the `GameOptions` part of `UI/uiconsts.(UIGameConstsH5).xdb`. When the game opens that file, we serve it with our category added at the end of the list (`settings_menu_data.cpp`, `AddCategory`; by structure, so it works with MMH5.5's file and the game's). Our words are served as the game's own text files, `UI/Consts/GameOptions/H5Together/...`, in the panels' language (`src/mods/texts/*.txt`, section `[settings]`). Nothing on disk changes. The log: `settings: the Options screen gets our "H5 Together" category (43 rows; ...)`.
+- The game's pages have no scroll bar (theirs fit). Ours are longer, so the page list (`UI/GameOptions/PageCont`, shared by every category) gets the game's own vertical scroll bar, the random map screen's, hidden while there is nothing to scroll: the game's own pages look as before.
+- Each row shows and sets a console variable of ours, `h5t_<section>_<key>`, holding the index of the row's choice. When a category's button is pressed (the screen's command `template`), we set them from `h5-together.ini`. **Apply** and **Default** write the category's variables and then save the profile (`0x008353e0`, called at `0x0075ca80` and `0x0075c70e`); that call goes through us first: the variables that changed are written into `h5-together.ini`, their level is put back to 0 so the game's profile file (`user_a2.cfg`) never holds them, and the "at once" ones are read again.
+- **The file is changed in place, the installer's way** (`settings_ini.cpp`, the same rule as `Merge-Settings` in `install.ps1`): a changed setting fills its own commented line `;key=...` in its section; a value equal to the default puts the `;` back; every other line and comment stays as it was, with its line endings. If the file cannot be written (a protected folder), the line at the bottom says so and nothing changes. The log lists each change and what Windows then reads: `settings: h5-together.ini: 3 line(s) changed; Windows reads notify.popup=(none), camera.zoom_out=200, rmg.teams=humans_vs_ai`.
+- **One table of every setting** (`settings_table.cpp`): section, key, default, kind, limits, who it matters to, when it applies, page, words. The menu is drawn from it, and `src/hook/test/settings_test.cpp` checks it against the shipped `tools/package/files/h5-together.ini` (the same 108 settings, the same defaults), every row's words in `en.txt` and `fr.txt`, the in-place writer (the cases of `tools/package/test_scripts.py`, and Windows' own reading of the result) and our category in a stand-in for the game's file. **A new setting:** one line in the table, its line in the shipped ini, and for a row its words in `en.txt` and `fr.txt`.
+
+**The H5 Together version in the main menu:** MMH5.5's "Version: 5.69k" text (`UI/MainMenu2/Version.txt`) gets a first line, `H5 Together 0.3.0`, in the game's own font: everyone sees their version before a co-op game. It is a text, not a button: a button of ours there would not look like the game's (the game's own buttons are on the scroll, and our overlay has no game font), so the way in is the Options screen.
+
+**The first-start question** (the update check, off by default): the first time the main menu shows, a box in the game rules panel's look asks "Check for new versions of H5 Together once a day? Yes / No". Yes writes `[update] check=1`; both answers write `[update] asked=1`, so it is asked only once; Esc (or another screen) answers nothing, and it is asked again at the next start. It is not asked when `[update] check` is already in the file, and never in robot runs (unless `[update] welcome_test=1`).
+
+**Robot steps** (`tools/robot/README.md`, "Checking the settings menu"): `key|F3`, `panel|settings open`, `panel|settings set <section>.<key> <value>` (as a click on the row), `panel|settings scroll <page> <line>`, `panel|settings default` (the Default box's Yes), `panel|settings welcome yes|no|close`, then the game's own `ui|NUI::CGameOptionsScreen accept`. Checked 2026-11-02 on the French test copy (MMH5.5 RC19k), in French, English and the long test language: every page, Apply, Default, F3 from the main menu, a new builder key used at once, the question, and no `h5t_` line in the profile's `user_a2.cfg`.
+
+**Settings** (`h5-together.ini`):
+
+```ini
+[update]
+asked=         ; written by the add-on: 1 once the first-start question was answered
+welcome_test=0 ; testing only (not in the shipped file): ask the question in robot runs too
 ```
 
 ## Steam test (`steam_spike.cpp`; off by default, for tests only)
