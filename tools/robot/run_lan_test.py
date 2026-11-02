@@ -181,6 +181,7 @@ def main():
                         "themselves; -1 = leave it)")
     p.add_argument("--host-step", action="append", default=[], help="extra host script step (see run_ai_test.py)")
     p.add_argument("--client-step", action="append", default=[], help="extra client script step")
+    p.add_argument("--texts-dir", help="language files for bin/h5-together/texts (default src/mods/texts), as run_ai_test.py")
     args = p.parse_args()
 
     game = pathlib.Path(args.game)
@@ -215,7 +216,7 @@ def main():
         "%d|shot|client-started" % (args.start_at + 12),
     ] + args.client_step
 
-    robot.install_dll(game)
+    robot.install_dll(game, texts=args.texts_dir)
     copies = [("host", PORTS["host"][0], host_steps), ("client", PORTS["client"][0], client_steps)]
     for name, port, steps in copies:
         (out / name).mkdir(parents=True)

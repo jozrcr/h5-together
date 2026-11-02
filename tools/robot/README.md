@@ -184,6 +184,17 @@ python tools\robot\lan_report.py --last 1
   Look for `rules: the world starts its scripts: ... map_scripts=1: it gets an empty one` in both logs, `the game opens scripts/advmap-startup.lua` (trace), every `H55 ...` start-up line twice in `console.txt`, the same served hash, and equal checksums. `map_scripts=0`: `... no scripts, as in the original game`, no `H55` line. `--client-rules enabled=0`: `no host's rules in this game: MMH5.5's own way`.
 - **The class skill lock** (`class_skills`): `--host-rules class_skills=1` (or in the waiting room `--host-step "24|panel|rules open" --host-step "25|panel|rules set class_skills 1" --host-step "27|panel|rules ok"`; on the setup screen the default `17|msg|create` comes too soon), `--rules-setting trace_skills=1` (one line per new skill a level-up offers: class, skill, on the class's MMH5.5 list or `NOT`), `--host-rules class_chance=30` to see the other skills often (testing). Look for `rules: class skills: UNLOCKED for this game ... table hash` (the same on both copies). The level-ups are the AI's own (a few per run: 12 AI turns gave 3 to 20); the host's game computes some offers twice as often as the client's, with the same result, so compare the skills, not the counts. **Saves:** `run_ai_test.py --rules-setting class_skills_single=1 --rules-setting class_skills=1` makes an unlocked single-player game and its daily autosave (`a save of the world is written with "OHW1;..."`); `--load-save "Sauvegarde auto N"` then shows `a saved game is read: its rules` and `UNLOCKED` (the autosave's number: the robot's saves rotate).
 
+## Checking our texts in another language (`src/hook/texts.cpp`, `src/mods/texts/*.txt`)
+
+Both runners copy `src/mods/texts/*.txt` into the test copy's `bin\h5-together\texts\` with the DLL, as the installer does. `--ui-setting language=en` (or `fr`, `xx`...) picks the panels' language; without it the DLL finds it by itself (a test copy outside Steam's folders has no Steam file for the game, so the red player's name in the game's texts decides: French on the French test copies). `--texts-dir <folder>` installs other files instead: a partial or broken translation, or the long test language (`python tools\lang\ui_texts.py long`, then `--texts-dir build\texts --ui-setting language=xx`).
+
+```
+python tools\robot\run_ai_test.py --game C:\Games\H5_test_k --ui-setting language=en --no-map --seconds 38 --shot-every 0 --step "8|menu|single custom_game" --step "13|rmg|" --step "18|shot|rmg-screen" --step "20|ui|NUI::CRMGScreen oh_builder" --step "24|shot|builder" --step "26|panel|preset 1" --step "29|shot|builder-preset" --step "30|panel|scroll end" --step "32|shot|builder-scrolled"
+python tools\robot\run_ai_test.py --game C:\Games\H5_test_k --texts-dir <folder with a partial fr.txt> --ui-setting language=fr --turns 100 --seconds 52 --end-turn-every 600 --shot-every 0 --step "30|panel|skins open" --step "33|shot|looks" --step "40|key|F2" --step "43|shot|rules-map"
+```
+
+Look for the `texts:` lines in the log (written when a panel first asks for a word): the language, which clue chose it, and each line of the file that was not used.
+
 ## Robot script
 
 Besides starting a map, the DLL runs a script of timed steps (`--step`, or `--host-step` / `--client-step`), `"<seconds>|<kind>|<text>"`, seconds counted from the first main-loop call:
