@@ -114,4 +114,11 @@ void InstallAll()
 	mods::ApplySettingsMenuFromSettings();  // Options, H5 Together: Accept writes h5-together.ini; F3; the first-start question
 }
 
+void InstallUnknownBuild()
+{
+	if (NoHooks())
+		return;
+	mods::ApplySteamSpikeFromSettings();  // calls only Steam's library, no address in the game
+}
+
 }  // namespace hooks
