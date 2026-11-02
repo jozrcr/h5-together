@@ -195,6 +195,15 @@ int WINAPI LanRecvFrom(SOCKET s, char *buf, int len, int flags, sockaddr *from, 
 
 }  // namespace
 
+void ReloadLanDiscoverySettings()
+{
+	wchar_t path[MAX_PATH];
+	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
+	g_all_adapters = GetPrivateProfileIntW(L"net", L"lan_all_adapters", 1, path) != 0;  // (one byte: the network thread reads it)
+	hooklog::Write("lan: from the settings menu: game queries %s go to every network adapter%s", g_all_adapters ? "also" : "no longer",
+	               g_sendto ? "" : " (not before a restart: the hooks are not in)");
+}
+
 void ApplyLanDiscoveryFromSettings()
 {
 	wchar_t path[MAX_PATH];

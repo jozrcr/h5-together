@@ -10,5 +10,7 @@ void InstallRmgBuilderEarly();
 // random map screen's "Template..." button (rmg_screen.cpp). Needs the recipe
 // templates (rmg_templates.cpp, installed before).
 void ApplyRmgBuilderFromSettings();
+// From the settings menu: [rmg] builder_key again, at once.
+void ReloadRmgBuilderSettings();
 
 }  // namespace mods

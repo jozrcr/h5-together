@@ -984,6 +984,14 @@ void ReadSettings()
 
 }  // namespace
 
+void ReloadRmgBuilderSettings()
+{
+	wchar_t key[16];
+	GetPrivateProfileStringW(L"rmg", L"builder_key", L"F11", key, 16, IniPath().c_str());
+	g_key = overlay::ParseKey(key, VK_F11);
+	hooklog::Write("rmg builder: from the settings menu: key %ls", key);
+}
+
 void InstallRmgBuilderEarly()
 {
 	ReadSettings();

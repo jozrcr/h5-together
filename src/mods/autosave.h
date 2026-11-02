@@ -7,5 +7,7 @@ namespace mods {
 // compression=1 (-1 = the game's level 6), autosave_every=1, fast_save_list=1
 // (the defaults). Only after DetectGameBuild() said the build is hookable.
 void ApplyAutosaveFromSettings();
+// From the settings menu: compression and autosave_every again, at once.
+void ReloadAutosaveSettings();
 
 }  // namespace mods

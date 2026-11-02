@@ -11,4 +11,7 @@ void InstallPlayerListEarly();
 // From hooks::InstallAll: the rest, with [ui] player_list=1 (the default).
 void ApplyPlayerListFromSettings();
 
+// From the settings menu: its key and its place, at once.
+void ReloadPlayerListSettings();
+
 }  // namespace mods

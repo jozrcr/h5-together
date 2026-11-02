@@ -8,4 +8,7 @@ namespace mods {
 // is hookable.
 void ApplyNotifyFromSettings();
 
+// From the settings menu: sound and popup again, at once (the main thread).
+void ReloadNotifySettings();
+
 }  // namespace mods

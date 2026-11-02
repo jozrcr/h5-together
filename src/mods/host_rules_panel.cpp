@@ -817,6 +817,16 @@ void Draw(const overlay::Frame &frame)
 
 namespace rules {
 
+void ReloadPanelSettings()
+{
+	wchar_t path[MAX_PATH], key[16];
+	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
+	GetPrivateProfileStringW(L"rules", L"key", L"F2", key, 16, path);
+	g_key = overlay::ParseKey(key, VK_F2);
+	g_button = GetPrivateProfileIntW(L"rules", L"button", 1, path) != 0;
+	hooklog::Write("rules panel: from the settings menu: key %ls, Rules... button %s", key, g_button ? "on" : "off");
+}
+
 bool InstallPanel()
 {
 	g_key = PanelKey();

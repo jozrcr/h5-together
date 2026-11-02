@@ -13,6 +13,8 @@ namespace watchdog {
 // starts. [debug] hang_seconds (default 20) and hang_test (F12 freezes the
 // game on purpose, for a hand test).
 void Install();
+// From the settings menu: hang_seconds again, at once.
+void ReloadSettings();
 
 // A mod's own state for the report. Called on the watchdog's thread, after the
 // main thread was looked at (it runs again then): it must only read the mod's

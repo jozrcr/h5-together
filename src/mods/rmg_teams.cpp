@@ -457,6 +457,22 @@ bool ParseList(const wchar_t *text)
 
 }  // namespace
 
+void ReloadRmgTeamsSettings()
+{
+	wchar_t path[MAX_PATH];
+	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
+	wchar_t text[64];
+	GetPrivateProfileStringW(L"rmg", L"teams", L"", text, 64, path);
+	g_mode = kOff;
+	if (!lstrcmpiW(text, L"humans_vs_ai"))
+		g_mode = kHumansVsAi;
+	else if (!lstrcmpiW(text, L"pairs"))
+		g_mode = kPairs;
+	else if (text[0] && ParseList(text))
+		g_mode = kList;
+	hooklog::Write("rmg teams: from the settings menu: teams=%ls, from the next game", text[0] ? text : L"(the map's own)");
+}
+
 void ApplyRmgTeamsFromSettings()
 {
 	wchar_t path[MAX_PATH];
