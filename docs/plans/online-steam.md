@@ -1,6 +1,6 @@
 # Plan: online play over Steam (a "virtual LAN")
 
-Status: **solo spike done (2026-11-02): Steam accepts app 15370 from inside the game.** Steam starts in the game's process, the relay network comes up, and a friends-only lobby is created ([results below](#solo-spike-results-2026-11-02)). This held even though the robot, not Steam, started the game. The two-PC part of the spike is next. Code: `src/mods/steam_spike.cpp` (`[online] spike`, off by default). SDK 1.65 is at `ref\steamworks_sdk_165\` (never committed).
+Status: **the spike passed (2026-11-02): two Steam accounts' games talk through Steam under app 15370.** Solo: Steam starts in the game's process, the relay network comes up, and a friends-only lobby is created ([results](#solo-spike-results-2026-11-02)), even when the robot, not Steam, started the game. Two PCs: a Linux laptop under Proton, on a phone's 4G connection, found the Windows host's friends-only lobby through the friends list, joined it, and 100 of 100 messages came back (median round trip 82 ms) ([results](#two-pc-test-results-2026-11-02)). Next: step 1. Code: `src/mods/steam_spike.cpp` (`[online] spike`, off by default). SDK 1.65 is at `ref\steamworks_sdk_165\` (never committed).
 
 Goal: friends join each other's games **from inside the game**, with no GameRanger and no ZeroTier. This is phase 6 of the project ("built-in online play"). This plan picks Steam as the first way to do it. The older idea (our own lobby server plus GameNetworkingSockets) becomes the fallback.
 
@@ -321,13 +321,32 @@ No need for the 480 retry: 15370 worked.
 
 **Side finding:** Steam has its own "FakeIP" feature (`steamnetworkingfakeip.h`: `ISteamNetworkingSockets::BeginAsyncRequestFakeIP`). It gives a Steam-managed fake IPv4 address and port for porting UDP code. Our own `198.18.x.y` mapping stays simpler, because the game's packets go through our Winsock hooks anyway. But FakeIP is worth a look in step 2.
 
-### What the two-PC test still has to answer
+### Two-PC test results (2026-11-02)
 
-- Whether the relays carry messages **between two PCs** under 15370 (`spike=host` / `spike=join`), the round trip, and whether Steam relays or connects directly.
-- Whether the joiner **finds the host's friends-only lobby through the friends list** (`GetFriendGamePlayed`). If not, the fallback is `spike_lobby=public` and a filtered search.
-- **A game started from the Steam library** (Steam sets the app id itself, and the overlay is injected at start), compared with this solo run's direct start.
-- **Linux under Proton:** does our Windows `steam_api.dll` reach the Linux Steam client?
-- The test package: `open-homm5-steam-spike-test1.zip` (our DLL and instructions; prepared in the scratchpad, not sent). `steam_api.dll` is not inside: the owner gives it to the friend from his SDK. The SDK licence would allow shipping it with our software (plan, research 3), but for a one-off test, handing it over separately keeps the zip ours only.
+The owner ran it with two of his own Steam accounts, Steam friends with each other:
+
+- **Host:** the desktop, Windows, the test copy `C:\Games\H5_test` (MMH5.5 RC19d, `MMH55_Utility_64.exe` started by double-click, not through Steam), home internet. `[online] spike=host`.
+- **Joiner:** a laptop running **Linux, the game under Proton**, started from the Steam library. It has the **plain Steam game** (Steam's 2025 `H5_Game.exe`, no MMH5.5): the spike also runs on a build we do not know (`hooks::InstallUnknownBuild`), since it never touches the game's code. Internet through **a phone's 4G connection share**. `[online] spike=join`.
+- The kit: `h5-together-steam-test2.zip` (scratchpad; our DLL, Valve's `steam_api.dll` from SDK 1.65, a one-line ini, a README).
+
+| Question | Answer | From the logs |
+|---|---|---|
+| Steam starts under Proton? | **Yes**, at once: our Windows `steam_api.dll` reached the Linux Steam client through Proton | joiner: `SteamAPI_InitFlat -> 0 (OK) in 10 ms`; `Steam says our app id is 15370` |
+| Joiner finds a friends-only lobby? | **Yes**, through the friends list, the moment the game started (no public lobby needed) | `friend … plays app 15370, lobby 1097…`; `joining lobby … (found through the friends list)` |
+| Joins it? | **Yes**, in 0.4 s; the lobby data came along | `lobby entered (join call) … response 1 (success)`; `lobby oh5_spike="host", oh5_version="0.2.7" (ours 0.2.7); members 2` |
+| Relay network | Up on both: host 6.2 s, joiner 7.5 s (24 relays known) | `relay network OK after 7454 ms` |
+| Messages between the two PCs | **100 sent, 100 echoed back** | `100 pings sent (0 refused), 100 echoes back` |
+| Round trip | min 60, **median 82**, max 1813 ms (the slow ones while the session was set up) | `round trip min 60, median 82, max 1813 ms` |
+| Relayed or direct? | **Direct**: Steam's NAT traversal (ICE) got through, even on 4G; ping 49 ms | `connected (3), ping 49 ms, not relayed … P2P ICE` |
+| Whole join, game start to done | about 12 s (most of it the relay network starting) | joiner log 4.0 s → 16.5 s |
+| Overlay | Not enabled at init in either game (`IsOverlayEnabled no`; only checked then) | not needed for the virtual LAN; matters later for Steam's invite button |
+
+What this settles:
+
+- **App 15370 works between two accounts**, Windows and Linux, a game started by Steam and one started outside Steam. No Spacewar 480 needed.
+- **Friends-only lobbies found through the friends list** are enough to find a friend's game: no public lobby, no search.
+- **Linux friends start the game from Steam with `WINEDLLOVERRIDES="dinput8=n,b" %command%`**, as for the add-on today; nothing more for Steam's networking.
+- **Not yet seen:** a relayed connection (both ends got a direct path), 3 PCs, a long session, and the overlay inside the game.
 
 ## Steps and effort
 
@@ -335,7 +354,7 @@ A session is one focused working block of a few hours.
 
 | Step | What | Sessions |
 |---|---|---|
-| 0 | The spike (above), then reading the logs. **Solo part done 2026-11-02**; the two-PC part waits for a second player | 1 + 0.5 |
+| 0 | The spike (above), then reading the logs. **Done 2026-11-02** (solo and two PCs) | 1 + 0.5 |
 | 1 | Packet map: the robot's `net_log` logs whole packets; find the address lists inside `01` and `03`; write it up in [multiplayer-sync.md](../subsystems/multiplayer-sync.md) | 0.5 |
 | 2 | Virtual LAN core with the loopback transport: Winsock hooks (stacked with `lan_discovery`), fake addresses, `gethostbyname` answer, hosting detection, unit tests, robot LAN game (checksums, no real IP in packets) | 2 |
 | 3 | Steam transport: lazy loading, init, our callback thread, lobbies, known hosts, sessions, version data; logs | 2 |
@@ -360,9 +379,9 @@ About **10 sessions** after a successful spike. Steps 1 and 2 need no SDK and co
 ## Questions for the owner
 
 1. OK to try the game's own app id 15370 first, with Spacewar 480 only as a test if 15370 fails?
-2. Who can be the second PC for the spike (a friend or your brother)? It needs his own Steam account that owns ToE and is your Steam friend.
+2. ~~Who can be the second PC for the spike?~~ Answered: the owner's Linux laptop with a second Steam account (2026-11-02).
 3. When a game is shown to others: **friends only** (recommended), or public for anyone with the add-on?
 4. Does anyone in the group play from a GOG copy? Then that group's games stay on ZeroTier, or we use Spacewar 480.
 5. OK to ship Valve's `steam_api.dll` inside our package (allowed by the SDK agreement as we read it, but a grey area because the app id isn't ours)? Or should each player copy it?
-6. How do the Linux friends start the game: as the Steam game with a launch option, as a non-Steam shortcut, or with Lutris/Wine?
+6. How do the Linux friends start the game: as the Steam game with a launch option, as a non-Steam shortcut, or with Lutris/Wine? (The Steam game with the launch option works for Steam's networking: the two-PC test.)
 7. Steps 1 and 2 (packet map, virtual LAN with the robot) need no SDK. Start them before the spike?
