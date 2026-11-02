@@ -12,10 +12,32 @@ How to install the add-on on a player's PC. What it does: [the main README](../R
 1. Download the latest `h5-together-<version>.zip` from the [releases page](https://github.com/jozrcr/h5-together/releases/latest).
 2. Close the game. Extract the whole zip (Windows: right-click it, **Extract All**).
 3. Run the installer from the extracted folder:
-   - **Windows:** double-click `install.bat`. It finds the game through Steam, or asks you for the folder, and tells you what it did.
-   - **Linux (Steam / Proton):** run `bash install.sh`. At the end it prints one line to paste into the game's Steam launch options. The full walkthrough, with ZeroTier to play without GameRanger, is [linux.md](linux.md).
+   - **Windows:** double-click `install.bat`. It looks for the game (Steam, GOG, or the folder that MMH5.5's own installer remembers), shows you what it found, copies the files in and tells you what to do next. The window waits for Enter at the end, so you can read it.
+   - **Linux (Steam / Proton):** run `bash install.sh`. Same screens, and at the end it prints one line to paste into the game's Steam launch options. The full walkthrough, with ZeroTier to play without GameRanger, is [linux.md](linux.md).
 
 The installer never changes the game's own files, and never replaces a `dinput8.dll` that is not ours (to keep another mod that uses that name, see [below](#another-mod-that-is-also-a-dinput8dll)).
+
+### What the installer shows
+
+Before it copies anything, it shows your game, so you can see it is the right one:
+
+```
+Your game
+  Folder:     C:\Program Files (x86)\Steam\steamapps\common\Heroes of Might and Magic 5 Tribes of the East
+  Found in:   Steam
+  Language:   French (Steam's setting for the game)
+  MMH5.5:     RC19k (tested with H5 Together)
+  Game exes:  MMH55_Utility_64.exe  MMH5.5's co-op exe: H5 Together works with it
+              H5_Game.exe           a copy of the co-op exe (made for GameRanger): works too
+  H5 Together has its panels in French, so that is what you will see.
+```
+
+- **Found in** says Steam or GOG when it can tell. **Language** is Steam's language setting for the game (not shown for other copies); the add-on's own panels use it when we have that language.
+- **MMH5.5** is named from the `55u.dll` file (RC19d and RC19k are the ones we tested). Any other `55u.dll` gives "a version we have not tested" with a yellow warning: the add-on may switch itself off (the game then runs as it always did, and `h5-together.log` says why). With no MMH5.5 at all the warning says that H5 Together needs it for now; the files are still copied, and start working when MMH5.5 is installed.
+- **Game exes:** the add-on works with MMH5.5's co-op exe, `MMH55_Utility_64.exe`. GameRanger starts `H5_Game.exe`, so the GameRanger guide has you put a copy of the co-op exe under that name: the installer recognises that copy. An `H5_Game.exe` that is the game's own exe does nothing with the add-on; start `MMH55_Utility_64.exe` then.
+- **No game found, or several:** with none it asks where the game is. Type **B** to choose the folder in a window (Windows), or paste the folder (the one that holds `bin`, or `bin` itself). With several it lists them (each with where it comes from and its MMH5.5) and you type a number. A folder is accepted only if its `bin` has `H5_Game.exe` or `MMH55_Utility_64.exe`; otherwise it explains and asks again. Press Enter alone to cancel (nothing is installed). GOG copies are looked for in GOG's list in the registry, and any copy through the entry that MMH5.5's own installer leaves; we have not tried a GOG copy of Heroes V yet, so tell us if yours is not found.
+- **The game is running:** the add-on's file cannot be replaced while the game runs, so the installer says so and waits: close the game, then press Enter. Type `S` to go on anyway, `Q` to stop (exit code 8, nothing changed).
+- **At the end** it says "All done" and what to do next: start the game, then look for `h5-together.log` in the `bin` folder. The first line says `H5 Together hook DLL <version> loaded` when the add-on runs.
 
 ## What gets installed
 
@@ -77,4 +99,4 @@ When the game starts, H5 Together loads `dinput8_next.dll` and passes the game's
 
 ## Uninstall
 
-Run `uninstall.bat` (Windows) or `bash uninstall.sh` (Linux) from the extracted folder. Only the add-on's own files are removed (the DLL, the logs, our templates); it asks before deleting your settings file and its `.bak` copies, and templates you added yourself stay.
+Run `uninstall.bat` (Windows) or `bash uninstall.sh` (Linux) from the extracted folder. It finds and shows the game the same way, asks you to close the game if it runs, and removes only the add-on's own files (the DLL, the logs, our templates and language files); it asks before deleting your settings file and its `.bak` copies, and templates you added yourself stay.

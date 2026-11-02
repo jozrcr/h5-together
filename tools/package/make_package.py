@@ -92,9 +92,10 @@ TEXT_NAME = re.compile(r"[a-z]{2,3}(-[a-z0-9]{1,8})?\.txt")
 CRLF_SUFFIXES = {".bat", ".ps1", ".txt", ".ini"}
 EXECUTABLE_SUFFIXES = {".sh"}
 
-# The code that finds the game is written three times (install, uninstall and the bug
-# report script) so that each script stands alone. The copies sit between these lines
-# and must match.
+# The code that finds the game and says what it found (Steam, GOG, the folder window, the
+# MMH5.5 version, the "game is running" check) is written three times (install, uninstall
+# and the bug report script) so that each script stands alone. The copies sit between these
+# lines and must match (one set of three for Windows, one for Linux).
 SHARED_PAIRS = [("install.ps1", "uninstall.ps1"), ("install.ps1", "bug-report.ps1"),
                 ("install.sh", "uninstall.sh"), ("install.sh", "bug-report.sh")]
 SHARED_START = "# ---- shared with uninstall."

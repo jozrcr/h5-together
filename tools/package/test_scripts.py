@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Tests the install and uninstall scripts of the package against FAKE folders.
 
-    python tools/package/test_scripts.py [--bash PATH] [--work-dir DIR] [--keep]
+    python tools/package/test_scripts.py [--bash PATH] [--work-dir DIR] [--keep] [--only windows|linux]
 
 It builds the zip with make_package.py (version "0.0.0-test"), unzips it, makes a fake
 Steam folder and fake game folders (empty files named like the game's exes), and
@@ -22,6 +22,9 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
+import time
+import uuid
 import zipfile
 from pathlib import Path
 
@@ -60,9 +63,9 @@ def tree(folder):
     return {p.relative_to(folder).as_posix(): (sha(p) if p.is_file() else None) for p in sorted(folder.rglob("*"))}
 
 
-def make_game(library, exes=("H5_Game.exe", "MMH55_Utility_64.exe")):
+def make_game(library, exes=("H5_Game.exe", "MMH55_Utility_64.exe"), name=GAME):
     """A fake game folder with empty-ish exes. Returns its bin folder."""
-    b = Path(library) / "steamapps" / "common" / GAME / "bin"
+    b = Path(library) / "steamapps" / "common" / name / "bin"
     b.mkdir(parents=True, exist_ok=True)
     for e in exes:
         (b / e).write_bytes(b"fake " + e.encode())
@@ -594,6 +597,366 @@ def migration_tests(who, pkg, game_bin, install, uninstall):
     return results
 
 
+# ---------------------------------------------------------------- finding the game, and what the scripts say about it
+
+def make_manifest(library, language="french", installdir=GAME):
+    """Steam's file for the game, in the library that holds it (the scripts read the folder and
+    the language from it). language None: the file has no language line."""
+    lines = ['"AppState"', "{", '\t"appid"\t\t"15370"', f'\t"installdir"\t\t"{installdir}"']
+    if language:
+        lines += ['\t"UserConfig"', "\t{", f'\t\t"language"\t\t"{language}"', "\t}"]
+    lines.append("}")
+    f = Path(library) / "steamapps" / "appmanifest_15370.acf"
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_bytes(("\n".join(lines) + "\n").encode("utf-8"))
+
+
+def add_mmh55(b, version="19e", u55=b"pretend 55u.dll"):
+    """MMH5.5's version pak (data/MMH55-Index.pak) and a 55u.dll for a fake game. Returns the
+    sha256 of the 55u.dll: with it, the scripts' test option counts the file as a known version."""
+    root = Path(b).parent
+    (root / "data").mkdir(exist_ok=True)
+    with zipfile.ZipFile(root / "data" / "MMH55-Index.pak", "w") as z:
+        z.writestr("scripts/H55-Version.lua", f'H55_Version = "{version}"\n')
+    (Path(b) / "55u.dll").write_bytes(u55)
+    return sha(Path(b) / "55u.dll")
+
+
+def make_steam_for(steam, libraries, posix_paths):
+    """make_steam, with the library paths written the way the scripts of the platform read them."""
+    make_steam(steam, libraries, escape_backslashes=not posix_paths)
+    if posix_paths:
+        v = Path(steam) / "steamapps" / "libraryfolders.vdf"
+        data = v.read_bytes()
+        for x in [steam, *libraries]:
+            data = data.replace(str(x).encode(), posix(x).encode())
+        v.write_bytes(data)
+
+
+def game_tests(who, pkg, work, install, uninstall, o, p, start_fake_game):
+    """What the scripts find, show and ask: the game's folder, language and exes, MMH5.5 and its
+    version, warnings, several games, a wrong folder, a game that is running.
+
+    install(*args, stdin="") and uninstall(...) run the scripts with those arguments and return
+    (exit code, output). o: the names of their options (game, steam, known). p: writes a path the
+    way the platform's scripts read it. start_fake_game(bin_folder) starts a program that looks
+    like the running game and returns a function that ends it."""
+    print(f"\nFinding the game, and what the installer says ({who})")
+    shutil.rmtree(work, ignore_errors=True)
+    work.mkdir(parents=True)
+    posix_paths = who != "Windows"
+    version = package_version(pkg)
+
+    # Steam, with its file for the game: the language, and a MMH5.5 that we know
+    steam, lib = work / "steam a", work / "lib a"
+    make_steam_for(steam, [steam, lib], posix_paths)
+    b = make_game(lib)
+    make_manifest(lib, "french")
+    h = add_mmh55(b, "19e", b"the 55u.dll of a version we know")
+    code, out = install(o["steam"], p(steam), o["known"], f"{h}=RC19k")
+    check(code == 0 and (b / "dinput8.dll").exists() and "Found the game." in out,
+          "game: a Steam game is found and installed, with no question asked", out)
+    check("Found in:   Steam" in out and "Language:   French (Steam's setting for the game)" in out and GAME in out,
+          "game: the found screen shows the folder, that it is a Steam copy and Steam's language", out)
+    check("MMH5.5:     RC19k (tested with H5 Together)" in out and "Warning" not in out and "Reminder" not in out,
+          "game: a known MMH5.5 is named (RC19k), with no warning", out)
+    check(re.search(r"MMH55_Utility_64\.exe +MMH5\.5's co-op exe: H5 Together works with it", out)
+          and re.search(r"H5_Game\.exe +the game's own exe, not MMH5\.5's", out),
+          "game: the exes are explained (the co-op exe works; the game's own exe does nothing)", out)
+    check("H5 Together has its panels in French" in out, "game: says the add-on's panels will be in the game's language", out)
+    check(f"All done: H5 Together {version} is installed." in out and "What to do next" in out and "h5-together.log" in out
+          and f'"H5 Together hook DLL {version} loaded"' in out,
+          "game: the end says it worked and what to do next (the first line of h5-together.log)", out)
+
+    # the same game, but an MMH5.5 that we have not tested
+    code, out = install(o["game"], p(b))
+    check(code == 0 and "MMH5.5:     a version we have not tested (its version file says 19e)" in out
+          and "Warning: this MMH5.5 is a version we have not tested (tested: RC19d and RC19k)." in out
+          and "Reminder: this MMH5.5 is a version we have not tested" in out,
+          "game: an MMH5.5 that is not a known version: named as such with its version file, warned at the start and the end", out)
+
+    # uninstall shows the game too
+    code, out = uninstall(o["game"], p(b), stdin="y\n")
+    check(code == 0 and "Your game" in out and "Found in:   Steam" in out and "Removing" in out and "H5 Together is removed" in out
+          and not (b / "dinput8.dll").exists(),
+          "game: the uninstaller shows the game it works on and says it is done", out)
+
+    # no MMH5.5 (only the game's own exe): a plain warning at the start and the end, still installs
+    b = make_game(work / "lib c", exes=("H5_Game.exe",))
+    code, out = install(o["game"], p(b))
+    check(code == 0 and (b / "dinput8.dll").exists() and "MMH5.5:     not found" in out
+          and "Warning: MMH5.5 was not found in this folder (there is no MMH55_Utility_64.exe)." in out
+          and "Reminder: MMH5.5 was not found" in out and "needs MMH5.5" in out,
+          "game: without MMH5.5 it says so plainly (warning and reminder), and still installs", out)
+    check("Language:" not in out and "Found in:" not in out, "game: a folder that is not a Steam copy shows no store and no language", out)
+    code, out = uninstall(o["game"], p(b), stdin="y\n")
+    check(code == 0 and "Your game" in out and "MMH5.5:     not found" in out and "Warning" not in out,
+          "game: the uninstaller shows the facts but does not warn about MMH5.5", out)
+
+    # H5_Game.exe that is a copy of the co-op exe (the GameRanger guide)
+    b = make_game(work / "lib d")
+    (b / "H5_Game.exe").write_bytes((b / "MMH55_Utility_64.exe").read_bytes())
+    code, out = install(o["game"], p(b))
+    check(code == 0 and re.search(r"H5_Game\.exe +a copy of the co-op exe \(made for GameRanger\): works too", out),
+          "game: an H5_Game.exe that is a copy of the co-op exe is recognised", out)
+
+    # the language: no texts for it, English, and no language line
+    for language, shown, expect in (("german", "German", "H5 Together has no texts in German yet: its panels will be in English"),
+                                    ("english", "English", "H5 Together has its panels in English"),
+                                    (None, None, None)):
+        b = make_game(work / f"lib e {language}")
+        make_manifest(work / f"lib e {language}", language)
+        code, out = install(o["game"], p(b))
+        if language:
+            check(code == 0 and f"Language:   {shown} (Steam's setting for the game)" in out and expect in out,
+                  f"game: Steam language {language}: shown, and what the add-on will use", out)
+        else:
+            check(code == 0 and "Language:" not in out and "H5 Together has" not in out,
+                  "game: a Steam file without a language line: no language shown", out)
+
+    # the folder named in Steam's file for the game (not only the usual name)
+    steam, lib = work / "steam f", work / "lib f"
+    make_steam_for(steam, [steam, lib], posix_paths)
+    b = make_game(lib, name="Heroes Own Folder Name")
+    make_manifest(lib, "english", installdir="Heroes Own Folder Name")
+    code, out = install(o["steam"], p(steam))
+    check(code == 0 and (b / "dinput8.dll").exists() and "Found the game." in out,
+          "game: the folder that Steam's file names (installdir) is found, whatever its name", out)
+    (lib / "steamapps" / "appmanifest_15370.acf").unlink()
+    code, out = install(o["steam"], p(steam), stdin="")
+    check(code == 4 and "could not find the game" in out, "game: without that file the odd folder name is not found (it asks)", out)
+
+    # two games: the list says what each is; a number that is not in it; a folder that is not the game
+    steam, la, lb = work / "steam h", work / "lib h1", work / "lib h2"
+    make_steam_for(steam, [steam, la, lb], posix_paths)
+    b1 = make_game(la)
+    make_manifest(la, "french")
+    add_mmh55(b1, "19d", b"an unknown 55u.dll")
+    b2 = make_game(lb, exes=("H5_Game.exe",))
+    code, out = install(o["steam"], p(steam), stdin=f"9\n{p(work)}\n2\n")
+    check("The game is in several places:" in out and "1) " in out and "2) " in out
+          and "Steam; MMH5.5: a version we have not tested (its version file says 19d)" in out and "MMH5.5: not found" in out,
+          "game: several games: the list says for each where it comes from and its MMH5.5", out)
+    check("There is no number 9" in out and "That is not the game folder" in out and code == 0
+          and (b2 / "dinput8.dll").exists() and not (b1 / "dinput8.dll").exists(),
+          "game: a wrong number and a wrong folder are explained; then number 2 installs into the second game only", out)
+    code, out = install(o["steam"], p(steam), stdin=f"{p(b1.parent)}\n")
+    check(code == 0 and (b1 / "dinput8.dll").exists(), "game: with several games a pasted folder works too", out)
+    uninstall(o["game"], p(b1), stdin="y\n")
+    uninstall(o["game"], p(b2), stdin="y\n")
+
+    # nothing found: a wrong folder is explained, then Enter cancels
+    empty = work / "steam empty"
+    make_steam_for(empty, [empty], posix_paths)
+    code, out = install(o["steam"], p(empty), stdin=f"{p(work)}\n\n")
+    check(code == 4 and "That is not the game folder" in out and "Try again" in out and "No game folder, so nothing was installed" in out,
+          "game: none found, a wrong folder: explained, then Enter cancels with exit 4", out)
+
+    # the game is running: the installer and the uninstaller ask to close it
+    print(f"\nThe game is running ({who})")
+    b = make_game(work / "lib j")
+    code, out = install(o["game"], p(b))
+    fresh = make_game(work / "lib j2")
+    stop = start_fake_game(b)
+    try:
+        before = tree(b)
+        code, out = install(o["game"], p(b), stdin="q\n")
+        check(code == 8 and "The game is running (H5_Game.exe)" in out and "Close it and run install" in out
+              and "nothing was installed" in out and tree(b) == before,
+              "running: the installer asks to close the game; Q stops it (exit 8) and nothing is changed", out)
+        code, out = install(o["game"], p(b), stdin="")
+        check(code == 8, "running: with no answer at all it stops (exit 8)", out)
+        code, out = uninstall(o["game"], p(b), stdin="q\n")
+        check(code == 8 and "The game is running" in out and "nothing was removed" in out and tree(b) == before,
+              "running: the uninstaller asks the same, and removes nothing (exit 8)", out)
+        if who == "Windows":
+            code, out = install(o["game"], p(fresh), stdin="q\n")
+            check(code == 0 and "The game is running" not in out and (fresh / "dinput8.dll").exists(),
+                  "running: a game that runs from another folder does not stop an install into this one", out)
+        code, out = install(o["game"], p(b), stdin="s\n")
+        check(code == 0 and "The game is running" in out and "All done" in out, "running: S goes on anyway", out)
+    finally:
+        stop()
+    code, out = install(o["game"], p(b))
+    check(code == 0 and "The game is running" not in out, "running: once the game is closed it just installs", out)
+    code, out = uninstall(o["game"], p(b), stdin="y\n")
+    check(code == 0 and not (b / "dinput8.dll").exists(), "running: and the uninstaller removes", out)
+    uninstall(o["game"], p(fresh), stdin="y\n")
+
+
+def windows_only_game_tests(pkg, work, install, uninstall):
+    """GOG and MMH5.5's own entry in the registry (a key of our own with the same layout as
+    HKLM:\\SOFTWARE), the folder window (answered by -TestPicker), the pause at the end."""
+    print("\nFinding the game on Windows: GOG, MMH5.5's installer, the folder window, the pause")
+    shutil.rmtree(work, ignore_errors=True)
+    work.mkdir(parents=True)
+    key = f"HKCU:\\Software\\H5TogetherTest-{uuid.uuid4().hex[:10]}"
+
+    def reg_set(path, name, value):
+        code, out = run(["powershell", "-NoProfile", "-Command",
+                         f"New-Item -Path '{path}' -Force | Out-Null; Set-ItemProperty -LiteralPath '{path}' -Name '{name}' -Value '{value}'"])
+        if code != 0:
+            raise RuntimeError(f"could not write the test registry key {path}: {out}")
+
+    empty = work / "steam empty"
+    make_steam(empty, [empty])
+    # a GOG copy: its root holds goggame-<id>.info; and Heroes III, which must not count as ours
+    gog = work / "GOG Games" / "Heroes of Might and Magic 5"
+    gb = gog / "bin"
+    gb.mkdir(parents=True)
+    for e in ("H5_Game.exe", "MMH55_Utility_64.exe"):
+        (gb / e).write_bytes(b"fake " + e.encode())
+    (gog / "goggame-1207658787.info").write_bytes(b"{}")
+    homm3 = work / "GOG Games" / "HoMM 3 Complete"
+    homm3.mkdir()
+    (homm3 / "Heroes3.exe").write_bytes(b"fake")
+    try:
+        reg_set(f"{key}\\GOG.com\\Games\\1207658787", "gameName", "Heroes of Might and Magic 3 Complete")
+        reg_set(f"{key}\\GOG.com\\Games\\1207658787", "path", str(homm3))
+        reg_set(f"{key}\\GOG.com\\Games\\1207658800", "gameName", "Heroes of Might and Magic 5")
+        reg_set(f"{key}\\GOG.com\\Games\\1207658800", "path", str(gog) + "\\")
+        reg_set(f"{key}\\GOG.com\\Games\\1111111111", "path", str(work / "does not exist"))
+        code, out = install("-SteamDir", str(empty), "-TestRegistry", key)
+        check(code == 0 and (gb / "dinput8.dll").exists() and "Found the game." in out and "Found in:   GOG" in out,
+              "GOG: a game in GOG's registry list is found (path with a trailing backslash), marked GOG, no question asked", out)
+        check("Heroes3" not in out and "HoMM 3" not in out and "several places" not in out,
+              "GOG: Heroes III in the same list, and a folder that is gone, are ignored", out)
+        uninstall("-GameDir", str(gb), stdin="y\n")
+
+        # MMH5.5's own installer wrote an uninstall entry with the folder it installed into
+        mm = work / "other copy"
+        mmb = make_game(mm)
+        reg2 = key + "2"
+        reg_set(f"{reg2}\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{{CEC93C99-EB3D-4EBE-B0BE-AE228E5B47AE}}_is1",
+                "InstallLocation", str(mmb.parent) + "\\")
+        try:
+            code, out = install("-SteamDir", str(empty), "-TestRegistry", reg2)
+            check(code == 0 and (mmb / "dinput8.dll").exists() and "Found the game." in out,
+                  "MMH5.5's installer: the folder in its uninstall entry is found (any copy of the game)", out)
+            uninstall("-GameDir", str(mmb), stdin="y\n")
+        finally:
+            run(["powershell", "-NoProfile", "-Command", f"Remove-Item -LiteralPath '{reg2}' -Recurse -Force -ErrorAction SilentlyContinue"])
+
+        # Steam and GOG both have it: a list with both; the same game listed twice counts once
+        steam, lib = work / "steam both", work / "lib both"
+        make_steam(steam, [steam, lib])
+        sb = make_game(lib)
+        make_manifest(lib, "french")
+        reg_set(f"{key}\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{{CEC93C99-EB3D-4EBE-B0BE-AE228E5B47AE}}_is1",
+                "InstallLocation", str(gog))
+        code, out = install("-SteamDir", str(steam), "-TestRegistry", key, stdin="2\n")
+        check(code == 0 and "several places" in out and "1) " in out and "2) " in out and "3) " not in out
+              and "Steam; MMH5.5: a version we have not tested" in out and "GOG; MMH5.5: a version we have not tested" in out
+              and (gb / "dinput8.dll").exists() and not (sb / "dinput8.dll").exists(),
+              "GOG and Steam: both are listed (the GOG game once, though two entries name it); number 2 installs into it", out)
+        uninstall("-GameDir", str(gb), stdin="y\n")
+
+        # the folder window: B opens it (here answered by -TestPicker), and a cancelled window asks again
+        code, out = install("-SteamDir", str(empty), "-TestRegistry", key + "-none", "-TestPicker", str(gog), stdin="b\n")
+        check(code == 0 and (gb / "dinput8.dll").exists() and "Type B and press Enter" in out,
+              "folder window: B (none found) chooses the folder in a window; the choice is checked and installed", out)
+        uninstall("-GameDir", str(gb), stdin="y\n")
+        code, out = install("-SteamDir", str(empty), "-TestRegistry", key + "-none", "-TestPicker", "cancel", stdin="b\n\n")
+        check(code == 4 and "No folder chosen" in out and not (gb / "dinput8.dll").exists(),
+              "folder window: closing the window without a choice asks again; Enter cancels (exit 4)", out)
+        code, out = install("-SteamDir", str(empty), "-TestRegistry", key + "-none", "-TestPicker", str(work), stdin="b\n\n")
+        check(code == 4 and "That is not the game folder" in out and "Try again" in out,
+              "folder window: a folder that is not the game is refused with an explanation", out)
+        two = work / "steam two"
+        make_steam(two, [two, lib, work / "lib two"])
+        make_game(work / "lib two")
+        code, out = install("-SteamDir", str(two), "-TestRegistry", key + "-none", "-TestPicker", str(gog), stdin="b\n")
+        check(code == 0 and (gb / "dinput8.dll").exists() and "Or type B to choose another folder in a window" in out,
+              "folder window: with several games B also offers the window", out)
+        uninstall("-GameDir", str(gb), stdin="y\n")
+    finally:
+        run(["powershell", "-NoProfile", "-Command",
+             f"foreach ($k in '{key}', '{key}2', '{key}-none') {{ Remove-Item -LiteralPath $k -Recurse -Force -ErrorAction SilentlyContinue }}"])
+
+    # the window itself can be built here (the types exist in this PowerShell); it is not shown
+    code, out = run(["powershell", "-NoProfile", "-Command",
+                     "Add-Type -AssemblyName System.Windows.Forms; $f = New-Object System.Windows.Forms.Form; $f.TopMost = $true; "
+                     "$d = New-Object System.Windows.Forms.FolderBrowserDialog; $d.ShowNewFolderButton = $false; 'window ok'"])
+    check(code == 0 and "window ok" in out, "folder window: the folder dialog can be created on this Windows PowerShell", out)
+
+    # the window at the end: without -NoPause the script waits for Enter, so that a window opened by
+    # a double click stays on screen (Read-Host's prompt is not in a pipe's output: watch it wait)
+    b = make_game(work / "lib pause")
+    no_registry = key + "-none"
+    waits, code, out = run_until_it_waits(bat(str(pkg / "install.bat"), "-GameDir", str(b), "-TestRegistry", no_registry),
+                                          "To remove H5 Together")
+    check(waits and code == 0 and "All done" in out, "pause: the installer waits for Enter at the end (and ends with exit 0 after it)", out)
+    waits, code, out = run_until_it_waits(bat(str(pkg / "install.bat"), "-GameDir", str(work / "nope"), "-TestRegistry", no_registry),
+                                          "so nothing was installed")
+    check(waits and code == 4, "pause: it also waits when it stops early (no game found), then exits 4", out)
+    waits, code, out = run_until_it_waits(bat(str(pkg / "uninstall.bat"), "-GameDir", str(b), "-TestRegistry", no_registry),
+                                          "To put it back later", answer="y\n")
+    check(waits and code == 0 and not (b / "dinput8.dll").exists(), "pause: the uninstaller waits for Enter at the end too", out)
+
+
+def run_until_it_waits(cmd, marker, answer="\n", wait=4.0):
+    """Starts a command, waits until its output shows the marker and then `wait` more seconds, and
+    reports whether it is still running (waiting for a key). Then answers it. Returns (still running,
+    exit code, output)."""
+    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    chunks = []
+
+    def read():
+        for line in iter(proc.stdout.readline, b""):
+            chunks.append(line)
+    reader = threading.Thread(target=read, daemon=True)
+    reader.start()
+    deadline = time.time() + 120
+    while time.time() < deadline and proc.poll() is None and marker.encode() not in b"".join(chunks):
+        time.sleep(0.2)
+    time.sleep(wait)
+    waiting = proc.poll() is None
+    try:
+        if answer:
+            proc.stdin.write(answer.encode())
+        proc.stdin.close()
+        proc.wait(timeout=30)
+    except Exception:
+        proc.kill()
+        proc.wait()
+    reader.join(5)
+    return waiting, proc.returncode, b"".join(chunks).decode("utf-8", errors="replace")
+
+
+def start_fake_game_windows(bin_folder):
+    """Makes H5_Game.exe in the folder a copy of cmd.exe and starts it (it waits a minute for
+    nothing), so that Windows lists a program called H5_Game that runs from that folder."""
+    exe = Path(bin_folder) / "H5_Game.exe"
+    shutil.copyfile(Path(os.environ["SystemRoot"]) / "System32" / "cmd.exe", exe)
+    proc = subprocess.Popen([str(exe), "/c", "ping -n 60 127.0.0.1 >nul"],
+                            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    time.sleep(1.5)
+
+    def stop():
+        proc.kill()
+        proc.wait()
+        time.sleep(0.3)
+        exe.write_bytes(b"fake H5_Game.exe")
+    return stop
+
+
+def start_fake_game_linux(proc_dir):
+    """A process whose command line names H5_Game.exe, as the game's process does under Wine. The
+    scripts read H5_TOGETHER_PROC_DIR (set for all Linux tests, an empty folder to begin with)
+    instead of /proc, so this is a folder 4242/cmdline holding that command line: nothing real runs
+    (a real fake process did not always vanish from Git Bash's /proc when killed)."""
+    def start(bin_folder):
+        f = Path(proc_dir) / "4242" / "cmdline"
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_bytes(b"Z:\\home\\player\\game\\bin\\H5_Game.exe\0")
+
+        def stop():
+            f.unlink()
+            f.parent.rmdir()
+        return stop
+    return start
+
+
 # ---------------------------------------------------------------- the bug report script
 
 # What the report may hold: these four files and system.txt, nothing else.
@@ -669,24 +1032,29 @@ def bug_report_package_checks(pkg, zip_path):
     hashes = re.findall(r"`([0-9a-f]{64})`", row)
     check(len(hashes) == 2, "bug report: docs/plans/mmh55-rc19k.md still lists the 55u.dll hashes of RC19d and RC19k", row)
     if len(hashes) == 2:
-        forms = {"bug-report.ps1": '{h}" = "{v}"', "bug-report.sh": '{h}) echo "{v}"'}
-        for script, form in forms.items():
+        forms = {"ps1": '{h}" = "{v}"', "sh": '{h}) echo "{v}"'}
+        for script in ("bug-report.ps1", "bug-report.sh", "install.ps1", "install.sh", "uninstall.ps1", "uninstall.sh"):
             text = (pkg / script).read_text(encoding="ascii")
+            form = forms[script.rsplit(".", 1)[1]]
             check(form.format(h=hashes[0], v="RC19d") in text and form.format(h=hashes[1], v="RC19k") in text,
-                  f"bug report: {script} names 55u.dll {hashes[0][:8]}... RC19d and {hashes[1][:8]}... RC19k")
+                  f"MMH5.5 versions: {script} names 55u.dll {hashes[0][:8]}... RC19d and {hashes[1][:8]}... RC19k")
+        for script in ("install.sh", "uninstall.sh", "bug-report.sh"):
+            check('KNOWN_55U_NAMES="RC19d and RC19k"' in (pkg / script).read_text(encoding="ascii"),
+                  f"MMH5.5 versions: {script} lists the tested versions (RC19d and RC19k) in its warning")
 
 
 def system_text(files):
     return files["system.txt"].decode("utf-8-sig").replace("\r\n", "\n")
 
 
-def bug_report_tests(who, pkg, work, run_report, fmt=".zip", home_short=False, no_dump="-NoDump"):
+def bug_report_tests(who, pkg, work, run_report, fmt=".zip", home_short=False, no_dump="-NoDump", known_flag=""):
     """The bug report script against fake game folders.
 
     run_report(bin_folder, out_folder, *extra) runs the script and returns (exit code, output).
     fmt: ".zip", or ".tar.gz" when the script is told to make that (a tuple: either).
     home_short: the game folder is below the script's $HOME, so system.txt writes it as ~/...
-    no_dump: the script's option that leaves the crash report's .dmp out."""
+    no_dump: the script's option that leaves the crash report's .dmp out.
+    known_flag: the script's test option that counts a 55u.dll as a known MMH5.5 version."""
     print(f"\nBug report script ({who})")
     version = package_version(pkg)
     shutil.rmtree(work, ignore_errors=True)  # (so that a second run in the same --work-dir counts the reports again)
@@ -706,6 +1074,8 @@ def bug_report_tests(who, pkg, work, run_report, fmt=".zip", home_short=False, n
     check(all(files.get(n) == sources[n] for n in REPORT_FILES), "bug report: the four files are copied byte for byte")
     check(str(made[0]) in text.replace("\r", "") or made[0].name in text, "bug report: says where the file is", text)
     check("Nothing was sent anywhere" in text and "player names" in text, "bug report: says it sends nothing, and that the log has player names", text)
+    check("Your game" in text and "MMH5.5:     a version we have not tested (its version file says 19k)" in text,
+          "bug report: shows what it found of the game (the same screen as the installer), MMH5.5's version file included", text)
     s = system_text(files)
     check(f"dinput8.dll in the game folder: H5 Together {version}" in s, "bug report: system.txt names the add-on version in the game folder", s)
     check(f"the package this script came from: H5 Together {version}" in s, "bug report: system.txt names the version of the package it came from")
@@ -721,6 +1091,14 @@ def bug_report_tests(who, pkg, work, run_report, fmt=".zip", home_short=False, n
         check("game folder: ~/report lib/steamapps/common/" in s, "bug report: system.txt writes the home folder as ~", s)
     user = os.environ.get("USERNAME") or os.environ.get("USER") or ""
     check(len(user) < 4 or user not in s, "bug report: system.txt does not carry the user name", s)
+
+    # a 55u.dll that is a known MMH5.5 version is named in the report
+    known_out = work / "reports known"
+    code, text = run_report(b, known_out, known_flag, f"{sha(b / '55u.dll')}=RC19k")
+    made = report_files(known_out)
+    check(code == 0 and made and f"55u.dll: RC19k (sha256 {sha(b / '55u.dll')})" in system_text(read_report(made[0]))
+          and "MMH5.5:     RC19k (tested with H5 Together)" in text,
+          "bug report: a known 55u.dll is named (RC19k) in system.txt and on the found screen", text)
 
     # a second report in the same minute replaces the first; a new one never touches the game folder
     code, text = run_report(b, out)
@@ -882,11 +1260,17 @@ def windows_tests(pkg, work):
     make_steam(steam_only, [steam_only, lib2])
     bin2 = make_game(lib2)
 
+    # (-TestRegistry names a key that does not exist, so that the GOG and MMH5.5 entries that this
+    # PC may really have in HKLM are not looked at; the tests of those pass a key of their own)
+    no_registry = "HKCU:\\Software\\H5TogetherTest-none"
+
     def install(*args, stdin=""):
-        return run(bat(str(pkg / "install.bat"), "-NoPause", *args), stdin)
+        extra = [] if "-TestRegistry" in args else ["-TestRegistry", no_registry]
+        return run(bat(str(pkg / "install.bat"), "-NoPause", *extra, *args), stdin)
 
     def uninstall(*args, stdin=""):
-        return run(bat(str(pkg / "uninstall.bat"), "-NoPause", *args), stdin)
+        extra = [] if "-TestRegistry" in args else ["-TestRegistry", no_registry]
+        return run(bat(str(pkg / "uninstall.bat"), "-NoPause", *extra, *args), stdin)
 
     our_dll = (pkg / "dinput8.dll").read_bytes()
     our_ini = (pkg / "h5-together.ini").read_bytes()
@@ -1072,11 +1456,18 @@ def windows_tests(pkg, work):
     check(code == 7 and "h5-together\\texts" in out and not (tpl_bin / "dinput8.dll").exists() and not (tpl_bin / "h5-together").exists(),
           "package without the language files folder: exit 7, nothing installed", out)
 
+    # what the scripts find and say: the found screen, MMH5.5 and its version, warnings, several
+    # games, a game that is running; then what only Windows has (GOG, the folder window, the pause)
+    game_tests("Windows", pkg, work / "game", install, uninstall,
+               {"game": "-GameDir", "steam": "-SteamDir", "known": "-TestKnown55u"}, str, start_fake_game_windows)
+    windows_only_game_tests(pkg, work / "game windows", install, uninstall)
+
     # the bug report script
     def run_report(game_bin, out_dir, *extra):
-        return run(bat(str(pkg / "bug-report.bat"), "-NoPause", "-GameDir", str(game_bin), "-OutDir", str(out_dir), *extra))
+        return run(bat(str(pkg / "bug-report.bat"), "-NoPause", "-TestRegistry", no_registry,
+                       "-GameDir", str(game_bin), "-OutDir", str(out_dir), *extra))
 
-    bug_report_tests("Windows", pkg, work / "bug report", run_report)
+    bug_report_tests("Windows", pkg, work / "bug report", run_report, known_flag="-TestKnown55u")
     bug_report_windows_extra(pkg, work / "bug report extra", run_report)
 
     # PowerShell 5.1 specifically (the script must run there)
@@ -1094,6 +1485,10 @@ def posix(p):
 def linux_tests(pkg, work, bash):
     print(f"\nLinux scripts (install.sh / uninstall.sh) with {bash}")
     work.mkdir(parents=True, exist_ok=True)
+    # what the scripts see as the running programs: an empty folder (so a real game on this PC does not matter)
+    proc_dir = work / "proc"
+    proc_dir.mkdir(exist_ok=True)
+    os.environ["H5_TOGETHER_PROC_DIR"] = posix(proc_dir)
     home = work / "home"
     steam = home / ".local" / "share" / "Steam"
     flat = home / ".var" / "app" / "com.valvesoftware.Steam" / ".local" / "share" / "Steam"
@@ -1219,6 +1614,21 @@ def linux_tests(pkg, work, bash):
     code, out = run([bash, str(lone / "install.sh"), "--game-dir", posix(bin2)], "", env=env)
     check(code == 7 and not (bin2 / "dinput8.dll").exists(), "install.sh without dinput8.dll: exit 7", out)
 
+    # what the scripts find and say: the found screen, MMH5.5 and its version, warnings, several
+    # games, a game that is running
+    game_tests("Linux", pkg, work / "game", lambda *a, stdin="": sh("install.sh", *a, stdin=stdin),
+               lambda *a, stdin="": sh("uninstall.sh", *a, stdin=stdin),
+               {"game": "--game-dir", "steam": "--steam-dir", "known": "--test-known-55u"}, posix, start_fake_game_linux(proc_dir))
+
+    # Steam installed as a Snap
+    home_snap = work / "home_snap"
+    steam_snap = home_snap / "snap" / "steam" / "common" / ".local" / "share" / "Steam"
+    lib_snap = work / "lib_snap"
+    make_steam_for(steam_snap, [lib_snap], True)
+    bin_snap = make_game(lib_snap)
+    code, out = run([bash, str(pkg / "install.sh")], "", env=dict(os.environ, HOME=posix(home_snap)))
+    check(code == 0 and (bin_snap / "dinput8.dll").exists(), "Snap Steam folder is found", out)
+
     # the settings file: refreshed, values kept, backups
     ini_bin = make_game(work / "ini_lib")
     results = settings_tests("Linux", pkg, ini_bin,
@@ -1288,9 +1698,10 @@ def linux_tests(pkg, work, bash):
         return run_report
 
     run_report = report_runner(work / "bug_report")
-    bug_report_tests("Linux", pkg, work / "bug_report", run_report, fmt=(".zip", ".tar.gz"), home_short=True, no_dump="--no-dump")
+    bug_report_tests("Linux", pkg, work / "bug_report", run_report, fmt=(".zip", ".tar.gz"), home_short=True,
+                     no_dump="--no-dump", known_flag="--test-known-55u")
     bug_report_tests("Linux, --tar", pkg, work / "bug_report_tar", report_runner(work / "bug_report_tar", "--tar"), fmt=".tar.gz",
-                     home_short=True, no_dump="--no-dump")
+                     home_short=True, no_dump="--no-dump", known_flag="--test-known-55u")
 
     print("\nBug report script (Linux only)")
     extra = work / "bug_report_extra"
@@ -1316,6 +1727,7 @@ def main():
     ap.add_argument("--bash", help="bash to test the .sh scripts with (default: bash from PATH, if it is not WSL's)")
     ap.add_argument("--work-dir", type=Path, help="folder for the fake trees (default: a new temp folder)")
     ap.add_argument("--keep", action="store_true", help="do not delete the work folder at the end")
+    ap.add_argument("--only", choices=["windows", "linux"], help="run only the Windows or only the Linux script tests (faster while working)")
     args = ap.parse_args()
 
     work = args.work_dir or Path(tempfile.mkdtemp(prefix="h5-together-test-"))
@@ -1334,12 +1746,14 @@ def main():
     bug_report_package_checks(pkg, out_dir / "h5-together-0.0.0-test.zip")
 
     win = lin = None
-    if os.name == "nt":
+    if os.name == "nt" and args.only != "linux":
         win = windows_tests(pkg, work / "win")
     else:
-        print("\n(skipping the Windows script tests: not on Windows)")
+        print("\n(skipping the Windows script tests: " + ("--only linux" if args.only == "linux" else "not on Windows") + ")")
 
     bash = args.bash or shutil.which("bash")
+    if args.only == "windows":
+        bash = None
     if bash and os.name == "nt" and "system32" in bash.lower():
         bash = None  # that is WSL's launcher
     if bash:
