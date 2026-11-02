@@ -18,7 +18,7 @@ if (-not $vcvars) {
 }
 if (-not $vcvars) { throw "no Visual Studio found; set HOOK_VCVARS to vcvarsall.bat" }
 
-$sources = "dllmain.cpp", "log.cpp", "game_build.cpp", "hooks.cpp", "ai_trace.cpp", "robot.cpp", "robot_input.cpp", "robot_endturn.cpp", "robot_trace.cpp", "robot_menu.cpp", "robot_screen.cpp", "robot_ui.cpp", "robot_lobby.cpp", "robot_net.cpp", "robot_profile.cpp", "robot_paths.cpp", "robot_clock.cpp", "patch.cpp", "d3d9_hook.cpp", "watchdog.cpp", "..\mods\net_tuning.cpp", "..\mods\lan_discovery.cpp", "..\mods\coop_guard.cpp", "..\mods\lockstep.cpp", "..\mods\ai_pacing.cpp", "..\mods\autosave.cpp", "..\mods\notify.cpp", "..\mods\rmg_teams.cpp", "..\mods\rmg_templates.cpp", "..\mods\fast_paths.cpp", "..\mods\fast_paths_relax.cpp", "..\mods\fast_paths_search.cpp", "..\mods\fast_paths_expand.cpp", "..\mods\fast_paths_ashore.cpp", "..\mods\original_music.cpp", "..\mods\original_music_xdb.cpp", "..\mods\player_list.cpp", "..\mods\player_list_game.cpp", "..\mods\player_list_draw.cpp", "..\mods\rmg_maker.cpp", "..\mods\rmg_recipe.cpp", "..\mods\rmg_join.cpp", "..\mods\camera.cpp", "..\mods\languages.cpp", "..\mods\languages_text.cpp", "dinput_hook.cpp", "input_mute.cpp", "overlay.cpp", "overlay_input.cpp", "overlay_textures.cpp", "overlay_test_panel.cpp", "..\mods\rmg_builder.cpp", "..\mods\rmg_builder_data.cpp", "..\mods\rmg_builder_widgets.cpp", "..\mods\rmg_screen.cpp", "..\mods\rmg_factions.cpp", "..\mods\audio_volume.cpp", "..\mods\edge_sky.cpp", "..\mods\wheel.cpp", "..\mods\wheel_logic.cpp", "..\mods\host_rules.cpp", "..\mods\host_rules_logic.cpp", "..\mods\host_rules_panel.cpp", "..\mods\host_rules_bonus.cpp", "..\mods\host_rules_icons.cpp", "..\mods\host_rules_classes.cpp", "..\mods\hero_skins.cpp", "..\mods\hero_skins_logic.cpp", "..\mods\hero_skins_panel.cpp"
+$sources = "dllmain.cpp", "log.cpp", "game_build.cpp", "hooks.cpp", "ai_trace.cpp", "robot.cpp", "robot_input.cpp", "robot_endturn.cpp", "robot_trace.cpp", "robot_menu.cpp", "robot_screen.cpp", "robot_ui.cpp", "robot_lobby.cpp", "robot_net.cpp", "robot_profile.cpp", "robot_paths.cpp", "robot_clock.cpp", "patch.cpp", "d3d9_hook.cpp", "watchdog.cpp", "..\mods\net_tuning.cpp", "..\mods\lan_discovery.cpp", "..\mods\coop_guard.cpp", "..\mods\lockstep.cpp", "..\mods\ai_pacing.cpp", "..\mods\autosave.cpp", "..\mods\notify.cpp", "..\mods\rmg_teams.cpp", "..\mods\rmg_templates.cpp", "..\mods\fast_paths.cpp", "..\mods\fast_paths_relax.cpp", "..\mods\fast_paths_search.cpp", "..\mods\fast_paths_expand.cpp", "..\mods\fast_paths_ashore.cpp", "..\mods\original_music.cpp", "..\mods\original_music_xdb.cpp", "..\mods\player_list.cpp", "..\mods\player_list_game.cpp", "..\mods\player_list_draw.cpp", "..\mods\rmg_maker.cpp", "..\mods\rmg_recipe.cpp", "..\mods\rmg_join.cpp", "..\mods\camera.cpp", "..\mods\languages.cpp", "..\mods\languages_text.cpp", "dinput_hook.cpp", "input_mute.cpp", "overlay.cpp", "overlay_input.cpp", "overlay_textures.cpp", "overlay_test_panel.cpp", "..\mods\rmg_builder.cpp", "..\mods\rmg_builder_data.cpp", "..\mods\rmg_builder_widgets.cpp", "..\mods\rmg_screen.cpp", "..\mods\rmg_factions.cpp", "..\mods\audio_volume.cpp", "..\mods\edge_sky.cpp", "..\mods\wheel.cpp", "..\mods\wheel_logic.cpp", "..\mods\host_rules.cpp", "..\mods\host_rules_logic.cpp", "..\mods\host_rules_panel.cpp", "..\mods\host_rules_bonus.cpp", "..\mods\host_rules_icons.cpp", "..\mods\host_rules_classes.cpp", "..\mods\hero_skins.cpp", "..\mods\hero_skins_logic.cpp", "..\mods\hero_skins_panel.cpp", "..\mods\steam_spike.cpp", "..\mods\steam_spike_logic.cpp"
 # Source paths are relative to src\hook (the build runs there): with the full
 # path of a deep folder, the command line grew past cmd's 8191 characters.
 # Dear ImGui (third_party\imgui, for the player list overlay): the same settings
@@ -64,6 +64,18 @@ if ($Test) {
     $cmd += " && cl $flags test\wheel_test.cpp ..\mods\wheel_logic.cpp /Fo`"$out\\`" /Fe`"$out\wheel_test.exe`""
     # the host rules: H55-Settings.lua read and served with other values, the start script's edits, the carried texts, the hello's codes
     $cmd += " && cl $flags test\host_rules_test.cpp ..\mods\host_rules_logic.cpp /Fo`"$out\\`" /Fe`"$out\host_rules_test.exe`""
+    # the Steam spike's pure work: its setting, log names, test messages, round trips
+    $cmd += " && cl $flags test\steam_spike_test.cpp ..\mods\steam_spike_logic.cpp /Fo`"$out\\`" /Fe`"$out\steam_spike_test.exe`""
+    # our Steamworks declarations against Valve's SDK headers, only where the SDK is (ref\ is never
+    # committed; a worktree has none, so STEAMWORKS_SDK can name an unpacked SDK folder)
+    $sdk_dirs = @()
+    if ($env:STEAMWORKS_SDK) { $sdk_dirs += Get-Item $env:STEAMWORKS_SDK -ErrorAction SilentlyContinue }
+    $sdk_dirs += Get-ChildItem (Join-Path $repo "ref") -Directory -Filter "steamworks_sdk_*" -ErrorAction SilentlyContinue | Sort-Object Name -Descending
+    $sdk = $sdk_dirs | Where-Object { $_ -and (Test-Path (Join-Path $_.FullName "sdk\public\steam\steam_api.h")) } | Select-Object -First 1
+    if ($sdk) {
+        $sdk_inc = Join-Path $sdk.FullName "sdk\public"
+        $cmd += " && cl /nologo /W3 /EHsc /std:c++17 /D_CRT_SECURE_NO_WARNINGS /I`"$sdk_inc`" test\steam_abi_check.cpp /Fo`"$out\\`" /Fe`"$out\steam_abi_check.exe`""
+    }
     # the hang watchdog on a thread of its own that freezes on purpose (own object folder: built with WATCHDOG_TEST)
     $wd_out = Join-Path $out "watchdog_test"
     New-Item -ItemType Directory -Force $wd_out | Out-Null
@@ -118,6 +130,12 @@ if ($Test) {
         if ($LASTEXITCODE -ne 0) { throw "mouse wheel test failed" }
         & (Join-Path $out "host_rules_test.exe")
         if ($LASTEXITCODE -ne 0) { throw "host rules test failed" }
+        & (Join-Path $out "steam_spike_test.exe")
+        if ($LASTEXITCODE -ne 0) { throw "Steam spike test failed" }
+        if ($sdk) {
+            & (Join-Path $out "steam_abi_check.exe")
+            if ($LASTEXITCODE -ne 0) { throw "Steam declarations check failed" }
+        } else { Write-Host "Steam declarations check skipped: no ref\steamworks_sdk_* here" }
         Remove-Item -ErrorAction SilentlyContinue open-homm5.log
         & (Join-Path $out "watchdog_test.exe")
         if ($LASTEXITCODE -ne 0) { Get-Content open-homm5.log; throw "watchdog test failed" }

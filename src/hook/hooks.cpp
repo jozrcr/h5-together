@@ -27,6 +27,7 @@
 #include "../mods/rmg_factions.h"
 #include "../mods/rmg_teams.h"
 #include "../mods/rmg_templates.h"
+#include "../mods/steam_spike.h"
 #include "../mods/wheel.h"
 
 namespace hooks {
@@ -72,6 +73,7 @@ void InstallAll()
 		return;
 	}
 	watchdog::Install();  // first: the others register their state for its reports
+	mods::ApplySteamSpikeFromSettings();  // [online] spike (test only, off by default): early, before the game's Direct3D device
 	InstallAiTrace();
 	mods::ApplyNetTuningFromSettings();
 	mods::ApplyFastPathsFromSettings();

@@ -139,11 +139,34 @@ def write_mod_settings(game, args, instance):
     skins = getattr(args, "skins_setting", None) or []  # e.g. trace=1, show_others=0
     if skins:
         lines += ["[skins]"] + skins
+    # [online] = the Steam spike (src/mods/steam_spike.cpp), off by default
+    online = getattr(args, "online_setting", None) or []  # e.g. spike=1, app_id=480
+    if online:
+        lines += ["[online]"] + online
+    keep_player_file(mod_settings_file(game, instance))
     mod_settings_file(game, instance).write_text("\n".join(lines) + "\n", encoding="ascii")
     choices = skins_file(game, instance)
+    keep_player_file(choices)
     choices.unlink(missing_ok=True)
     if getattr(args, "skins_file", None):
         shutil.copy2(args.skins_file, choices)
+
+
+def keep_player_file(path):
+    """The test copies are also played by hand: keep the player's own settings file
+    aside for the run (put back by put_back_player_file). A backup left by a run
+    that never finished is the player's, so it is never overwritten."""
+    backup = path.with_name(path.name + ".robot-backup")
+    if path.exists() and not backup.exists():
+        shutil.copy2(path, backup)
+
+
+def put_back_player_file(path):
+    """Remove the run's file and put the player's back, if there was one."""
+    backup = path.with_name(path.name + ".robot-backup")
+    path.unlink(missing_ok=True)
+    if backup.exists():
+        shutil.move(str(backup), str(path))
 
 
 def skins_file(game, instance):
@@ -373,8 +396,8 @@ def collect(game, out, instance, exit_code, elapsed):
     # Leave the test copy playable by hand: without this file the DLL does not
     # enter robot mode (it only logs AI steps).
     ini.unlink(missing_ok=True)
-    mod_settings_file(game, instance).unlink(missing_ok=True)
-    skins_file(game, instance).unlink(missing_ok=True)
+    put_back_player_file(mod_settings_file(game, instance))
+    put_back_player_file(skins_file(game, instance))
     profile = game / "bin" / ("open-homm5-profile%s.txt" % ("-" + instance if instance else ""))
     if profile.exists():  # AI profiler samples (profile_ai), see tools/robot/profile_report.py
         shutil.move(str(profile), str(out / "ai-profile.txt"))
@@ -454,6 +477,9 @@ def main():
                    help="[rules] setting, e.g. governance=0 or trace=1 (repeatable; src/mods/host_rules.cpp)")
     p.add_argument("--debug-setting", action="append", default=[], metavar="KEY=VALUE",
                    help="[debug] setting, e.g. hang_test_at=60 or hang_seconds=10 (repeatable; src/hook/watchdog.cpp)")
+    p.add_argument("--online-setting", action="append", default=[], metavar="KEY=VALUE",
+                   help="[online] setting, e.g. spike=1 or app_id=480 (repeatable; src/mods/steam_spike.cpp; "
+                        "needs bin\\open-homm5\\steam_api.dll in the test copy)")
     p.add_argument("--resolution", default="1024x768", metavar="WxH",
                    help="the game window's size (windowed), e.g. 1920x1080 (default 1024x768)")
     p.add_argument("--trace-moves", action="store_true", help="log what the start-move command calls (robot_trace.cpp)")
