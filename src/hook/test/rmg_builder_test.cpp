@@ -1,14 +1,16 @@
 // Test of the template builder's data (src/mods/rmg_builder_data.cpp), no game
 // needed. Run by build.ps1 -Test:
-//   rmg_builder_test.exe <src/mods/rmg/templates>
+//   rmg_builder_test.exe <src/mods/rmg/templates> <src/mods/texts>
 // It checks that:
 //   - the presets are the ready templates: each recipe builds its ready file's
 //     bytes (with the name), and every ready file has a preset;
 //   - whatever the panel can offer has a recipe name (so "Use" always works),
 //     and the maker's own check (CheckChoices) agrees with MakeTemplate;
 //   - the zone map's positions are the web page's (numbers from Node);
-//   - the French words of the maker's warnings, the game's text format, and
-//     that a UI file we do not know is left alone.
+//   - the maker's messages have ids, said in English as the maker says them and
+//     in French with their numbers (en.txt, fr.txt); every word of the panel is
+//     in both files; the game's text format, and that a UI file we do not know
+//     is left alone.
 #include <windows.h>
 #include <math.h>
 #include <stdio.h>
@@ -20,6 +22,7 @@
 #include "../../mods/rmg_builder_data.h"
 #include "../../mods/rmg_maker.h"
 #include "../../mods/rmg_recipe.h"
+#include "../texts_logic.h"
 
 namespace {
 
@@ -210,30 +213,103 @@ void TestPositions()
 	}
 }
 
-void TestWords()
+void TestWords(const std::string &texts_dir)
 {
-	const std::string small = "Zones are small (3600 tiles each): pick a bigger map or fewer zones.";
-	const std::string big = "Zones are very big (9000 tiles each): the generator may leave them empty; pick a smaller map or more zones.";
-	const std::string rich = "Some zones hold more treasure (340000) than any shipped template (252000); not tested in the game yet.";
-	const std::string players = "the game allows at most 8 players (9 asked)";
-	Check(data::Localize(small, data::kEnglish) == small, "English warnings stay as the maker says them");
-	Check(data::Localize(small, data::kFrench).find("3600 cases") != std::string::npos, "French: small zones");
-	Check(data::Localize(big, data::kFrench).find("9000 cases") != std::string::npos, "French: big zones");
-	Check(data::Localize(rich, data::kFrench).find("340000") != std::string::npos &&
-	          data::Localize(rich, data::kFrench).find("252000") != std::string::npos,
-	      "French: treasure");
-	Check(data::Localize(players, data::kFrench).find("(9 demand") != std::string::npos, "French: 8 players at most");
-	Check(data::Localize("something else", data::kFrench) == "something else", "an unknown text stays as it is");
-	for (int language = 0; language < 2; ++language) {
-		const data::Words &w = data::WordsFor(language);
-		const char *const *all = reinterpret_cast<const char *const *>(&w);
-		bool filled = true;
-		for (size_t i = 0; i < sizeof(data::Words) / sizeof(const char *); ++i)
-			filled = filled && all[i] && all[i][0];
-		Check(filled, language ? "every French word is there" : "every English word is there");
+	std::string en_bytes, fr_bytes;
+	texts::Book en, fr;
+	Check(ReadFileBytes(texts_dir + "\\en.txt", &en_bytes) && texts::Parse(en_bytes, &en) &&
+	          ReadFileBytes(texts_dir + "\\fr.txt", &fr_bytes) && texts::Parse(fr_bytes, &fr),
+	      "en.txt and fr.txt read");
+	const auto text = [](const texts::Book &b, const char *key) {
+		const auto it = b.texts.find(key);
+		return it == b.texts.end() ? nullptr : it->second.c_str();
+	};
+	// The maker's messages: each with an id; in English the panel says what the maker says,
+	// in French its own words with the message's numbers.
+	std::vector<Choices> cases;
+	Choices c;
+	c.teams = 1;
+	cases.push_back(c);  // too few teams
+	c.teams = 3;
+	c.per_team = 3;
+	cases.push_back(c);  // 9 players
+	c = Choices();
+	c.size = "XL";
+	cases.push_back(c);  // 2 teams of 2 on an extra large map: big zones
+	c = Choices();
+	c.teams = 4;
+	c.per_team = 2;
+	c.team_zones = 2;
+	c.border_zones = 2;
+	c.centre_zones = 2;
+	c.size = "S";
+	cases.push_back(c);  // many zones on a small map: small zones
+	c = Choices();
+	c.loot = "veryrich";
+	c.size = "H";
+	c.underground = true;
+	cases.push_back(c);  // very rich: more treasure than any shipped template
+	// a few French words of each message (fr.txt), and whether it has numbers
+	const struct {
+		MessageId id;
+		const char *fr_part;
+		int numbers;
+	} kFrench[] = {{MessageId::kTooFewTeams, "Il faut au moins 2", 0},
+	               {MessageId::kTooManyPlayers, " demand", 1},
+	               {MessageId::kSmallZones, "Zones petites (", 1},
+	               {MessageId::kBigZones, "Zones tr", 1},
+	               {MessageId::kRichZones, "que tout mod", 2}};
+	int said = 0;
+	bool seen[6] = {};
+	for (const Choices &k : cases) {
+		Template t;
+		std::string error, check_error;
+		Message m, check_m;
+		const bool made = MakeTemplate(k, &t, &error, &m);
+		CheckChoices(k, &check_error, &check_m);
+		std::vector<std::pair<std::string, Message>> messages;
+		if (!made)
+			messages.push_back({error, m});
+		for (size_t i = 0; i < t.warnings.size(); ++i)
+			messages.push_back({t.warnings[i], i < t.warning_ids.size() ? t.warning_ids[i] : Message()});
+		Check(t.warnings.size() == t.warning_ids.size(), "each warning of the maker has its id");
+		if (!made)
+			Check(check_m.id == m.id && check_m.a == m.a, "CheckChoices gives the same message id as MakeTemplate");
+		for (const auto &msg : messages) {
+			const char *key = data::MessageKey(msg.second.id);
+			if (!key)
+				continue;
+			seen[static_cast<int>(msg.second.id)] = true;
+			char what[300];
+			_snprintf_s(what, sizeof(what), _TRUNCATE, "English: %s = what the maker says (%s)", key, msg.first.c_str());
+			Check(data::MessageText(msg.second, text(en, key), msg.first) == msg.first, what);
+			const std::string french = data::MessageText(msg.second, text(fr, key), msg.first);
+			bool ok = false;
+			for (const auto &f : kFrench)
+				if (f.id == msg.second.id)
+					ok = french.find(f.fr_part) != std::string::npos &&
+					     (f.numbers < 1 || french.find(std::to_string(msg.second.a)) != std::string::npos) &&
+					     (f.numbers < 2 || french.find(std::to_string(msg.second.b)) != std::string::npos);
+			_snprintf_s(what, sizeof(what), _TRUNCATE, "French: %s in its words, with its numbers (%s)", key, french.c_str());
+			Check(ok, what);
+			++said;
+		}
 	}
-	const std::string text = data::GameText("Mod\xc3\xa8les...");
-	Check(text == std::string("\xff\xfeM\0o\0d\0\xe8\0l\0e\0s\0.\0.\0.\0", 22), "the game's text format (UTF-16 with its mark)");
+	Check(seen[1] && seen[2] && seen[3] && seen[4] && seen[5], "each of the five kinds of messages was seen");
+	Check(data::MessageText(Message(), "ignored", "unknown loot level x") == "unknown loot level x",
+	      "a message without an id stays in the maker's words");
+	// Every word of the panel is a text of en.txt and fr.txt.
+	const char *const *all = reinterpret_cast<const char *const *>(&data::kKeys);
+	int missing = 0;
+	for (size_t i = 0; i < sizeof(data::Words) / sizeof(const char *); ++i)
+		if (!all[i] || !text(en, all[i]) || !text(fr, all[i])) {
+			printf("FAIL: %s is not in en.txt and fr.txt\n", all[i] ? all[i] : "(none)");
+			++missing;
+		}
+	Check(missing == 0, "every word of the builder is in en.txt and fr.txt");
+	printf("ok  : %d maker messages said in English and French\n", said);
+	const std::string game_text = data::GameText("Mod\xc3\xa8les...");
+	Check(game_text == std::string("\xff\xfeM\0o\0d\0\xe8\0l\0e\0s\0.\0.\0.\0", 22), "the game's text format (UTF-16 with its mark)");
 	std::string out = "untouched";
 	Check(!data::MakeMainPanel("<WindowSimpleShared/>", &out) && out == "untouched", "a main panel we do not know is left alone");
 	Check(!data::MakeButton("<WindowMSButton/>", &out) && !data::MakeReaction("<UISRunReaction/>", &out),
@@ -244,14 +320,14 @@ void TestWords()
 
 int main(int argc, char **argv)
 {
-	if (argc < 2) {
-		printf("usage: rmg_builder_test <src/mods/rmg/templates>\n");
+	if (argc < 3) {
+		printf("usage: rmg_builder_test <src/mods/rmg/templates> <src/mods/texts>\n");
 		return 2;
 	}
 	TestPresets(argv[1]);
 	TestPanelChoices();
 	TestPositions();
-	TestWords();
+	TestWords(argv[2]);
 	if (g_failed) {
 		printf("rmg builder: %d of %d checks FAILED\n", g_failed, g_checks);
 		return 1;

@@ -22,8 +22,7 @@ extern const int kPresetCount;
 // The preset whose recipe the choices encode to, or -1.
 int PresetOf(const Choices &choices);
 
-// --- words -------------------------------------------------------------------------------
-enum Language { kEnglish = 0, kFrench = 1 };  // as overlay::Language
+// --- words: the [builder] texts (src/hook/texts.h) ----------------------------------------
 struct Words {
 	const char *title;
 	const char *start_from, *custom;
@@ -32,21 +31,25 @@ struct Words {
 	const char *loot_section, *loot, *loot_items[4], *guards, *guard_items[3], *by_distance, *same, *rings[4];
 	const char *map_section, *size, *auto_size, *sizes[7], *underground;
 	const char *legend;
-	const char *stats;         // printf: players, zones, neutral zones
-	const char *size_line;     // printf: the size (sizes[i])
+	const char *stats;         // {players}, {zones}, {neutral}
+	const char *size_line;     // {size} (one of sizes[])
 	const char *size_line_ug;  // the same, with underground
 	const char *use, *save, *cancel;
-	const char *saved, *not_saved, *use_failed;  // printf: a file name / a reason
+	const char *saved, *not_saved, *use_failed;  // {file} / {code}
 	const char *native_button, *native_tooltip;
 };
-const Words &WordsFor(int language);
+// The panel's words as text keys: texts::Table(kKeys) gives them in the player's language.
+extern const Words kKeys;
 
 // The loot / guard words of the maker, in order ("poor"... / "weak"...).
 extern const char *const kLootKeys[4];
 extern const char *const kGuardKeys[3];
 
-// A warning or an error of the maker in the panel's language (English: as it is).
-std::string Localize(const std::string &maker_text, int language);
+// A message of the maker as the panel shows it: `english` (the maker's own
+// words) for a message without an id, else the text of MessageKey(m.id) (`text`,
+// in the player's language) with the message's numbers.
+const char *MessageKey(MessageId id);  // "builder.msg.small_zones"..., nullptr for MessageId::kNone
+std::string MessageText(const Message &m, const char *text, const std::string &english);
 
 // --- the zone map: the page's positions() (tools/rmg/template-maker.html) ---------------
 // In the page's drawing units: a 560x480 box, the circle centred at 280,240, radius 190.

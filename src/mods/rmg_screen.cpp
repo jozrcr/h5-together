@@ -69,6 +69,7 @@
 #include "../hook/log.h"
 #include "../hook/overlay.h"
 #include "../hook/patch.h"
+#include "../hook/texts.h"
 
 namespace mods {
 namespace {
@@ -243,7 +244,7 @@ GameStream *__fastcall OpenHook(void *vfs, void *edx, const GameString *path)
 		const bool ours = key == button_key || key == reaction_key || key == label_key || key == tooltip_key;
 		if (!ours || !g_native)
 			return g_open_next(vfs, edx, path);
-		const data::Words &w = data::WordsFor(overlay::PanelLanguage());
+		const data::Words &w = texts::Table(data::kKeys);
 		const std::string bytes = key == button_key     ? g_button
 		                          : key == reaction_key ? g_reaction
 		                          : key == label_key    ? data::GameText(w.native_button)

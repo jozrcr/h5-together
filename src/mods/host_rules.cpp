@@ -246,6 +246,7 @@ bool g_start_known = false;      // this PC's start script (H55-AdvMap.lua) was 
 uint32_t g_start_hash = 0;       // its "StartingBonus" part (0 = not found)
 bool g_start_patchable = false;  // our edits fit it
 std::string g_start_problem;     // why not
+bool g_start_missing = false;    // why not: there is no such file
 Values g_chosen = rules::NoValues();  // host: [rules] <key>= (valid values only)
 
 const int kHashes = 5;  // rest, whole, stats, start script, class table
@@ -265,12 +266,17 @@ const void *g_pcs_logic = nullptr;  // the host lobby they belong to
 DWORD g_host_seen = 0, g_client_seen = 0;  // the last update of each lobby logic (tick)
 bool g_will_apply = false;
 bool g_start_ok = false;   // host: every PC can take the start rules (the same start script, our edits fit)
-std::string g_start_why;   // host: why not
+std::string g_start_why;   // host: why not (for the log)
+rules::Why g_start_why_code;  // the same for the panel
 bool g_class_ok = false;   // host: every PC can take class_skills (the host's class table, editable)
-std::string g_class_why;   // host: why not
+std::string g_class_why;   // host: why not (for the log)
+rules::Why g_class_why_code;
 std::string g_map_path;   // host: the lobby's map
 int g_map_script = -1;    // host: does it have a map script (-1 unknown)
-std::vector<std::string> g_missing, g_differ;
+std::vector<std::string> g_missing;
+std::vector<rules::Differ> g_differ;
+// rules::Differ::what for the log (the panel has them in the player's words)
+const char *const kDifferWhat[3] = {"H55-Settings.lua (besides the rules)", "H55-Settings.lua", "MMH5.5's stats files"};
 
 bool g_lobby_known = false;  // client: what the host sent in the lobby
 Values g_lobby_values = rules::NoValues();
@@ -511,6 +517,7 @@ void LoadFiles()
 			g_start_hash = hash;
 			g_start_patchable = fits;
 			g_start_problem = fits ? std::string() : why;
+			g_start_missing = !read;
 		}
 	}
 	{
@@ -747,10 +754,14 @@ void CheckPlayers(const void *logic, const BYTE *info, bool log)
 	g_start_why = !g_start_known ? "this PC's H55-AdvMap.lua was not read yet"
 	              : !g_start_patchable ? "the host's H55-AdvMap.lua: " + g_start_problem
 	                                   : std::string();
+	g_start_why_code.code = !g_start_known ? rules::Why::kStartNotRead : !g_start_patchable ? rules::Why::kStartHost : rules::Why::kNone;
+	g_start_why_code.player.clear();
 	const rules::ClassInfo classes = rules::ClassTableInfo();
 	g_class_ok = classes.editable;
 	g_class_why = classes.editable ? std::string() : "the host's class table cannot be edited (" + classes.why + ")";
-	static const char *const kWhat[3] = {"H55-Settings.lua (besides the rules)", "H55-Settings.lua", "MMH5.5's stats files"};
+	g_class_why_code.code = classes.editable ? rules::Why::kNone : rules::Why::kClassHost;
+	g_class_why_code.player.clear();
+	const char *const *kWhat = kDifferWhat;
 	for (int pc : HumanClients(logic, info)) {
 		Pc *p = FindPc(pc);
 		const std::string name = PcName(info, pc);
@@ -761,9 +772,12 @@ void CheckPlayers(const void *logic, const BYTE *info, bool log)
 		}
 		// the start script: the same "StartingBonus" part as the host's (then our edits fit it there too)
 		if (!p->has[3] || p->hash[3] != g_start_hash) {
-			if (g_start_ok)
+			if (g_start_ok) {
 				g_start_why = name + (p->has[3] ? "'s H55-AdvMap.lua is not the host's (its StartingBonus part differs)"
 				                                : " has not sent its H55-AdvMap.lua's hash yet");
+				g_start_why_code.code = p->has[3] ? rules::Why::kStartDiffers : rules::Why::kStartWaiting;
+				g_start_why_code.player = name;
+			}
 			g_start_ok = false;
 			if (log && p->has[3] && !p->told[3]) {
 				p->told[3] = true;
@@ -774,10 +788,15 @@ void CheckPlayers(const void *logic, const BYTE *info, bool log)
 		}
 		// the class table: the host's, and editable there (a PC that cannot edit its table sends 0)
 		if (!p->has[4] || p->hash[4] == 0 || p->hash[4] != classes.hash) {
-			if (g_class_ok)
+			if (g_class_ok) {
 				g_class_why = name + (!p->has[4]        ? " has not sent its class table's hash yet"
 				                      : p->hash[4] == 0 ? "'s class table cannot be edited"
 				                                        : "'s class table is not the host's (another MMH5.5 version?)");
+				g_class_why_code.code = !p->has[4]        ? rules::Why::kClassWaiting
+				                        : p->hash[4] == 0 ? rules::Why::kClassCannot
+				                                          : rules::Why::kClassDiffers;
+				g_class_why_code.player = name;
+			}
 			g_class_ok = false;
 			if (log && p->has[4] && !p->told[4]) {
 				p->told[4] = true;
@@ -792,7 +811,7 @@ void CheckPlayers(const void *logic, const BYTE *info, bool log)
 				continue;
 			if (k == 1 && p->has[0] && p->hash[0] == mine[0])
 				continue;  // only the rules' values differ: the host's replace them
-			g_differ.push_back(name + ": " + kWhat[k]);
+			g_differ.push_back({name, k});
 			if (log && !p->told[k]) {
 				p->told[k] = true;
 				hooklog::Write("rules: CHECK: %s (PC %d) has another %s than the host (%08x, host %08x): the game may "
@@ -1108,8 +1127,8 @@ void __fastcall HostStartHook(void *logic, void *edx)
 			g_armed = true;
 			g_armed_values = values;
 			std::string differ;
-			for (const std::string &d : g_differ)
-				differ += "; files differ: " + d;
+			for (const rules::Differ &d : g_differ)
+				differ += "; files differ: " + d.player + ": " + kDifferWhat[d.what];
 			hooklog::Write("rules: START: every player has H5 Together's rules: this game uses %s (the host's choices: %s)%s",
 			               ValueList(values).c_str(), ValueList(g_chosen).c_str(), differ.c_str());
 		}
@@ -1321,16 +1340,16 @@ View GetView(View::Role role)
 			v.missing = g_missing;
 			v.differ = g_differ;
 			v.start_ok = g_start_ok;
-			v.start_why = g_start_why;
+			v.start_why = g_start_why_code;
 			v.class_ok = g_class_ok;
-			v.class_why = g_class_why;
+			v.class_why = g_class_why_code;
 		}
 		else {  // the setup screen: only this PC's own start script and class table are known
 			v.start_ok = !g_start_known || g_start_patchable;
-			v.start_why = g_start_problem;
+			v.start_why.code = g_start_missing ? rules::Why::kStartMissing : rules::Why::kStartThisPc;
 			const rules::ClassInfo classes = rules::ClassTableInfo();
 			v.class_ok = !classes.read || classes.editable;
-			v.class_why = classes.why;
+			v.class_why.code = rules::Why::kClassThisPc;
 		}
 	}
 	else if (role == View::kClient) {

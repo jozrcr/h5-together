@@ -10,6 +10,34 @@
 namespace mods {
 namespace rules {
 
+// Why the start rules or class_skills cannot be used: the panel says it in the
+// player's language (the rules.why.* texts, in this order); the technical
+// detail is in the log.
+struct Why {
+	enum Code {
+		kNone = -1,
+		kStartNotRead,   // this PC's start script was not read yet
+		kStartMissing,   // this PC has no start script
+		kStartThisPc,    // this PC's start script is not one our edits fit
+		kStartHost,      // the host's start script is not one our edits fit
+		kStartDiffers,   // player's start script is not the host's
+		kStartWaiting,   // player has not sent its start script's hash yet
+		kClassThisPc,    // this PC's class table cannot be edited
+		kClassHost,      // the host's class table cannot be edited
+		kClassWaiting,   // player has not sent its class table's hash yet
+		kClassCannot,    // player's class table cannot be edited
+		kClassDiffers,   // player's class table is not the host's
+		kCount
+	} code = kNone;
+	std::string player;
+};
+
+// A player whose MMH5.5 files differ from the host's.
+struct Differ {
+	std::string player;
+	int what;  // 0 H55-Settings.lua besides the rules, 1 H55-Settings.lua, 2 MMH5.5's stats files
+};
+
 // What the panel shows, taken under the mod's lock.
 struct View {
 	enum Role { kNoGame, kSetup, kHost, kClient, kInGame } role = kNoGame;  // kSetup: the host's setup screen
@@ -22,17 +50,17 @@ struct View {
 	bool will_apply = false;  // host and client: every player has H5 Together's rules (else the files' rules)
 	int map_script = -1;      // host and client: the lobby's map has a map script (1), none (0: MMH5.5's scripts will not run), unknown (-1)
 	std::vector<std::string> missing;  // host: the players without it (names)
-	std::vector<std::string> differ;   // host: players whose MMH5.5 files differ ("Name: settings"...)
+	std::vector<Differ> differ;        // host: players whose MMH5.5 files differ
 	bool this_differs = false;         // client: the host said this PC's files differ from its own
 	bool in_game_rules = false;        // in game: the host's rules are used (else the files')
 	// host: every PC can take the start rules (game mode, ToE bonuses), else why not;
 	// client: the host said they can (false: MMH5.5's way for them)
 	bool start_ok = true;
-	std::string start_why;
+	Why start_why;
 	// host: every PC can take class_skills (the same class table, which can be
 	// edited), else why not; client: the host said they can
 	bool class_ok = true;
-	std::string class_why;
+	Why class_why;
 	bool class_from_save = false;  // in game: this game's class skills came from a loaded save
 };
 // The view for this role (the panel decides it from the screen on top and LobbyRole()).

@@ -21,8 +21,8 @@
 //     of its bonus (+0x84) through the icon's vtable slot 0x68 (thiscall(text,
 //     a 5-dword format {0x80000000, 0x80000000, 0, 0, 0})); we do the same after
 //     a change, so the new text shows at once.
-// The texts are ours (English and French, the panel's language): ToE's bonuses,
-// and the game mode. MMH5.5's own texts come back when the rules go back to
+// The texts are ours (the [bonus] texts, in the panels' language: src/hook/texts.h):
+// ToE's bonuses, and the game mode. MMH5.5's own texts come back when the rules go back to
 // MMH5.5's way (we keep them from the first row we saw).
 //
 // The icons: MMH5.5 repainted the four pictures for its modes (a fist and a
@@ -53,7 +53,7 @@
 #include "host_rules_internal.h"
 
 #include "../hook/log.h"
-#include "../hook/overlay.h"
+#include "../hook/texts.h"
 
 namespace mods {
 namespace {
@@ -113,51 +113,33 @@ DWORD Read(const void *base, DWORD offset)
 	return Readable(p, 4) ? *reinterpret_cast<const DWORD *>(p) : 0;
 }
 
-// --- the words -------------------------------------------------------------------------------
+// --- the words: the [bonus] texts (src/hook/texts.h), with the game's colour tags --------------
 struct Words {
-	const wchar_t *bonus[4];  // ToE's bonuses
-	const wchar_t *none;      // MMH5.5 takes the bonus back: nothing to choose
-	const wchar_t *mode;      // %ls = the mode
-	const wchar_t *modes[5];
-	const char *names[4];     // for the log
+	const char *bonus[4];  // ToE's bonuses
+	const char *none;      // MMH5.5 takes the bonus back: nothing to choose
+	const char *mode;      // {mode} = the mode
+	const char *modes[4];  // the game mode rule's values 1..4
 };
 
-const Words kEnglish = {
-	{L"<color=yellow>Start bonus: random<color_default><br>Gold, resources or a minor artifact, as in Tribes of the East.",
-	 L"<color=yellow>Start bonus: minor artifact<color_default><br>Your first hero starts with a random minor artifact.",
-	 L"<color=yellow>Start bonus: gold<color_default><br>500 to 1000 more gold at the start.",
-	 L"<color=yellow>Start bonus: resources<color_default><br>3 to 6 more of one random resource at the start."},
-	L"<color=yellow>No start bonus to choose<color_default><br>MMH5.5 gives every human player's first hero a random minor "
-	L"artifact.",
-	L"<br><br>Game mode: %ls (the host's game rules).",
-	{L"", L"Default", L"Savage", L"Nightmare", L"Random (Default, Savage or Nightmare, drawn at the start)"},
-	{"random", "minor artifact", "gold", "resources"},
+const Words kKeys = {
+	{"bonus.random", "bonus.artifact", "bonus.gold", "bonus.resources"},
+	"bonus.none",
+	"bonus.mode",
+	{"bonus.mode.default", "bonus.mode.savage", "bonus.mode.nightmare", "bonus.mode.random"},
 };
 
-const Words kFrench = {
-	{L"<color=yellow>Bonus de d\u00e9part : al\u00e9atoire<color_default><br>De l'or, des ressources ou un artefact mineur, comme "
-	 L"dans Tribes of the East.",
-	 L"<color=yellow>Bonus de d\u00e9part : artefact mineur<color_default><br>Votre premier h\u00e9ros commence avec un artefact "
-	 L"mineur al\u00e9atoire.",
-	 L"<color=yellow>Bonus de d\u00e9part : or<color_default><br>500 \u00e0 1000 pi\u00e8ces d'or de plus au d\u00e9part.",
-	 L"<color=yellow>Bonus de d\u00e9part : ressources<color_default><br>3 \u00e0 6 unit\u00e9s d'une ressource "
-	 L"al\u00e9atoire de plus au d\u00e9part."},
-	L"<color=yellow>Pas de bonus de d\u00e9part \u00e0 choisir<color_default><br>MMH5.5 donne au premier h\u00e9ros de chaque "
-	L"joueur humain un artefact mineur al\u00e9atoire.",
-	L"<br><br>Mode de jeu : %ls (r\u00e8gles de la partie choisies par l'h\u00f4te).",
-	{L"", L"Par d\u00e9faut", L"Sauvage", L"Cauchemar", L"Al\u00e9atoire (Par d\u00e9faut, Sauvage ou Cauchemar, tir\u00e9 au d\u00e9but)"},
-	{"random", "minor artifact", "gold", "resources"},
-};
+// The bonuses, for the log.
+const char *const kBonusNames[4] = {"random", "minor artifact", "gold", "resources"};
 
 // The four tooltips for these tips.
 void Texts(const rules::BonusTips &tips, std::wstring out[4])
 {
-	const Words &w = overlay::PanelLanguage() == overlay::kFrench ? kFrench : kEnglish;
-	wchar_t mode[256] = L"";
+	const Words &w = texts::Table(kKeys);
+	std::string mode;
 	if (tips.mode >= 1 && tips.mode <= 4)
-		_snwprintf_s(mode, _countof(mode), _TRUNCATE, w.mode, w.modes[tips.mode]);
+		mode = texts::Fill(w.mode, {{"mode", w.modes[tips.mode - 1]}});
 	for (int i = 0; i < 4; ++i)
-		out[i] = std::wstring(tips.toe ? w.bonus[i] : w.none) + mode;
+		out[i] = texts::Wide(std::string(tips.toe ? w.bonus[i] : w.none) + mode);
 }
 
 // --- the game's side (each call alone, so a bad guess cannot take the game down) ------------------
@@ -478,7 +460,7 @@ void SyncBonusTips(void *logic, const BonusTips &tips)
 		}
 		if (bonus != g_last_bonus[i]) {
 			g_last_bonus[i] = bonus;
-			hooklog::Write("rules: the lobby's row %d: start bonus %d (%s)", i, bonus, kEnglish.names[bonus]);
+			hooklog::Write("rules: the lobby's row %d: start bonus %d (%s)", i, bonus, kBonusNames[bonus]);
 		}
 		SyncIcon(i, full, icon, bonus, tips.toe);
 		if (!g_have_original) {

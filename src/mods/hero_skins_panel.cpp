@@ -25,6 +25,7 @@
 #include "../hook/log.h"
 #include "../hook/overlay.h"
 #include "../hook/robot.h"
+#include "../hook/texts.h"
 #include "../hook/third_party/imgui/imgui.h"
 
 namespace mods {
@@ -68,32 +69,20 @@ float Px(float size, float k)
 	return floorf(size * k + 0.5f);
 }
 
-// --- words --------------------------------------------------------------------------------------
+// --- words: the [looks] texts (src/hook/texts.h) ------------------------------------------------
 struct Words {
-	const char *title;      // %s = the hero's name
+	const char *title;      // {hero} = the hero's name
 	const char *own;
-	const char *also;       // %s = names
+	const char *also;       // {heroes} = names
 	const char *apply, *cancel;
 	const char *single, *multi_soon, *multi_on, *multi_off;
 };
-const Words kEnglish = {"%s's look", "its own look", "Also worn by: %s", "Apply", "Cancel",
-                        "Pick a look of its faction: its figures on the map, in battle and on the hero screen. "
-                        "Its portrait stays its own.",
-                        "Multiplayer: the choice counts for every player a few seconds into the game.",
-                        "Multiplayer: the choice counts for every player a few seconds after Apply.",
-                        "In this game the looks are off (a PC lacks H5 Together, or another version): "
-                        "the choice is kept for your next games."};
-const Words kFrench = {"Apparence : %s", "son apparence", "Aussi port\xc3\xa9\x65 par : %s", "Appliquer", "Annuler",
-                       "Choisissez une apparence de sa faction : ses figures sur la carte, en combat et dans "
-                       "l'\xc3\xa9\x63ran du h\xc3\xa9ros. Son portrait reste le sien.",
-                       "Partie \xc3\xa0 plusieurs : le choix compte pour tous quelques secondes apr\xc3\xa8s le d\xc3\xa9\x62ut.",
-                       "Partie \xc3\xa0 plusieurs : le choix compte pour tous quelques secondes apr\xc3\xa8s \xc2\xab Appliquer \xc2\xbb.",
-                       "Dans cette partie, les apparences sont d\xc3\xa9sactiv\xc3\xa9\x65s (un PC n'a pas H5 Together, "
-                       "ou une autre version) : le choix servira aux prochaines parties."};
+const Words kKeys = {"looks.title", "looks.own", "looks.also", "looks.apply", "looks.cancel",
+                     "looks.single", "looks.multi_soon", "looks.multi_on", "looks.multi_off"};
 
 const Words &WordsNow()
 {
-	return overlay::PanelLanguage() == overlay::kFrench ? kFrench : kEnglish;
+	return texts::Table(kKeys);
 }
 
 // --- names: the game's text files (UTF-16), cached ------------------------------------------------
@@ -332,7 +321,7 @@ void DrawHeroScreenButton(const overlay::Frame &frame)
 		               ImVec2(0, 0), ImVec2(1, 1), pressed ? IM_COL32(200, 200, 200, 255) : IM_COL32_WHITE);
 	draw->AddRect(p0, p1, g_button_hovered ? ui::kGold : ui::kEdge, 3.0f * k, 0, (g_button_hovered ? 2.0f : 1.5f) * k);
 	if (g_button_hovered) {  // the tooltip
-		const char *tip = overlay::PanelLanguage() == overlay::kFrench ? "Apparence" : "Look";
+		const char *tip = texts::Get("looks.button_tip");
 		const float px = Px(kBodyFont, k);
 		ImFont *font = overlay::Font(px);
 		const float tw = ui::TextWidth(font, px, tip);
@@ -447,7 +436,7 @@ void DrawPanel(const overlay::Frame &frame)
 	const float title_px = Px(kTitleFont, l.k), body_px = Px(kBodyFont, l.k), small_px = Px(kSmallFont, l.k);
 	ImFont *title_font = overlay::Font(title_px), *body = overlay::Font(body_px), *small = overlay::Font(small_px);
 	char title[200];
-	_snprintf_s(title, sizeof(title), _TRUNCATE, w.title, g.hero_name.c_str());
+	_snprintf_s(title, sizeof(title), _TRUNCATE, "%s", texts::Fill(w.title, {{"hero", g.hero_name}}).c_str());
 	CentredText(draw, title_font, title_px, l.At(kTitleX, 0).x, l.At(kTitleX + kTitleW, 0).x,
 	            l.At(0, kTitleY + kTitleH / 2).y - title_px / 2, ui::kGold, title);
 
@@ -498,7 +487,7 @@ void DrawPanel(const overlay::Frame &frame)
 	const float x = l.At(kGridX, 0).x, width = kGridW * l.k;
 	if (g.selected >= 0 && g.selected < count && !g.also[g.selected].empty()) {
 		char also[400];
-		_snprintf_s(also, sizeof(also), _TRUNCATE, w.also, g.also[g.selected].c_str());
+		_snprintf_s(also, sizeof(also), _TRUNCATE, "%s", texts::Fill(w.also, {{"heroes", g.also[g.selected]}}).c_str());
 		const std::string fitted = ui::Fit(small, small_px, also, width);
 		ui::ShadowText(draw, small, small_px, ImVec2(x, y), ui::kDim, fitted.c_str());
 		y += small_px * 1.35f;
