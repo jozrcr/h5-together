@@ -118,6 +118,7 @@ This builds `build\hook\dinput8.dll` and runs these tests outside the game:
 - `test/ai_trace_test.cpp`: calls the AI hook exactly the way the game calls the AI (`__thiscall`, command list then flag) on a fake AI object, built with the compiler's runtime stack check (`/RTCs`). It checks that the arguments reach the original function unchanged and that the log line is right. A calling-convention mistake here would crash the game, so this test matters.
 - `test/original_music_test.cpp`: the "original music" mod's text work (`src/mods/original_music_xdb.cpp`) on small made-up data files: which music lines change and which stay.
 - `test/languages_test.cpp`: the French texts mod's work on bytes (`src/mods/languages_text.cpp`): paths, text encodings and a small zip archive made in the test.
+- `test/log_test.cpp`: the log's size limit (`log.cpp`): a log over the limit becomes the old log and the next one starts empty; a small one is kept and the next run is appended after a separator; a log that another copy of the game holds open is not moved.
 - `test/rmg_maker_test.cpp`: the C++ template maker (`src/mods/rmg_maker.cpp`) against the JavaScript one. First `node tools/rmg/test_template_maker.js --expected build/rmg_parity` writes what the page's maker builds for the 24 ready templates, 400 random choices and a few special ones; the test must build the same bytes, names, warnings and numbers, and refuse bad choices with the same message. Needs Node.js.
 - `test/rmg_recipe_test.cpp`: recipe names (`src/mods/rmg_recipe.cpp`): choices → `OH-X1-...` → the same choices, every bad name and path refused, reading a template link the way the game keeps it (`src/mods/rmg_join.cpp`), the teams of a recipe map, and each ready template built from its recipe name, compared with the file in `src/mods/rmg/templates/`. It also checks that 302 recorded `X1` names still build what they built when recorded (`tools/rmg/x1_fingerprints.txt`): what an `X1` name builds must never change.
 - `test/rmg_builder_test.cpp`: the template builder's data (`src/mods/rmg_builder_data.cpp`): each preset builds its ready file byte for byte and every ready file has a preset; every choice the panel offers has a recipe name, and the maker's check (`CheckChoices`) answers as `MakeTemplate`; the zone map's positions equal the web page's (numbers from Node); the French warnings; the game's text format; a UI file we do not know is left alone.
@@ -150,7 +151,7 @@ On **Linux** (Wine/Proton) Wine prefers its own built-in `dinput8.dll`. Tell it 
 | `game_build.cpp/.h` | which exe are we in? |
 | `hooks.cpp/.h` | installs all hooks (honours `open-homm5.nohooks`); `InstallEarly` for the few that must be in before the game reads its data |
 | `ai_trace.cpp` | the AI turn trace |
-| `log.cpp/.h` | `open-homm5.log` writer |
+| `log.cpp/.h` | `open-homm5.log` writer. At start-up a log over 5 MB becomes `open-homm5.old.log` (one older log is kept) and a new one starts; a log that goes on from earlier runs gets a `---- new run ----` line before the new run's first line |
 | `d3d9_hook.cpp/.h` | the shared Direct3D 9 hooks (overlay, robot screenshots) |
 | `version.h` | the version number (log's first line, install package) |
 | `patch.cpp/.h` | redirecting the game's `call` instructions to our code (several hooks may stack on one call) |

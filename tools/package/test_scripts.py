@@ -404,10 +404,11 @@ def windows_tests(pkg, work):
     # uninstall: ours removed, log removed, ini only after asking
     code, out = install("-SteamDir", str(steam_only))
     (bin2 / "open-homm5.log").write_bytes(b"log")
+    (bin2 / "open-homm5.old.log").write_bytes(b"older log")
     code, out = uninstall("-SteamDir", str(steam_only), stdin="n\n")
     check(code == 0, "uninstall (answer n): exit 0", out)
-    check(not (bin2 / "dinput8.dll").exists() and not (bin2 / "open-homm5.log").exists(),
-          "uninstall: dinput8.dll and open-homm5.log removed")
+    check(not (bin2 / "dinput8.dll").exists() and not (bin2 / "open-homm5.log").exists() and not (bin2 / "open-homm5.old.log").exists(),
+          "uninstall: dinput8.dll, open-homm5.log and the old log (open-homm5.old.log) removed")
     check((bin2 / "open-homm5.ini").exists(), "uninstall (answer n): ini kept")
     code, out = uninstall("-SteamDir", str(steam_only), stdin="y\n")
     check(code == 0 and not (bin2 / "open-homm5.ini").exists(), "uninstall (answer y): ini removed", out)
@@ -590,9 +591,11 @@ def linux_tests(pkg, work, bash):
 
     sh("install.sh")
     (bin2 / "open-homm5.log").write_bytes(b"log")
+    (bin2 / "open-homm5.old.log").write_bytes(b"older log")
     code, out = sh("uninstall.sh", stdin="n\n")
-    check(code == 0 and not (bin2 / "dinput8.dll").exists() and not (bin2 / "open-homm5.log").exists() and (bin2 / "open-homm5.ini").exists(),
-          "uninstall (n): dll and log removed, ini kept", out)
+    check(code == 0 and not (bin2 / "dinput8.dll").exists() and not (bin2 / "open-homm5.log").exists()
+          and not (bin2 / "open-homm5.old.log").exists() and (bin2 / "open-homm5.ini").exists(),
+          "uninstall (n): dll, log and old log removed, ini kept", out)
     code, out = sh("uninstall.sh", stdin="y\n")
     check(code == 0 and snapshot(bin2) == before, "uninstall (y): folder back to how it was", out)
     check(not (bin2 / "open-homm5").exists(), "uninstall: the (empty) open-homm5 folder is gone too")

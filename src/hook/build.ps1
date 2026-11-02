@@ -47,6 +47,8 @@ if ($Test) {
     $tflags = "/nologo /Od /RTCs /MTd /W4 /WX /EHsc /std:c++17 /utf-8 /DUNICODE /D_UNICODE /DWIN32_LEAN_AND_MEAN /DAI_TRACE_TEST"
     # the "original music" mod's text work (no game needed)
     $cmd += " && cl $flags test\original_music_test.cpp ..\mods\original_music_xdb.cpp /Fo`"$out\\`" /Fe`"$out\original_music_test.exe`""
+    # the log's size limit: a big log becomes the old log at start-up
+    $cmd += " && cl $flags test\log_test.cpp log.cpp /Fo`"$out\\`" /Fe`"$out\log_test.exe`""
     # the "languages" mod's work on bytes: paths, text encodings, zip directories
     $cmd += " && cl $flags test\languages_test.cpp ..\mods\languages_text.cpp /Fo`"$out\\`" /Fe`"$out\languages_test.exe`""
     # the C++ template maker against the JavaScript one, and the recipe names
@@ -96,6 +98,8 @@ if ($Test) {
         if ($LASTEXITCODE -ne 0) { throw "original music test failed" }
         & (Join-Path $out "languages_test.exe")
         if ($LASTEXITCODE -ne 0) { throw "languages test failed" }
+        & (Join-Path $out "log_test.exe")
+        if ($LASTEXITCODE -ne 0) { throw "log test failed" }
         # Node writes what the C++ template maker must build (and runs the
         # JavaScript maker's own checks); the two test exes compare.
         if (-not (Get-Command node -ErrorAction SilentlyContinue)) { throw "Node.js is needed for the template maker's parity test" }

@@ -29,7 +29,7 @@ Everything goes into the game's `bin` folder (on Steam usually `C:\Program Files
 
 ## Check that it works
 
-Start the game as you do for co-op games (GameRanger, or `MMH55_Utility_64.exe`). A file **`open-homm5.log`** appears in the same `bin` folder; its first line says `open-homm5 hook DLL <version> loaded`. If something goes wrong (a freeze, a crash, an "out of sync"), send that log. After a freeze, wait 30 seconds before closing the game, so the log can say where it was stuck.
+Start the game as you do for co-op games (GameRanger, or `MMH55_Utility_64.exe`). A file **`open-homm5.log`** appears in the same `bin` folder; its first line says `open-homm5 hook DLL <version> loaded`. If something goes wrong (a freeze, a crash, an "out of sync"), send that log. After a freeze, wait 30 seconds before closing the game, so the log can say where it was stuck. The log does not grow for ever: when it is over 5 MB at the next start, the game keeps it as `open-homm5.old.log` (one older log is kept) and starts a new `open-homm5.log`.
 
 ## Updating
 
@@ -37,4 +37,4 @@ Install the new version the same way, over the old one. Your settings are kept, 
 
 ## Uninstall
 
-Run `uninstall.bat` (Windows) or `bash uninstall.sh` (Linux) from the extracted folder. Only the add-on's own files are removed (the DLL, the log, our templates); it asks before deleting your settings file and its `.bak` copies, and templates you added yourself stay.
+Run `uninstall.bat` (Windows) or `bash uninstall.sh` (Linux) from the extracted folder. Only the add-on's own files are removed (the DLL, the logs, our templates); it asks before deleting your settings file and its `.bak` copies, and templates you added yourself stay.

@@ -10,6 +10,17 @@ namespace hooklog {
 // each copy gets its own log and robot config).
 void PathNextToExe(const wchar_t *stem, const wchar_t *ext, wchar_t *out, DWORD size);
 
+// The log is kept to a size. At start-up a log over kMaxLogBytes becomes
+// open-homm5.old.log (the one older log that is kept; an earlier .old.log goes) and a
+// new log starts. Without this the file grew for ever (1.4 MB after a few weeks of play).
+const unsigned long long kMaxLogBytes = 5ull * 1024 * 1024;
+
+// Moves the log at `path` to `old_path` (replacing what is there) if it holds more than
+// `limit` bytes. Returns true if it moved it. Does nothing, and returns false, when the
+// log is small or missing, or when another copy of the game has it open (Windows then
+// refuses to move it, and that copy goes on writing to the same file).
+bool RotateIfLarge(const wchar_t *path, const wchar_t *old_path, unsigned long long limit);
+
 void Open(HMODULE self);
 void Close();
 // printf-style; adds a timestamp (ms since the DLL loaded) and the thread id.
