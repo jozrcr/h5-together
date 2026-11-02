@@ -7,9 +7,10 @@ Everything here changes how the original game behaves, on purpose. It is kept ap
 - Faster co-op: [LAN link tuning](#lan-link-tuning-net_tuningcpp), [LAN games over VPNs](#lan-games-over-vpns-lan_discoverycpp-on-by-default), [faster co-op segments](#faster-co-op-segments-coop_guardcpp-on-when-every-player-agrees), [quicker lockstep](#quicker-lockstep-lockstepcpp-the-drain-and-the-trace-on-by-default), [one AI decision per frame](#one-ai-decision-per-frame-ai_pacingcpp-on-by-default), [quicker autosaves](#quicker-autosaves-autosavecpp-the-trace-and-level-1-on-by-default), [fast AI pathfinding](#fast-ai-pathfinding-fast_pathscpp-on-by-default)
 - Interface: ["your turn" notification](#your-turn-notification-notifycpp-on-by-default), [player list](#player-list-player_listcpp-on-by-default), [hero looks](#hero-looks-hero_skinscpp-on-but-nothing-changes-until-a-look-is-chosen), [our panels in your language](#our-panels-in-your-language-srcmodstextstxt-srchooktextscpp), [French texts for the game](#one-language-french-texts-languagescpp-off-by-default)
 - Random maps: [teams](#teams-on-random-maps-rmg_teamscpp-on-by-default-only-for-recipe-maps), [templates and recipe names](#random-map-templates-rmg_templatescpp-rmg_makercpp-rmg_recipecpp-on-by-default), [template builder](#template-builder-rmg_buildercpp-rmg_screencpp-on-by-default), [start terrain that matches the factions](#start-terrain-that-matches-the-factions-rmg_factionscpp-off-by-default)
-- Rules: [game rules from the host](#game-rules-from-the-host-host_rulescpp-on-and-nothing-changes-unless-the-host-changes-something)
+- Rules: [game rules from the host](#game-rules-from-the-host-host_rulescpp-on-and-nothing-changes-unless-the-host-changes-something), with [H5 Together's version in the waiting room](#h5-togethers-version-in-the-waiting-room-030)
+- [New version available](#new-version-available-update_checkcpp-off-by-default) (opt-in)
 - Camera, sound and visuals: [original music](#original-music-original_musiccpp-off-by-default), [camera zoom and start distance](#farther-camera-zoom-start-distance-cameracpp-off-by-default), [the mouse wheel under Wine](#the-mouse-wheel-under-wine--proton-wheelcpp-wheel_logiccpp-on-under-wine-only), [wider volume range](#wider-volume-range-audio_volumecpp-off-by-default), [black past the map's edge](#black-past-the-maps-edge-edge_skycpp-off-by-default)
-- The freeze detector (hang watchdog) is part of the DLL itself: [src/hook/README.md](../hook/README.md#the-hang-watchdog-watchdogcpp).
+- The freeze detector (hang watchdog), the crash reports and chain-loading another `dinput8.dll` mod are part of the DLL itself: [src/hook/README.md](../hook/README.md#the-hang-watchdog-watchdogcpp).
 
 ## LAN link tuning (`net_tuning.cpp`)
 
@@ -894,6 +895,20 @@ Plan, research and robot checks: [docs/plans/host-rules.md](../../docs/plans/hos
 - **The icons:** with ToE start bonuses on, the bonus icons show Tribes of the East's own pictures (dice, a helmet, gold, resources) instead of MMH5.5's mode pictures, on every PC, as soon as the rule is on (and MMH5.5's again when it is off). Each PC reads ToE's pictures from its own game's `data.pak` when the waiting room first opens (nothing is copied to disk). If they cannot be read, the icons stay MMH5.5's and the log says why (`rules: ToE's bonus pictures ...`). For a few seconds after a player joins, before the add-on knows that player has it too, the icons and tooltips are MMH5.5's.
 - The log: `rules: the scripts read scripts/H55-AdvMap.lua: served with game mode Default, each human keeps the ToE start bonus; ... hash ...` (the same hash on every PC).
 
+### H5 Together's version in the waiting room (0.3.0)
+
+**What it is for:** co-op works best when every PC has the same H5 Together. Before 0.3.0 a different version only showed as a silent "co-op timing OFF" in the log.
+
+- **Where:** a line at the bottom of the waiting room, under the game's frame (between MMH5.5's "Version" text and the "Start the game" scroll), on the host and on every client with 0.3.0 or later, in the panels' language:
+  - all the same: `Every player has H5 Together 0.3.0.` (dim);
+  - different: `Not the same H5 Together on every PC (yours: 0.3.0): Bob 0.2.9, Ann 0.3.0 (another build), Eve: older than 0.3.0, Max: no H5 Together.` and `For co-op, every PC needs the same H5 Together version: update before you start.` (on a dark field);
+  - on a client whose host has a version before 0.3.0: `The host has an older H5 Together than yours (0.3.0).` (15 s after joining: the host's rules came, but no list); no H5 Together at all (or its game rules off): `The host has no H5 Together (or its game rules are off).`
+- **How:** the game rules' hello (above) carries two more requests from each client: 'V', its H5 Together version (8 bits each: major, minor, patch), and 'B', its build (the DLL's link time stamp: two builds of one version differ, e.g. a test build). The host sends each client that said its version the list of every player's, itself first, as one more lobby text (`V1`, one line per player: kind, version, build, name; `host_rules_logic.h`). A player who joined less than 12 s ago and said nothing yet is not counted.
+- **Compatibility, on purpose:** a host before 0.3.0 does not know 'V' and 'B' and ignores them (as the game ignores unknown requests); a client before 0.3.0 never gets the list (only clients that said their version do). The rules' own hello and protocol (`kProtocol` 4) are unchanged, so 0.2.7 and 0.3.0 still agree on the game rules. A later change of the list gets another first line (`V2`); a client that cannot read it says the host has "another, newer" H5 Together, it never guesses.
+- **Limit:** it rides on the game rules' hello, so a PC with `[rules] enabled=0` says nothing and shows as "no H5 Together".
+- The log: `rules: versions: PC 1 has H5 Together 0.3.0`, `rules: versions: every player (2) has this H5 Together, 0.3.0` or `rules: versions: NOT THE SAME H5 TOGETHER on every PC (this one: 0.3.0): Bob 0.2.9 (build 6ae8aadd)`, and the line shown.
+- **Robot checks** (2026-11-02, LAN, RC19k test copy; the two copies share one DLL, so `[rules] test_version=` made one of them say another version, or none): the same version on both, all 607 world checksums equal and the dim line on both; a client saying 0.2.9: both lines name the other copy's version; a host saying none (as 0.2.7): the client's line says the host's H5 Together is older, 15 s after it joined; a client with `[rules] enabled=0`: the host's line names it as having none.
+
 **Robot checks** (2026-11-01, LAN, two copies; all world checksums equal):
 - A1M4 (RC19k) with `governance=0 ai_cheat=0 mixed_stacks=0`: both PCs served the same file (hash `a07c5c34`), MMH5.5 no longer mixed the neutral stacks (`H55 Stacks Qty: 36`, no `H55 Mixing`). The client saw the host's rules in the waiting room and in game.
 - The owner's `MAP_JoacJoz` (a random map with a map script): the same, plus `competitive_towns=0`.
@@ -926,6 +941,28 @@ trace=0       ; testing: log every script file the game opens, and print each pl
               ; resources and minor artifacts to the game's console
 trace_skills=0        ; testing: log every new skill a level-up offers (class, on the class's list or not)
 class_skills_single=0 ; testing: a single-player game uses class_skills and class_chance (to check saves)
+test_version=         ; testing: this PC says another H5 Together version in the waiting room ("0.2.9"),
+                      ; or "old" = none, as a PC before 0.3.0 (robot runs: both copies share one DLL)
+```
+
+## New version available (`update_check.cpp`, off by default)
+
+**What it is for:** players hear about a new version without watching the GitHub page. The owner's choice (2026-11-02): opt-in, contacting only GitHub.
+
+- **Off by default.** With `[update] check=1`: at most once a day, when the main menu first shows, one HTTPS request to GitHub's public "latest release" address for our repo (`https://api.github.com/repos/jozrcr/h5-together/releases/latest`), on a thread of its own (WinHTTP with Windows' proxy settings; 5 s to connect, 10 s to answer; the game never waits for it). It sends nothing about the player: a User-Agent naming the add-on and its version, as GitHub asks; GitHub sees the address it comes from, as any website does. Only the answer's `tag_name` is read.
+- **When a newer version is out:** two lines at the bottom left of the main menu, above MMH5.5's "Version" text, in the panels' language: `H5 Together 0.3.1 is out (you have 0.3.0).` / `Get it from github.com/jozrcr/h5-together/releases`. And the log: `update: H5 Together 0.3.1 is out (this is 0.3.0): https://github.com/jozrcr/h5-together/releases (after 297 ms; nothing is downloaded)`. Nothing is ever downloaded, installed or opened.
+- **Once a day:** the time of the check and the version found are written to `[update]` (`last_check=`, `latest=`), so the notice also shows on the days without a request, and a failed request (no internet, GitHub busy) is not retried before the next day. The log says why: `update: no answer from GitHub (WinHTTP error 12007: no internet, or GitHub cannot be reached); the next check is in a day`.
+- **Versions:** `v0.3.1` and `0.3.1` are the same; numbers compare as numbers (`0.3.10` after `0.3.9`); a test build `0.3.1-beta` comes before `0.3.1` (`update_check_logic.cpp`, tested by `src/hook/test/new_release_test.cpp`).
+- A later settings menu (v0.3 block 3) will show the switch; for now it is in the file only.
+- **Robot checks** (2026-11-02): one real request (`--setting update.check=1`): `update: this is the newest version (0.2.7; GitHub's latest release: v0.2.7; after 297 ms)`, no notice. With `last_check=<now>` and `latest=0.9.0` in the file: no request ("checked less than a day ago") and the notice in the main menu, in English and French.
+
+**Settings** (`h5-together.ini`):
+
+```ini
+[update]
+check=0        ; 1 = ask GitHub at most once a day for the latest version (off by default)
+last_check=    ; written by the add-on: when it last asked (seconds since 1970)
+latest=        ; written by the add-on: the latest version it was told
 ```
 
 ## Steam test (`steam_spike.cpp`; off by default, for tests only)

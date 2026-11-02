@@ -96,3 +96,41 @@ watchdog: our DLL is at 6f340000 (link time stamp 6ade25e8): ...
 - Robot: `python tools\robot\run_ai_test.py --turns 4 --quick-combat --debug-setting hang_test_at=28 --debug-setting hang_seconds=10` (the freeze starts once, 28 s after the game first took its messages). Checked 2026-10-25: one look after 10 s, the main thread at 2000 of 2000 ms, EIP in `GetTickCount` (the test loop calls it), the stack `HangTestSpin` → our `PeekMessageA` hook → `0x00c3b4a9` (main loop) → the game's callers, the last AI steps, "takes its messages again, after 25 s", and the AI went on with its next turn.
 - Two more testing switches (robot runs): `hang_test_frame_ms=N` makes every frame N ms longer (a slow PC: how the robot reproduced the same-frame AI decisions), `hang_test_ai_step=N` freezes 3 s once instead of the first AI call that starts a turn from the N-th call on.
 - A first robot run showed why the watched thread is the one that makes the DirectInput object (the game's main thread): a short-lived start-up thread also calls the exe's `PeekMessageA` first.
+
+## Crashes
+
+Since 0.3.0 a crash (an exception nobody handles) gets a report next to the log: `h5-together-crash-<date>-<time>.txt` and a small minidump `.dmp` (`src/hook/crash.cpp`; how it works and its settings: [src/hook/README.md](../../src/hook/README.md#crash-reports-crashcpp)).
+
+### The game's own crash filters (read in the exe, 2026-11-02)
+
+Found by the exe's references to `SetUnhandledExceptionFilter` (import `0x00e0a114`) and `UnhandledExceptionFilter` (`0x00e0a12c`); the same in the vanilla 3.1 exe and `MMH55_Utility`:
+
+| Where | What |
+|---|---|
+| `0x00c67b10`, called once from the renderer's start `0x00a415d0` (after `Direct3DCreate9`) | sets the filter `0x00c67a50` (flag `[0x010d9e20]`, the filter before it in `[0x010d9e24]`) |
+| `0x00c67a50` | an access violation whose address is inside one of the blocks of `0x00c44170`'s list: EIP moves past the faulting instruction (`0x00c67790` gives the next one) and the game goes on ("continue execution"). Anything else: the filter that was there before, or Windows' `UnhandledExceptionFilter` if there was none |
+| `0x00c2e330` / `0x00c2dad0` | would set / remove `0x00c2dff0`, an "exception report" (it formats `Unhandled Exception (0x%X) at the 0x%X: %s`, may show the dialog `IDD_EXCEPTION_REPORT` (`0x00d058e0`), then `FatalExit(0xdead)`), but nothing calls them: never installed |
+| `0x00836c40` | reads the console variables `default_assert_report` and `default_exception_report` (`[0x00f799e8]`, `[0x00f799e4]`), used only by that dead report |
+
+Other modules:
+- `msvcr71.dll` (the game's C runtime): `0x7c3411a6` sets a filter (`0x7c35f07d`) for C++ exceptions nobody caught (it ends the game), which passes the others to the filter before it.
+- MMH5.5's `55u.dll`, `55.dll`, `um.dll` and `UbiStats.dll`: only the C runtime's `/GS` failure report (`SetUnhandledExceptionFilter(NULL)` then `UnhandledExceptionFilter`): it ends the game without any filter, so no report of ours for that one.
+- The exe imports the game folder's `dbghelp.dll` (2002) for `StackWalk64` / `SymFromAddr`; our minidump uses Windows' own `dbghelp.dll` from the system folder, a separate copy.
+
+So our filter goes in when our DLL loads, before any of the game's code runs: the game's `0x00c67a50` comes later, in front of ours, and passes on to ours only what it does not recover from. Our report says when that happened (`crash filters: the game's own filter (0x00c67a50) is in front of ours and passed this crash on`); the robot's deliberate crash showed exactly that.
+
+### Reading a report
+
+```
+what: exception c0000005 (access violation: writing address 00000000)
+where: MMH55_Utility_64.exe+0x46e9d0 (0x0086e9d0, AI turn driver+0x90)
+thread: 1672 (the game's main thread)
+probable callers (return addresses on the stack, innermost first; the minidump has the exact stack):
+  ...
+```
+(an invented example)
+
+- **what:** the exception. `c0000005` is an access violation: "reading address 00000000" is a null pointer read. `c00000fd` is a stack overflow (often an endless recursion).
+- **where:** as in the watchdog's reports: exe addresses are the vanilla 3.1 exe's, named when our docs know the function; our DLL's offsets are names in that build's `build\hook\dinput8.map` (`python tools\hang\symbolize.py` reads a log; for a crash report, look the offset up in the map by hand, or open the `.dmp`).
+- **probable callers:** values on the stack that point just after a call instruction, innermost first; some are stale. The `.dmp` has the exact stack: open it in Visual Studio or WinDbg with the same exe and DLL next to it (our DLL has no debug symbols: its offsets are looked up in the map).
+- **the last lines of the log:** what the game and the add-on were doing just before.
