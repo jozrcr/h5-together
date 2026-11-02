@@ -11,6 +11,7 @@
 #include <windows.h>
 #include <unknwn.h>
 
+#include "crash.h"
 #include "dinput_hook.h"
 #include "game_build.h"
 #include "hooks.h"
@@ -46,6 +47,7 @@ void InstallHooksOnce()
 	g_hooks_done = true;
 	const GameBuild build = DetectGameBuild();
 	hooklog::Write("game build: %s", GameBuildName(build));
+	crash::SetGameBuild(GameBuildName(build), IsHookable(build));  // (and this is the game's main thread)
 	if (IsHookable(build))
 		hooks::InstallAll();
 	else

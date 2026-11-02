@@ -3,13 +3,22 @@
 #include <share.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <string.h>
 
 namespace hooklog {
 namespace {
 
 CRITICAL_SECTION g_lock;
+bool g_lock_ready = false;
 FILE *g_file = nullptr;
 DWORD g_start = 0;
+FILETIME g_previous_end = {};
+
+// The last lines, for a crash report: a ring of fixed buffers (nothing is allocated).
+const int kKeptChars = 240;
+char g_kept[kKeptLines][kKeptChars];
+int g_kept_next = 0;   // the slot the next line goes to
+int g_kept_count = 0;  // lines in the ring (up to kKeptLines)
 
 }  // namespace
 
@@ -36,6 +45,27 @@ unsigned long long FileSize(const wchar_t *path)
 	return (static_cast<unsigned long long>(info.nFileSizeHigh) << 32) | info.nFileSizeLow;
 }
 
+// One finished line ("  123456 [ 4321] text") into the file and the ring. Under the lock.
+void Put(const char *line)
+{
+	if (g_file) {
+		fputs(line, g_file);
+		fputc('\n', g_file);
+		fflush(g_file);
+	}
+	lstrcpynA(g_kept[g_kept_next], line, kKeptChars);
+	g_kept_next = (g_kept_next + 1) % kKeptLines;
+	if (g_kept_count < kKeptLines)
+		++g_kept_count;
+}
+
+void Format(char *out, size_t size, const char *fmt, va_list args)
+{
+	char text[1024];
+	_vsnprintf_s(text, sizeof(text), _TRUNCATE, fmt, args);
+	_snprintf_s(out, size, _TRUNCATE, "%10lu [%5lu] %s", GetTickCount() - g_start, GetCurrentThreadId(), text);
+}
+
 }  // namespace
 
 bool RotateIfLarge(const wchar_t *path, const wchar_t *old_path, unsigned long long limit)
@@ -48,11 +78,15 @@ bool RotateIfLarge(const wchar_t *path, const wchar_t *old_path, unsigned long l
 void Open(HMODULE)
 {
 	InitializeCriticalSection(&g_lock);
+	g_lock_ready = true;
 	g_start = GetTickCount();
 	// The log goes next to the game exe (the current directory may differ).
 	wchar_t path[MAX_PATH], old_path[MAX_PATH];
 	PathNextToExe(L"h5-together", L".log", path, MAX_PATH);
 	PathNextToExe(L"h5-together", L".old.log", old_path, MAX_PATH);
+	WIN32_FILE_ATTRIBUTE_DATA info;
+	if (GetFileAttributesExW(path, GetFileExInfoStandard, &info))
+		g_previous_end = info.ftLastWriteTime;
 	RotateIfLarge(path, old_path, kMaxLogBytes);
 	const bool appending = FileSize(path) > 0;
 	// shared for reading, so the log can be watched while the game runs
@@ -75,18 +109,69 @@ void Close()
 
 void Write(const char *fmt, ...)
 {
-	char line[1024];
+	char line[1100];
 	va_list args;
 	va_start(args, fmt);
-	_vsnprintf_s(line, sizeof(line), _TRUNCATE, fmt, args);
+	Format(line, sizeof(line), fmt, args);
 	va_end(args);
 
 	EnterCriticalSection(&g_lock);
-	if (g_file) {
-		fprintf(g_file, "%10lu [%5lu] %s\n", GetTickCount() - g_start, GetCurrentThreadId(), line);
-		fflush(g_file);
-	}
+	Put(line);
 	LeaveCriticalSection(&g_lock);
+}
+
+namespace {
+
+// The lock within about a second, else false (another thread keeps it: maybe a crashed one).
+bool TryLock()
+{
+	if (!g_lock_ready)
+		return false;
+	for (int i = 0; i < 100; ++i) {
+		if (TryEnterCriticalSection(&g_lock))
+			return true;
+		Sleep(10);
+	}
+	return false;
+}
+
+}  // namespace
+
+void WriteNoWait(const char *fmt, ...)
+{
+	char line[1100];
+	va_list args;
+	va_start(args, fmt);
+	Format(line, sizeof(line), fmt, args);
+	va_end(args);
+	if (!TryLock())
+		return;
+	Put(line);
+	LeaveCriticalSection(&g_lock);
+}
+
+void LastLines(char *out, size_t size)
+{
+	if (!size)
+		return;
+	out[0] = 0;
+	// Without the lock (a crashed thread may hold it), a line being written may show half done.
+	const bool locked = TryLock();
+	size_t used = 0;
+	for (int i = 0; i < g_kept_count; ++i) {
+		const char *line = g_kept[(g_kept_next - g_kept_count + i + kKeptLines) % kKeptLines];
+		const int n = _snprintf_s(out + used, size - used, _TRUNCATE, "%.*s\n", kKeptChars, line);
+		if (n < 0)
+			break;
+		used += static_cast<size_t>(n);
+	}
+	if (locked)
+		LeaveCriticalSection(&g_lock);
+}
+
+FILETIME PreviousRunEnd()
+{
+	return g_previous_end;
 }
 
 }  // namespace hooklog

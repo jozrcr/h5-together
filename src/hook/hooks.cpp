@@ -2,6 +2,7 @@
 
 #include <windows.h>
 
+#include "crash.h"
 #include "game_build.h"
 #include "log.h"
 #include "overlay.h"
@@ -63,6 +64,7 @@ void InstallEarly()
 	// one is still encrypted now, and gets them with InstallAll()).
 	if (NoHooks() || !IsHookable(DetectGameBuild()))
 		return;
+	crash::Install("from the DLL's load, before the game's own crash filter");  // first: before the game's code runs
 	mods::InstallLanguagesEarly();  // [lang] texts=fr, before the game reads its first text
 	mods::InstallOriginalMusicEarly();
 	mods::InstallPlayerListEarly();  // the Direct3D import, before the game makes its device
@@ -78,6 +80,7 @@ void InstallAll()
 		hooklog::Write("h5-together.nohooks (or open-homm5.nohooks) found: hooks disabled");
 		return;
 	}
+	crash::Install("at the game's first DirectInput call");  // (done at the DLL's load in an unwrapped exe)
 	watchdog::Install();  // first: the others register their state for its reports
 	mods::ApplySteamSpikeFromSettings();  // [online] spike (test only, off by default): early, before the game's Direct3D device
 	InstallAiTrace();

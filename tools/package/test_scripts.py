@@ -680,12 +680,13 @@ def system_text(files):
     return files["system.txt"].decode("utf-8-sig").replace("\r\n", "\n")
 
 
-def bug_report_tests(who, pkg, work, run_report, fmt=".zip", home_short=False):
+def bug_report_tests(who, pkg, work, run_report, fmt=".zip", home_short=False, no_dump="-NoDump"):
     """The bug report script against fake game folders.
 
     run_report(bin_folder, out_folder, *extra) runs the script and returns (exit code, output).
     fmt: ".zip", or ".tar.gz" when the script is told to make that (a tuple: either).
-    home_short: the game folder is below the script's $HOME, so system.txt writes it as ~/..."""
+    home_short: the game folder is below the script's $HOME, so system.txt writes it as ~/...
+    no_dump: the script's option that leaves the crash report's .dmp out."""
     print(f"\nBug report script ({who})")
     version = package_version(pkg)
     shutil.rmtree(work, ignore_errors=True)  # (so that a second run in the same --work-dir counts the reports again)
@@ -762,6 +763,38 @@ def bug_report_tests(who, pkg, work, run_report, fmt=".zip", home_short=False):
     made = report_files(out3)
     check(code == 0 and made and "NOT the H5 Together one" in system_text(read_report(made[0])) and (b3 / "dinput8.dll").read_bytes() == b"MZ some other mod",
           "bug report: another mod's dinput8.dll is named as such and left alone", text)
+
+    # crash reports of the add-on: the newest .txt and its .dmp go in (not the older ones, not a robot copy's)
+    b8 = make_report_game(pkg, work / "report lib 8")
+    crash = {"h5-together-crash-20261030-101500.txt": b"an old crash", "h5-together-crash-20261030-101500.dmp": b"MDMP old",
+             "h5-together-crash-20261102-153012.txt": b"H5 Together crash report\r\nwhat: exception c0000005\r\n",
+             "h5-together-crash-20261102-153012.dmp": b"MDMP\x93\xa7 the newest dump",
+             "h5-together-host-crash-20261103-000000.txt": b"a robot copy's", "h5-together-crash-notes.txt": b"not a report"}
+    for name, data in crash.items():
+        (b8 / name).write_bytes(data)
+    newest = ["h5-together-crash-20261102-153012.txt", "h5-together-crash-20261102-153012.dmp"]
+    out8 = work / "reports8"
+    code, text = run_report(b8, out8)
+    made = report_files(out8)
+    files = read_report(made[0]) if made else {}
+    check(code == 0 and sorted(files) == sorted(list(REPORT_FILES) + newest + ["system.txt"]) and all(files[n] == crash[n] for n in newest),
+          "bug report: the newest crash report (.txt and .dmp) goes in, byte for byte, and no older or other one", str(sorted(files)))
+    s8 = system_text(files) if files else ""
+    check("2 kept; the newest is in this zip: h5-together-crash-20261102-153012.txt and h5-together-crash-20261102-153012.dmp" in s8,
+          "bug report: system.txt says which crash report is in it", s8)
+    check("newest crash report too" in text and "part of the game's memory" in text and no_dump in text,
+          "bug report: says it holds the crash report, that the .dmp holds game memory, and how to leave it out", text)
+    out9 = work / "reports9"
+    code, text = run_report(b8, out9, no_dump)
+    made = report_files(out9)
+    files = read_report(made[0]) if made else {}
+    check(code == 0 and sorted(files) == sorted(list(REPORT_FILES) + [newest[0], "system.txt"])
+          and "(its .dmp left out: " + no_dump + ")" in (system_text(files) if files else ""),
+          f"bug report: {no_dump} leaves the .dmp out (the .txt stays) and system.txt says so", str(sorted(files)))
+    check(all((b8 / n).read_bytes() == d for n, d in crash.items()), "bug report: the crash reports stay in the game folder")
+    s0 = system_text(read_report(report_files(out)[0])) if report_files(out) else ""
+    check("Crash reports of the add-on" in s0 and "\n  none\n" in s0.split("Crash reports of the add-on", 1)[-1][:120],
+          "bug report: without crash reports system.txt says none", s0)
 
     # MMH5.5 not there, or a pak without the version script
     b4 = make_report_game(pkg, work / "report lib 4", pak_version=None)
@@ -1240,8 +1273,9 @@ def linux_tests(pkg, work, bash):
         return run_report
 
     run_report = report_runner(work / "bug_report")
-    bug_report_tests("Linux", pkg, work / "bug_report", run_report, fmt=(".zip", ".tar.gz"), home_short=True)
-    bug_report_tests("Linux, --tar", pkg, work / "bug_report_tar", report_runner(work / "bug_report_tar", "--tar"), fmt=".tar.gz", home_short=True)
+    bug_report_tests("Linux", pkg, work / "bug_report", run_report, fmt=(".zip", ".tar.gz"), home_short=True, no_dump="--no-dump")
+    bug_report_tests("Linux, --tar", pkg, work / "bug_report_tar", report_runner(work / "bug_report_tar", "--tar"), fmt=".tar.gz",
+                     home_short=True, no_dump="--no-dump")
 
     print("\nBug report script (Linux only)")
     extra = work / "bug_report_extra"

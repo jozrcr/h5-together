@@ -6,6 +6,9 @@
 #   h5-together.log and h5-together.old.log   what the add-on wrote
 #   h5-together.ini, h5-together-skins.ini    your settings
 #   the same four under the add-on's old name (open-homm5, until 0.2.7), if they are there
+#   the newest crash report, if there is one: h5-together-crash-<date>-<time>.txt (what
+#                                             crashed) and its .dmp (a small minidump; it holds
+#                                             part of the game's memory: --no-dump leaves it out)
 #   system.txt                                the add-on, MMH5.5 and Linux versions, a few file
 #                                             sizes and hashes, the other DLLs in the game folder
 # No saves, no maps, no game files. It sends nothing anywhere: the zip is yours to look at
@@ -20,6 +23,7 @@
 #   --steam-dir <folder>  look in this Steam folder only
 #   --out-dir <folder>    put the report here instead of in the current folder
 #   --tar                 make a .tar.gz instead of a .zip (for when there is no zip tool)
+#   --no-dump             leave the crash report's .dmp out (its .txt still goes in)
 #
 # The zip is made with "zip", or else with python3's zipfile module; if neither is there,
 # a .tar.gz is made instead.
@@ -37,12 +41,14 @@ game_dir_arg=""
 steam_dir_arg=""
 out_dir_arg=""
 force_tar=0
+no_dump=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --game-dir)  game_dir_arg="${2:-}"; shift ;;
         --steam-dir) steam_dir_arg="${2:-}"; shift ;;
         --out-dir)   out_dir_arg="${2:-}"; shift ;;
         --tar)       force_tar=1 ;;
+        --no-dump)   no_dump=1 ;;
         -h|--help)   awk 'NR > 1 { if (/^#/) { sub(/^# ?/, ""); print } else exit }' "${BASH_SOURCE[0]}"; exit 0 ;;
         *) echo "Unknown option: $1 (try --help)"; exit 2 ;;
     esac
@@ -263,6 +269,28 @@ for name in h5-together.log h5-together.old.log h5-together.ini h5-together-skin
         case "$name" in h5-together.log|open-homm5.log) has_log=1 ;; esac
     fi
 done
+# The add-on's newest crash report (h5-together-crash-<date>-<time>.txt and its .dmp, next to
+# the log; the names sort as the time does). The add-on keeps the 3 newest.
+crash_count=0
+crash_txt=""
+crash_dmp=""
+while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    crash_count=$((crash_count + 1))
+    crash_txt="$f"
+done < <(find "$bin" -mindepth 1 -maxdepth 1 -type f -name 'h5-together-crash-*.txt' -print 2>/dev/null |
+         grep -E '/h5-together-crash-[0-9]{8}-[0-9]{6}\.txt$' | sort)
+if [ -n "$crash_txt" ]; then
+    pack_names+=("$(basename "$crash_txt")")
+    pack_paths+=("$crash_txt")
+    if [ -f "${crash_txt%.txt}.dmp" ]; then
+        crash_dmp="$(basename "${crash_txt%.txt}.dmp")"
+        if [ "$no_dump" -eq 0 ]; then
+            pack_names+=("$crash_dmp")
+            pack_paths+=("${crash_txt%.txt}.dmp")
+        fi
+    fi
+fi
 
 stage="$(mktemp -d "${TMPDIR:-/tmp}/h5-together-report.XXXXXX")" || { echo "Cannot make a temporary folder."; exit 5; }
 trap 'rm -rf "$stage"' EXIT
@@ -342,6 +370,17 @@ trap 'rm -rf "$stage"' EXIT
     done < <(find "$bin" -mindepth 1 -maxdepth 1 -type f \( -iname '*.dll' -o -iname '*.asi' \) -print 2>/dev/null | sort)
     [ "$any_dll" -eq 1 ] || echo "  none"
     echo
+    echo "Crash reports of the add-on (written next to the log when the game crashes)"
+    if [ -z "$crash_txt" ]; then
+        echo "  none"
+    elif [ -z "$crash_dmp" ]; then
+        echo "  $crash_count kept; the newest is in this zip: $(basename "$crash_txt") (no .dmp with it)"
+    elif [ "$no_dump" -eq 1 ]; then
+        echo "  $crash_count kept; the newest is in this zip: $(basename "$crash_txt") (its .dmp left out: --no-dump)"
+    else
+        echo "  $crash_count kept; the newest is in this zip: $(basename "$crash_txt") and $crash_dmp"
+    fi
+    echo
     echo "Files in this zip"
     for i in "${!pack_names[@]}"; do
         echo "  ${pack_names[$i]}  $(wc -c < "${pack_paths[$i]}" | tr -d ' ') bytes"
@@ -388,6 +427,16 @@ if [ "$has_log" -eq 0 ]; then
     echo
     echo "There is no h5-together.log in the game folder, so the report only tells about your installation."
     echo "(Either the add-on is not installed here, or the game was not started since.)"
+fi
+if [ -n "$crash_txt" ]; then
+    echo
+    if [ -n "$crash_dmp" ] && [ "$no_dump" -eq 0 ]; then
+        echo "It holds the newest crash report too: $(basename "$crash_txt") and $crash_dmp."
+        echo "The .dmp holds part of the game's memory at the crash (player names, folder names)."
+        echo "To leave it out, run this again with --no-dump."
+    else
+        echo "It holds the newest crash report too: $(basename "$crash_txt")."
+    fi
 fi
 echo
 echo "Attach that file to your report on GitHub: https://github.com/jozrcr/h5-together/issues/new/choose"

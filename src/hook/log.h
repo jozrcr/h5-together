@@ -26,4 +26,17 @@ void Close();
 // printf-style; adds a timestamp (ms since the DLL loaded) and the thread id.
 void Write(const char *fmt, ...);
 
+// --- for the crash report (crash.cpp) ---------------------------------------------------
+// The same as Write, but it gives up (and writes nothing) when another thread holds the
+// log for more than about a second: a crashed thread may hold it for ever.
+void WriteNoWait(const char *fmt, ...);
+// The last lines written (up to kKeptLines, as in the log, oldest first, each ending
+// with "\n"), into `out` (always ended with 0). Safe from a crash: it never waits long.
+const int kKeptLines = 20;
+void LastLines(char *out, size_t size);
+// When the log was last written before this run (its time on disk when Open() found it),
+// or a zero time when there was no log. A crash report written at about that time
+// belongs to the previous run.
+FILETIME PreviousRunEnd();
+
 }  // namespace hooklog
