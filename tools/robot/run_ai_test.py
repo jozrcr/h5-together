@@ -262,6 +262,8 @@ def prepare(game, args, out, instance="", net_port=None):
         ("net_share_udp_ports", int(bool(getattr(args, "share_udp_ports", False)))),
         ("net_lan_relay_ports", getattr(args, "relay_ports", "")),
         ("net_log_packets", getattr(args, "net_log_packets", -1)),
+        ("net_log_bytes", getattr(args, "net_log_bytes", 0) or 0),
+        ("net_scan_addresses", int(bool(getattr(args, "net_scan", False)))),
     ] + [("step", s) for s in args.step]
     ini.write_text("".join("%s=%s\n" % kv for kv in config), encoding="ascii")
     write_mod_settings(game, args, instance)

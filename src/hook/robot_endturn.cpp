@@ -100,6 +100,7 @@ void MaybeEndHumanTurn(DWORD every_ms, DWORD ai_idle_ms, bool stuck_exit)
 	if (AutoCloseScreens()) {
 		if (++battle_polls > kStuckInBattleAfter && stuck_exit) {
 			hooklog::Write("robot: stuck: a battle or a box has waited for %ld checks, closing the game", battle_polls);
+			LogNetSummary();  // the address scan's totals (robot_net.cpp)
 			hooklog::Close();
 			TerminateProcess(GetCurrentProcess(), 4);  // no game shutdown code: it can crash mid-turn
 		}
@@ -114,6 +115,7 @@ void MaybeEndHumanTurn(DWORD every_ms, DWORD ai_idle_ms, bool stuck_exit)
 		hooklog::Write("robot: stuck: %ld turn ends without an AI step (a battle or a box waits for the human player), "
 		               "closing the game",
 		               kStuckAfter);
+		LogNetSummary();  // the address scan's totals (robot_net.cpp)
 		hooklog::Close();
 		TerminateProcess(GetCurrentProcess(), 4);  // no game shutdown code: it can crash mid-turn
 	}

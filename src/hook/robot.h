@@ -21,6 +21,8 @@
 //   screenshot_dir=C:\Games\H5_test\robot_frames
 //   screenshot_every_seconds=10   (robot_screen.cpp)
 //   net_log=1                     (robot_net.cpp)
+//   net_log_bytes=2048            (whole packets in the net log, robot_net.cpp)
+//   net_scan_addresses=1          (this PC's addresses inside packets, robot_net.cpp)
 //   net_lan_relay_ports=8891      (two copies on one PC, robot_net.cpp)
 #pragma once
 #include <windows.h>
@@ -120,7 +122,15 @@ DWORD LastFrameTick();                      // GetTickCount() of the last frame 
 // For several copies of the game on one PC (LAN game discovery), see the file:
 // share_udp_ports (net_share_udp_ports=1) and relay_ports (net_lan_relay_ports=P,Q).
 // logged_packets: how many packets per socket and direction to log (-1 = default).
-void InstallNetLog(bool share_udp_ports, const char *relay_ports, int logged_packets);
+// log_bytes (net_log_bytes=N): each logged packet's first N bytes too, 64 per line
+// (0 = only the first 12, on the packet's own line).
+// scan_addresses (net_scan_addresses=1): look for this PC's own IPv4 addresses
+// inside EVERY packet the game sends or receives (the packet map of
+// docs/plans/online-steam.md, and the virtual LAN's "no real address" check).
+void InstallNetLog(bool share_udp_ports, const char *relay_ports, int logged_packets, int log_bytes,
+                   bool scan_addresses);
+// The address scan's totals, once more, just before the robot closes the game.
+void LogNetSummary();
 
 // Appends the return addresses found on a stack (starting at esp) to line: the
 // first few system ones as "module+offset", then the game's own (Ghidra addresses).

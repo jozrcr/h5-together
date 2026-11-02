@@ -47,7 +47,8 @@ def instance_args(args, name, steps):
         end_turn_every=args.end_turn_every, press_enter_every=0,
         repeat_command=None, repeat_every=0, trace_segments=False, segment_ms=0,
         shot_every=args.shot_every, step=steps, net_log=True, relay_ports=others, trace_mp=args.trace_mp, trace_crc=True,
-        net_log_packets=args.net_log_packets, net_tuning=args.net_tuning,
+        net_log_packets=args.net_log_packets, net_log_bytes=args.net_log_bytes, net_scan=args.net_scan,
+        net_tuning=args.net_tuning,
         net_keepalive_ms=args.net_keepalive_ms, net_send_interval_ms=args.net_send_interval_ms,
         net_batched_segments=args.net_batched_segments, net_setting=args.net_setting, mp_segment_ms=args.mp_segment_ms,
         ai_walk_speed_scale=args.ai_walk_speed_scale, walk_step_ms=args.walk_step_ms,
@@ -162,6 +163,11 @@ def main():
     p.add_argument("--trace-hello", action="store_true",
                    help="EXPERIMENT: both copies send co-op guard hellos and log their order")
     p.add_argument("--net-log-packets", type=int, default=-1, help="packets logged per socket and direction")
+    p.add_argument("--net-log-bytes", type=int, default=0,
+                   help="log each logged packet's first N bytes too (2048 = whole packets; robot_net.cpp)")
+    p.add_argument("--net-scan", action="store_true",
+                   help="look for this PC's own IPv4 addresses inside every packet (robot_net.cpp; the packet map "
+                        "of docs/plans/online-steam.md)")
     p.add_argument("--net-tuning", choices=["on", "off"], default="on",
                    help="the LAN link tuning mod (src/mods/net_tuning.cpp) on both copies; off = the game's timings")
     p.add_argument("--net-keepalive-ms", type=int, help="mod setting: idle links send every N ms (mod default 50)")
