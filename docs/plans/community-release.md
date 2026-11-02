@@ -1,6 +1,6 @@
 # Plan: v0.3, the community release
 
-Status: proposal for the owner (2026-11-02), being built. Block 1 (quick wins) is in `main`. **Block 2 (texts in files, part 3) is built in the branch `v03-texts`**: see "Built" at the start of part 3.
+Status: proposal for the owner (2026-11-02), being built. Block 1 (quick wins) is in `main`. **Block 2 (texts in files, part 3) is built in the branch `v03-texts`**: see "Built" at the start of part 3. **The install scripts (part 1, without a setup.exe) are made friendlier in the branch `v03-install`**: see "Built" at the start of part 1.
 
 The goal: share the add-on with the wider Heroes V / MMH5.5 community. Someone who has never heard of us should be able to:
 1. download one file and double-click it;
@@ -33,6 +33,19 @@ A "session" below means one focused working block of a few hours.
 ---
 
 ## Part 1: one-click installer
+
+### Built for v0.3 (2026-11-02, branch `v03-install`): the scripts, friendlier (no setup.exe)
+
+The owner decided against the exe for v0.3, so the zip's scripts got the parts of this plan that do not need one. Everything below the next heading (Inno Setup, SmartScreen, "Apps" entry, signing) stays as the plan for later, after online play.
+
+How it works now: [tools/package/README.md, "Finding the game, and what the scripts say about it"](../../tools/package/README.md#finding-the-game-and-what-the-scripts-say-about-it); for players: [docs/install.md](../install.md).
+
+- **Messages:** one "Your game" screen before anything is copied (folder, Steam or GOG, Steam's language, MMH5.5 and its version, the exes, yellow warnings), "Installing ...", the existing "Done. What I did" list, then "All done" with a short "What to do next" (start the game; the first line of `h5-together.log` says `H5 Together hook DLL <version> loaded`). The Windows window waits for Enter at the end, also when it stops early (tested by watching the script wait).
+- **MMH5.5:** `55u.dll`'s hash names RC19d or RC19k (the same two hashes as the bug report, compared with [mmh55-rc19k.md](mmh55-rc19k.md) by the tests); any other `55u.dll` is "a version we have not tested" with `H55_Version` from `MMH55-Index.pak` (the code moved from the bug report script into the shared block). Missing or untested gives a plain warning at the start and again at the end; the install still goes ahead. The exes are explained too: the co-op exe, an `H5_Game.exe` that is byte for byte a copy of it (the GameRanger guide), or the game's own exe.
+- **Finding the game:** Steam (now reading `appmanifest_15370.acf` for the folder's real name and the language), **GOG** (`HKLM\SOFTWARE\WOW6432Node\GOG.com\Games\*\path`; we match on the folder, not on GOG's id, which we do not know for Heroes V), and **MMH5.5's own uninstall entry** (`{CEC93C99-...}_is1`, `InstallLocation`: the folder of any copy it was installed into). Nothing found, or several: a numbered list, **B** for a folder window (Windows `FolderBrowserDialog`), or a pasted folder; each choice is checked (`bin` with a known exe). Linux: Steam (native, Flatpak, and now Snap), numbers and pasted folders, no GOG or window.
+- **The game is running:** the installer and uninstaller ask to close it (Windows: the game's processes in that `bin`; Linux: the exe names in `/proc/*/cmdline`), `S` goes on, `Q` stops. New exit code **8**.
+- **Kept as it was:** the settings refresh and backups, the move from the open-homm5 names, templates, language files, exit codes 0 and 3 to 7, `install.sh` printing the Steam launch option, ASCII-only scripts, the guard that the shared "find the game" blocks match (one pair for Windows, one for Linux; the block grew from about 120 lines to about 430 for Windows and 320 for Linux).
+- **Not done, on purpose or for lack of a test copy:** no GOG copy of Heroes V to try (the registry code was tried against this PC's real GOG list, which holds Heroes III, and against fake keys); the folder window itself was only built, not clicked in the tests (a person has to look at it once); an "admin needed" check for copies under `Program Files` (the install says "run as administrator" when a copy fails); the Linux Steam Deck desktop mode and `localconfig.vdf` launch-option check of step 1.4; a menu on `install.sh`.
 
 ### Today
 
