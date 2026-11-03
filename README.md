@@ -9,6 +9,7 @@ An unofficial add-on for **Heroes of Might and Magic V: Tribes of the East** wit
 ## What it does
 
 - **Faster co-op games.** The computer's turns are much quicker, and so are clicks. A rare freeze of the host during computer turns is fixed.
+- **Online play with your Steam friends** (new in 0.3.0, a test). Your friends' games show in the game's own LAN list, through Steam: no GameRanger, no VPN. The host invites friends from the waiting room. [How it works](#online-play-over-steam-new-a-test).
 - **Settings inside the game.** Main menu, **Options**, **H5 Together** (or press **F3**). No file to edit.
 - **A few extras on top:** a player list on the map, a "your turn" notification, a random map template builder, other looks for your heroes, and a game rules menu for the host.
 - **Safe to try.** It never changes the game's own files, and it is easy to remove.
@@ -36,7 +37,8 @@ The installer finds your game, shows you what it found ("Your game": the folder,
 - **Open source.** All the code is in this repository, under the [MIT licence](LICENSE). Anyone can read it.
 - **Built on GitHub's machines.** The zip on the releases page is built and tested by GitHub from the code you see here (the recipe is in [.github/workflows/package.yml](.github/workflows/package.yml)), not on a private PC.
 - **It never changes the game's own files.** It adds one file, `dinput8.dll`, a settings file and some folders of its own to the game's `bin` folder. The game loads `dinput8.dll` when it starts. MMH5.5's settings are changed only in the PC's memory, never on disk.
-- **It sends nothing about you.** It sends nothing to us or to anyone else. In a multiplayer game, the players' PCs exchange a few small messages (versions, game rules, hero looks) over the game's own connection. The only thing that can contact a server is the optional update check, which is off unless you say yes: once a day it asks GitHub for the number of the latest version. Nothing is downloaded or installed by the add-on.
+- **It sends nothing about you.** It sends nothing to us or to anyone else. In a multiplayer game, the players' PCs exchange a few small messages (versions, game rules, hero looks) over the game's own connection. Apart from online play over Steam (below), the only thing that can contact a server is the optional update check, which is off unless you say yes: once a day it asks GitHub for the number of the latest version. Nothing is downloaded or installed by the add-on.
+- **Online play over Steam is off unless you turn it on.** When it is on, the game talks to your friends' games through Steam, as any Steam game does: Steam sees the friends-only game you host and the invites you send. The add-on also shows its version number to your Steam friends' add-ons (a small Steam "rich presence" value), so they know you have it.
 - **Antivirus scan of this release:** (link to the VirusTotal result: to be added at release.)
 - **How to remove it:** run `uninstall.bat` (Windows) or `bash uninstall.sh` (Linux). It removes only the add-on's own files. Or delete `dinput8.dll` from the game's `bin` folder: the game is then as before.
 
@@ -50,7 +52,24 @@ If a player has another version, or none, the game still runs, but the parts tha
 
 ![The waiting room, with the Rules button and the version line at the bottom](docs/images/lobby-versions.png)
 
-Over the internet, use what your group uses today (GameRanger, or ZeroTier for a friend on Linux). Built-in online play without GameRanger is being built; it is not in this version.
+Over the internet, use what your group uses today (GameRanger, or ZeroTier for a friend on Linux), or the new online play over Steam below.
+
+## Online play over Steam (new, a test)
+
+New in 0.3.0: play over the internet with your **Steam friends**, without GameRanger or a VPN. The add-on carries the game's own LAN play through Steam's network, so your friends' games show in the game's LAN list as if you were in the same house.
+
+1. **Every player:** main menu, **Options, H5 Together, Online play: Steam**, then restart the game. Steam must be running, and the game must be the Steam version.
+2. **The host:** **Multiplayer, LAN, Create**, as usual. In the waiting room, **Invite friends...** opens Steam's invite window (or the add-on's own list of your Steam friends).
+3. **The friends:** accept the invite in Steam. The game starts if it is not running, opens the LAN screen and joins the host's game by itself. Or open **Multiplayer, LAN** and join the host's game in the list, like a LAN game.
+
+Good to know:
+
+- **Everyone needs H5 Together 0.3.0 with Online play on Steam,** and the host's Steam friends are the ones who see the game (the game is for friends only).
+- **While it is on, the LAN list shows only games through Steam**, not games on your local network. For a real LAN game or GameRanger, set Online play back to **Off**.
+- **Steam picks the way:** straight between the PCs when it can, or through Valve's relay servers (on a phone's 4G connection, for example). The LAN screen shows a few lines about Steam: whether it is on, and which friends play with H5 Together.
+- **Tested** with two PCs (Windows, and Linux with Proton), on home Wi-Fi and over 4G. Not yet with three or more players: tell us how it goes.
+- **Not for GOG copies:** it needs the game bought on Steam. A group with a GOG player keeps using LAN, ZeroTier or GameRanger.
+- It uses Valve's `steam_api.dll`, which comes with the zip (see [Legal](#legal)).
 
 ## What works with what
 
@@ -65,6 +84,7 @@ Over the internet, use what your group uses today (GameRanger, or ZeroTier for a
 | Windows 10 and 11 | Yes |
 | Linux with Steam and Proton | Yes, with a launch option ([docs/linux.md](docs/linux.md)) |
 | Steam Deck, Wine / Lutris / Heroic, the H5 Lobby app | Not tested |
+| Online play over Steam | Steam copies, on Windows and on Linux with Proton. Not GOG |
 
 "Not recognised" is safe: the add-on checks the exe at start and, when it does not know it, only writes "unknown build" in its log and changes nothing.
 
@@ -178,5 +198,7 @@ H5 Together stands on **MMH5.5**, the big Heroes V mod by its team ([ModDB page]
 ## Legal
 
 Our code is under the [MIT licence](LICENSE). The only third-party code in the DLL is Dear ImGui (MIT, with the stb files and the small ProggyClean font it carries), in [src/hook/third_party/imgui/](src/hook/third_party/imgui/); the install zip carries both licences as `LICENSE.txt` and `THIRD-PARTY-NOTICES.txt`.
+
+The release zip also carries **Valve's `steam_api.dll`** (from the Steamworks SDK), for online play over Steam. It is Valve's file, redistributed as Valve's Steamworks SDK agreement allows for software that uses Steam; it is not covered by our licence and is not in this repository. The add-on loads it only when online play over Steam is on. Steam is a trademark of Valve Corporation; this project is not affiliated with or endorsed by Valve.
 
 Apart from that, this repository contains only our own code, notes and tools. It contains **no game files**, so you need your own legal copy of Heroes of Might and Magic V: Tribes of the East (for example from Steam) to use anything here. Heroes of Might and Magic is a trademark of Ubisoft; this is an unofficial fan project, not affiliated with or endorsed by Ubisoft.

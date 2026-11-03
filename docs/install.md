@@ -91,6 +91,7 @@ Everything goes into the game's `bin` folder (on Steam usually `C:\Program Files
 | `h5-together.ini` | the settings. Change them in the game (main menu, **Options**, **H5 Together**, or F3), or in this file with Notepad. Every line is commented out and shows its default, so you can leave it alone |
 | `h5-together\templates\OH-*.xdb` | 24 ready random map templates for the game's list. Every player of a multiplayer game needs the same ones |
 | `h5-together\texts\en.txt`, `fr.txt` | the words of the add-on's panels, one file per language. A language file you added yourself stays |
+| `h5-together\steam_api.dll` | Valve's Steam library (from the Steamworks SDK), for online play over Steam. The add-on loads it only when **Online play** is set to **Steam** in Options; otherwise it is never used. The uninstaller removes it |
 
 Keep the extracted folder: `uninstall.bat` and `bug-report.bat` (or the `.sh` files on Linux) live there.
 
@@ -117,6 +118,8 @@ In the game: main menu, **Options**, then **H5 Together** (or press **F3**, in t
 - The settings are saved in `h5-together.ini`. You can also edit that file with Notepad (then restart the game): every line is commented out with `;` and shows its default; remove the `;` and type your value. Every setting is explained in [src/mods/README.md](../src/mods/README.md).
 
 The defaults keep the original game: the speed-ups, fixes and panels are on, and whatever changes how the game plays, looks or sounds is off until you turn it on.
+
+**Online play over Steam** (new in 0.3.0, a test) is one of these settings: **Online play: Steam**, then restart the game. Every player of the game does the same. How to host, invite and join: [the README](../README.md#online-play-over-steam-new-a-test).
 
 ## Updating
 

@@ -16,6 +16,9 @@ Short answers to what players ask most. How to install: [install.md](install.md)
 [Is it running?](#how-do-i-know-it-is-running) ·
 [Settings](#how-do-i-change-settings) ·
 [GameRanger](#gameranger-and-the-h5-lobby-app) ·
+[Online play over Steam](#can-we-play-over-the-internet-without-gameranger) ·
+[A friend's game is not in the list](#online-play-my-friends-game-is-not-in-the-lan-list) ·
+["Timeout" when joining](#timeout-may-be-no-more-free-slots-when-joining) ·
 [A friend has another version](#a-friend-has-another-version-or-none) ·
 [Out of sync](#the-game-says-out-of-sync) ·
 [A freeze](#the-game-froze) ·
@@ -101,6 +104,26 @@ GameRanger works. It starts `H5_Game.exe`, which, following the GameRanger guide
 
 We have not tried the H5 Lobby app. If you do, please tell us.
 
+### Can we play over the internet without GameRanger?
+
+Yes, with your **Steam friends**, from 0.3.0 (a test for now). Every player sets **Options, H5 Together, Online play: Steam** and restarts the game. The host creates a LAN game as usual and clicks **Invite friends...** in the waiting room; the friends accept the invite in Steam, and their game joins by itself (or they pick the host's game in **Multiplayer, LAN**). Everything else is the game's own LAN play. Details: [the README](../README.md#online-play-over-steam-new-a-test).
+
+It needs the game bought on Steam (not GOG), Steam running, and H5 Together 0.3.0 with online play on, for every player. While it is on, the LAN list shows only games through Steam: for GameRanger or a real LAN game, set it back to **Off**.
+
+### Online play: my friend's game is not in the LAN list
+
+Look at the lines under the list on the LAN screen: they say whether Steam is on, how many of your friends play with H5 Together, and why a game cannot be joined (another version, for example). Then check:
+
+- you are **Steam friends** with the host (the host's game is for friends only);
+- **both** of you set Online play to **Steam** and restarted the game, and Steam is running on both PCs;
+- you have the **same H5 Together and the same MMH5.5** (a game made with another one shows a line saying so).
+
+If it still does not show, make a [bug report](#how-do-i-make-a-bug-report) from both PCs.
+
+### "Timeout. May be no more free slots" when joining
+
+Click **OK**, pick the game again and click **Join**. Over Steam, 0.3.0 sends every message again until it arrives, which fixed the one case we saw (a join answer lost on a 4G connection). If it happens again, please make a [bug report](#how-do-i-make-a-bug-report): the log says what was lost.
+
 ### A friend has another version, or none
 
 The waiting room's bottom line says it: who has which version, or none. The game still runs, but what needs everyone stays off: the host's game rules, the shorter co-op steps and other players' hero looks. For the best result, everyone installs the same version of H5 Together, and has the same MMH5.5.
@@ -173,4 +196,6 @@ MMH5.5's scripts, balance, installer and translations are made by the MMH5.5 tea
 
 ### Does it send anything about me?
 
-No. It sends nothing to us or to anyone else. In a multiplayer game the PCs of the players exchange a few small messages (versions, game rules, hero looks) over the game's own connection. The only thing that can contact a server is the update check, which is **off** unless you say yes: once a day it asks GitHub for the number of the latest version, and GitHub sees the address it comes from, as any website does. The bug report zip is made on your PC and goes nowhere until you attach it yourself.
+No. It sends nothing to us or to anyone else. In a multiplayer game the PCs of the players exchange a few small messages (versions, game rules, hero looks) over the game's own connection. Apart from online play over Steam (below), the only thing that can contact a server is the update check, which is **off** unless you say yes: once a day it asks GitHub for the number of the latest version, and GitHub sees the address it comes from, as any website does. The bug report zip is made on your PC and goes nowhere until you attach it yourself.
+
+**Online play over Steam** is off unless you turn it on. When it is on, the game talks to your friends' games through Steam, as any Steam game does: Steam sees the friends-only game you host and the invites you send, and the add-on shows its version number to your Steam friends' add-ons (a small Steam "rich presence" value).
