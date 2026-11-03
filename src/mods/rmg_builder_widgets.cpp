@@ -158,7 +158,7 @@ void ButtonPicture(ImDrawList *draw, ImVec2 p0, ImVec2 p1, const char *label, Im
 	else
 		draw->AddRectFilled(p0, p1, pressed ? IM_COL32(70, 52, 30, 255) : IM_COL32(96, 72, 40, 255), 4.0f * k);
 	if (hovered && !pressed) {
-		if (ImTextureID highlight = Tex(kButtonHighlight))
+		if (ImTextureID highlight = Tex(kButtonHighlight))  // light added over the button (the overlay draws it added)
 			draw->AddImage(highlight, p0, p1);
 		else
 			draw->AddRect(p0, p1, kGold, 4.0f * k, 0, 1.5f * k);
@@ -206,11 +206,13 @@ bool Combo(const char *id, ImVec2 p, ImVec2 size, const char *const *items, int 
 	// the arrow button, inside the field on the right (the game's ComboBtn: 25x25 at -4, 4 of a 33 high field)
 	const float inset = Round(3.0f * k), bs = size.y - 2 * inset;
 	const ImVec2 b0(p1.x - inset - bs, p.y + inset), b1(p1.x - inset, p.y + inset + bs);
-	ImTextureID arrow = Tex(hovered ? kComboButtonHighlight : kComboButton);
-	if (!arrow)
-		arrow = Tex(kComboButton);
-	if (arrow)
+	// the highlight is light added over the arrow (the overlay draws it added), as the game does
+	if (ImTextureID arrow = Tex(kComboButton)) {
 		draw->AddImage(arrow, b0, b1);
+		if (hovered)
+			if (ImTextureID highlight = Tex(kComboButtonHighlight))
+				draw->AddImage(highlight, b0, b1);
+	}
 	else {
 		draw->AddRectFilled(b0, b1, IM_COL32(92, 90, 85, 255));
 		const float cx = (b0.x + b1.x) / 2, cy = (b0.y + b1.y) / 2, r = bs * 0.25f;

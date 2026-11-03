@@ -1,10 +1,15 @@
 // The overlay (see overlay.h): the clients, the ImGui frame, the fonts, the
 // screen on top, the panels' language and our keys.
 //
-// How it draws: d3d9_hook.cpp calls us just before each frame is shown
-// (IDirect3DDevice9::Present); we draw with Dear ImGui (third_party/imgui, its
-// DirectX 9 renderer) between our own BeginScene/EndScene, only on frames where
-// a client wants to draw. On a device reset (fullscreen switch, alt-tab) ImGui's
+// How it draws: once per frame, with Dear ImGui (third_party/imgui, its DirectX 9
+// renderer), only on frames where a client wants to draw. Where: just under the
+// game's own cursor (overlay_cursor.cpp: the game calls its cursor's "draw" as
+// the last picture of its frame, and we draw there first, inside the game's
+// scene), so that the cursor stays above our panels. When that frame had no
+// cursor drawn (or the game is not as expected), just before the frame is shown
+// (IDirect3DDevice9::Present, from d3d9_hook.cpp), between our own
+// BeginScene/EndScene, over everything, as before. The clients are always asked
+// at Present (see AskClients). On a device reset (fullscreen switch, alt-tab) ImGui's
 // Direct3D objects are released before and made again after; the pictures live
 // in D3DPOOL_MANAGED. When no client has drawn for 10 s (main menu, a battle...),
 // every Direct3D object of ours goes, so that we hold nothing of the game's
@@ -230,8 +235,61 @@ void ReleaseDeviceObjects()
 	g_imgui_device = nullptr;
 }
 
+// --- pictures of light (a button's highlight) ----------------------------------------------
+// Some of the game's pictures have no alpha at all, only colours to add to what
+// is behind (internal::AddedPicture: a button's or a drop-down arrow's
+// highlight). ImGui's renderer blends every picture by its alpha, so those
+// were invisible: our buttons showed no hover. Around each draw command with
+// such a picture, a callback switches the device to adding, and ImGui's own
+// "reset" callback sets its usual blending back.
+void AddBlend(const ImDrawList *, const ImDrawCmd *)
+{
+	if (IDirect3DDevice9 *device = g_imgui_device) {
+		device->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ONE);
+		device->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ONE);
+		device->SetRenderState(D3DRS_SRCBLENDALPHA, D3DBLEND_ZERO);
+		device->SetRenderState(D3DRS_DESTBLENDALPHA, D3DBLEND_ONE);
+	}
+}
+
+void AddLightBlending(ImDrawData *data)
+{
+	for (int l = 0; l < data->CmdListsCount; ++l) {
+		ImVector<ImDrawCmd> &commands = data->CmdLists[l]->CmdBuffer;
+		bool any = false;
+		for (const ImDrawCmd &c : commands)
+			any = any || (!c.UserCallback && internal::AddedPicture(reinterpret_cast<const void *>(static_cast<uintptr_t>(c.GetTexID()))));
+		if (!any)
+			continue;
+		ImVector<ImDrawCmd> out;
+		out.reserve(commands.Size + 8);
+		for (const ImDrawCmd &c : commands) {
+			const bool added =
+				!c.UserCallback && internal::AddedPicture(reinterpret_cast<const void *>(static_cast<uintptr_t>(c.GetTexID())));
+			if (added) {
+				ImDrawCmd on = c;
+				on.ElemCount = 0;
+				on.UserCallback = &AddBlend;
+				on.UserCallbackData = nullptr;
+				out.push_back(on);
+			}
+			out.push_back(c);
+			if (added) {
+				ImDrawCmd off = c;
+				off.ElemCount = 0;
+				off.UserCallback = ImDrawCallback_ResetRenderState;
+				off.UserCallbackData = nullptr;
+				out.push_back(off);
+			}
+		}
+		commands.swap(out);
+	}
+}
+
 // --- the frame ---------------------------------------------------------------------------
-bool DrawFrame(IDirect3DDevice9 *device)
+// in_game_scene: we are inside the game's own BeginScene/EndScene (under its
+// cursor), so we draw in it; otherwise (at Present) in a scene of our own.
+bool DrawFrame(IDirect3DDevice9 *device, bool in_game_scene)
 {
 	if (device->TestCooperativeLevel() != D3D_OK)
 		return false;  // lost (fullscreen, alt-tab): nothing can be drawn now
@@ -260,7 +318,8 @@ bool DrawFrame(IDirect3DDevice9 *device)
 		if (g_clients[i].wanted)
 			CallDraw(&g_clients[i], &frame);
 	ImGui::Render();
-	if (SUCCEEDED(device->BeginScene())) {
+	AddLightBlending(ImGui::GetDrawData());
+	if (in_game_scene || SUCCEEDED(device->BeginScene())) {
 		// The pictures have mipmaps: use them (ImGui's renderer sets the other
 		// filters), and give the game back its own setting afterwards.
 		DWORD mip_filter = D3DTEXF_NONE;
@@ -270,16 +329,25 @@ bool DrawFrame(IDirect3DDevice9 *device)
 		ImGui_ImplDX9_RenderDrawData(ImGui::GetDrawData());
 		if (got)
 			device->SetSamplerState(0, D3DSAMP_MIPFILTER, mip_filter);
-		device->EndScene();
+		if (!in_game_scene)
+			device->EndScene();
 	}
 	if (internal::ModalOpen())
 		internal::ModalDrawn();
 	return true;
 }
 
-void OnPresent(IDirect3DDevice9 *device)
+// The clients are asked at Present only, outside the game's own frame: what
+// they do then may act on the game (a panel's OK, a key that opens a screen),
+// which must not happen while the game is drawing a screen. A frame drawn under
+// the game's cursor shows what they said at the previous Present.
+bool g_asked = false;       // the clients were asked (at a Present)
+bool g_any = false;         // ... and one of them wants to draw
+bool g_drawn = false;       // the frame being made was drawn under the game's cursor
+DWORD g_last_drawn = 0;     // GetTickCount() of the last frame drawn
+
+void AskClients()
 {
-	static DWORD last_drawn = 0;
 	internal::ModalFrameStart();
 	bool any = false;
 	for (int i = 0; i < g_client_count; ++i) {
@@ -287,9 +355,20 @@ void OnPresent(IDirect3DDevice9 *device)
 		s.wanted = s.on && CallWanted(&s);
 		any = any || s.wanted;
 	}
-	if (any && DrawFrame(device))
-		last_drawn = GetTickCount();
-	else if (g_imgui_device && GetTickCount() - last_drawn > 10000)
+	g_any = any;
+	g_asked = true;
+}
+
+void OnPresent(IDirect3DDevice9 *device)
+{
+	const bool drawn = g_drawn;
+	g_drawn = false;
+	internal::CursorFrameShown();
+	AskClients();  // for this frame if it was not drawn yet, else for the next one
+	// not drawn under the game's cursor in this frame: now, over everything (as before)
+	if (!drawn && g_any && DrawFrame(device, false))
+		g_last_drawn = GetTickCount();
+	if (g_imgui_device && GetTickCount() - g_last_drawn > 10000)
 		ReleaseDeviceObjects();
 }
 
@@ -359,6 +438,19 @@ bool GameInFront()
 	       (front == window || GetAncestor(front, GA_ROOTOWNER) == GetAncestor(window, GA_ROOTOWNER));
 }
 
+bool FrameWaiting()
+{
+	return g_asked && g_any && !g_drawn;
+}
+
+void DrawUnderCursor(IDirect3DDevice9 *device)
+{
+	if (FrameWaiting() && DrawFrame(device, true)) {
+		g_drawn = true;
+		g_last_drawn = GetTickCount();
+	}
+}
+
 }  // namespace internal
 
 void InstallEarly()
@@ -373,6 +465,7 @@ bool AddClient(const Client &client)
 		if (!d3dhook::Install(!g_early))
 			return false;
 		internal::InstallTextures();
+		internal::InstallCursorHook();
 		d3dhook::AddPresentCallback(&OnPresent, 0);  // the robot's screenshots come after (they show the overlay)
 		d3dhook::AddResetCallback(&OnReset);
 		g_installed = true;
