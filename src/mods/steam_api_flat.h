@@ -83,6 +83,7 @@ enum ConnectionState {
 // k_nSteamNetworkingSend_*
 const int kSendUnreliableNoNagle = 1;
 const int kSendReliable = 8;
+const int kSendReliableNoNagle = 9;
 const int kSendAutoRestartBrokenSession = 32;
 
 // k_nSteamNetworkConnectionInfoFlags_Relayed

@@ -117,6 +117,7 @@ struct Session {
 	bool asked, accepted, said_ignored, logged_info;
 	uint32_t first_ms;  // its first message (0: none yet)
 	long messages;
+	long messages_at_status;  // `messages` at its last quality line
 };
 
 struct SelfMessage {
@@ -153,7 +154,10 @@ void PopName(uint32_t pop, char *out, size_t size)
 
 class SteamTransport : public Transport {
 public:
-	SteamTransport(CRITICAL_SECTION *lock, uint32_t app_id) : lock_(lock), app_id_(app_id) {}
+	SteamTransport(CRITICAL_SECTION *lock, uint32_t app_id, bool reliable)
+		: lock_(lock), app_id_(app_id), reliable_(reliable)
+	{
+	}
 
 	const char *Name() const override { return "steam"; }
 	uint64_t SelfId() const override { return me_; }
@@ -177,8 +181,10 @@ public:
 		char me[12];
 		Short(me_, me, sizeof(me));
 		hooklog::Write("vlan steam: Steam started in %u ms as app %u; we are %s; our game is \"%s\"; lobbies are friends "
-		               "only",
-		               s_.init_ms, s_.steam_app_id, me, game_);
+		               "only; %s",
+		               s_.init_ms, s_.steam_app_id, me, game_,
+		               reliable_ ? "messages reliable (a lost one is sent again, as on a LAN)"
+		                         : "messages unreliable (each sent once, as UDP)");
 		// the online UI: friends see that we play with H5 Together's online play
 		const bool presence = s_.api.set_rich_presence(s_.friends, kPresenceKey, OPEN_HOMM5_VERSION);
 		boot_ms_ = GetTickCount();
@@ -218,8 +224,13 @@ public:
 			return false;
 		if (to == me_)
 			return PushSelf(channel, message, size);
+		// Reliable by default: the game was made for a LAN, where nothing is lost. A lost
+		// "accepted" answer to a join was never sent again by the joined game: the join
+		// failed with "Timeout" over 4G (online-steam-test2.md, run 2).
 		const int r = s_.api.send(s_.msgs, IdentityOf(to), message, static_cast<uint32_t>(size),
-		                          kSendUnreliableNoNagle | kSendAutoRestartBrokenSession, channel);
+		                          (reliable_ ? kSendReliableNoNagle : kSendUnreliableNoNagle) |
+		                              kSendAutoRestartBrokenSession,
+		                          channel);
 		if (r != kResultOk) {
 			++refused_;
 			if (refused_ <= 5) {
@@ -1124,6 +1135,42 @@ private:
 		hooklog::Write("vlan steam: so far: %ld messages sent (%ld refused), %ld received (%ld unreadable), %ld to "
 		               "ourselves; sessions: %ld accepted, %ld ignored; %d known host(s)",
 		               sent_, refused_, received_, bad_, to_self_, accepted_, ignored_, hosts_.Count());
+		LogQuality();
+	}
+
+	// How each session that brought messages since the last line does: its route (it can
+	// change), Steam's own share of the packets that arrive, and what waits to be sent.
+	void LogQuality()
+	{
+		for (int i = 0; i < session_count_; ++i) {
+			Session &s = sessions_[i];
+			if (s.id == me_ || s.messages == s.messages_at_status)
+				continue;
+			s.messages_at_status = s.messages;
+			ConnectionInfo info = {};
+			RealTimeStatus status = {};
+			const int state = s_.api.session_info(s_.msgs, IdentityOf(s.id), &info, &status);
+			char who[12], relay[8], here[16], there[16];
+			Short(s.id, who, sizeof(who));
+			PopName(info.pop_relay, relay, sizeof(relay));
+			Share(status.quality_local, here, sizeof(here));
+			Share(status.quality_remote, there, sizeof(there));
+			const bool relayed = (info.flags & kConnectionFlagRelayed) != 0;
+			hooklog::Write("vlan steam: the session with %s: %s, ping %d ms, %s%s; packets that arrive: %s of theirs "
+			               "here, %s of ours there; waiting to go: %d bytes reliable (%d sent, not acknowledged), %d "
+			               "unreliable",
+			               who, steamspike::ConnectionStateName(state), status.ping_ms,
+			               relayed ? "through Steam's relay in " : "direct", relayed ? relay : "", here, there,
+			               status.pending_reliable, status.sent_unacked_reliable, status.pending_unreliable);
+		}
+	}
+
+	static void Share(float quality, char *out, size_t size)
+	{
+		if (quality < 0.0f)
+			_snprintf_s(out, size, _TRUNCATE, "?");  // (Steam does not know yet)
+		else
+			_snprintf_s(out, size, _TRUNCATE, "%.1f%%", quality * 100.0f);
 	}
 
 	bool IsMember(uint64_t id) const
@@ -1209,6 +1256,7 @@ private:
 
 	CRITICAL_SECTION *lock_;
 	uint32_t app_id_;
+	bool reliable_;
 	steamrt::Steam s_ = {};
 	volatile uint64_t me_ = 0;
 	volatile bool booted_ = false;
@@ -1270,9 +1318,9 @@ private:
 
 }  // namespace
 
-Transport *MakeSteamTransport(CRITICAL_SECTION *lock, uint32_t app_id)
+Transport *MakeSteamTransport(CRITICAL_SECTION *lock, uint32_t app_id, bool reliable)
 {
-	return new SteamTransport(lock, app_id);
+	return new SteamTransport(lock, app_id, reliable);
 }
 
 void SetSteamInviteHandler(void (*handler)(const online::Invite &invite))

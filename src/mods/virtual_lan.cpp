@@ -527,7 +527,8 @@ void InstallVirtualLan()
 		UINT app_id = GetPrivateProfileIntW(L"online", L"app_id", 15370, path);
 		if (app_id < 1 || app_id > 0x7fffffff)
 			app_id = 15370;
-		g_transport = vlan::MakeSteamTransport(&g_lock, app_id);
+		const bool reliable = GetPrivateProfileIntW(L"online", L"reliable", 1, path) != 0;
+		g_transport = vlan::MakeSteamTransport(&g_lock, app_id, reliable);
 	} else {
 		UINT own_port = GetPrivateProfileIntW(L"online", L"loopback_port", 47100, path);
 		if (own_port < 1 || own_port > 65535)

@@ -1,6 +1,6 @@
 # Steam test 3: a real LAN game between two PCs over Steam
 
-Status: **Wi-Fi run passed (2026-11-03); the 4G run is next** (see [Results](#results)). Both PCs use **the same `dinput8.dll`: the one in the package zip GitHub builds for the pull request** (the Actions run's artifact `h5-together-<version>`; downloading it needs a GitHub login: the owner, in a browser, or `gh run download`). The laptop's helper is `tools/robot/laptop_test.py` in the repo (`git pull`). The first kit, `h5-together-steam-test3.zip` in the session's scratchpad, could not reach the laptop (no DLLs in git, no file sharing over the LAN), so the test moved to the next day.
+Status: **Wi-Fi run passed (2026-11-03 morning); 4G runs and a hand-played game the same evening: in step everywhere, one failed join (fixed: reliable messages)** (see [Results](#results)). Both PCs use **the same `dinput8.dll`: the one in the package zip GitHub builds for the pull request** (the Actions run's artifact `h5-together-<version>`; downloading it needs a GitHub login: the owner, in a browser, or `gh run download`). The laptop's helper is `tools/robot/laptop_test.py` in the repo (`git pull`). The first kit, `h5-together-steam-test3.zip` in the session's scratchpad, could not reach the laptop (no DLLs in git, no file sharing over the LAN), so the test moved to the next day.
 
 This is the first real test of step 3 of [online-steam.md](online-steam.md): the virtual LAN with its **Steam transport** (`[online] mode=steam`). The earlier two-PC test (the spike) only sent test messages between the two games. This time the **game's own LAN play** goes through Steam: the host creates a LAN game, and the other PC sees it in the game's own LAN list, joins it, and they play.
 
@@ -139,11 +139,35 @@ Things seen, not failures:
 - **A wasted retry, fixed after the test:** after the host left, the laptop kept asking Steam to join the host's old lobby every 5 s (Steam answered 2, "no such lobby"), because its game still sent packets to the host. Now a lobby whose host left is never joined again; a new lobby of the same host still is (`LobbyPlan::Forget`, test in `virtual_lan_test.cpp`).
 - The helper's line about Steam's launch option was misleading (the laptop's option also swaps the exe for MMH5.5's); reworded.
 
-### Run 2: 4G (to do)
+### Run 2: 4G (2026-11-03, evening): in step, one failed join
 
-The same, with the laptop on the phone's connection. On mobile networks Steam may not find a direct path and may relay the session; the log then says `relayed`. Expected: it still works, with a higher ping.
+The laptop on a phone's 4G hotspot, the desktop on the home network. Both PCs ran the package DLL of [PR #85](https://github.com/jozrcr/h5-together/pull/85) (online step 4, with `main` and its #84 fix merged in: artifact `h5-together-0.0.0-dev.201`, `dinput8.dll` sha256 `088da6b61cda…`). Three games:
+
+| | 2a: robots | 2b: robots again | 2c: by hand |
+|---|---|---|---|
+| Route | Steam's relay (Paris), ping 50 ms | relay (Paris), 43 to 50 ms | **direct**, 144 to 156 ms |
+| Join | first try | **failed** ("Timeout. May be no more free slots available in the game. Error code 0.18.0"); worked when clicked again | first try, from a Steam invite |
+| Game | 4 days, then the host's robot closed it (no AI: see below) | started by a click on the host; 8 AI turns, 8 days | 5 days, 2 humans and 2 AI, 3 autosaves |
+| World checksums | 185 compared, all equal | 2,384 compared, all equal | not traced (no robot) |
+| Real addresses, refused messages | none | none | none |
+
+**2a.** The owner clicked in the host's waiting room while its robot ran (ready, a start bonus, the AI row). The robot's blind "AI row: arrow right" then closed the AI row instead of opening it, so the game had no computer player, and after 4 turn ends without an AI step the robot's stuck check closed the host's game. Not a fault of the add-on; robots and hands do not mix.
+
+**2b, the failed join.** The laptop's game sent its join request (31 bytes, starting `01 01`) five times, 0.2 to 1.6 s apart; the host's game got all five. In the joins that work, the host answers at once with 33 bytes starting `04` ("accepted"), then both sides talk. This time no `04` ever reached the laptop. Instead the host's game sent its in-game stream (18-byte packets every 50 ms, acknowledging nothing) to the laptop for about 85 s: it had taken the laptop in, but its "accepted" was lost on the way, and the game never sends it again (a duplicate request is ignored). On a LAN nothing is lost, so the game was never made for this. The host's waiting room kept the laptop's row open, and a second click on Join (a new request) worked at once. **Fix:** the Steam transport now sends every message **reliably** (Steam sends a lost one again, as fast as the ping allows; `[online] reliable=1`, the default; `0` = each message once, as before), so the virtual LAN behaves like the LAN the game expects. The log's minute line now also says, for each session, the route, the share of packets that arrive each way, and what waits to be sent.
+
+**Pacing (2b, AI turns).** The host's AI moves took a median of 700 ms each (p80 1.4 s), against 514 ms (p80 0.86 s) on Wi-Fi in the morning. While the AI played, the PCs waited about 0.5 to 1.2 s on average per 10 s window for the other's report (the laptop's worst single wait: 5.2 s); in the morning on Wi-Fi it was 0.4 s on average (worst 2.8 s). So 4G adds to the AI's own slowness; reliable messages may help here too (a lost report waited for the game's own resend before). To measure next time with `reliable=1` and `0`.
+
+**2c, by hand: the owner's verdict "it works extremely well".** The laptop's game was not running: accepting the invite in Steam started it (`+connect_lobby`), the main menu showed the invite, the host's game was in the LAN list at once, and the join worked on the first click (the joining is still by hand: see step 4). Waits per 10 s window: 116 ms on average, the worst single wait 1.3 s. Autosaves took about 0.25 s.
+
+Things seen, not failures:
+
+- **The overlay's first notification froze the host for 10 s.** In 2a, right after Steam showed the host "a friend is now playing", the host's game stopped drawing for 10.5 s inside Steam's overlay code (the game's `BeginScene` call, then `crashhandler.dll` waiting). Not in 2b or 2c. Steam's, not ours; worth watching in real games.
+- **Steam's overlay** is "not enabled" when Steam's API starts and enabled 5 s later, on both PCs, whether Steam started the game or not (under Proton too). So the online UI asks Steam about the overlay when the button is clicked, not at the start.
+- **Fake addresses:** the laptop's address scan found 1 packet holding `01 00 00 7f` (127.0.0.1 backwards, as in the morning), nothing else.
+- **Not ours:** at each autosave of 2c the host's log showed "rmg factions: REBUILD FAILED … the game will not be in step" about 20 times. Faction terrain was off; the start-message hook also runs when the autosave reads old saves' headers. Nothing was rebuilt and the game stayed in step; to be fixed on its own.
+- **The online UI (PR #85)**, by hand: our Steam lines on the LAN screen are drawn over the game's error box (they should hide under a game's message box); the game's cursor goes under every panel of ours, and our buttons show no hover. To fix in the online UI and the overlay.
 
 ## Not tested here
 
-- A relayed connection (on the same home Wi-Fi Steam finds a direct path); the 4G run may get one.
-- Three PCs, an invite from the friends list (step 4), a saved game.
+- Three PCs, a saved game loaded over Steam.
+- Reliable messages (`reliable=1`) on 4G: the next run.
