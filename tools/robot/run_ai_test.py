@@ -503,6 +503,9 @@ def main():
                    help="[rules] setting, e.g. governance=0 or trace=1 (repeatable; src/mods/host_rules.cpp)")
     p.add_argument("--debug-setting", action="append", default=[], metavar="KEY=VALUE",
                    help="[debug] setting, e.g. hang_test_at=60 or hang_seconds=10 (repeatable; src/hook/watchdog.cpp)")
+    p.add_argument("--net-setting", action="append", default=[], metavar="KEY=VALUE",
+                   help="[net] setting, e.g. catch_up_behind=0 (src/mods/lockstep.cpp); --setting net.KEY would "
+                        "make a second [net] section, which the DLL does not read")
     p.add_argument("--setting", action="append", default=[], metavar="SECTION.KEY=VALUE",
                    help="a setting of another section of h5-together.ini, e.g. update.check=1 or chain.dll=none")
     p.add_argument("--online-setting", action="append", default=[], metavar="KEY=VALUE",
