@@ -9,7 +9,7 @@ Everything here changes how the original game behaves, on purpose. It is kept ap
 - Random maps: [teams](#teams-on-random-maps-rmg_teamscpp-on-by-default-only-for-recipe-maps), [templates and recipe names](#random-map-templates-rmg_templatescpp-rmg_makercpp-rmg_recipecpp-on-by-default), [template builder](#template-builder-rmg_buildercpp-rmg_screencpp-on-by-default), [start terrain that matches the factions](#start-terrain-that-matches-the-factions-rmg_factionscpp-off-by-default)
 - Rules: [game rules from the host](#game-rules-from-the-host-host_rulescpp-on-and-nothing-changes-unless-the-host-changes-something), with [H5 Together's version in the waiting room](#h5-togethers-version-in-the-waiting-room-030)
 - [New version available](#new-version-available-update_checkcpp-off-by-default) (opt-in)
-- Online play (being built, off by default): [Steam test](#steam-test-steam_spikecpp-off-by-default-for-tests-only), [virtual LAN](#virtual-lan-virtual_lancpp-off-by-default-being-built)
+- Online play (being built, off by default): [Steam test](#steam-test-steam_spikecpp-off-by-default-for-tests-only), [virtual LAN](#virtual-lan-virtual_lancpp-off-by-default-being-built), [the online UI](#online-play-over-steam-the-ui-online_uicpp)
 - [The settings menu](#the-settings-menu-settings_cpp-options-h5-together): the add-on's settings in the game's own Options screen (Options, H5 Together; F3)
 - Camera, sound and visuals: [original music](#original-music-original_musiccpp-off-by-default), [camera zoom and start distance](#farther-camera-zoom-start-distance-cameracpp-off-by-default), [the mouse wheel under Wine](#the-mouse-wheel-under-wine--proton-wheelcpp-wheel_logiccpp-on-under-wine-only), [wider volume range](#wider-volume-range-audio_volumecpp-off-by-default), [black past the map's edge](#black-past-the-maps-edge-edge_skycpp-off-by-default), [the main menu's scene and music](#the-main-menus-scene-and-music-menu_scenecpp-off-by-default)
 - The freeze detector (hang watchdog), the crash reports and chain-loading another `dinput8.dll` mod are part of the DLL itself: [src/hook/README.md](../hook/README.md#the-hang-watchdog-watchdogcpp).
@@ -592,7 +592,7 @@ ready = ready
 computer = Computer {n}
 ```
 
-`[section]` + `key` gives the key the code asks for (`players.day`); `\n` is a new line. In the code a text is `texts::Get("rules.title")`, `texts::Format("players.computer", {{"n", "3"}})`, or a panel's table of keys (`texts::Table(kKeys)`, a struct of `const char *` written with keys: the panels' drawing code reads `w.title` as before). Sections: `[language]` (the language's own name, and the game's name of the red player in it), `[players]`, `[notify]`, `[rules]`, `[bonus]`, `[looks]`, `[builder]`.
+`[section]` + `key` gives the key the code asks for (`players.day`); `\n` is a new line. In the code a text is `texts::Get("rules.title")`, `texts::Format("players.computer", {{"n", "3"}})`, or a panel's table of keys (`texts::Table(kKeys)`, a struct of `const char *` written with keys: the panels' drawing code reads `w.title` as before). Sections: `[language]` (the language's own name, and the game's name of the red player in it), `[players]`, `[notify]`, `[rules]`, `[bonus]`, `[looks]`, `[builder]`, `[update]`, `[versions]`, `[online]`, `[settings]`, `[welcome]`.
 
 **Which language** (`[ui] language=auto`, the default), the first clue that answers:
 
@@ -1041,9 +1041,9 @@ asked=         ; written by the add-on: 1 once the first-start question was answ
 
 **What it shows:** like the game's categories, two pages side by side, each a list with headers:
 - **On this PC:** Interface (player list, "your turn", the panels' keys and buttons, hero looks), Camera and visuals, Sound, Language, Random maps. The rows for the mouse wheel fix and the game's texts only show when they matter (under Wine; with the French packs, or `[lang] texts` already set).
-- **Co-op games:** Host (teams, team arrows, builder maps' teams, faction start terrain, and a line pointing to the game rules, F2), Advanced (co-op timing and steps, view delay, network timings, AI pathfinding, LAN over VPNs, autosaves, our templates, the host's rules, live hero screen, freeze detector, crash reports, another `dinput8.dll` mod), Help (the add-on's and MMH5.5's versions, the update check, where the file and the log are).
+- **Co-op games:** Online play (Off / Steam, and a line saying where friends' games show, or that `steam_api.dll` is missing: [the online UI](#online-play-over-steam-the-ui-online_uicpp)), Host (teams, team arrows, builder maps' teams, faction start terrain, and a line pointing to the game rules, F2), Advanced (co-op timing and steps, view delay, network timings, AI pathfinding, LAN over VPNs, autosaves, our templates, the host's rules, live hero screen, freeze detector, crash reports, another `dinput8.dll` mod), Help (the add-on's and MMH5.5's versions, the update check, where the file and the log are).
 
-47 settings; the other 61 stay in the file (the 20 game rules have their own panel, F2; 39 are for testing or written by the add-on). `lan_peers` (addresses) is shown as a line: the game has no text box, so it is set in the file.
+48 settings (47 until online play's row, step 4); the other 60 stay in the file (the 20 game rules have their own panel, F2; 38 are for testing or written by the add-on). `lan_peers` (addresses) is shown as a line: the game has no text box, so it is set in the file.
 
 **When a change applies:** a name that ends in ` *` waits for a restart of the game, ` **` for the next game (the line at the top of each page says so; the tooltip says it in words). After **Apply**, a line at the bottom of the screen says, for example, "1 change applies after a restart of the game." The menu never restarts the game.
 
@@ -1055,7 +1055,7 @@ asked=         ; written by the add-on: 1 once the first-start question was answ
 
 Each "at once" setting is read again by its own mod (`settings_reload.cpp`, a `Reload...Settings()` in each mod: plain values the mod reads when it uses them, changed on the main thread). Checked with the robot: a new builder key opens the builder at once, the camera hook goes in for the next map, the rules key, the freeze detector's wait (log lines `... from the settings menu: ...`). The plan hoped for more (the co-op timing, the view delay, the team arrows, the language at once): those install hooks or patch the game's code at start-up, or hold texts other code keeps pointers to, so they stay "after a restart" (when in doubt, restart).
 
-**During a multiplayer game** the Host and Advanced rows are greyed out by the game itself (its `disable_options_by_multiplayer`, set by the map's Options code, as for its own "quick combat"): changing them halfway would only make this PC disagree with the others. As a second net, Apply does not write a Host or Advanced change while that variable is on (robot check: `[coop] guard not changed: read only during a multiplayer game`).
+**During a multiplayer game** the Online play, Host and Advanced rows are greyed out by the game itself (its `disable_options_by_multiplayer`, set by the map's Options code, as for its own "quick combat"): changing them halfway would only make this PC disagree with the others. As a second net, Apply does not write a Host or Advanced change while that variable is on (robot check: `[coop] guard not changed: read only during a multiplayer game`).
 
 **Buttons:** the game's own. **Apply** writes the changed settings; **Default** (after the game's own "restore the defaults?" box) puts every setting of our category back to its default; **Back** forgets the changes. Nothing is written before Apply or Default.
 
@@ -1098,7 +1098,7 @@ spike_ping_bytes=300
 
 ## Virtual LAN (`virtual_lan*.cpp`; off by default, being built)
 
-The core of online play over Steam ([docs/plans/online-steam.md](../../docs/plans/online-steam.md), steps 2 and 3). The game keeps its own LAN play; the add-on carries its LAN packets somewhere else: **over Steam, between Steam friends** (`mode=steam`, `virtual_lan_steam.cpp`), or through a **loopback transport** for the robot's tests (two copies of the game on one PC, `virtual_lan_loopback.cpp`). With `mode=off` (the default) nothing is hooked and nothing changes. There is no panel yet (step 4): a friend's game shows up in the game's own LAN list.
+The core of online play over Steam ([docs/plans/online-steam.md](../../docs/plans/online-steam.md), steps 2 and 3). The game keeps its own LAN play; the add-on carries its LAN packets somewhere else: **over Steam, between Steam friends** (`mode=steam`, `virtual_lan_steam.cpp`), or through a **loopback transport** for the robot's tests (two copies of the game on one PC, `virtual_lan_loopback.cpp`). With `mode=off` (the default) nothing is hooked and nothing changes. A friend's game shows up in the game's own LAN list; what else the player sees is [the online UI](#online-play-over-steam-the-ui-online_uicpp) (step 4).
 
 How it works, in plain words:
 
@@ -1124,10 +1124,27 @@ The log says what it does (lines starting with `vlan:` and `vlan steam:`): this 
 
 ```ini
 [online]
-mode=off             ; off (default) | steam (tests for now: docs/plans/online-steam-test2.md) | loopback (robot tests only)
+mode=off             ; off (default) | steam (Options > H5 Together > Online play; being tested) | loopback (robot tests only)
 app_id=15370         ; steam: the game's Steam app (only for tests: 480 = Valve's Spacewar)
 loopback_port=47100  ; loopback: this copy's own port on 127.0.0.1
 loopback_peers=      ; loopback: the other copies' ports, e.g. 47102
 ```
 
 `python tools\robot\run_lan_test.py --vlan` sets these for the robot's host and client (ports 47101 and 47102) and turns off the robot's own broadcast copies, so the client can only find the host through the virtual LAN. `tools/robot/packet_map.py` then shows where the addresses sit in the packets, and the robot's address scan (`--net-scan`) counts packets holding a real address of this PC (it must be 0).
+
+## Online play over Steam: the UI (`online_ui.cpp`)
+
+Step 4 of [docs/plans/online-steam.md](../../docs/plans/online-steam.md#step-4-the-online-ui-2026-11-03): what a player sees of online play, in the game's own look. With `[online] mode=off` (the default) none of it shows.
+
+- **Turning it on:** Options > H5 Together, page 2, "Online play": Off (local network) / Steam. It applies after a restart of the game (the hooks and Steam start long before the LAN screen). The line under it says where friends' games show, or that `bin\h5-together\steam_api.dll` is missing (a GOG copy: Steam cannot start; nothing else changes).
+- **Multiplayer > LAN:** a few lines in the empty box under the games list: whether Steam works (if not: why, and that the list shows the local network as before), how many Steam friends play with H5 Together (their rich presence `h5t_version`, set by every PC with `mode=steam`), invites, and friends' games this PC cannot join (another MMH5.5 or game build, another H5 Together protocol). The games themselves are in the game's own list.
+- **The waiting room (host):** "Invite friends..." next to "Rules...". It opens Steam's invite dialog when Steam's overlay is enabled in the game (it was 5 s after Steam started, in robot runs), else, or if the overlay does not open within 2.5 s, our own list of the Steam friends who are online, each with an "Invite" button (`InviteUserToLobby`).
+- **An invite** (accepted in Steam, "Join game" in Steam's friends list, or Steam starting the game with `+connect_lobby`): a banner on the main menu for 20 s ("Pierre invites you to play: open Multiplayer > LAN."), and when the game is in the background the taskbar flash, the sound and the pop-up of the "your turn" notification (`[notify] sound=`, `popup=`). The host's lobby is read without joining it, and its game shows in the LAN list.
+
+The Steam calls are made by the Steam transport's thread (`virtual_lan_steam.cpp`); the UI reads a status under the virtual LAN's lock and only asks for the invites. The words are the `[online]` texts of `src/mods/texts/*.txt`. No Steam name or SteamID goes to the log.
+
+**For tests** (`h5-together.ini`, not in the shipped file): `[online] ui_test=1` shows made-up friends (two with H5 Together, a game of another MMH5.5, one of another H5 Together, six friends in the list); inviting them calls no Steam function. Robot steps: `panel|online invite` (as a click on the button), `panel|online picker` (our list), `panel|online close`, `panel|online test_invite` and `panel|online pick <row>` (both only with `ui_test=1`). Example (the screenshots of step 4, with `steam_api.dll` in the test copy):
+
+```
+python tools\robot\run_ai_test.py --game C:\Games\H5_test_k --no-map --seconds 58 --shot-every 0 --online-setting mode=steam --online-setting ui_test=1 --setvar "lan_last_login = Robot-host" --step "8|panel|online test_invite" --step "10|shot|menu-invite-banner" --step "12|key|F3" --step "16|shot|options-online-row" --step "17|ui|NUI::CGameOptionsScreen options_back" --step "19|menu|multi lan" --step "26|shot|lan-status" --step "28|ui|NUI::CLobbyScreen create" --step "32|map|A1M4/" --step "34|msg|create" --step "42|shot|waiting-room-invite" --step "43|panel|online invite" --step "45|shot|invite-list" --step "46|panel|online pick 0" --step "47|panel|online pick 2" --step "49|shot|invite-list-invited" --step "50|panel|online close"
+```

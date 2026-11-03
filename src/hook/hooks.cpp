@@ -23,6 +23,7 @@
 #include "../mods/menu_scene.h"
 #include "../mods/net_tuning.h"
 #include "../mods/notify.h"
+#include "../mods/online_ui.h"
 #include "../mods/original_music.h"
 #include "../mods/player_list.h"
 #include "../mods/rmg_builder.h"
@@ -89,6 +90,7 @@ void InstallEarly()
 	mods::InstallHostRulesEarly();  // its panel: the Direct3D import
 	mods::InstallUpdateCheckEarly();  // [update] check=1: its notice in the main menu
 	mods::InstallSettingsMenuEarly();  // our page in the Options screen: before the game reads its list
+	mods::InstallOnlineUiEarly();  // [online] mode=steam: its lines and button are drawn by the overlay
 	overlay::InstallTestPanelEarly();
 }
 
@@ -125,6 +127,7 @@ void InstallAll()
 	mods::ApplyWheelFromSettings();  // its DirectInput filter goes first (order -10)
 	mods::ApplyEdgeSkyFromSettings();  // [camera] edge_sky: before the first map reads its light
 	mods::ApplyHostRulesFromSettings();  // [rules]: the host's rules, served as H55-Settings.lua
+	mods::ApplyOnlineUiFromSettings();  // [online] mode=steam: Steam's lines on the LAN screen, Invite friends... (after the rules' button)
 	mods::ApplyAudioVolumeFromSettings();
 	mods::ApplyHeroSkinsFromSettings();  // after notify and the co-op guard: it stacks on their hooks
 	mods::ApplyUpdateCheckFromSettings();  // [update] check (off by default)

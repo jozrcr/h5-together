@@ -315,13 +315,15 @@ const char *PlayTurnSound()
 // so it runs on a thread of its own: the game never waits for it.
 const UINT kIconId = 0x4835;
 HANDLE g_popup_wake = nullptr;
-volatile LONG g_popup_request = 0;  // > 0: show it for that day; -1: remove it
+volatile LONG g_popup_request = 0;  // 1: show it; -1: remove it
 HWND volatile g_popup_window = nullptr;
 HICON volatile g_popup_icon = nullptr;
-bool g_popup_shown = false;  // the main thread asked for it and not for its removal
-// Its words (the [notify] texts), set once by the main thread before the first pop-up:
-// the texts are chosen on the main thread (it reads a game file for that).
+volatile LONG g_popup_shown = 0;  // asked for and not removed since (the turn check, or an invite)
+// Its words, set just before each request (the turn's: the [notify] texts; an invite's:
+// online_ui.cpp's), read by the pop-up's thread: under g_popup_lock.
+CRITICAL_SECTION g_popup_lock;
 std::string g_popup_tip, g_popup_title, g_popup_info;
+INIT_ONCE g_popup_once = INIT_ONCE_STATIC_INIT;
 
 DWORD WINAPI PopupThread(void *)
 {
@@ -337,9 +339,11 @@ DWORD WINAPI PopupThread(void *)
 		if (request > 0) {
 			nid.uFlags = NIF_ICON | NIF_TIP | NIF_INFO;
 			nid.hIcon = g_popup_icon;
+			EnterCriticalSection(&g_popup_lock);
 			wcsncpy_s(nid.szTip, texts::Wide(g_popup_tip).c_str(), _TRUNCATE);
 			wcsncpy_s(nid.szInfoTitle, texts::Wide(g_popup_title).c_str(), _TRUNCATE);
-			wcsncpy_s(nid.szInfo, texts::Wide(texts::Fill(g_popup_info, {{"day", std::to_string(request)}})).c_str(), _TRUNCATE);
+			wcsncpy_s(nid.szInfo, texts::Wide(g_popup_info).c_str(), _TRUNCATE);
+			LeaveCriticalSection(&g_popup_lock);
 			nid.dwInfoFlags = NIIF_INFO | NIIF_NOSOUND;  // the sound is ours (sound=)
 			bool ok = added && Shell_NotifyIconW(NIM_MODIFY, &nid);
 			if (!ok)
@@ -357,9 +361,31 @@ DWORD WINAPI PopupThread(void *)
 	}
 }
 
-void ShowPopup(HWND window, int day)
+// The pop-up's thread, once (the turn check at start-up, or the first invite, from any thread).
+BOOL CALLBACK StartPopup(PINIT_ONCE, void *, void **)
 {
-	if (!g_popup_wake || !window)
+	InitializeCriticalSection(&g_popup_lock);
+	g_popup_wake = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+	HANDLE thread = g_popup_wake ? CreateThread(nullptr, 0, &PopupThread, nullptr, 0, nullptr) : nullptr;
+	if (thread)
+		CloseHandle(thread);
+	else if (g_popup_wake) {
+		CloseHandle(g_popup_wake);
+		g_popup_wake = nullptr;
+	}
+	return TRUE;
+}
+
+bool PopupReady()
+{
+	InitOnceExecuteOnce(&g_popup_once, &StartPopup, nullptr, nullptr);
+	return g_popup_wake != nullptr;
+}
+
+// Shows the pop-up with these words (any thread).
+void ShowPopupWords(HWND window, const std::string &tip, const std::string &title, const std::string &info)
+{
+	if (!window || !PopupReady())
 		return;
 	HICON icon = reinterpret_cast<HICON>(GetClassLongPtrW(window, GCLP_HICONSM));
 	if (!icon)
@@ -368,23 +394,29 @@ void ShowPopup(HWND window, int day)
 		icon = LoadIconW(nullptr, MAKEINTRESOURCEW(32516));  // IDI_INFORMATION
 	g_popup_window = window;
 	g_popup_icon = icon;
-	static bool words = false;
-	if (!words) {
-		g_popup_tip = texts::Get("notify.tip");
-		g_popup_title = texts::Get("notify.title");
-		g_popup_info = texts::Get("notify.info");
-		words = true;
-	}
-	InterlockedExchange(&g_popup_request, day > 0 ? day : 1);
+	EnterCriticalSection(&g_popup_lock);
+	g_popup_tip = tip;
+	g_popup_title = title;
+	g_popup_info = info;
+	LeaveCriticalSection(&g_popup_lock);
+	InterlockedExchange(&g_popup_request, 1);
 	SetEvent(g_popup_wake);
-	g_popup_shown = true;
+	InterlockedExchange(&g_popup_shown, 1);
+}
+
+void ShowPopup(HWND window, int day)
+{
+	ShowPopupWords(window, texts::Get("notify.tip"), texts::Get("notify.title"),
+	               texts::Format("notify.info", {{"day", std::to_string(day > 0 ? day : 1)}}));
 }
 
 void RemovePopup()
 {
+	if (!g_popup_wake)
+		return;
 	InterlockedExchange(&g_popup_request, -1);
 	SetEvent(g_popup_wake);
-	g_popup_shown = false;
+	InterlockedExchange(&g_popup_shown, 0);
 }
 
 // --- the turn check, after each frame update of the adventure controller --------------
@@ -439,6 +471,17 @@ void AfterFrame(const void *controller)
 		RemovePopup();
 }
 
+bool g_settings_read = false;  // sound and popup (an invite reads them too when turn=0)
+
+void ReadSoundAndPopup(const wchar_t *path)
+{
+	g_sound = GetPrivateProfileIntW(L"notify", L"sound", 1, path) != 0;
+	g_popup = GetPrivateProfileIntW(L"notify", L"popup", 1, path) != 0;
+	if (g_sound)
+		g_system_sound = HasSystemSound(L"SystemNotification");
+	g_settings_read = true;
+}
+
 typedef void(__fastcall *UpdateFn)(void *controller, void *edx, DWORD a, DWORD b, DWORD c, DWORD d, DWORD e);
 UpdateFn g_update_next = nullptr;
 
@@ -454,8 +497,7 @@ void ReloadNotifySettings()
 {
 	wchar_t path[MAX_PATH];
 	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
-	g_sound = GetPrivateProfileIntW(L"notify", L"sound", 1, path) != 0;
-	g_popup = GetPrivateProfileIntW(L"notify", L"popup", 1, path) != 0;
+	ReadSoundAndPopup(path);
 	hooklog::Write("notify: from the settings menu: sound %s, pop-up %s%s", g_sound ? "on" : "off", g_popup ? "on" : "off",
 	               g_update_next ? "" : " (the notification itself is off)");
 }
@@ -464,12 +506,11 @@ void ApplyNotifyFromSettings()
 {
 	wchar_t path[MAX_PATH];
 	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
+	ReadSoundAndPopup(path);  // (an invite of online play uses them too)
 	if (!GetPrivateProfileIntW(L"notify", L"turn", 1, path)) {
 		hooklog::Write("notify: \"your turn\" notification off (h5-together.ini)");
 		return;
 	}
-	g_sound = GetPrivateProfileIntW(L"notify", L"sound", 1, path) != 0;
-	g_popup = GetPrivateProfileIntW(L"notify", L"popup", 1, path) != 0;
 	g_trace = GetPrivateProfileIntW(L"notify", L"trace", 0, path) != 0;
 	if (CodeAsExpected())
 		g_update_next = reinterpret_cast<UpdateFn>(hookpatch::RedirectCall(kUpdateCall, kUpdate, &UpdateHook));
@@ -477,19 +518,36 @@ void ApplyNotifyFromSettings()
 		hooklog::Write("notify: the game's code is not as expected: no \"your turn\" notification");
 		return;
 	}
-	if (g_sound)
-		g_system_sound = HasSystemSound(L"SystemNotification");
-	if (g_popup) {
-		g_popup_wake = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-		HANDLE thread = g_popup_wake ? CreateThread(nullptr, 0, &PopupThread, nullptr, 0, nullptr) : nullptr;
-		if (thread)
-			CloseHandle(thread);
-		else
-			g_popup = false;
-	}
+	if (g_popup && !PopupReady())
+		g_popup = false;
 	hooklog::Write("notify: \"your turn\" notification on: taskbar flash%s%s%s", !g_sound ? "" : g_system_sound
 	               ? ", the system notification sound" : ", a chime (no system notification sound)",
 	               g_popup ? ", pop-up" : "", g_trace ? ", trace" : "");
+}
+
+void NotifyInvite(const std::string &title, const std::string &text)
+{
+	const HWND window = GameWindow();
+	if (GameInFront(window)) {
+		hooklog::Write("notify: an invite: the game is in front (the add-on's banner shows it)");
+		return;
+	}
+	if (window) {
+		FLASHWINFO flash = {sizeof(flash), window, FLASHW_TRAY | FLASHW_TIMERNOFG, 0, 0};
+		FlashWindowEx(&flash);
+	}
+	const char *sound = g_settings_read && g_sound ? PlayTurnSound() : nullptr;
+	const bool popup = g_settings_read && g_popup && window;
+	if (popup)
+		ShowPopupWords(window, title, title, text);
+	hooklog::Write("notify: an invite: %s%s%s%s", window ? "taskbar flash" : "no game window found", sound ? ", " : "",
+	               sound ? sound : "", popup ? ", pop-up" : "");
+}
+
+void NotifyGameInFront()
+{
+	if (g_popup_shown && GameInFront(GameWindow()))
+		RemovePopup();
 }
 
 }  // namespace mods

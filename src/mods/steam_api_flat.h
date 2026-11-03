@@ -50,6 +50,13 @@ const int kLobbyDistanceWorldwide = 3;
 const int kFriendFlagImmediate = 4;  // regular friends
 const int kFriendRelationshipFriend = 3;
 
+// EPersonaState (the ones we name)
+const int kPersonaOffline = 0;
+const int kPersonaOnline = 1;
+const int kPersonaBusy = 2;
+const int kPersonaAway = 3;
+const int kPersonaSnooze = 4;
+
 // ESteamNetworkingAvailability
 enum Availability {
 	kAvailCannotTry = -102,
@@ -210,6 +217,11 @@ struct GameOverlayActivated {
 	uint32_t app_id;
 	uint32_t overlay_pid;
 };
+const int kCallGameLobbyJoinRequested = 333;      // GameLobbyJoinRequested_t: an invite accepted, or "Join game"
+struct GameLobbyJoinRequested {
+	SteamId lobby;
+	SteamId friend_id;  // the friend it came through (0 if not directly through a friend)
+};
 const int kCallRelayNetworkStatus = 1281;         // SteamRelayNetworkStatus_t
 struct RelayNetworkStatus {
 	int32_t avail;
@@ -269,6 +281,13 @@ typedef const char *(__cdecl *GetLobbyMemberDataFn)(Iface, SteamId lobby, SteamI
 typedef void(__cdecl *SetLobbyMemberDataFn)(Iface, SteamId lobby, const char *key, const char *value);
 typedef bool(__cdecl *RequestLobbyDataFn)(Iface, SteamId lobby);
 typedef Microseconds(__cdecl *GetLocalTimestampFn)(Iface);
+// added for step 4, the online UI (online_ui.cpp): invites, friends' rich presence
+typedef bool(__cdecl *SetRichPresenceFn)(Iface, const char *key, const char *value);
+typedef const char *(__cdecl *GetFriendRichPresenceFn)(Iface, SteamId, const char *key);
+typedef void(__cdecl *RequestFriendRichPresenceFn)(Iface, SteamId);
+typedef int(__cdecl *GetFriendPersonaStateFn)(Iface, SteamId);
+typedef void(__cdecl *ActivateInviteDialogFn)(Iface, SteamId lobby);
+typedef bool(__cdecl *InviteUserToLobbyFn)(Iface, SteamId lobby, SteamId invitee);
 
 // An identity for a SteamID, filled the way SetSteamID64 does.
 inline Identity IdentityOf(SteamId id)
