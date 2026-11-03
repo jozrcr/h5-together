@@ -54,6 +54,7 @@ using namespace steamflat;
 
 const DWORD kTickMs = 20;
 const uint32_t kScanEveryMs = 2000;
+const int kScanYieldEvery = 8;  // friends looked at between two pauses of the lock (ScanFriendsNow)
 const uint32_t kAskDataEveryMs = 10000;  // RequestLobbyData for a friend's lobby we are not in
 const uint32_t kForgetLobbyMs = 10000;   // a friend's lobby not seen in the friends list for this long
 // A friend's lobby whose data does not come (Steam may not show a friends-only lobby's
@@ -790,6 +791,13 @@ private:
 		const int count = s_.api.friend_count(s_.friends, kFriendFlagImmediate);
 		int playing = 0, in_lobbies = 0, with_us = 0;
 		for (int i = 0; i < count; ++i) {
+			if (i && i % kScanYieldEvery == 0) {
+				// Let the game's sends and reads in: under Proton a whole scan held the
+				// lock 17 ms on average (27 at most), and they waited for it.
+				LeaveCriticalSection(lock_);
+				SwitchToThread();
+				EnterCriticalSection(lock_);
+			}
 			const uint64_t id = s_.api.friend_by_index(s_.friends, i, kFriendFlagImmediate);
 			FriendGameInfo game = {};
 			if (!id || !s_.api.friend_game(s_.friends, id, &game) || steamspike::AppIdOfGameId(game.game_id) != app_id_)
