@@ -49,6 +49,7 @@ enum Group {
 	kSound,        // page 1
 	kLanguage,     // page 1
 	kRandomMaps,   // page 1
+	kOnline,       // page 2, first: online play over Steam (read only during a multiplayer game)
 	kHostGroup,    // page 2: only the host's value counts
 	kAdvanced,     // page 2: everyone in a game should have the same
 	kHelp,         // page 2, at the end

@@ -42,4 +42,8 @@ bool Install(bool late);
 // The window of the last device created (its focus window), or nullptr.
 HWND DeviceWindow();
 
+// The device whose frame was last shown through our Present hook, or nullptr
+// (no frame yet). Only to compare with: it may have been released since.
+IDirect3DDevice9 *PresentedDevice();
+
 }  // namespace d3dhook

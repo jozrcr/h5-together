@@ -33,6 +33,7 @@ const char *GroupName(Group g)
 	case kSound: return "sound";
 	case kLanguage: return "language";
 	case kRandomMaps: return "random_maps";
+	case kOnline: return "online";
 	case kHostGroup: return "host";
 	case kAdvanced: return "advanced";
 	case kHelp: return "help";
@@ -49,6 +50,7 @@ const char *GroupText(Group g, bool help)
 	case kSound: return help ? "settings.group.sound.help" : "settings.group.sound";
 	case kLanguage: return help ? "settings.group.language.help" : "settings.group.language";
 	case kRandomMaps: return help ? "settings.group.random_maps.help" : "settings.group.random_maps";
+	case kOnline: return help ? "settings.group.online.help" : "settings.group.online";
 	case kHostGroup: return help ? "settings.group.host.help" : "settings.group.host";
 	case kAdvanced: return help ? "settings.group.advanced.help" : "settings.group.advanced";
 	case kHelp: return help ? "settings.group.help.help" : "settings.group.help";
@@ -124,7 +126,7 @@ void OptionXml(std::string *x, const MenuRow &r, const std::string &eol)
 {
 	const int t = 7;
 	const bool header = !r.s || r.s->control == kNone;
-	const bool mp = r.s && (r.group == kHostGroup || r.group == kAdvanced);  // read only during a multiplayer game
+	const bool mp = r.s && (r.group == kHostGroup || r.group == kAdvanced || r.group == kOnline);  // read only during a multiplayer game
 	Add(x, t, "<Item>", eol);
 	Add(x, t + 1, header ? std::string("<ID/>") : "<ID>" + r.var + "</ID>", eol);
 	Add(x, t + 1, std::string("<Type>") + TypeOf(r) + "</Type>", eol);
@@ -206,7 +208,7 @@ const Name kOrder[] = {
 	{"net", "view_delay_ms"}, {"net", "tuning"}, {"ai", "fast_paths"}, {"net", "lan_all_adapters"}, {"net", "lan_peers"},
 	{"save", "fast_save_list"}, {"save", "compression"}, {"save", "autosave_every"}, {"rmg", "templates"},
 	{"rules", "enabled"}, {"skins", "live_hero_screen"}, {"debug", "hang_watchdog"}, {"debug", "hang_seconds"},
-	{"debug", "crash_report"}, {"chain", "dll"}, {"update", "check"},
+	{"debug", "crash_report"}, {"chain", "dll"}, {"update", "check"}, {"online", "mode"},
 };
 
 bool Starts(const std::string &s, const char *prefix)
@@ -251,6 +253,8 @@ std::vector<MenuRow> MenuRows(const MenuOptions &o, int page)
 				out.push_back(Row(*s, o));
 		if (group == kHostGroup)
 			out.push_back(Line(group, "info_rules"));
+		if (group == kOnline)
+			out.push_back(Line(group, "info_online"));
 		if (group == kHelp)
 			out.push_back(Line(group, "info_file"));
 	}
@@ -355,6 +359,10 @@ bool MenuText(const std::string &raw_name, const MenuOptions &o, GetText get, co
 			*out = tooltip ? get("settings.info.rules.help") : body + get("settings.info.rules");
 		else if (stem == "info_same")
 			*out = tooltip ? get("settings.info.same.help") : body + get("settings.info.same");
+		else if (stem == "info_online" && o.steam_dll)  // where friends' games show
+			*out = tooltip ? get("settings.info.online.help") : body + get("settings.info.online");
+		else if (stem == "info_online")  // no steam_api.dll: say so, plainly
+			*out = tooltip ? get("settings.info.online_no_dll.help") : body + get("settings.info.online_no_dll");
 		else if (stem == "info_legend1")
 			*out = tooltip ? get("settings.when.restart") : body + get("settings.mark.restart");
 		else if (stem == "info_legend2")

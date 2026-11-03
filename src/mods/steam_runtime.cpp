@@ -16,6 +16,7 @@ using namespace steamflat;
 bool g_tried = false;
 bool g_ok = false;
 Steam g_steam = {};
+Failure g_failure = Failure::kNone;
 
 template <typename T>
 void Load(HMODULE dll, const char *name, T *out, char *missing, size_t size)
@@ -76,6 +77,12 @@ bool LoadApi(HMODULE dll, Api *api, const char *who)
 	Load(dll, "SteamAPI_ISteamNetworkingUtils_GetRelayNetworkStatus", &api->relay_status, missing, n);
 	Load(dll, "SteamAPI_ISteamNetworkingUtils_GetLocalTimestamp", &api->local_timestamp, missing, n);
 	Load(dll, "SteamAPI_SteamNetworkingMessage_t_Release", &api->release, missing, n);
+	Load(dll, "SteamAPI_ISteamFriends_SetRichPresence", &api->set_rich_presence, missing, n);
+	Load(dll, "SteamAPI_ISteamFriends_GetFriendRichPresence", &api->friend_rich_presence, missing, n);
+	Load(dll, "SteamAPI_ISteamFriends_RequestFriendRichPresence", &api->request_rich_presence, missing, n);
+	Load(dll, "SteamAPI_ISteamFriends_GetFriendPersonaState", &api->friend_state, missing, n);
+	Load(dll, "SteamAPI_ISteamFriends_ActivateGameOverlayInviteDialog", &api->invite_dialog, missing, n);
+	Load(dll, "SteamAPI_ISteamMatchmaking_InviteUserToLobby", &api->invite_user, missing, n);
 	if (missing[0])
 		hooklog::Write("%s: steam_api.dll lacks:%s (an older SDK? 1.65 has them all)", who, missing);
 	return missing[0] == 0;
@@ -100,17 +107,22 @@ bool DoStart(uint32_t app_id, const char *who)
 	HMODULE dll = LoadLibraryExW(dll_path, nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
 	if (!dll) {
 		hooklog::Write("%s: cannot load %ls (error %lu): is Valve's steam_api.dll there?", who, dll_path, GetLastError());
+		g_failure = Failure::kNoDll;
 		return false;
 	}
 	Api &api = g_steam.api;
-	if (!LoadApi(dll, &api, who))
+	if (!LoadApi(dll, &api, who)) {
+		g_failure = Failure::kOldDll;
 		return false;
+	}
 	wchar_t cwd[MAX_PATH] = L"";
 	GetCurrentDirectoryW(MAX_PATH, cwd);
 	wchar_t appid_txt[MAX_PATH];
 	_snwprintf_s(appid_txt, MAX_PATH, _TRUNCATE, L"%s\\steam_appid.txt", cwd);
 	if (GetFileAttributesW(appid_txt) != INVALID_FILE_ATTRIBUTES)
 		hooklog::Write("%s: note: a steam_appid.txt in the game's folder overrides our app id", who);
+	wchar_t before[32] = L"";
+	g_steam.launched_by_steam = GetEnvironmentVariableW(L"SteamAppId", before, 32) > 0;
 	SetAppIdVariable(L"SteamAppId", app_id, who);
 	SetAppIdVariable(L"SteamGameId", app_id, who);
 	char err[kErrMsgSize] = "";
@@ -119,8 +131,10 @@ bool DoStart(uint32_t app_id, const char *who)
 	g_steam.init_ms = GetTickCount() - t0;
 	hooklog::Write("%s: SteamAPI_InitFlat -> %d (%s) in %lu ms%s%s", who, r, steamspike::InitResultName(r),
 	               static_cast<unsigned long>(g_steam.init_ms), err[0] ? ": " : "", err);
-	if (r != kInitOk)
+	if (r != kInitOk) {
+		g_failure = r == kInitNoSteamClient ? Failure::kNoSteam : r == kInitVersionMismatch ? Failure::kSteamTooOld : Failure::kRefused;
 		return false;
+	}
 	api.dispatch_init();
 	g_steam.pipe = api.get_pipe();
 	g_steam.user = api.user();
@@ -133,11 +147,14 @@ bool DoStart(uint32_t app_id, const char *who)
 		hooklog::Write("%s: a Steam interface is missing (user %p, friends %p, utils %p, matchmaking %p, messages %p, "
 		               "networking utils %p)",
 		               who, g_steam.user, g_steam.friends, g_steam.utils, g_steam.mm, g_steam.msgs, g_steam.netu);
+		g_failure = Failure::kNoAnswer;
 		return false;
 	}
 	g_steam.me = api.get_steam_id(g_steam.user);
 	g_steam.app_id = app_id;
 	g_steam.steam_app_id = api.get_app_id(g_steam.utils);
+	if (!g_steam.me)
+		g_failure = Failure::kNoAnswer;
 	return g_steam.me != 0;
 }
 
@@ -150,6 +167,11 @@ const Steam *Start(uint32_t app_id, const char *who)
 		g_ok = DoStart(app_id, who);
 	}
 	return g_ok ? &g_steam : nullptr;
+}
+
+Failure LastFailure()
+{
+	return g_ok ? Failure::kNone : g_failure;
 }
 
 }  // namespace steamrt

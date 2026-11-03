@@ -90,8 +90,10 @@ int MaskShift(DWORD mask)
 
 // The first picture of a .dds file as a texture of the device, or nullptr.
 // Uncompressed 32/24-bit pictures and DXT1/3/5 (the formats of the game's interface).
-IDirect3DTexture9 *TextureFromDds(IDirect3DDevice9 *device, const std::string &d, const char *path)
+// *added: a picture of light to add (see AddedPicture in overlay_internal.h).
+IDirect3DTexture9 *TextureFromDds(IDirect3DDevice9 *device, const std::string &d, const char *path, bool *added)
 {
+	*added = false;
 	if (d.size() < 128 || d.compare(0, 4, "DDS ") != 0) {
 		hooklog::Write("overlay: %s is not a .dds file", path);
 		return nullptr;
@@ -145,6 +147,7 @@ IDirect3DTexture9 *TextureFromDds(IDirect3DDevice9 *device, const std::string &d
 	std::vector<DWORD> level(static_cast<size_t>(width) * height);
 	const int bytes = static_cast<int>(bits / 8);
 	const int rs = MaskShift(rmask), gs = MaskShift(gmask), bs = MaskShift(bmask), as = MaskShift(amask);
+	DWORD any_alpha = 0, any_colour = 0;
 	for (UINT y = 0; y < height; ++y) {
 		const BYTE *src = reinterpret_cast<const BYTE *>(pixels) + y * row_bytes;
 		for (UINT x = 0; x < width; ++x) {
@@ -153,8 +156,13 @@ IDirect3DTexture9 *TextureFromDds(IDirect3DDevice9 *device, const std::string &d
 			const DWORD r = (v & rmask) >> rs, g = (v & gmask) >> gs, b = (v & bmask) >> bs;
 			const DWORD a = (pf_flags & 0x1) && amask ? (v & amask) >> as : 0xff;
 			level[y * width + x] = (a << 24) | (r << 16) | (g << 8) | b;
+			any_alpha |= a;
+			any_colour |= r | g | b;
 		}
 	}
+	// No alpha at all, but colours: the game's "add this light" pictures (their
+	// .xdb says ConversionType CONVERT_TRANSPARENT_ADD), e.g. a button's highlight.
+	*added = !any_alpha && any_colour;
 	IDirect3DTexture9 *texture = nullptr;
 	if (FAILED(device->CreateTexture(width, height, 0, 0, D3DFMT_A8R8G8B8, D3DPOOL_MANAGED, &texture, nullptr)) ||
 	    !texture)
@@ -200,6 +208,7 @@ IDirect3DTexture9 *TextureFromDds(IDirect3DDevice9 *device, const std::string &d
 struct Picture {
 	char path[160];
 	IDirect3DTexture9 *texture;  // nullptr: it could not be read
+	bool added;                  // light to add (AddedPicture)
 };
 const int kPictures = 64;
 Picture g_pictures[kPictures];
@@ -233,6 +242,16 @@ void ReleaseTextures()
 	g_device = nullptr;
 }
 
+bool AddedPicture(const void *texture)
+{
+	if (!texture)
+		return false;
+	for (int i = 0; i < g_count; ++i)
+		if (g_pictures[i].texture == texture)
+			return g_pictures[i].added;
+	return false;
+}
+
 }  // namespace internal
 
 void *GameTexture(IDirect3DDevice9 *device, const char *path, int *loads_left, bool *failed)
@@ -258,9 +277,10 @@ void *GameTexture(IDirect3DDevice9 *device, const char *path, int *loads_left, b
 	Picture &p = g_pictures[g_count++];
 	lstrcpynA(p.path, path, sizeof(p.path));
 	p.texture = nullptr;
+	p.added = false;
 	std::string data;
 	if (ReadGameFile(path, &data))
-		p.texture = TextureFromDds(device, data, path);
+		p.texture = TextureFromDds(device, data, path, &p.added);
 	else
 		hooklog::Write("overlay: cannot read %s", path);
 	if (failed)

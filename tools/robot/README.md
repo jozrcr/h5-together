@@ -243,6 +243,7 @@ Besides starting a map, the DLL runs a script of timed steps (`--step`, or `--ho
 | `key` | `F1`..`F12` | presses one of **our overlay's** keys (the DLL's own key handling sees it; the game does not): e.g. `F11` opens the template builder on the random map screen, `F9` is not covered (the player list reads its key itself) |
 | `dik` | `<hex DIK code> [hold ms]` | presses a **game** key through the robot's DirectInput keyboard (`robot_input.cpp`), held 150 ms or the given time: e.g. `d1 1500` = Page Down (zoom out) for 1.5 s, `c9 1500` = Page Up |
 | `wheel` | `<notches> [steps]` | turns the mouse wheel: that many notches (+ up = zoom in, - down = zoom out), one per read of the game's mouse events, as positions (the running sum, as Windows gives them) or with `steps` as +-120 steps (as Wine gives them, to check `[camera] wheel_fix`) |
+| `mouse` | `<x> <y>` or `off` | from then on, the game hears that the mouse is at that point of its window (client pixels: 1008×729 in robot runs, the 1024×768 window minus its frame; the back buffer has the same size), wherever the real mouse is, so it draws its cursor there: the exe's `GetCursorPos` import goes through the robot when the script has a `mouse` step. `off` gives the real mouse back. Our modal panels follow that cursor too (hover); no click. For screenshots of the cursor over our panels |
 | `panel` | a command | for our open panel, what a click would do (the robot cannot click): the template builder takes `preset <n>`, `distance on\|off`, `scroll <units>\|end`, `use`, `save`, `cancel` and `open` (`rmg_builder.cpp`) |
 | `peek` | `<screen class> <hex offset> ...` | research: logs the objects along a pointer chain from a screen, with their class names |
 
@@ -267,7 +268,7 @@ In robot mode the DLL:
 | Measures the AI | the AI turn trace (`src/hook/ai_trace.cpp`): one log line per AI step |
 | Stops | after `--turns` AI turns, or `--seconds` |
 | Shows what the game says | copies `printf` / `fprintf` / `OutputDebugStringA` output to the log; the console goes to `console.txt`; message boxes are logged (and plain "OK" boxes answered) |
-| Takes screenshots | saves the back buffer just before `IDirect3DDevice9::Present` shows it, after the player list overlay drew on it (`robot_screen.cpp`, through the shared Direct3D hooks of `src/hook/d3d9_hook.cpp`) |
+| Takes screenshots | saves the back buffer just before `IDirect3DDevice9::Present` shows it, after the overlay drew on it and with the game's own cursor (`robot_screen.cpp`, through the shared Direct3D hooks of `src/hook/d3d9_hook.cpp`) |
 
 ## LAN games (two copies on one PC)
 
@@ -287,6 +288,7 @@ python tools\robot\lan_report.py --last 2      # checksums of both runs
 - `--net-log-bytes N` (`net_log_bytes`): each logged packet's first N bytes, 64 per line (`robot: net:   +0040 ...`).
 - `--net-scan` (`net_scan_addresses=1`): looks for this PC's own IPv4 addresses inside **every** packet the game sends or gets; logs the first 3 packets of each kind that hold one, whole, and a count every 10 s (`robot: net: address scan: ... N hold an address of this PC`). Matches in reversed byte order are counted apart: they turn up by chance in acknowledgement bits.
 - `--vlan`: both copies run the virtual LAN with its loopback transport (`[online] mode=loopback`, ports 47101 and 47102, `src/mods/virtual_lan.cpp`), and the DLL's broadcast copies to the other copy's port are off, so the client can find the host only through the virtual LAN. The `vlan:` lines in both logs say what it carried and dropped. With it, the scan's count must be 0.
+- `--client-autojoin N` (with `--vlan`): at N seconds the client, on the main menu, gets a made-up invite to the host's game, and the online UI's auto-join (`src/mods/online_join.cpp`) opens the LAN screen and joins, instead of the robot's own clicks (look for `online: auto-join:` lines). `--client-online test_drop_join=1` makes the client's join request get lost: the game's "Timeout" box (`online: game message boxes shown: 1`). `--host-online` / `--client-online KEY=VALUE` add other `[online]` settings; `--client-setvar` a profile setting for the client only.
 
 **Desync check:** the runner sets `mp_check_crc = 1` on both copies (`--no-crc` leaves it off); without it the game computes no world checksums at all. Both copies log every checksum (`trace_crc`), and `lan_report.py` says "all equal on both copies (no desync)" or where they first differ. `--fast-paths on` and `--ai-setting` set the fast pathfinding mod on both copies, as in `run_ai_test.py`. The client never runs the AI (the host does), so its "stuck" exit is off (`stuck_exit=0`). Not handled yet: a battle between the AI and the client's human player can leave the host waiting (the host then exits as stuck).
 

@@ -95,6 +95,8 @@ public:
 	uint32_t Learn(uint64_t id, uint32_t declared, Learned *what = nullptr);
 	// Whose address is it? False for an address nobody has.
 	bool IdOf(uint32_t address, uint64_t *id) const;
+	// The address of a known id (nothing added); false if the id is not known.
+	bool Find(uint64_t id, uint32_t *address) const;
 	int Count() const { return count_; }  // ourselves included
 
 private:
@@ -306,7 +308,7 @@ public:
 	void Joined(uint64_t lobby);   // we are in the lobby of the host we play with
 	void Failed(uint32_t now_ms);  // Steam refused (create or join): try again after kRetryMs
 	void Left();                   // LeaveLobby done (or the lobby went away)
-	void Forget();                 // the host we played with left its lobby: no going back to it
+	void Forget();                 // the host we played with left its lobby: never that lobby again
 	In Where() const { return in_; }
 	uint64_t Lobby() const { return lobby_; }
 	uint64_t Host() const { return host_; }  // the host we play with (or played with last)
@@ -318,6 +320,7 @@ private:
 	bool hosted_ = false;
 	uint32_t stopped_ms_ = 0;  // when it stopped hosting
 	uint64_t host_ = 0, host_lobby_ = 0;
+	uint64_t gone_lobby_ = 0;  // (a host that hosts again makes a new lobby)
 	bool played_ = false;
 	uint32_t played_ms_ = 0;  // last packet to or from that host
 	In in_ = In::kNone;

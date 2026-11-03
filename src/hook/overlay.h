@@ -8,7 +8,9 @@
 // before each frame is shown, and the device resets). Each panel registers as
 // a client; once per frame the overlay asks every client whether it wants to
 // draw, lets them load pictures and ask for fonts, then runs one ImGui frame
-// in which each of them draws, in the order they registered.
+// in which each of them draws, in the order they registered. That frame is
+// drawn just under the game's own cursor (overlay_cursor.cpp), so the cursor
+// stays above our panels.
 //
 // Modal panels (overlay_input.cpp): while one is open, the game gets no mouse
 // or keyboard input and the panel gets it all:
@@ -45,9 +47,14 @@ struct Frame {
 
 struct Client {
 	const char *name;  // for the log, and the owner name of its modal panel
-	// Every frame shown (also when nothing is drawn): true = draw this frame.
-	// Keep it cheap: the client's own state, its key, the screen on top.
+	// Every frame shown (also when nothing is drawn), just before it is shown
+	// (Present, outside the game's own frame): true = draw the next frame.
+	// Keep it cheap: the client's own state, its key, the screen on top. This
+	// is the place to act on the game (a panel's OK, a key that opens a screen).
 	bool (*wanted)();
+	// prepare and draw may run inside the game's frame (just under its cursor,
+	// overlay_cursor.cpp): they only read the game, never act on it (a click
+	// leaves a note for the next wanted).
 	// The frame will be drawn: load pictures (GameTexture) and ask for the
 	// fonts this frame needs (WantFont). Optional.
 	void (*prepare)(const Frame &frame);
@@ -88,6 +95,9 @@ bool TopScreen(char *class_name, int size);
 // The screen object on top (the one TopScreen names; the whole object, where
 // its main vftable is), or nullptr.
 void *TopScreenObject();
+// The RTTI class names of every screen in the game's list, bottom first (the
+// last one is TopScreen's); their count (at most `max`).
+int ScreenNames(char (*names)[96], int max);
 // The panels' language as English or French: kFrench when the texts in use
 // are French (texts.h chooses the language, any language with a texts file;
 // the panels take their words from there).

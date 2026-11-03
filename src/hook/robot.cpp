@@ -33,7 +33,7 @@ struct Step {
 	char kind;  // 'c' console, 'm' menu, 'u' ui, 'g' game message, 'p' pick map, 'l' pick save,
 	            // 'o' setup option, 'r' setup slider, 'j' pick game, 'k' peek, 'w' waiting-room slots, 'a' slot arrow,
 	            // 'v' memory, 's' screenshot, 'y' a key of our overlay, 'b' a command for our panel,
-	            // 'd' a game key (DirectInput), 'z' the mouse wheel
+	            // 'd' a game key (DirectInput), 'z' the mouse wheel, 'x' the mouse's place
 	char text[512];
 };
 const int kMaxSteps = 32;
@@ -75,6 +75,7 @@ bool g_net_scan = false;     // net_scan_addresses (robot_net.cpp)
 volatile LONG g_overlay_key = 0;  // a "key" step's key, until the overlay takes it
 char g_panel_command[512];          // a "panel" step's text, until a panel takes it
 volatile LONG g_panel_pending = 0;
+bool g_mouse_steps = false;         // the script has "mouse" steps: GetCursorPos goes through us
 
 // --- running a console command the way WinMain does (0x00d112a7) ---------------
 //   push L"mainmenu"; lea ecx,[str]; call 0x00456220   build a game wide string
@@ -224,6 +225,50 @@ LRESULT CALLBACK RobotWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 		return 0;
 	}
 	return CallWindowProcA(OriginalProc(hwnd), hwnd, msg, wp, lp);
+}
+
+// --- the robot's mouse ("mouse|<x> <y>") -------------------------------------------
+// The game moves its own cursor from Windows' (GetCursorPos, every frame, in
+// 0x00835ce0) and draws it there. The robot's window is in the background and
+// the real mouse is the player's, so for a script with "mouse" steps the exe's
+// GetCursorPos import goes through us: once a step ran, the game hears that the
+// mouse is at that point of its window (client pixels), wherever the real one
+// is; "mouse|off" gives it the real one again. Our own DLL's calls are not
+// changed (they do not go through the exe's import table).
+typedef BOOL(WINAPI *GetCursorPosFn)(POINT *);
+GetCursorPosFn g_real_GetCursorPos = nullptr;
+volatile LONG g_mouse_on = 0, g_mouse_x = 0, g_mouse_y = 0;
+
+BOOL WINAPI RobotGetCursorPos(POINT *p)
+{
+	if (g_mouse_on && p && g_game_hwnd) {
+		POINT q = {g_mouse_x, g_mouse_y};
+		if (ClientToScreen(g_game_hwnd, &q)) {
+			*p = q;
+			return TRUE;
+		}
+	}
+	return g_real_GetCursorPos(p);
+}
+
+void PlaceMouse(const char *text)
+{
+	if (!g_real_GetCursorPos) {
+		hooklog::Write("robot: mouse \"%s\": GetCursorPos does not go through the robot", text);
+		return;
+	}
+	if (_stricmp(text, "off") == 0) {
+		InterlockedExchange(&g_mouse_on, 0);
+		hooklog::Write("robot: mouse: the game hears the real mouse again");
+		return;
+	}
+	char *rest = nullptr;
+	const long x = strtol(text, &rest, 10);
+	const long y = rest ? strtol(rest, nullptr, 10) : 0;
+	InterlockedExchange(&g_mouse_x, x);
+	InterlockedExchange(&g_mouse_y, y);
+	InterlockedExchange(&g_mouse_on, 1);
+	hooklog::Write("robot: mouse at %ld, %ld (the game window's client pixels)", x, y);
 }
 
 typedef ATOM(WINAPI *RegisterClassAFn)(const WNDCLASSA *);
@@ -381,6 +426,9 @@ BOOL WINAPI RobotPeekMessageA(LPMSG msg, HWND hwnd, UINT min, UINT max, UINT rem
 				TurnWheel(notches, strstr(s.text, "steps") != nullptr);
 				hooklog::Write("robot: mouse wheel %+d notch(es) queued, as %s", notches,
 				               strstr(s.text, "steps") ? "steps (+-120 each, as Wine gives them)" : "positions (as Windows gives them)");
+			}
+			else if (s.kind == 'x') {  // "<x> <y>" (client pixels) or "off": where the game hears the mouse is
+				PlaceMouse(s.text);
 			}
 			else if (s.kind == 'b') {  // "<command>" for our open panel (e.g. the builder's "preset 4", "use")
 				lstrcpynA(g_panel_command, s.text, sizeof(g_panel_command));
@@ -723,10 +771,13 @@ bool ReadConfig(const wchar_t *path)
 				         : strcmp(kind, "wheel") == 0 ? 'z'
 				         : strcmp(kind, "rmg") == 0 ? 'n'
 				         : strcmp(kind, "panel") == 0 ? 'b'
+				         : strcmp(kind, "mouse") == 0 ? 'x'
 				                                     : 'c';
 				lstrcpynA(s.text, text, sizeof(s.text));
 				if (s.kind == 'd' || s.kind == 'z')
 					EnableGameInput();
+				if (s.kind == 'x')
+					g_mouse_steps = true;
 			}
 		}
 		else if (strcmp(line, "command_delay_seconds") == 0)
@@ -814,6 +865,12 @@ void Init()
 		PatchImport("USER32.dll", "RegisterClassA", reinterpret_cast<void *>(&RobotRegisterClassA)));
 	g_real_RegisterClassExA = reinterpret_cast<RegisterClassExAFn>(
 		PatchImport("USER32.dll", "RegisterClassExA", reinterpret_cast<void *>(&RobotRegisterClassExA)));
+	if (g_mouse_steps) {  // the robot's mouse
+		g_real_GetCursorPos = reinterpret_cast<GetCursorPosFn>(
+			PatchImport("USER32.dll", "GetCursorPos", reinterpret_cast<void *>(&RobotGetCursorPos)));
+		hooklog::Write(g_real_GetCursorPos ? "robot: the game's GetCursorPos goes through the robot (mouse steps)"
+		                                   : "robot: GetCursorPos import not found: no robot mouse");
+	}
 
 	// Capture the game's text output.
 	g_real_OutputDebugStringA = reinterpret_cast<OutputDebugStringAFn>(
@@ -877,6 +934,7 @@ void Init()
 		               : g_steps[i].kind == 'z' ? "wheel"
 		               : g_steps[i].kind == 'n' ? "rmg"
 		               : g_steps[i].kind == 'b' ? "panel"
+		               : g_steps[i].kind == 'x' ? "mouse"
 		               : g_steps[i].kind == 's' ? "shot"
 		                                        : "console",
 		               g_steps[i].text);
@@ -900,9 +958,9 @@ bool TakeOverlayKey(int vk)
 
 bool TakePanelCommand(char *out, int size, const char *prefix)
 {
-	// Commands that start with a panel's own prefix ("skins ...", "rules ...", "settings ...")
-	// are left for that panel; the others go to the first panel that asks without one.
-	static const char *const kPrefixes[] = {"skins ", "rules ", "settings "};
+	// Commands that start with a panel's own prefix ("skins ...", "rules ...", "settings ...",
+	// "online ...") are left for that panel; the others go to the first panel that asks without one.
+	static const char *const kPrefixes[] = {"skins ", "rules ", "settings ", "online "};
 	if (InterlockedCompareExchange(&g_panel_pending, 0, 0) != 1)
 		return false;
 	const char *text = g_panel_command;

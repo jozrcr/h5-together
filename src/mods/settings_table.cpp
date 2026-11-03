@@ -52,6 +52,7 @@ const Value kEveryDays[] = {{"1", "settings.value.every_day"}, {"2", nullptr}, {
 const Value kHangSeconds[] = {{"10", nullptr}, {"15", nullptr}, {"20", nullptr},  {"30", nullptr},  {"45", nullptr}, {"60", nullptr},
                               {"90", nullptr}, {"120", nullptr}, {"180", nullptr}, {"300", nullptr}, {"600", nullptr}};
 const Value kChain[] = {{"dinput8_next.dll", "settings.value.chain_next"}, {"none", "settings.value.chain_none"}};
+const Value kOnlineMode[] = {{"off", "settings.value.online_off"}, {"steam", "settings.value.online_steam"}};  // (+ loopback: tests)
 
 // --- the table -----------------------------------------------------------------------------------
 // FILE_ONLY: in the file only. HIDDEN: read by the code, not in the shipped file. ROW: a row of
@@ -238,8 +239,10 @@ const Setting kSettings[] = {
 	// [chain]
 	ROW("chain", "dll", "dinput8_next.dll", kChoice, 0, 0, kChain, COUNT(kChain), nullptr, kPlayer, kRestart, kAdvanced, kList,
 	    "settings.chain.dll", "settings.chain.dll.help"),
-	// [online]
-	FILE_ONLY("online", "mode", "off", kText, 0, 0, kTester, kRestart),  // the virtual LAN, being built (off | steam | loopback)
+	// [online]: the virtual LAN (off | steam | loopback, the robot's). Steam starts at the game's first DirectInput
+	// call and the Winsock hooks go in when the DLL loads, so a change waits for a restart.
+	ROW("online", "mode", "off", kChoice, 0, 0, kOnlineMode, COUNT(kOnlineMode), nullptr, kGroup, kRestart, kOnline, kList,
+	    "settings.online.mode", "settings.online.mode.help"),
 
 	// read by the code, not in the shipped file (appendix B): for testing
 	HIDDEN("audio", "log_data_files", "0", kInt, 0, 1000000),
@@ -260,6 +263,9 @@ const Setting kSettings[] = {
 	HIDDEN("online", "spike_ping_bytes", "300", kInt, 0, 1200),
 	HIDDEN("online", "loopback_port", "47100", kInt, 1, 65535),  // the virtual LAN's robot tests
 	HIDDEN("online", "loopback_peers", "", kText, 0, 0),
+	HIDDEN("online", "reliable", "1", kBool, 0, 1),  // 0 = Steam sends each message once, as UDP
+	HIDDEN("online", "ui_test", "0", kBool, 0, 1),  // the online UI with made-up friends (robot screenshots)
+	HIDDEN("online", "test_drop_join", "0", kBool, 0, 1),  // the virtual LAN loses our join requests (the game's timeout box)
 };
 
 #undef ROW
@@ -316,6 +322,7 @@ int PageOf(Group group)
 	case kLanguage:
 	case kRandomMaps:
 		return 1;
+	case kOnline:
 	case kHostGroup:
 	case kAdvanced:
 	case kHelp:
@@ -371,6 +378,8 @@ bool Valid(const Setting &s, const std::string &raw)
 		}
 		if (SameText(s.section, "chain") && SameText(s.key, "dll"))  // another file name
 			return !value.empty();
+		if (SameText(s.section, "online") && SameText(s.key, "mode"))  // the robot's own tests
+			return SameText(value.c_str(), "loopback");
 		return false;
 	case kText:
 		return true;

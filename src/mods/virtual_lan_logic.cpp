@@ -329,6 +329,16 @@ bool PeerTable::IdOf(uint32_t address, uint64_t *id) const
 	return true;
 }
 
+bool PeerTable::Find(uint64_t id, uint32_t *address) const
+{
+	const int i = IndexOfId(id);
+	if (i < 0)
+		return false;
+	if (address)
+		*address = addresses_[i];
+	return true;
+}
+
 size_t EncodeMessage(uint16_t source_port, uint32_t sender_address, const uint8_t *packet, size_t size, uint8_t *out,
                      size_t out_size)
 {
@@ -680,6 +690,8 @@ void LobbyPlan::PlaysWith(uint64_t host, uint64_t lobby, uint32_t now_ms)
 {
 	if (!host)
 		return;
+	if (lobby == gone_lobby_)
+		lobby = 0;  // (our game still sends to the host that left it)
 	if (host != host_) {
 		host_ = host;
 		host_lobby_ = lobby;
@@ -756,6 +768,9 @@ void LobbyPlan::Left()
 void LobbyPlan::Forget()
 {
 	played_ = false;
+	if (host_lobby_)
+		gone_lobby_ = host_lobby_;
+	host_lobby_ = 0;
 }
 
 }  // namespace vlan

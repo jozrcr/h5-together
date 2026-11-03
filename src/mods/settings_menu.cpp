@@ -67,6 +67,7 @@
 
 #include "../hook/game_build.h"
 #include "../hook/log.h"
+#include "../hook/old_names.h"
 #include "../hook/overlay.h"
 #include "../hook/patch.h"
 #include "../hook/robot.h"
@@ -261,6 +262,10 @@ st::MenuOptions OptionsNow()
 	const st::Setting *texts_row = st::Find("lang", "texts");
 	if (texts_row && !st::SameValue(*texts_row, FileValue(file, *texts_row), "game"))
 		o.packs = true;
+	// online play over Steam: Valve's steam_api.dll where steam_runtime.cpp looks for it
+	wchar_t steam_dll[MAX_PATH];
+	oldnames::PathInOurFolder(L"steam_api.dll", steam_dll, MAX_PATH);
+	o.steam_dll = GetFileAttributesW(steam_dll) != INVALID_FILE_ATTRIBUTES;
 	return o;
 }
 
@@ -437,7 +442,7 @@ void Sync()
 			continue;
 		if (index < 0 || index >= static_cast<int>(r.items.size()))
 			continue;
-		if (multiplayer && (r.group == st::kHostGroup || r.group == st::kAdvanced)) {
+		if (multiplayer && (r.group == st::kHostGroup || r.group == st::kAdvanced || r.group == st::kOnline)) {
 			hooklog::Write("settings: [%s] %s not changed: read only during a multiplayer game", r.s->section, r.s->key);
 			SetVar(r.var, shown->second);
 			continue;

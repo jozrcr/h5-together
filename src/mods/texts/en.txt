@@ -276,6 +276,55 @@ host_older = The host has an older H5 Together than yours ({ours}).
 host_none = The host has no H5 Together (or its game rules are off).
 host_newer = The host has another, newer H5 Together than yours ({ours}).
 
+# Online play over Steam ([online] mode=steam): the lines on the game's LAN screen
+# (Multiplayer > LAN), the "Invite friends..." button of the waiting room and its list,
+# and an invite. {n}: a number; {player}: a Steam friend's name; {version}, {ours}:
+# H5 Together's version of the friend's game and of this PC. Multiplayer > LAN: the
+# game's own names of that menu and its button, in this language.
+[online]
+title = Online play over Steam
+starting = Steam is starting...
+relay = Steam's network is starting: your friends' games show in a few seconds.
+off.no_dll = Steam is not available: Valve's steam_api.dll is missing from bin\h5-together.
+off.old_dll = Steam is not available: the steam_api.dll in bin\h5-together is too old.
+off.no_steam = Steam is not available: Steam is not running. Start Steam, then the game.
+off.steam_old = Steam is not available: Steam must be updated first.
+off.refused = Steam is not available: Steam refused (logged in? the game bought on Steam?).
+off.no_answer = Steam is not available: Steam did not answer.
+off.no_hooks = Online play is not available with this exe of the game.
+off.lan = The list shows the games of your local network, as without H5 Together.
+friends_none = Steam: none of your friends is playing with H5 Together right now.
+friends_one = Steam: 1 friend is playing with H5 Together.
+friends = Steam: {n} friends are playing with H5 Together.
+others_one = 1 more is playing Heroes V without H5 Together's online play.
+others = {n} more are playing Heroes V without H5 Together's online play.
+list = Their games show in the list above, like local network games.
+invite = {player} invites you: their game is in the list above.
+invite_wait = {player} invites you: their game shows in the list above in a moment.
+invite_cannot = {player} invites you, but you cannot join that game (another version).
+other_game = {player} hosts a game you cannot join: another version of MMH5.5 or of the game.
+other_protocol = {player} hosts with H5 Together {version}, which cannot play with yours ({ours}): update.
+someone = A friend
+banner = {player} invites you to play: open Multiplayer > LAN.
+join.waiting = {player} invites you: waiting for their game in the list above, then it is joined by itself.
+join.joining = {player} invites you: joining their game...
+join.no_row = {player} invites you, but their game did not show in the list: choose it when it shows, then Join.
+join.failed = {player} invites you, but joining their game did not work: choose it in the list and press Join again.
+toast_title = Heroes V: an invite
+invite_button = Invite friends...
+picker.title = Invite friends
+picker.sub = Your Steam friends who are online. An invited friend sees your game in Multiplayer > LAN.
+picker.none = None of your Steam friends is online.
+picker.playing_us = in Heroes V, with H5 Together
+picker.playing = in Heroes V
+picker.online = online
+picker.busy = busy
+picker.away = away
+picker.invite = Invite
+picker.invited = Invited
+picker.refused = Refused
+picker.close = Close
+
 # The settings menu: the "H5 Together" page of the game's Options screen (Options,
 # H5 Together). Each setting has a name (<section>.<key>) and a line that explains it
 # (<section>.<key>.help, shown when the mouse rests on the row). Keep the names short
@@ -300,6 +349,8 @@ group.language = Language
 group.language.help = The add-on's words, and the game's texts.
 group.random_maps = Random maps
 group.random_maps.help = The template builder on the random map screen.
+group.online = Online play
+group.online.help = The game's LAN games over Steam, with your Steam friends. Every player turns it on.
 group.host = Host
 group.host.help = Only the host's choice counts: every player gets it when the game starts.
 group.advanced = Advanced
@@ -314,6 +365,10 @@ info.rules = Game rules: waiting room, Rules...
 info.rules.help = The host chooses them for every player.
 info.same = Same values for every player
 info.same.help = Otherwise the faster co-op steps stay off, and the log says why.
+info.online = Friends' games: Multiplayer, LAN
+info.online.help = Each player turns it on and restarts the game. Without Steam, the game's own LAN play stays.
+info.online_no_dll = No steam_api.dll: Steam not available
+info.online_no_dll.help = Valve's steam_api.dll goes in bin\h5-together (H5 Together's package has it). Without it, the game's own LAN play stays.
 mark.restart = *: after a restart of the game
 mark.next_game = * after a restart, ** next game
 when.restart = Applies after a restart of the game.
@@ -346,6 +401,8 @@ value.every_day = every day
 value.every_week = once a week
 value.chain_next = dinput8_next.dll
 value.chain_none = None
+value.online_off = Off (local network)
+value.online_steam = Steam
 value.menu_default = As installed
 value.menu_toe = Tribes of the East
 value.menu_homm5 = Heroes V
@@ -443,6 +500,8 @@ debug.crash_report = Crash reports
 debug.crash_report.help = If the game crashes, a report and a small minidump next to the log. Nothing is sent anywhere.
 chain.dll = Other dinput8.dll mod
 chain.dll.help = Another mod named dinput8.dll, renamed dinput8_next.dll: H5 Together loads it. None = never.
+online.mode = Online play
+online.mode.help = Steam: your Steam friends' games show in the game's LAN list (Multiplayer, LAN), and the host can invite friends from the waiting room. Needs Steam running and the game bought on Steam.
 update.check = Check for new versions
 update.check.help = Asks GitHub for the latest version number; a notice in the main menu if it is newer. Nothing is downloaded.
 mmh55_unknown = MMH5.5 (version not recognised)
