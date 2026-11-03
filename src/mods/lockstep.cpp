@@ -58,6 +58,17 @@
 //    (default 2, the game's 10) changes that Sleep(10) ("push 0x0a" at
 //    0x0047cc05). Only how often the network is looked at changes.
 //
+// 6. A PC that is behind stays behind: the pacing (point 4) only slows the PCs
+//    that are ahead, and the one behind runs at its own normal speed, never
+//    faster. Every click of the others then waits for it (in real games over
+//    Steam, 0.1-0.2 s per click, the PC behind running Linux/Proton). [net]
+//    catch_up_behind=1 (the default), while co-op timing is ON: when the other
+//    PCs have reported 2 or more segments more than this one, this PC's timer
+//    runs faster, 10% more per segment behind (at most 50%), until it has caught
+//    up. The pacing (slot 5) advances the timer by its speed times the frame's
+//    time; our hook passes it a longer frame. Only this PC's own pace changes:
+//    the world still runs segment by segment, the same on every PC.
+//
 // [net] trace_lockstep=1 (the default; 0 = off) writes, every 10 seconds, how long this PC waited
 // from closing its own segment to running it, who it waited for last, the
 // frames per second and how many reports a drain took in, so a log from a
@@ -98,6 +109,12 @@ const DWORD kGameSlopeBits = 0x3d4ccccd;  // 0.05f
 const DWORD kPacingCapCmp = 0x007c8e7f;
 const DWORD kPacingCapMov = 0x007c8ef3;
 const DWORD kGameCap = 20;
+// Point 6: the pacing itself (slot 5, __thiscall(float frame, int), ret 8).
+const DWORD kPacingSlot = kMpTransceiverVftable + 5 * 4;
+const DWORD kPacing = 0x007c8dd0;
+const LONG kBehindFrom = 2;      // segments behind the others before this PC speeds up
+const float kBoostStep = 0.1f;   // faster per segment behind, from the second one
+const float kBoostMax = 1.5f;
 // The network thread's loop (0x0047cbd0): "mov edi, [Sleep]" at 0x0047cbe4,
 // then "push 0x0a; call edi" at 0x0047cc05.
 const DWORD kNetSleepLoad = 0x0047cbe4;
@@ -110,8 +127,12 @@ const int kWaits = 1024;   // waits remembered per summary, for the p80
 
 typedef void(__fastcall *PumpFn)(void *transceiver, void *edx);
 typedef void(__fastcall *SendFn)(void *transceiver, void *edx, void *command);
+typedef void(__fastcall *PacingFn)(void *transceiver, void *edx, float frame, int other);
 PumpFn g_pump_next = nullptr;
 SendFn g_send_next = nullptr;
+PacingFn g_pacing_next = nullptr;
+bool g_catch_behind = false;     // [net] catch_up_behind=1 and the pacing hook is in
+volatile bool g_coop_on = false;  // co-op timing is ON (every PC agreed)
 bool g_drain = false;
 bool g_trace = false;
 
@@ -184,6 +205,8 @@ struct Trace {
 	double wait_sum, wait_max;
 	float waits[kWaits];  // this summary's waits, for the p80
 	int last_reporter[kMaxPlayers];     // how often each player was the last one waited for
+	int boosted;                        // frames this PC ran faster to catch up (point 6)
+	float boost_max;
 	Pending pending[kPending];          // a ring, oldest at `first`
 	int first, queued, dropped;
 	Kind kinds[kClasses + 1];
@@ -231,6 +254,28 @@ void TimeCommand(const Pending &c, double run, double wait)
 	s.commands++;
 }
 
+// Every kTimingEvery segments (the same ones on every PC), when each player's
+// report of that segment was seen here, on this PC's clock (ms). With the logs
+// of two PCs, "their report seen here" minus "my report", added up both ways,
+// is the time the reports take on the way and inside the games (the clocks'
+// offset cancels out): small, and a PC that waits is waiting for a PC that is
+// behind; large, and the reports themselves are slow (tools/robot/segment_timing.py).
+const LONG kTimingEvery = 200;
+
+void TimingLine(LONG segment, const double *at, int players, int me)
+{
+	char text[256] = "";
+	size_t used = 0;
+	for (int p = 0; p < players && used < sizeof(text) - 1; ++p) {
+		const int wrote = _snprintf_s(text + used, sizeof(text) - used, _TRUNCATE, "%s%d%s %.1f", p ? ", " : "", p,
+		                              p == me ? "(me)" : "", at[p]);
+		if (wrote < 0)
+			break;
+		used += static_cast<size_t>(wrote);
+	}
+	hooklog::Write("lockstep: segment %ld reported, seen here at (ms, this PC's clock): %s", segment, text);
+}
+
 // Notes the reports that arrived (and this PC's own ones) since the last look,
 // and the segments that became complete: a segment runs when every player has
 // reported it, so its wait is from this PC's own report to the last report.
@@ -252,6 +297,8 @@ void TraceLook(const BYTE *t, double now)
 		for (int p = 1; p < s.players; ++p)
 			if (at[p] > at[last])
 				last = p;
+		if (s.ran % kTimingEvery == 0)
+			TimingLine(s.ran, at, s.players, me);
 		double wait = 0;
 		if (me >= 0 && me < s.players && at[me] > 0) {
 			wait = at[last] - at[me];
@@ -371,15 +418,20 @@ void TraceWindow(const BYTE *t, double now)
 		std::nth_element(s.waits, at, s.waits + kept);
 		p80 = static_cast<int>(*at);
 	}
+	char caught[64] = "";
+	if (s.boosted)
+		_snprintf_s(caught, sizeof(caught), _TRUNCATE, "; caught up in %d frames (at most x%.1f)", s.boosted,
+		            s.boost_max);
 	hooklog::Write("lockstep: %d segments in %d s, waited %d ms on average (p80 %d, longest %d) after this PC's own "
 	               "report; last report from player [%s]; %d frames/s (longest frame %d ms); drain took %d extra "
-	               "reports (at most %d in a frame); spread %ld segments",
+	               "reports (at most %d in a frame); spread %ld segments%s",
 	               s.segments, static_cast<int>(span / 1000), s.segments ? static_cast<int>(s.wait_sum / s.segments) : 0,
 	               p80, static_cast<int>(s.wait_max), who, static_cast<int>(s.frames * 1000.0 / span),
-	               static_cast<int>(s.longest_frame), s.drains_extra, s.max_drain, high - low);
+	               static_cast<int>(s.longest_frame), s.drains_extra, s.max_drain, high - low, caught);
 	CommandsLine(p80);
 	s.window_start = now;
-	s.frames = s.drains_extra = s.max_drain = s.segments = 0;
+	s.frames = s.drains_extra = s.max_drain = s.segments = s.boosted = 0;
+	s.boost_max = 0;
 	s.wait_sum = s.wait_max = s.longest_frame = 0;
 	memset(s.last_reporter, 0, sizeof(s.last_reporter));
 	memset(s.kinds, 0, sizeof(s.kinds));
@@ -660,8 +712,41 @@ void NetSleep(DWORD ms)
 // The co-op guard (coop_guard.cpp) switched to its shorter segments, or a new
 // game started with the game's own timing: our margin, catch-up and pacing
 // slope apply only while every PC runs the add-on's timing.
+// Point 6: how much faster this PC's timer runs this frame (1 = its normal pace).
+float Boost(const BYTE *t)
+{
+	const int players = Players(t);
+	const int me = static_cast<int>(Read(t, 0x54));
+	if (players <= 1 || players > kMaxPlayers || me < 0 || me >= players)
+		return 1.0f;
+	const LONG *reported = Reported(t);
+	LONG ahead = 0;
+	for (int p = 0; p < players; ++p)
+		if (p != me && reported[p] - reported[me] > ahead)
+			ahead = reported[p] - reported[me];
+	if (ahead < kBehindFrom)
+		return 1.0f;
+	const float boost = 1.0f + kBoostStep * static_cast<float>(ahead - kBehindFrom + 1);
+	return boost < kBoostMax ? boost : kBoostMax;
+}
+
+void __fastcall PacingHook(void *self, void *edx, float frame, int other)
+{
+	float boost = 1.0f;
+	if (g_coop_on) {
+		boost = Boost(static_cast<const BYTE *>(self));
+		if (boost > 1.0f && g_trace && g_trace_state.transceiver == self) {
+			g_trace_state.boosted++;
+			if (boost > g_trace_state.boost_max)
+				g_trace_state.boost_max = boost;
+		}
+	}
+	g_pacing_next(self, edx, frame * boost, other);
+}
+
 void LockstepCoopTiming(bool on, DWORD segment_ms)
 {
+	g_coop_on = on && g_catch_behind;
 	Switch(kViewDelayImmediate, 400, g_view_ms, on);
 	Switch(kCatchUpImmediates[0], 150, g_catch_up_ms, on);
 	Switch(kCatchUpImmediates[1], 150, g_catch_up_ms, on);
@@ -692,6 +777,7 @@ void ApplyLockstepFromSettings()
 	const DWORD catch_up = GetPrivateProfileIntW(L"net", L"catch_up_ms", 600, path);
 	const bool scale_pacing = GetPrivateProfileIntW(L"net", L"scale_pacing", 1, path) != 0;
 	const DWORD net_sleep = GetPrivateProfileIntW(L"net", L"net_sleep_ms", 2, path);
+	const bool catch_behind = GetPrivateProfileIntW(L"net", L"catch_up_behind", 1, path) != 0;
 
 	if (view != 400) {
 		if (view < 50 || view > 400)
@@ -725,6 +811,15 @@ void ApplyLockstepFromSettings()
 		}
 	}
 	NetSleep(net_sleep);
+	if (catch_behind) {
+		g_pacing_next = reinterpret_cast<PacingFn>(hookpatch::PatchPointer(kPacingSlot, kPacing, &PacingHook));
+		g_catch_behind = g_pacing_next != nullptr;
+		hooklog::Write(g_catch_behind ? "lockstep: with co-op timing ON, a PC 2 or more segments behind the others runs "
+		                                "faster until it has caught up (up to x1.5)"
+		                              : "lockstep: the pacing code is not as expected: no catch-up for a PC behind");
+		if (g_catch_behind)
+			watchdog::NameFunction(&PacingHook, "lockstep PacingHook");
+	}
 	if (!g_drain && !g_trace)
 		return;
 	FineClock();

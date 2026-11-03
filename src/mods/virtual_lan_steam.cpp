@@ -111,6 +111,31 @@ struct InviteEntry {
 	char name[online::kNameSize];
 };
 
+// The PC's fine clock, in microseconds.
+int64_t QpcMicros()
+{
+	static LARGE_INTEGER freq = {};
+	LARGE_INTEGER now;
+	if (!freq.QuadPart)
+		QueryPerformanceFrequency(&freq);
+	QueryPerformanceCounter(&now);
+	return now.QuadPart * 1000000 / freq.QuadPart;
+}
+
+// How long some calls took, for the minute line: under Proton every call into
+// Steam crosses to the Linux Steam client, and our thread's work holds the
+// core's lock, which the game's own sends and reads wait for.
+struct Timing {
+	long count;
+	int64_t total_us, max_us;
+	void Add(int64_t us)
+	{
+		++count;
+		total_us += us;
+		max_us = us > max_us ? us : max_us;
+	}
+};
+
 // Somebody who sent us a message or asked for a session.
 struct Session {
 	uint64_t id;
@@ -227,10 +252,12 @@ public:
 		// Reliable by default: the game was made for a LAN, where nothing is lost. A lost
 		// "accepted" answer to a join was never sent again by the joined game: the join
 		// failed with "Timeout" over 4G (online-steam-test2.md, run 2).
+		const int64_t t0 = QpcMicros();
 		const int r = s_.api.send(s_.msgs, IdentityOf(to), message, static_cast<uint32_t>(size),
 		                          (reliable_ ? kSendReliableNoNagle : kSendUnreliableNoNagle) |
 		                              kSendAutoRestartBrokenSession,
 		                          channel);
+		send_time_.Add(QpcMicros() - t0);
 		if (r != kResultOk) {
 			++refused_;
 			if (refused_ <= 5) {
@@ -254,7 +281,10 @@ public:
 			return true;
 		for (int tries = 0; tries < 64; ++tries) {
 			Message *m = nullptr;
-			if (s_.api.receive(s_.msgs, channel, &m, 1) <= 0 || !m)
+			const int64_t t0 = QpcMicros();
+			const int got = s_.api.receive(s_.msgs, channel, &m, 1);
+			receive_time_.Add(QpcMicros() - t0);
+			if (got <= 0 || !m)
 				return false;
 			const uint64_t from = SteamIdOf(m->peer);
 			const size_t size = m->size > 0 ? static_cast<size_t>(m->size) : 0;
@@ -379,7 +409,9 @@ private:
 		SteamTransport *t = static_cast<SteamTransport *>(self);
 		for (;;) {
 			EnterCriticalSection(t->lock_);
+			const int64_t t0 = QpcMicros();
 			t->Tick(GetTickCount());
+			t->tick_time_.Add(QpcMicros() - t0);
 			online::Invite fresh[kMaxInvites];
 			int fresh_count = 0;
 			for (; fresh_count < t->fresh_count_ && fresh_count < kMaxInvites; ++fresh_count)
@@ -745,6 +777,13 @@ private:
 
 	// --- our friends' games ------------------------------------------------------------
 	void ScanFriends(uint32_t now)
+	{
+		const int64_t t0 = QpcMicros();
+		ScanFriendsNow(now);
+		scan_time_.Add(QpcMicros() - t0);
+	}
+
+	void ScanFriendsNow(uint32_t now)
 	{
 		scanned_at_ = now;
 		scan_now_ = false;
@@ -1136,6 +1175,22 @@ private:
 		               "ourselves; sessions: %ld accepted, %ld ignored; %d known host(s)",
 		               sent_, refused_, received_, bad_, to_self_, accepted_, ignored_, hosts_.Count());
 		LogQuality();
+		LogTimings();
+	}
+
+	// The minute's call times (see Timing), then a fresh count.
+	void LogTimings()
+	{
+		const Timing *all[] = {&send_time_, &receive_time_, &tick_time_, &scan_time_};
+		char text[4][64];
+		for (int i = 0; i < 4; ++i)
+			_snprintf_s(text[i], sizeof(text[i]), _TRUNCATE, "%ld, avg %lld us, max %lld us", all[i]->count,
+			            all[i]->count ? static_cast<long long>(all[i]->total_us / all[i]->count) : 0LL,
+			            static_cast<long long>(all[i]->max_us));
+		hooklog::Write("vlan steam: call times this minute: sends %s; reads %s; our thread's rounds (holding the lock "
+		               "the game's sends and reads wait for) %s, of which friends scans %s",
+		               text[0], text[1], text[2], text[3]);
+		send_time_ = receive_time_ = tick_time_ = scan_time_ = Timing();
 	}
 
 	// How each session that brought messages since the last line does: its route (it can
@@ -1292,6 +1347,7 @@ private:
 	uint64_t self_order_ = 0;
 
 	long sent_ = 0, refused_ = 0, received_ = 0, bad_ = 0, to_self_ = 0, accepted_ = 0, ignored_ = 0;
+	Timing send_time_ = {}, receive_time_ = {}, tick_time_ = {}, scan_time_ = {};
 	uint32_t stats_at_ = 0;
 	long stats_logged_ = -1;
 
