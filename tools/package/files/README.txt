@@ -39,6 +39,7 @@ Translations are welcome: copy en.txt to the code of your language (de.txt, ru.t
 WHAT IT DOES
 
 - Faster co-op: quicker AI turns and clicks, less AI thinking on big maps, no long autosave freeze, LAN games over ZeroTier.
+- Online play over Steam (off until you turn it on): your Steam friends' games in the game's LAN list, invites from the waiting room.
 - Stability: a fix for a rare host freeze during computer turns, a freeze detector, and a short report when the game crashes (see below).
 - Multiplayer waiting room: a line at the bottom says whether every player has the same H5 Together version, and who does not.
 - Player list on the adventure map: who is playing, who has ended the turn. F9 hides it.
@@ -50,12 +51,12 @@ WHAT IT DOES
 - Linux: the mouse wheel zooms out again (automatic).
 
 
-NEW IN 0.2.7
+NEW IN 0.3.0 (a test release)
 
-- Game rules (host): Tribes of the East start bonuses (each player keeps the bonus picked with the lobby arrows: gold, resources, artifact, with ToE's own icons) and a separate game mode choice (Default, Savage, Nightmare, Random).
-- Game rules (host): MMH5.5's scripts can also run on random maps straight from the game's generator in multiplayer, so the other rules work there too.
-- Game rules (host): "Skills of each class": MMH5.5's lock, or Unlocked (any skill can be offered, the ones off the class's list at a small chance, as in the original game).
-- The installer updates h5-together.ini: your values are kept, the new settings are added, and the old file is saved as h5-together.ini.bak.
+- Online play with your Steam friends, without GameRanger: Options, H5 Together, Online play: Steam, then restart the game (every player). Your friends' games show in Multiplayer, LAN. The host invites friends with "Invite friends..." ("Inviter des amis..." in French) in the waiting room; an invited friend's game joins by itself. While it is on, the LAN list shows only games through Steam: for GameRanger, set it back to Off. Needs the Steam game and Steam running; tested with two PCs.
+- Settings inside the game (Options, H5 Together, or F3), a friendlier installer, the version line in the waiting room, crash reports, the bug report script, an optional new version notice, the add-on's words in language files, and a main menu picture and tune (off by default).
+- The game's cursor stays above the add-on's panels, and their buttons light up under the cursor.
+- open-homm5 is now H5 Together: installing over 0.2.7 renames your files and keeps your settings.
 
 
 REPORTING A PROBLEM
