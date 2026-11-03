@@ -510,6 +510,30 @@ bool TopScreen(char *class_name, int size)
 	return ReadTopScreen(class_name, size);
 }
 
+int ScreenNames(char (*names)[96], int max)
+{
+	if (g_screens_ok < 0)
+		g_screens_ok = memcmp(reinterpret_cast<const void *>(kTopScreenGetter), kTopScreenGetterBytes,
+		                      sizeof(kTopScreenGetterBytes)) == 0;
+	if (!g_screens_ok)
+		return 0;
+	int n = 0;
+	__try {
+		const DWORD *sentinel = *reinterpret_cast<const DWORD *const *>(kScreenList);
+		if (!sentinel)
+			return 0;
+		for (DWORD node = sentinel[0]; node && node != reinterpret_cast<DWORD>(sentinel) && n < max && n < 64;
+		     node = Read(reinterpret_cast<const void *>(node), 0)) {
+			const void *screen = reinterpret_cast<const void *>(Read(reinterpret_cast<const void *>(node), 8));
+			lstrcpynA(names[n++], screen ? ClassName(screen) : "?", 96);
+		}
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER) {
+		return n;
+	}
+	return n;
+}
+
 void *TopScreenObject()
 {
 	if (g_screens_ok < 0)
