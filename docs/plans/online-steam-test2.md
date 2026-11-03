@@ -173,20 +173,22 @@ Things seen, not failures:
 
 **Setup.** Desktop host (Windows) and the Linux laptop as joiner, on the home Wi-Fi (direct, 1-12 ms), robots on both, A1M4, 8 AI turns. The laptop ran **on battery** (about 50 frames/s, frames up to 0.5 s), a slow PC, which is the case to fix. New timing lines (PR #91): every 200 segments each PC logs when it saw each player's report of that segment; `tools/robot/segment_timing.py` pairs two logs, so "the reports are slow on the way" and "a PC is behind" can be told apart.
 
-| | before (0.3.0) | catch-up off | catch-up on | **catch-up + faster link** |
-|---|---|---|---|---|
-| Host: average wait per segment | 577 ms | 461 ms | 389 ms | **124 ms** |
-| Laptop: average wait per segment (p80, worst) | 559 ms (1382, 3625) | 520 ms (1398, 2944) | 682 ms (1838, 4872) | **178 ms (340, 1440)** |
-| Host: time between AI moves (median / p80) | 570 / 891 ms | 558 / 891 | 154 / 597 | **175 / 326 ms** |
-| Host: commands, from sending to their run | 523 ms | 484 ms | 193 ms | **164 ms** |
-| 8 AI turns | 95 s | 90 s | 90 s | **80 s** |
-| World checksums | all equal | all equal | all equal | all equal (1,477) |
+| | before (0.3.0) | catch-up off | catch-up on | catch-up + faster link | **the new defaults, no settings** |
+|---|---|---|---|---|---|
+| Host: average wait per segment | 577 ms | 461 ms | 389 ms | 124 ms | **122 ms** |
+| Laptop: average wait per segment (p80, worst) | 559 ms (1382, 3625) | 520 ms (1398, 2944) | 682 ms (1838, 4872) | 178 ms (340, 1440) | **212 ms (386, 1795)** |
+| Host: time between AI moves (median / p80) | 570 / 891 ms | 558 / 891 | 154 / 597 | 175 / 326 ms | **150 / 272 ms** |
+| Host: commands, from sending to their run | 523 ms | 484 ms | 193 ms | 164 ms | **118 ms** |
+| 8 AI turns | 95 s | 90 s | 90 s | 80 s | **75 s** |
+| World checksums | all equal | all equal | all equal | all equal (1,477) | all equal (1,381) |
 
 **What the timing lines showed:**
 
 1. **The PC behind stays behind.** With the catch-up off, at most sample segments the reports were quick on the way (both ways added: 10-180 ms) but the laptop reported 400-700 ms after the host. The game's pacing only slows a PC that is ahead; a PC behind never runs faster, so after a slow moment it stays behind, and everyone waits for it. **Fix:** a PC that the others have out-reported by 2 or more segments runs up to 50% faster until it has caught up (`[net] catch_up_behind=1`, `lockstep.cpp` point 6).
 2. **During AI turns the host's link was full.** With the catch-up on, the laptop was no longer behind, and what was left showed: some reports took 0.5-2.4 s on the way, host to laptop. The game's link sends at most one packet of about 256 bytes of game data per send interval (10 ms then), and the AI's big commands (threat maps, paths) queued the host's segment reports behind them. **Fix:** a send interval of 2 ms and a keepalive of 10 ms (`net_tuning.cpp`, now the defaults); the reports then arrived within 0.2 s of each other.
-3. **Under Proton, Steam calls cost more**, as expected: a send 80 us (8 on Windows), a read 35 us (2-3), our scan of the Steam friends list 15-20 ms (5 on Windows), every 2 s. The scan held the lock the game's own sends and reads use, so they waited up to 20-30 ms once per scan. **Fix:** the scan lets go of the lock every 8 friends (a 1 ms sleep; with `SwitchToThread` the thread took it back at once).
+3. **Under Proton, Steam calls cost more**, as expected: a send 80 us (8 on Windows), a read 35 us (2-3), our scan of the Steam friends list 15-20 ms (5 on Windows), every 2 s. The scan held the lock the game's own sends and reads use, so they waited up to 20-30 ms once per scan. **Fix:** the scan lets go of the lock every 8 friends (a 1 ms sleep; with `SwitchToThread` the thread took it back at once). With it, the laptop's longest waits for the lock went from 18-32 ms to 5-8 ms.
+
+A LAN game between two copies on the desktop (no virtual LAN, the new defaults) stayed as good: both copies waited about 30 ms per segment, AI moves 136 ms apart (median), every check equal.
 
 A busy link now sends up to about 140 KB/s (500 packets a second), an idle one a small packet every 10 ms: fine for home connections, to be watched with 4 PCs over the internet.
 
