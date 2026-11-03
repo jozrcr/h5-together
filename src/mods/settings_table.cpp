@@ -87,6 +87,7 @@ const Setting kSettings[] = {
 	FILE_ONLY("net", "trace_lockstep", "1", kBool, 0, 1, kTester, kRestart),
 	FILE_ONLY("net", "catch_up_ms", "600", kInt, 150, 5000, kTester, kRestart),
 	FILE_ONLY("net", "scale_pacing", "1", kBool, 0, 1, kTester, kRestart),
+	FILE_ONLY("net", "catch_up_behind", "1", kBool, 0, 1, kTester, kRestart),
 	FILE_ONLY("net", "net_sleep_ms", "2", kInt, 1, 10, kTester, kRestart),
 	// [coop]
 	ROW("coop", "guard", "1", kBool, 0, 1, nullptr, 0, nullptr, kGroup, kRestart, kAdvanced, kCheck,

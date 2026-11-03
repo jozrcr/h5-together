@@ -152,6 +152,7 @@ view_delay_ms=100 ; 50..400, only while co-op timing is ON (else the game's 400)
 trace_lockstep=1  ; 0 = no summary lines
 catch_up_ms=600   ; 150..1000, only while co-op timing is ON (the game: 150)
 scale_pacing=1    ; 0 = the game's pacing slope also with co-op timing ON
+catch_up_behind=1 ; 0 = a PC behind the others never runs faster (the game's rule)
 net_sleep_ms=2    ; 1..10, the network thread's rest between rounds (the game: 10)
 ```
 
