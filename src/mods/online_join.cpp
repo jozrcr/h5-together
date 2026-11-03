@@ -539,17 +539,20 @@ void Frame(const char *top, bool boxed)
 	case Step::kOpening:
 		if (lan)
 			Go(Step::kWaitRow, now, "the LAN screen is open");
+		else if (boxed)
+			g.step_at = now;  // (a box or the name box over it: wait for the player)
 		else if (now - g.step_at > kOpenMs)
 			Stop("the LAN screen did not open in 10 s");
 		return;
 	case Step::kWaitRow:
-		if (!lan) {
-			if (!boxed)
-				Stop("the player left the LAN screen");
+		if (boxed) {  // a box, or the name box, over the LAN screen: the player answers it first; the wait starts again
+			g.step_at = now;
 			return;
 		}
-		if (boxed)
+		if (!lan) {
+			Stop("the player left the LAN screen");
 			return;
+		}
 		if (now - g.scanned_at >= kScanMs) {
 			g.scanned_at = now;
 			if (TryJoin(overlay::TopScreenObject())) {

@@ -28,7 +28,8 @@ void Start(uint64_t lobby, uint64_t host, const char *name, const char *why);
 // The invite's host became known (the lobby's data came).
 void Update(uint64_t lobby, uint64_t host);
 // Each frame: `top` is the RTTI name of the game's screen on top; `boxed`: a game
-// message box or dialog is open over it.
+// message box or dialog is open over it (a common message box, or the LAN screen's
+// name box NUI::CSimpleEditBox, a screen of its own): then the auto-join waits.
 void Frame(const char *top, bool boxed);
 
 // What the LAN screen says about it (no row: 20 s; failed: a message box, or no

@@ -65,6 +65,7 @@ const char kName[] = "online";
 const char kLobbyScreen[] = ".?AVCLobbyScreen@NUI@@";
 const char kWaitScreen[] = ".?AVCMPWaitScreen@NUI@@";
 const char kMainMenu[] = ".?AVCMainMenuScreen@NUI@@";
+const char kNameBox[] = ".?AVCSimpleEditBox@NUI@@";  // the LAN screen's "Nom du joueur" box, a screen over it
 
 // --- layout: the game's 1024x768 screens, centred and scaled with the height ---------------
 const float kRefH = 768.0f, kScreenW = 1024.0f;
@@ -205,9 +206,10 @@ void RobotCommand(const char *text)
 		ClosePicker("robot");
 	else if (strcmp(text, "test_invite") == 0)
 		OnlineTestInvite();
-	else if (strcmp(text, "test_autojoin") == 0) {
-		// as an invite to the first host this PC hears of (the robot's two copies: the host)
-		autojoin::Start(0, 0, "", "robot: an invite to the first host this PC hears of");
+	else if (strncmp(text, "test_autojoin", 13) == 0 && (!text[13] || text[13] == ' ')) {
+		// as an invite to the first host this PC hears of (the robot's two copies: the host),
+		// from a made-up friend whose name may follow
+		autojoin::Start(0, 0, text[13] ? text + 14 : "", "robot: an invite to the first host this PC hears of");
 	}
 	else if (strcmp(text, "games") == 0)
 		autojoin::LogGames();
@@ -292,7 +294,7 @@ bool Wanted()
 		for (int i = 0; i < g_status.invite_count; ++i)
 			autojoin::Update(g_status.invites[i].lobby, g_status.invites[i].host);
 	}
-	autojoin::Frame(g_top, g_boxed);
+	autojoin::Frame(g_top, g_boxed || strcmp(g_top, kNameBox) == 0);
 	std::string who;
 	g_join_shown = g_lan && !g_boxed ? autojoin::State(&who) : online::JoinState::kNone;
 	g_join_name = who;

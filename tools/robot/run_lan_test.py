@@ -53,7 +53,8 @@ def instance_args(args, name, steps):
         # mp_check_crc: without it the game computes no world checksums at all
         # (0x007c9be0), and the desync check below has nothing to compare
         setvar=["lan_last_login = Robot-%s" % name, "net_lan_match_maker_port = %d" % discovery] +
-               (["mp_check_crc = 1"] if args.crc else []) + args.setvar,
+               (["mp_check_crc = 1"] if args.crc else []) + args.setvar +
+               (args.client_setvar if name == "client" else []),
         turns=args.turns, seconds=args.seconds, command_delay=8,
         end_turn_every=args.end_turn_every, press_enter_every=0,
         repeat_command=None, repeat_every=0, trace_segments=False, segment_ms=0,
@@ -97,6 +98,8 @@ def main():
     p.add_argument("--end-turn-every", type=int, default=5,
                    help="the DLL ends its human player's turn (when no AI is playing) at most every N seconds")
     p.add_argument("--setvar", action="append", default=[], help="extra profile setting for both copies")
+    p.add_argument("--client-setvar", action="append", default=[],
+                   help='extra profile setting for the client only (e.g. \'lan_last_login = ""\': no player name)')
     p.add_argument("--start-at", type=int, default=43, help="script time of the host's start (seconds)")
     p.add_argument("--client-ready-at", type=int, default=36,
                    help="script time of the client's 'ready' (later for a random map, which the client rebuilds "
@@ -252,7 +255,7 @@ def main():
     if args.client_autojoin:
         # the online UI's auto-join instead of the robot's own clicks: an "invite" to the host's
         # game while the client is on the main menu (src/mods/online_join.cpp; needs --vlan)
-        client_steps = ["%d|panel|online test_autojoin" % args.client_autojoin] + \
+        client_steps = ["%d|panel|online test_autojoin Lucas" % args.client_autojoin] + \
             [s for s in client_steps if s not in ("10|menu|multi lan", "26|game|0", "27|ui|NUI::CLobbyScreen join")]
 
     robot.install_dll(game, texts=args.texts_dir)
