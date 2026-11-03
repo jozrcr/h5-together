@@ -6,7 +6,7 @@ Run it from a kit folder that holds dinput8.dll and steam_api.dll, or from the r
 package zip that GitHub builds for the pull request). steam_api.dll is only needed when
 bin/h5-together/ has none yet.
 
-    python3 laptop_test.py install [--dll PATH]   # our DLL in the game, steam_api.dll, [online] mode=steam
+    python3 laptop_test.py install [--dll PATH]   # our DLL in the game, steam_api.dll, the package's texts, [online] mode=steam
     python3 laptop_test.py robot       # optional: the in-DLL robot joins the first LAN game by itself
     (start the game: /snap/bin/steam steam://rungameid/15370)
     python3 laptop_test.py collect     # after the game: logs and screenshots to ~/h5-steam-test3-results/<time>/
@@ -86,6 +86,25 @@ def set_online(ini_path):
     ini_path.write_text(newline.join(out) + newline, encoding="utf-8")
 
 
+def install_texts(dll, steam_dir, backup):
+    """The package's h5-together/texts/ (next to its dinput8.dll), as the installer copies it:
+    without fr.txt our texts show in English. Files there before the test are kept first."""
+    texts = dll.resolve().parent / "h5-together" / "texts"
+    if not texts.is_dir():
+        print("no texts folder next to", dll, "(our texts stay as they are)")
+        return
+    dest = steam_dir / "texts"
+    if not dest.exists():
+        (backup / "texts.added").write_text("added by the test\n")
+    elif not (backup / "texts.added").exists() and not (backup / "texts").exists():
+        shutil.copytree(dest, backup / "texts")
+    dest.mkdir(exist_ok=True)
+    names = sorted(f.name for f in texts.glob("*.txt"))
+    for name in names:
+        shutil.copy2(texts / name, dest / name)
+    print("installed the texts (%s) in %s" % (", ".join(names), dest))
+
+
 def install(game, dll):
     bin_dir, backup = paths(game)
     backup.mkdir(exist_ok=True)
@@ -106,6 +125,7 @@ def install(game, dll):
         print("installed", steam_dir / "steam_api.dll")
     else:
         print("steam_api.dll already in", steam_dir, "(kept)")
+    install_texts(dll, steam_dir, backup)
     set_online(bin_dir / "h5-together.ini")
     print("h5-together.ini: [online] mode=steam")
     print("Steam's launch option must keep WINEDLLOVERRIDES=\"dinput8=n,b\" (so the game loads our DLL),")
@@ -193,6 +213,13 @@ def uninstall(game):
     if (backup / "steam_api.dll.added").exists():
         (bin_dir / "h5-together" / "steam_api.dll").unlink(missing_ok=True)
         print("removed steam_api.dll")
+    if (backup / "texts.added").exists():
+        shutil.rmtree(bin_dir / "h5-together" / "texts", ignore_errors=True)
+        print("removed the texts folder (there was none before)")
+    elif (backup / "texts").is_dir():
+        shutil.rmtree(bin_dir / "h5-together" / "texts", ignore_errors=True)
+        shutil.copytree(backup / "texts", bin_dir / "h5-together" / "texts")
+        print("put back the texts folder from before the test")
     shutil.rmtree(backup, ignore_errors=True)
 
 
