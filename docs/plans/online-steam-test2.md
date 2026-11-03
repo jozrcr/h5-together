@@ -1,6 +1,6 @@
 # Steam test 3: a real LAN game between two PCs over Steam
 
-Status: **ready to run (2026-11-02).** Both PCs use **the same `dinput8.dll`: the one in the package zip GitHub builds for the pull request** (the Actions run's artifact `h5-together-<version>`; downloading it needs a GitHub login: the owner, in a browser, or `gh run download`). The laptop's helper is `tools/robot/laptop_test.py` in the repo (`git pull`). The first kit, `h5-together-steam-test3.zip` in the session's scratchpad, could not reach the laptop (no DLLs in git, no file sharing over the LAN), so the test moved to the next day.
+Status: **Wi-Fi run passed (2026-11-03); the 4G run is next** (see [Results](#results)). Both PCs use **the same `dinput8.dll`: the one in the package zip GitHub builds for the pull request** (the Actions run's artifact `h5-together-<version>`; downloading it needs a GitHub login: the owner, in a browser, or `gh run download`). The laptop's helper is `tools/robot/laptop_test.py` in the repo (`git pull`). The first kit, `h5-together-steam-test3.zip` in the session's scratchpad, could not reach the laptop (no DLLs in git, no file sharing over the LAN), so the test moved to the next day.
 
 This is the first real test of step 3 of [online-steam.md](online-steam.md): the virtual LAN with its **Steam transport** (`[online] mode=steam`). The earlier two-PC test (the spike) only sent test messages between the two games. This time the **game's own LAN play** goes through Steam: the host creates a LAN game, and the other PC sees it in the game's own LAN list, joins it, and they play.
 
@@ -115,7 +115,35 @@ Do these in order. `GAME` below is the game folder: `/home/joz/snap/steam/common
 | `robot: games list: 0 games` | the host's game was not in the list at 40 s | start the laptop's game a bit later (the host must be waiting), or join by hand |
 | The game starts, then a desync box | the virtual LAN carried something wrong | send both logs |
 
+## Results
+
+### Run 1: home Wi-Fi (2026-11-03, morning): passed
+
+Both PCs ran the package DLL of `main` at 4f51455 (artifact `h5-together-0.0.0-dev.196`, `dinput8.dll` sha256 `4bd557223abe…`). The desktop was on Ethernet, the laptop on the same home network over Wi-Fi. Robots on both sides, nobody clicking.
+
+| Check | Result |
+|---|---|
+| Steam on both, same game | `mmh55/276f239a` on both; the relay network was ready on the host in 10 s |
+| Host's lobby | made 25 s after the host's game started, friends only |
+| Laptop finds the host | through the friends list, 2 s after its Steam started (`friend #… hosts a game: lobby #…`); the host's game is in the game's own LAN list ("Trefoil", 1/3) |
+| Join | the laptop's robot joined at 49 s of its run; Steam session **direct, 3 to 5 ms**; the waiting room said "Every player has H5 Together 0.2.7." on both |
+| Game | started by the host at 410 s; co-op timing ON (50 ms segments, both PCs agree); 9 days, 8 AI turns; the host's robot closed the game on purpose (`8 AI turns done`) |
+| Desync | none: about 1,500 world checksums compared on each PC, all equal |
+| Real addresses | none in any packet, on either PC. Each side's scan also found 3 packets holding `01 00 00 7f`, which reads as 127.0.0.1 backwards: the PC's own loopback address, not a real one, and probably just game data that happens to look like it |
+| Messages | about 17,000 each way through Steam, 0 refused, 0 unreadable |
+
+Things seen, not failures:
+
+- **Pacing:** in the game, the host waited on average 360 to 630 ms per segment for the laptop's report (p80 up to 885 ms); the laptop showed 129 to 149 frames per second under Proton. AI moves took about 0.5 s each (median gap 514 ms), close to the 0.44 to 0.49 s measured in LAN games with short segments ([phase1-report.md](../phase1-report.md)). On a home network the Steam path costs little.
+- **When the host closed its game**, the laptop's game did not stop: it took over the AI player and played days 11 and 12 alone, until the laptop session ended it. That is the game's own behaviour when a host leaves.
+- **A wasted retry, fixed after the test:** after the host left, the laptop kept asking Steam to join the host's old lobby every 5 s (Steam answered 2, "no such lobby"), because its game still sent packets to the host. Now a lobby whose host left is never joined again; a new lobby of the same host still is (`LobbyPlan::Forget`, test in `virtual_lan_test.cpp`).
+- The helper's line about Steam's launch option was misleading (the laptop's option also swaps the exe for MMH5.5's); reworded.
+
+### Run 2: 4G (to do)
+
+The same, with the laptop on the phone's connection. On mobile networks Steam may not find a direct path and may relay the session; the log then says `relayed`. Expected: it still works, with a higher ping.
+
 ## Not tested here
 
-- A relayed connection (on the same home Wi-Fi Steam finds a direct path); the 4G test tomorrow may get one.
+- A relayed connection (on the same home Wi-Fi Steam finds a direct path); the 4G run may get one.
 - Three PCs, an invite from the friends list (step 4), a saved game.
