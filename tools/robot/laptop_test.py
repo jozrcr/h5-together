@@ -108,7 +108,8 @@ def install(game, dll):
         print("steam_api.dll already in", steam_dir, "(kept)")
     set_online(bin_dir / "h5-together.ini")
     print("h5-together.ini: [online] mode=steam")
-    print("Steam's launch option must stay:  WINEDLLOVERRIDES=\"dinput8=n,b\" %command%")
+    print("Steam's launch option must keep WINEDLLOVERRIDES=\"dinput8=n,b\" (so the game loads our DLL),")
+    print("and the part that starts MMH55_Utility_64.exe instead of H5_Game.exe if it has one (the virtual LAN needs MMH5.5's exe)")
 
 
 def robot(game, seconds):

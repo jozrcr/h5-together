@@ -462,7 +462,10 @@ void TestLobbyPlan()
 	g.Forget();
 	Check(g.Next(100, &lobby) == LobbyPlan::Action::kNone, "the host left: we do not join its lobby again");
 	g.PlaysWith(77, 0x5555, 200);
-	Check(g.Next(200, &lobby) == LobbyPlan::Action::kJoin, "unless our game plays with it again");
+	Check(g.Next(200, &lobby) == LobbyPlan::Action::kNone,
+	      "not even when our game still sends to that host (Steam answered 2, no such lobby, every 5 s: two-PC test 3)");
+	g.PlaysWith(77, 0x7777, 300);
+	Check(g.Next(300, &lobby) == LobbyPlan::Action::kJoin && lobby == 0x7777, "a new lobby of that host: join it");
 	// no lobby known for the host yet
 	LobbyPlan u;
 	u.PlaysWith(77, 0, 0);

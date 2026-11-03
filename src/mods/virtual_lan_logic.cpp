@@ -680,6 +680,8 @@ void LobbyPlan::PlaysWith(uint64_t host, uint64_t lobby, uint32_t now_ms)
 {
 	if (!host)
 		return;
+	if (lobby == gone_lobby_)
+		lobby = 0;  // (our game still sends to the host that left it)
 	if (host != host_) {
 		host_ = host;
 		host_lobby_ = lobby;
@@ -756,6 +758,9 @@ void LobbyPlan::Left()
 void LobbyPlan::Forget()
 {
 	played_ = false;
+	if (host_lobby_)
+		gone_lobby_ = host_lobby_;
+	host_lobby_ = 0;
 }
 
 }  // namespace vlan
