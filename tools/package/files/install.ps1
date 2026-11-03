@@ -20,6 +20,10 @@
 # French) go to bin\h5-together\texts: ours are overwritten, any other file (a translation
 # of the player's own) stays.
 #
+# If the package has Valve's steam_api.dll (h5-together\steam_api.dll: online play over
+# Steam, off until the player turns it on), it goes to bin\h5-together\steam_api.dll, over
+# any copy there (that folder is ours). A package without it changes nothing there.
+#
 # An existing h5-together.ini is refreshed: it becomes this package's file with the
 # player's values in it (the old one is kept as h5-together.ini.bak; see Merge-Settings).
 # The files of the add-on's old name (open-homm5, until 0.2.7) get the new name first,
@@ -794,6 +798,9 @@ try {
     if (Test-Path -LiteralPath $srcTexts) {
         $textFiles = @(Get-ChildItem -LiteralPath $srcTexts -File | Where-Object { $_.Extension -ieq ".txt" })
     }
+    # Valve's steam_api.dll: only in some packages (GitHub's build has no copy of it).
+    $srcSteam = Join-Path $PSScriptRoot "h5-together\steam_api.dll"
+    $hasSteam = Test-Path -LiteralPath $srcSteam -PathType Leaf
     if (-not (Test-Path -LiteralPath $srcDll) -or -not (Test-Path -LiteralPath $srcIni) -or $templateFiles.Count -eq 0 -or $textFiles.Count -eq 0) {
         Write-Host "dinput8.dll, h5-together.ini and the folders h5-together\templates and h5-together\texts" -ForegroundColor Red
         Write-Host "must be next to this script." -ForegroundColor Red
@@ -908,6 +915,12 @@ try {
             Copy-Item -LiteralPath $f.FullName -Destination $dst -Force
         }
         $txtOthers = @(Get-ChildItem -LiteralPath $dstTexts -File | Where-Object { -not $oursTxt.ContainsKey($_.Name) }).Count
+        # Valve's steam_api.dll, if this package has it: over any copy there (the folder is ours).
+        if ($hasSteam) {
+            $dstSteam = Join-Path $bin "h5-together\steam_api.dll"
+            Copy-Item -LiteralPath $srcSteam -Destination $dstSteam -Force
+            try { Unblock-File -LiteralPath $dstSteam } catch { }
+        }
     } catch {
         Write-Host ""
         Write-Host "Could not copy the files into the game folder:" -ForegroundColor Red
@@ -986,6 +999,9 @@ try {
     Write-Host ("  - installed {0} language files in h5-together\texts ({1}): the words of the add-on's panels" -f $textFiles.Count, $codes)
     if ($txtReplaced -gt 0) { Write-Host ("    ({0} of them replaced our files from an earlier install)" -f $txtReplaced) }
     if ($txtOthers -gt 0) { Write-Host ("    (left the {0} other file(s) in that folder alone)" -f $txtOthers) }
+    if ($hasSteam) {
+        Write-Host "  - installed Valve's steam_api.dll in h5-together (online play over Steam, off until you turn it on in Options)"
+    }
     Write-Host "  - did not change or replace any file of the game itself"
     if ($game.Mmh55 -eq "missing") {
         Write-Host ""

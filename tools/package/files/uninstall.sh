@@ -5,7 +5,9 @@
 #   dinput8.dll (only if it is ours), h5-together.log (and h5-together.old.log), h5-together.ini (after asking),
 #   and the random map templates of this package (the OH-*.xdb files whose names are in
 #   this package's h5-together/templates folder), the language files of this package
-#   (h5-together/texts, the same names as in the package), then the folders if they are empty.
+#   (h5-together/texts, the same names as in the package), Valve's steam_api.dll in
+#   h5-together (only if this package has one and the file there is byte for byte the
+#   same; another copy stays), then the folders if they are empty.
 # The same files under the add-on's old name (open-homm5, until 0.2.7) go too.
 # Nothing else is touched: a template or a translation of your own stays. Steam's launch options are
 # yours to clear by hand.
@@ -467,6 +469,27 @@ else
 fi
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Valve's steam_api.dll (online play over Steam): only if this package has it, and only if
+# the file in the game is byte for byte that one (the same SHA-256). Another copy (another
+# version, put there by hand) stays. A package without it leaves it alone. Before the
+# language files and the templates, so that the folder h5-together can go once they are
+# gone too.
+our_dir="$(find_ci "$bin" h5-together)"
+if [ -f "$here/h5-together/steam_api.dll" ] && [ -n "$our_dir" ] && [ -d "$our_dir" ]; then
+    p="$(find_ci "$our_dir" steam_api.dll)"
+    if [ -n "$p" ] && [ -f "$p" ]; then
+        if ! cmp -s "$here/h5-together/steam_api.dll" "$p"; then
+            echo "  - kept h5-together/$(basename "$p"): it is not the copy this package installs (another version?), so I left it alone"
+        elif rm -f "$p"; then
+            echo "  - removed steam_api.dll (Valve's file for online play over Steam)"
+            rmdir "$our_dir" 2>/dev/null   # only if nothing else is in it
+        else
+            echo "  - could not remove steam_api.dll"
+            failed=1
+        fi
+    fi
+fi
 
 # The language files: only the names this package holds; a translation of the player's
 # own (another name) stays. Before the templates, so that the folder h5-together can go

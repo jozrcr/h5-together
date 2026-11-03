@@ -4,7 +4,9 @@
 #   dinput8.dll (only if it is ours), h5-together.log (and h5-together.old.log), h5-together.ini (after asking),
 #   and the random map templates of this package (the OH-*.xdb files whose names are in
 #   this package's h5-together\templates folder), the language files of this package
-#   (h5-together\texts, the same names as in the package), then the folders if they are empty.
+#   (h5-together\texts, the same names as in the package), Valve's steam_api.dll in
+#   h5-together (only if this package has one and the file there is byte for byte the
+#   same; another copy stays), then the folders if they are empty.
 # The same files under the add-on's old name (open-homm5, until 0.2.7) go too.
 # Nothing else is touched: a template or a translation of your own stays.
 #
@@ -564,6 +566,30 @@ try {
             }
         } else {
             Write-Host "  - kept $what"
+        }
+    }
+
+    # Valve's steam_api.dll (online play over Steam): only if this package has it, and only
+    # if the file in the game is byte for byte that one (the same SHA-256). Another copy
+    # (another version, put there by hand) stays. A package without it leaves it alone.
+    # Before the language files and the templates, so that the folder h5-together can go
+    # once they are gone too.
+    $ourDir = Join-Path $bin "h5-together"
+    $srcSteam = Join-Path $PSScriptRoot "h5-together\steam_api.dll"
+    $dstSteam = Join-Path $ourDir "steam_api.dll"
+    if ((Test-Path -LiteralPath $srcSteam -PathType Leaf) -and (Test-Path -LiteralPath $dstSteam -PathType Leaf)) {
+        $hash = Get-Sha256Hex $dstSteam
+        if ($hash -match '^[0-9a-f]{64}$' -and $hash -eq (Get-Sha256Hex $srcSteam)) {
+            try {
+                Remove-Item -LiteralPath $dstSteam -Force
+                Write-Host "  - removed steam_api.dll (Valve's file for online play over Steam)"
+                if (@(Get-ChildItem -LiteralPath $ourDir -Force).Count -eq 0) { Remove-Item -LiteralPath $ourDir -Force }
+            } catch {
+                Write-Host ("  - could not remove steam_api.dll: " + $_.Exception.Message) -ForegroundColor Red
+                $failed = $true
+            }
+        } else {
+            Write-Host "  - kept h5-together\steam_api.dll: it is not the copy this package installs (another version?), so I left it alone" -ForegroundColor Yellow
         }
     }
 

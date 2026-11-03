@@ -18,6 +18,10 @@
 # the words of the add-on's panels) into <game bin>/h5-together/texts. It overwrites its
 # own files there and never touches another file.
 #
+# If the package has Valve's steam_api.dll (h5-together/steam_api.dll: online play over
+# Steam, off until the player turns it on), it goes to <game bin>/h5-together/steam_api.dll,
+# over any copy there (that folder is ours). A package without it changes nothing there.
+#
 # An existing h5-together.ini is refreshed: it becomes this package's file with the
 # player's values in it (the old one is kept as h5-together.ini.bak; see merge_ini).
 # The files of the add-on's old name (open-homm5, until 0.2.7) get the new name first,
@@ -769,6 +773,20 @@ done
 txt_total="$(find "$txt_sub" -mindepth 1 -maxdepth 1 -type f | wc -l)"
 txt_others=$((txt_total - ${#txt_files[@]}))
 
+# Valve's steam_api.dll, if this package has it (GitHub's build has no copy of it): over any
+# copy there (the folder is ours), also one under another spelling, which Wine would find too.
+src_steam="$here/h5-together/steam_api.dll"
+steam_installed=0
+if [ -f "$src_steam" ]; then
+    dst="$(find_ci "$tpl_dir" steam_api.dll)"
+    [ -n "$dst" ] || dst="$tpl_dir/steam_api.dll"
+    if ! cp -f "$src_steam" "$dst"; then
+        echo "Could not copy steam_api.dll into $tpl_dir (see the message above)."
+        exit 5
+    fi
+    steam_installed=1
+fi
+
 echo
 echo "Done. What I did:"
 if [ "$old_moved" != " " ]; then
@@ -815,6 +833,7 @@ echo "    Everyone in a multiplayer game needs the same templates: install the s
 echo "  - installed ${#txt_files[@]} language files in h5-together/texts (${txt_codes#, }): the words of the add-on's panels"
 [ "$txt_replaced" -gt 0 ] && echo "    ($txt_replaced of them replaced our files from an earlier install)"
 [ "$txt_others" -gt 0 ] && echo "    (left the $txt_others other file(s) in that folder alone)"
+[ "$steam_installed" -eq 1 ] && echo "  - installed Valve's steam_api.dll in h5-together (online play over Steam, off until you turn it on in Options)"
 echo "  - did not change or replace any file of the game itself"
 
 if [ "$gi_mmh55" = "missing" ]; then

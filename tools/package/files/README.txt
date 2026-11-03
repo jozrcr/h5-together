@@ -19,7 +19,7 @@ Check that it works: start the game. A file named h5-together.log appears in the
 
 UNINSTALL
 
-Double-click uninstall.bat (Windows) or run: bash uninstall.sh (Linux). Only our own files are removed (dinput8.dll, the logs, our templates, our language files, and your settings file and its .bak copies if you say yes). Templates and translations you added yourself stay.
+Double-click uninstall.bat (Windows) or run: bash uninstall.sh (Linux). Only our own files are removed (dinput8.dll, the logs, our templates, our language files, Valve's steam_api.dll if this package installed it, and your settings file and its .bak copies if you say yes). Templates and translations you added yourself stay.
 
 
 SETTINGS (you can skip this)
@@ -74,5 +74,6 @@ Some mods (ASI loaders, widescreen fixes) also come as a dinput8.dll in the game
 LICENCES
 
 H5 Together is free software under the MIT licence: see LICENSE.txt in this folder. Dear ImGui (the panels) and the small parts it carries are under their own licences: see THIRD-PARTY-NOTICES.txt. The add-on is an unofficial fan project, not made or endorsed by Ubisoft.
+If this package has h5-together\steam_api.dll, that file is Valve's, from the Steamworks SDK (not ours, not under our licence: see THIRD-PARTY-NOTICES.txt). The installer puts it in the game's bin\h5-together folder, and the add-on only uses it for online play over Steam, which is off until you turn it on in Options.
 
 Project page, guides and bug reports: https://github.com/jozrcr/h5-together

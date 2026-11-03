@@ -152,10 +152,14 @@ def licence_checks(pkg, zip_path):
     check("stb_truetype" in text and "stb_rect_pack" in text and "stb_textedit" in text and "Sean Barrett" in text,
           "licence: the notices cover the stb files, by Sean Barrett")
     check("Tristan Grimmer" in text and "ProggyClean" in text, "licence: the notices cover the ProggyClean font built into Dear ImGui")
+    check("steam_api.dll" in text and "Valve Corporation" in text and "Steamworks SDK Access Agreement" in text
+          and "not covered by our MIT licence" in text,
+          "licence: the notices have a section for Valve's steam_api.dll (Steamworks SDK Access Agreement, not under our MIT licence)")
     check(b"@" not in raw and all(b < 0x80 for b in raw) and raw.count(b"\r\n") == raw.count(b"\n"),
           "licence: the notices are plain ASCII with CRLF line endings and no unreplaced placeholder")
     readme = (pkg / "README.txt").read_text(encoding="ascii")
     check("LICENSE.txt" in readme and "THIRD-PARTY-NOTICES.txt" in readme, "licence: README.txt tells where the licences are")
+    check("steam_api.dll" in readme and "Valve" in readme, "licence: README.txt says whose steam_api.dll is (when a package has it)")
     with zipfile.ZipFile(zip_path) as z:
         names = {i.filename.split("/", 1)[1] for i in z.infolist() if "/" in i.filename}
         check({"LICENSE.txt", "THIRD-PARTY-NOTICES.txt"} <= names, "licence: both are in the zip, next to README.txt")
@@ -301,6 +305,160 @@ def template_tests(who, pkg, game_bin, install, uninstall):
     # nothing installed: nothing to do, no error
     code, out = uninstall()
     check(code == 0 and "no random map templates" in out and tree(game_bin) == before, "templates: uninstall with nothing installed: no error, nothing changed", out)
+
+
+# ---------------------------------------------------------------- Valve's steam_api.dll
+
+# The real file never comes near the tests (it is not in the repo, and GitHub's build has
+# none): they use a tiny fake with the headers of a 32-bit Windows DLL.
+MAKE_PACKAGE = REPO / "tools" / "package" / "make_package.py"
+STEAM_API_LINE = "installed Valve's steam_api.dll in h5-together (online play over Steam, off until you turn it on in Options)"
+
+
+def fake_pe(machine=0x14C, characteristics=0x2102, note=b"a fake steam_api.dll for the tests"):
+    """A tiny file with the headers of a Windows DLL (machine 0x14c: 32-bit), and nothing
+    else: it cannot be loaded. characteristics 0x2102 says DLL, 0x0102 a program."""
+    mz = bytearray(0x40)
+    mz[0:2] = b"MZ"
+    mz[0x3C:0x40] = (0x40).to_bytes(4, "little")  # where the PE header starts
+    coff = machine.to_bytes(2, "little") + bytes(16) + characteristics.to_bytes(2, "little")
+    return bytes(mz) + b"PE\0\0" + coff + note
+
+
+def steam_api_package_checks(work, zip_path):
+    """make_package.py and Valve's steam_api.dll: --add-steam-api adds it to a zip built
+    already and changes nothing else, --steam-api builds the same zip, and both refuse a
+    file that is not a 32-bit DLL called steam_api.dll. Returns the unzipped package with
+    the fake file in it."""
+    print("\nValve's steam_api.dll in the package (a fake one)")
+    work = Path(work)
+    work.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(zip_path) as z:
+        old_infos = z.infolist()
+    top = old_infos[0].filename.split("/", 1)[0]
+    check(not any(i.filename.lower().endswith("steam_api.dll") for i in old_infos),
+          "steam_api: a package built without the option has none (GitHub's build)")
+    fake = work / "fake" / "steam_api.dll"
+    fake.parent.mkdir()
+    fake.write_bytes(fake_pe())
+    target = work / Path(zip_path).name
+    shutil.copyfile(zip_path, target)
+    original = target.read_bytes()
+
+    def add(zip_file, dll):
+        return run([sys.executable, str(MAKE_PACKAGE), "--add-steam-api", str(zip_file), str(dll)])
+
+    wrong = {"a file that is not a DLL": ("steam_api.dll", b"just some text", "not a Windows DLL"),
+             "a 64-bit DLL": ("steam_api.dll", fake_pe(machine=0x8664), "not a 32-bit DLL"),
+             "steam_api64.dll": ("steam_api64.dll", fake_pe(), "must be called steam_api.dll"),
+             "a program": ("steam_api.dll", fake_pe(characteristics=0x0102), "a program, not a DLL")}
+    for i, (label, (name, data, says)) in enumerate(wrong.items()):
+        f = work / "wrong" / str(i) / name
+        f.parent.mkdir(parents=True)
+        f.write_bytes(data)
+        code, out = add(target, f)
+        check(code != 0 and says in out and target.read_bytes() == original,
+              f"steam_api: --add-steam-api refuses {label} and leaves the zip as it was", out)
+
+    code, out = add(target, fake)
+    new = target.read_bytes()
+    check(code == 0 and new != original, "steam_api: --add-steam-api adds the file: exit 0", out)
+    check(f"sha256 {hashlib.sha256(new).hexdigest()}" in out, "steam_api: it prints the new zip's SHA-256", out)
+    name = f"{top}/h5-together/steam_api.dll"
+    with zipfile.ZipFile(target) as z:
+        infos = z.infolist()
+        added = z.read(name) if name in z.namelist() else b""
+        old_data_ok = z.testzip() is None
+    fields = lambda i: (i.filename, i.CRC, i.compress_size, i.file_size, i.header_offset, i.date_time, i.external_attr)
+    check([i.filename for i in infos] == [i.filename for i in old_infos] + [name],
+          "steam_api: the zip holds the same files in the same order, then <top folder>/h5-together/steam_api.dll",
+          str([i.filename for i in infos][-3:]))
+    check(old_data_ok and [fields(i) for i in infos[:-1]] == [fields(i) for i in old_infos]
+          and new[:infos[-1].header_offset] == original[:infos[-1].header_offset],
+          "steam_api: every other file of the zip is byte for byte as it was (headers and compressed data)")
+    check(added == fake.read_bytes() and ((infos[-1].external_attr >> 16) & 0o777) == 0o644
+          and infos[-1].date_time == old_infos[0].date_time,
+          "steam_api: the added file is the DLL given, byte for byte, a plain file (644) with the package's date")
+
+    code, out = add(target, fake)
+    check(code == 0 and "nothing to do" in out and target.read_bytes() == new, "steam_api: adding the same file again changes nothing", out)
+    other = work / "other" / "steam_api.dll"
+    other.parent.mkdir()
+    other.write_bytes(fake_pe(note=b"another version"))
+    code, out = add(target, other)
+    check(code != 0 and "already holds another" in out and target.read_bytes() == new,
+          "steam_api: adding a different steam_api.dll to a zip that has one is refused", out)
+    stray = work / "stray.zip"
+    with zipfile.ZipFile(stray, "w") as z:
+        z.writestr("readme.txt", "not our package")
+    code, out = add(stray, fake)
+    check(code != 0 and "not an H5 Together package" in out, "steam_api: a zip that is not our package is refused", out)
+
+    # --steam-api while building gives the same zip as a build and then --add-steam-api (same date)
+    env = dict(os.environ, SOURCE_DATE_EPOCH="1762200000")
+    build = [sys.executable, str(MAKE_PACKAGE), "--version", "0.0.0-steamtest"]
+    code1, out1 = run(build + ["--out-dir", str(work / "built with"), "--steam-api", str(fake)], env=env)
+    code2, out2 = run(build + ["--out-dir", str(work / "built then added")], env=env)
+    z1 = work / "built with" / "h5-together-0.0.0-steamtest.zip"
+    z2 = work / "built then added" / "h5-together-0.0.0-steamtest.zip"
+    code3, out3 = add(z2, fake)
+    check(code1 == 0 and code2 == 0 and code3 == 0 and z1.read_bytes() == z2.read_bytes(),
+          "steam_api: make_package.py --steam-api builds byte for byte the zip that a build and then --add-steam-api make",
+          out1 + out2 + out3)
+    code, out = run(build + ["--out-dir", str(work / "not built"), "--steam-api", str(work / "wrong" / "1" / "steam_api.dll")], env=env)
+    check(code != 0 and "not a 32-bit DLL" in out and not (work / "not built").exists(),
+          "steam_api: --steam-api refuses a 64-bit DLL and builds nothing", out)
+
+    with zipfile.ZipFile(target) as z:
+        z.extractall(work / "package")
+    return work / "package" / top
+
+
+def steam_api_tests(who, pkg, pkg_steam, game_bin, install, uninstall):
+    """Valve's steam_api.dll in a fake game folder. install(p) and uninstall(p) run the
+    scripts of the unzipped package p for game_bin (the uninstaller deletes the settings).
+    pkg has no steam_api.dll (GitHub's build), pkg_steam has the fake one."""
+    print(f"\nValve's steam_api.dll ({who})")
+    fake = (pkg_steam / "h5-together" / "steam_api.dll").read_bytes()
+    ours = game_bin / "h5-together"
+    dst = ours / "steam_api.dll"
+    before = tree(game_bin)
+
+    code, out = install(pkg)
+    check(code == 0 and not dst.exists() and "steam_api" not in out,
+          "steam_api: a package without it installs none and says nothing about it", out)
+    code, out = uninstall(pkg)
+    check(code == 0 and "steam_api" not in out and tree(game_bin) == before,
+          "steam_api: its uninstall says nothing about it either, and leaves the game folder as it was", out)
+
+    code, out = install(pkg_steam)
+    check(code == 0 and dst.is_file() and dst.read_bytes() == fake,
+          "steam_api: install copies it to bin/h5-together/steam_api.dll, byte for byte", out)
+    check(out.count("steam_api") == 1 and STEAM_API_LINE in out, "steam_api: install says so in one line", out)
+    dst.write_bytes(b"an older steam_api.dll")
+    code, out = install(pkg_steam)
+    check(code == 0 and dst.read_bytes() == fake, "steam_api: a reinstall overwrites another copy in bin/h5-together", out)
+
+    code, out = uninstall(pkg)
+    check(code == 0 and dst.read_bytes() == fake and "steam_api" not in out
+          and sorted(p.name for p in ours.iterdir()) == ["steam_api.dll"],
+          "steam_api: an uninstall from a package without it leaves it alone (and the folder h5-together with it)", out)
+
+    install(pkg_steam)
+    code, out = uninstall(pkg_steam)
+    check(code == 0 and not dst.exists() and "removed steam_api.dll" in out,
+          "steam_api: an uninstall from the package with it removes the same file", out)
+    check(not ours.exists() and tree(game_bin) == before,
+          "steam_api: then the empty h5-together folder goes too: the game folder is as it was")
+
+    install(pkg_steam)
+    dst.write_bytes(b"another steam_api.dll, put there by hand")
+    code, out = uninstall(pkg_steam)
+    check(code == 0 and dst.read_bytes() == b"another steam_api.dll, put there by hand" and "kept h5-together" in out
+          and "not the copy this package installs" in out and sorted(p.name for p in ours.iterdir()) == ["steam_api.dll"],
+          "steam_api: an uninstall keeps a steam_api.dll that differs from the package's, and says so", out)
+    dst.unlink()
+    ours.rmdir()
 
 
 # ---------------------------------------------------------------- the settings file
@@ -1251,7 +1409,7 @@ def bug_report_windows_extra(pkg, work, run_report):
 
 # ---------------------------------------------------------------- Windows
 
-def windows_tests(pkg, work):
+def windows_tests(pkg, work, pkg_steam):
     print("\nWindows scripts (install.bat / uninstall.bat)")
     work.mkdir(parents=True, exist_ok=True)
     steam_only = work / "steam_only"          # Steam folder, game in a second library with accents
@@ -1444,6 +1602,13 @@ def windows_tests(pkg, work):
                 lambda: install("-GameDir", str(txt_bin)),
                 lambda: uninstall("-GameDir", str(txt_bin), stdin="y\n"))
 
+    # Valve's steam_api.dll: from a package that has it (a fake one), and from one that has not
+    if pkg_steam:
+        steam_bin = make_game(work / "valve dll lib")  # (no "steam_api" in the path: the tests look for that word)
+        steam_api_tests("Windows", pkg, pkg_steam, steam_bin,
+                        lambda p: run(bat(str(p / "install.bat"), "-NoPause", "-TestRegistry", no_registry, "-GameDir", str(steam_bin))),
+                        lambda p: run(bat(str(p / "uninstall.bat"), "-NoPause", "-TestRegistry", no_registry, "-GameDir", str(steam_bin)), "y\n"))
+
     # a package without its templates folder is incomplete: exit 7, nothing installed
     no_tpl = work / "pkg without templates"
     shutil.copytree(pkg, no_tpl, ignore=shutil.ignore_patterns("h5-together"))
@@ -1482,7 +1647,7 @@ def posix(p):
     return Path(p).as_posix()
 
 
-def linux_tests(pkg, work, bash):
+def linux_tests(pkg, work, bash, pkg_steam):
     print(f"\nLinux scripts (install.sh / uninstall.sh) with {bash}")
     work.mkdir(parents=True, exist_ok=True)
     # what the scripts see as the running programs: an empty folder (so a real game on this PC does not matter)
@@ -1645,6 +1810,24 @@ def linux_tests(pkg, work, bash):
                 lambda: sh("install.sh", "--game-dir", posix(txt_bin)),
                 lambda: sh("uninstall.sh", "--game-dir", posix(txt_bin), stdin="y\n"))
 
+    # Valve's steam_api.dll: from a package that has it (a fake one), and from one that has not
+    if pkg_steam:
+        steam_bin = make_game(work / "valve_dll_lib")  # (no "steam_api" in the path: the tests look for that word)
+        steam_api_tests("Linux", pkg, pkg_steam, steam_bin,
+                        lambda p: run([bash, str(p / "install.sh"), "--game-dir", posix(steam_bin)], "", env=env),
+                        lambda p: run([bash, str(p / "uninstall.sh"), "--game-dir", posix(steam_bin)], "y\n", env=env))
+        # a copy under another spelling (Wine finds H5-Together/Steam_API.dll too) is overwritten, not doubled
+        ci_steam = make_game(work / "valve_dll_ci_lib")
+        (ci_steam / "H5-Together").mkdir()
+        (ci_steam / "H5-Together" / "Steam_API.dll").write_bytes(b"an older copy, another spelling")
+        code, out = run([bash, str(pkg_steam / "install.sh"), "--game-dir", posix(ci_steam)], "", env=env)
+        check(code == 0 and sorted(p.name for p in (ci_steam / "H5-Together").iterdir()) == ["Steam_API.dll", "templates", "texts"]
+              and (ci_steam / "H5-Together" / "Steam_API.dll").read_bytes() == (pkg_steam / "h5-together" / "steam_api.dll").read_bytes(),
+              "steam_api: a copy under another spelling (H5-Together/Steam_API.dll) is overwritten, not doubled", out)
+        code, out = run([bash, str(pkg_steam / "uninstall.sh"), "--game-dir", posix(ci_steam)], "y\n", env=env)
+        check(code == 0 and "removed steam_api.dll" in out and not (ci_steam / "H5-Together").exists(),
+              "steam_api: the uninstaller removes it under that spelling too, then the empty folder", out)
+
     # a package without its templates folder is incomplete: exit 7, nothing installed
     no_tpl = work / "pkg_without_templates"
     shutil.copytree(pkg, no_tpl, ignore=shutil.ignore_patterns("h5-together"))
@@ -1744,10 +1927,13 @@ def main():
     texts_package_checks(pkg, out_dir / "h5-together-0.0.0-test.zip")
     licence_checks(pkg, out_dir / "h5-together-0.0.0-test.zip")
     bug_report_package_checks(pkg, out_dir / "h5-together-0.0.0-test.zip")
+    pkg_steam = steam_api_package_checks(work / "valve dll", out_dir / "h5-together-0.0.0-test.zip")
+    if not (pkg_steam / "h5-together" / "steam_api.dll").is_file():
+        pkg_steam = None  # (a check above failed; the script tests with it are skipped)
 
     win = lin = None
     if os.name == "nt" and args.only != "linux":
-        win = windows_tests(pkg, work / "win")
+        win = windows_tests(pkg, work / "win", pkg_steam)
     else:
         print("\n(skipping the Windows script tests: " + ("--only linux" if args.only == "linux" else "not on Windows") + ")")
 
@@ -1758,7 +1944,7 @@ def main():
         bash = None  # that is WSL's launcher
     if bash:
         (work / "lin").mkdir(exist_ok=True)
-        lin = linux_tests(pkg, work / "lin", bash)
+        lin = linux_tests(pkg, work / "lin", bash, pkg_steam)
     else:
         print("\n(skipping the Linux script tests: no bash; pass --bash)")
 

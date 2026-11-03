@@ -2,9 +2,10 @@ H5 Together: third-party notices
 
 H5 Together itself is under the MIT licence (see LICENSE.txt in this folder).
 
-dinput8.dll also contains the code and data below, which belong to other people and
-come under their own licences. Their notices must go along with copies of it, so here
-they are. H5 Together contains no other third-party code. The game's own files, and
+dinput8.dll also contains the code and data in sections 1 to 3 below, which belong to
+other people and come under their own licences. Their notices must go along with copies
+of it, so here they are. H5 Together contains no other third-party code. Section 4 is
+about a separate file of Valve's that some packages carry. The game's own files, and
 MMH5.5's, are not in this package: the add-on only reads the ones on your PC.
 
 
@@ -71,3 +72,17 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+
+================================================================================
+4. steam_api.dll, by Valve Corporation  (online play over Steam)
+   https://partner.steamgames.com/
+   Only in packages that have the file h5-together\steam_api.dll.
+================================================================================
+
+When present, h5-together\steam_api.dll is Valve Corporation's file from the
+Steamworks SDK, unchanged. Copyright Valve Corporation. It is redistributed under
+the Steamworks SDK Access Agreement
+(https://partner.steamgames.com/documentation/sdk_access_agreement). It is not part
+of H5 Together and not covered by our MIT licence. H5 Together uses it only when
+you turn on online play over Steam (Options, H5 Together, Online play).
