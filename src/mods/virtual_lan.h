@@ -44,5 +44,11 @@ bool OnlineInvite(uint64_t friend_id);
 int OnlineOverlayOpened();
 // ui_test: a made-up invite, as if from Steam (the robot's "panel|online test_invite").
 void OnlineTestInvite();
+// The auto-join after an invite (online_ui.cpp): the fake address a host's game is
+// at for our game (the one the LAN list shows it from); false while not known. Also
+// with mode=loopback (the robot's two copies).
+bool OnlineHostAddress(uint64_t host, uint32_t *address);
+// The first known host that is not us (0: none). For the robot's "test_autojoin".
+uint64_t OnlineFirstHost();
 
 }  // namespace mods

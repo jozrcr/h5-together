@@ -160,6 +160,19 @@ void TestLines(texts::Book &en)
 	v.name[0] = 0;
 	Check(InviteText(v, &Words) == "A friend invites you to play: open Multiplayer > LAN.", "banner: +connect_lobby (nobody known)",
 	      InviteText(v, &Words));
+
+	// the auto-join's line on the LAN screen
+	Check(JoinLine(JoinState::kNone, "Lucas", &Words).text.empty(), "auto-join: no line when there is none");
+	const Line wait = JoinLine(JoinState::kWaiting, "Lucas", &Words), join = JoinLine(JoinState::kJoining, "", &Words);
+	const Line none = JoinLine(JoinState::kNoRow, "Lucas", &Words), failed = JoinLine(JoinState::kFailed, "Lucas", &Words);
+	Check(wait.tone == Tone::kGood && wait.text.find("Lucas invites you: waiting for their game") == 0 &&
+	          join.tone == Tone::kGood && join.text == "A friend invites you: joining their game...",
+	      "auto-join: waiting and joining lines (a friend without a name)", wait.text + " / " + join.text);
+	Check(none.tone == Tone::kWarn && none.text.find("Lucas invites you, but their game did not show") == 0 && failed.tone == Tone::kWarn &&
+	          failed.text.find("press Join again") != std::string::npos,
+	      "auto-join: the two failures are warnings that say what to do", none.text + " / " + failed.text);
+	Invite made = TestInvite();
+	Check(made.made_up && !made.host && !made.lobby, "auto-join: ui_test's made-up invite is marked (no auto-join for it)");
 }
 
 void TestNames()
@@ -278,6 +291,9 @@ void TestWords(const std::string &dir)
 	CopyName("Lucas", v.name, kNameSize);
 	Check(InviteText(v, &Words) == "Lucas vous invite \xc3\xa0 jouer : ouvrez Multijoueur > R\xc3\xa9seau local.",
 	      "words: French banner, with the game's own menu names", InviteText(v, &Words));
+	Check(JoinLine(JoinState::kJoining, "", &Words).text == "Un ami vous invite : connexion \xc3\xa0 sa partie..." &&
+	          JoinLine(JoinState::kNoRow, "Lucas", &Words).text.find("Rejoindre") != std::string::npos,
+	      "words: French auto-join lines, with the game's own button name (Rejoindre)");
 }
 
 }  // namespace

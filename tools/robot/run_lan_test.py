@@ -47,6 +47,7 @@ def instance_args(args, name, steps):
         others = ""
         online = ["mode=loopback", "loopback_port=%d" % VLAN_PORTS[name],
                   "loopback_peers=" + ",".join(str(p) for n, p in VLAN_PORTS.items() if n != name)]
+        online += args.host_online if name == "host" else args.client_online
     return argparse.Namespace(
         map=args.map, difficulty="1", no_map=True, command=None,
         # mp_check_crc: without it the game computes no world checksums at all
@@ -206,6 +207,14 @@ def main():
     p.add_argument("--client-setting", action="append", default=[], metavar="SECTION.KEY=VALUE", help="the same, client only")
     p.add_argument("--host-step", action="append", default=[], help="extra host script step (see run_ai_test.py)")
     p.add_argument("--client-step", action="append", default=[], help="extra client script step")
+    p.add_argument("--host-online", action="append", default=[], metavar="KEY=VALUE",
+                   help="with --vlan: another [online] setting for the host (e.g. test_drop_join=1)")
+    p.add_argument("--client-online", action="append", default=[], metavar="KEY=VALUE",
+                   help="with --vlan: another [online] setting for the client (e.g. test_drop_join=1: its join is lost, "
+                        "the game's timeout box)")
+    p.add_argument("--client-autojoin", type=int, default=0, metavar="SECONDS",
+                   help="with --vlan: at that time the client gets an 'invite' to the host's game on the main menu, and "
+                        "the online UI's auto-join opens the LAN screen and joins (instead of the robot's own clicks)")
     p.add_argument("--texts-dir", help="language files for bin/h5-together/texts (default src/mods/texts), as run_ai_test.py")
     args = p.parse_args()
 
@@ -240,6 +249,11 @@ def main():
         "%d|arrow|1 ready" % args.client_ready_at,
         "%d|shot|client-started" % (args.start_at + 12),
     ] + args.client_step
+    if args.client_autojoin:
+        # the online UI's auto-join instead of the robot's own clicks: an "invite" to the host's
+        # game while the client is on the main menu (src/mods/online_join.cpp; needs --vlan)
+        client_steps = ["%d|panel|online test_autojoin" % args.client_autojoin] + \
+            [s for s in client_steps if s not in ("10|menu|multi lan", "26|game|0", "27|ui|NUI::CLobbyScreen join")]
 
     robot.install_dll(game, texts=args.texts_dir)
     copies = [("host", PORTS["host"][0], host_steps), ("client", PORTS["client"][0], client_steps)]

@@ -86,6 +86,8 @@ bool g_steam_wanted = false;  // [online] mode=steam
 bool g_no_hooks = false;      // ... but the game's network imports were not found
 int g_boot = 0;               // Steam's start: 0 not yet, 1 done, -1 failed
 bool g_ui_test = false;       // [online] ui_test=1: made-up friends, for robot screenshots
+bool g_test_drop_join = false;  // [online] test_drop_join=1: our join requests (01) are lost (the game's timeout box)
+bool g_said_drop_join = false;
 std::vector<online::Friend> g_test_friends;
 online::Invite g_test_invite;
 uint32_t g_test_invites = 0;
@@ -327,6 +329,13 @@ int WINAPI VlanSendTo(SOCKET s, const char *buf, int len, int flags, const socka
 			break;
 		case vlan::Route::kToPeer: {
 			uint64_t id = 0;
+			if (g_test_drop_join && size && packet[0] == 0x01) {  // test: the join request is lost (the game's timeout box)
+				if (!g_said_drop_join) {
+					g_said_drop_join = true;
+					hooklog::Write("vlan: test: our game's join request dropped ([online] test_drop_join=1)");
+				}
+				break;
+			}
 			if (g_peers.IdOf(destination, &id)) {
 				if (!vlan::IsQuery(packet, size)) {
 					LockSelf("our game's first packet to a peer");  // (before it goes: its header holds the address)
@@ -511,6 +520,7 @@ void InstallVirtualLan()
 	InitializeCriticalSection(&g_lock);
 	g_steam_wanted = mode == vlan::Mode::kSteam;
 	g_ui_test = g_steam_wanted && GetPrivateProfileIntW(L"online", L"ui_test", 0, path) != 0;
+	g_test_drop_join = GetPrivateProfileIntW(L"online", L"test_drop_join", 0, path) != 0;
 	if (g_ui_test)
 		hooklog::Write("vlan: [online] ui_test=1: the online UI shows made-up friends (for screenshots); no invite to them is sent");
 	if (mode == vlan::Mode::kSteam) {
@@ -706,6 +716,38 @@ int OnlineOverlayOpened()
 	const int n = g_boot > 0 ? g_transport->OverlayOpened() : 0;
 	LeaveCriticalSection(&g_lock);
 	return n;
+}
+
+bool OnlineHostAddress(uint64_t host, uint32_t *address)
+{
+	if (!g_on || !g_transport || !host)
+		return false;
+	EnterCriticalSection(&g_lock);
+	bool found = g_peers.Count() != 0 && host != g_peers.SelfId() && g_peers.Find(host, address);
+	if (!found) {  // not heard from yet: the address its lobby declares
+		const vlan::KnownHosts &hosts = g_transport->Hosts();
+		int at = -1;
+		if (hosts.Has(host, &at) && hosts.At(at).address) {
+			*address = hosts.At(at).address;
+			found = true;
+		}
+	}
+	LeaveCriticalSection(&g_lock);
+	return found;
+}
+
+uint64_t OnlineFirstHost()
+{
+	if (!g_on || !g_transport)
+		return 0;
+	EnterCriticalSection(&g_lock);
+	uint64_t id = 0;
+	const vlan::KnownHosts &hosts = g_transport->Hosts();
+	for (int i = 0; i < hosts.Count() && !id; ++i)
+		if (hosts.At(i).id != g_peers.SelfId())
+			id = hosts.At(i).id;
+	LeaveCriticalSection(&g_lock);
+	return id;
 }
 
 void OnlineTestInvite()

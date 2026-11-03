@@ -1004,6 +1004,8 @@ private:
 			memcpy(v.name, e.name, sizeof(v.name));
 			v.visible = e.check == HostCheck::kOk && hosts_.Has(e.info.host);
 			v.cannot = e.check == HostCheck::kOtherGame || e.check == HostCheck::kOtherProtocol;
+			v.lobby = e.lobby;
+			v.host = e.check == HostCheck::kOk ? e.info.host : 0;
 		}
 		s.invite_serial = invite_serial_;
 		s.own_lobby = OwnLobby();

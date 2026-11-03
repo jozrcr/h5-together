@@ -55,6 +55,9 @@ struct Invite {
 	char name[kNameSize];  // who invited ("" = not known: "+connect_lobby", or not through a friend)
 	bool visible;          // the host's game is known now: it shows in the game's LAN list
 	bool cannot;           // the host's game cannot be joined (another game or protocol)
+	uint64_t lobby;        // the invite's Steam lobby (for the auto-join; never shown)
+	uint64_t host;         // its host's SteamID once the lobby's data came (0: not yet)
+	bool made_up;          // ui_test's made-up invite: no auto-join
 };
 
 struct Status {
@@ -96,6 +99,17 @@ std::vector<Line> StatusLines(const Status &s, GetText get, const char *ours);
 // The words of an invite for the banner and the Windows pop-up ("Pierre invites you
 // to play: open Multiplayer > LAN.").
 std::string InviteText(const Invite &invite, GetText get);
+
+// The auto-join after an invite (online_join.cpp), as the LAN screen tells it.
+enum class JoinState {
+	kNone,
+	kWaiting,  // the LAN screen is open: waiting for the host's game in the list
+	kJoining,  // the host's game was chosen and Join pressed
+	kNoRow,    // the host's game did not show in the list in time
+	kFailed,   // Join did not lead to the waiting room (a message box, or too long)
+};
+// Its line (kNone: an empty text). `name`: the inviting friend ("" = "A friend").
+Line JoinLine(JoinState state, const char *name, GetText get);
 // A Steam name for the screen: control characters out, at most kNameSize - 1 bytes,
 // never cut inside a UTF-8 letter.
 void CopyName(const char *from, char *out, size_t size);

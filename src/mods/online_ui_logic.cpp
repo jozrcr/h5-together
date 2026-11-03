@@ -150,6 +150,17 @@ std::string InviteText(const Invite &invite, GetText get)
 	return Fill(get, "online.banner", {{"player", Who(invite.name, get)}});
 }
 
+Line JoinLine(JoinState state, const char *name, GetText get)
+{
+	switch (state) {
+	case JoinState::kWaiting: return {Fill(get, "online.join.waiting", {{"player", Who(name, get)}}), Tone::kGood};
+	case JoinState::kJoining: return {Fill(get, "online.join.joining", {{"player", Who(name, get)}}), Tone::kGood};
+	case JoinState::kNoRow: return {Fill(get, "online.join.no_row", {{"player", Who(name, get)}}), Tone::kWarn};
+	case JoinState::kFailed: return {Fill(get, "online.join.failed", {{"player", Who(name, get)}}), Tone::kWarn};
+	default: return {std::string(), Tone::kBody};
+	}
+}
+
 bool KeepFriend(int persona)
 {
 	return persona >= 1 && persona <= 6;
@@ -254,6 +265,7 @@ Invite TestInvite()
 {
 	Invite v = {};
 	SetName(v.name, "Lucas");
+	v.made_up = true;
 	return v;
 }
 

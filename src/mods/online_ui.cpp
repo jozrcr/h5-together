@@ -43,6 +43,7 @@
 #include <vector>
 
 #include "notify.h"
+#include "online_join.h"
 #include "online_ui_logic.h"
 #include "rmg_builder_widgets.h"
 #include "virtual_lan.h"
@@ -123,6 +124,21 @@ uint64_t g_pick = 0;  // a row's button was clicked: invite after the frame
 bool g_close = false;
 bool g_logged_lines = false;
 std::string g_told_lines;
+// a game message box or dialog is open over the screen; the auto-join's line
+bool g_boxed = false;
+online::JoinState g_join_shown = online::JoinState::kNone;
+std::string g_join_name;
+
+// Is a game message box or dialog open over the screen? Two kinds (robot runs of
+// 2026-11-03): dialogs that are screens of their own, on top of the list (the exit
+// question NUI::CExitGameQuestionScreen, the LAN screen's name box NUI::CSimpleEditBox:
+// then the screen on top is not ours, and nothing of ours shows anyway), and the
+// common message boxes, which are not in the screen list at all (the LAN screen's
+// "Timeout..." error: TopScreen still says NUI::CLobbyScreen): those the box watch sees.
+bool Boxed()
+{
+	return autojoin::GameBoxOpen();
+}
 
 const char *Get(const char *key)
 {
@@ -189,6 +205,12 @@ void RobotCommand(const char *text)
 		ClosePicker("robot");
 	else if (strcmp(text, "test_invite") == 0)
 		OnlineTestInvite();
+	else if (strcmp(text, "test_autojoin") == 0) {
+		// as an invite to the first host this PC hears of (the robot's two copies: the host)
+		autojoin::Start(0, 0, "", "robot: an invite to the first host this PC hears of");
+	}
+	else if (strcmp(text, "games") == 0)
+		autojoin::LogGames();
 	else if (strncmp(text, "pick ", 5) == 0) {
 		const int row = atoi(text + 5);
 		if (!g_status.test)
@@ -222,6 +244,22 @@ void ButtonInput()
 }
 
 // --- the overlay client ------------------------------------------------------------------------------
+// The game's screens changed: the log says which (research and diagnosis: which
+// screen a message box is).
+void LogScreens()
+{
+	static std::string told;
+	char names[16][96];
+	const int n = overlay::ScreenNames(names, 16);
+	std::string all;
+	for (int i = 0; i < n; ++i)
+		all += std::string(i ? " > " : "") + names[i];
+	if (all == told)
+		return;
+	told = all;
+	hooklog::Write("online: the game's screens: %s", all.empty() ? "(none)" : all.c_str());
+}
+
 bool Wanted()
 {
 	g_top[0] = 0;
@@ -230,23 +268,42 @@ bool Wanted()
 	char command[128];
 	if (robot::TakePanelCommand(command, sizeof(command), "online "))
 		RobotCommand(command);
-	if (g_status.state == online::State::kOff) {
-		g_button_shown = false;
-		return false;
-	}
-	NotifyGameInFront();
+	const bool steam = g_status.state != online::State::kOff;  // (else mode=loopback: the auto-join only)
 	const DWORD now = GetTickCount();
+	LogScreens();
+	g_boxed = Boxed();
 	g_lan = strcmp(g_top, kLobbyScreen) == 0;
 	g_wait = strcmp(g_top, kWaitScreen) == 0;
 	g_menu = strcmp(g_top, kMainMenu) == 0;
-	// a new invite: the main menu's banner
-	if (g_status.invite_serial != g_seen_serial) {
-		g_seen_serial = g_status.invite_serial;
-		if (g_status.invite_count > 0) {
-			g_banner = online::InviteText(g_status.invites[0], &Get);
-			g_banner_until = now + kBannerMs;
-			hooklog::Write("online: an invite: the main menu's banner for %u s", kBannerMs / 1000);
+	if (steam) {
+		NotifyGameInFront();
+		// a new invite: the main menu's banner, and the auto-join
+		if (g_status.invite_serial != g_seen_serial) {
+			g_seen_serial = g_status.invite_serial;
+			if (g_status.invite_count > 0) {
+				const online::Invite &v = g_status.invites[0];
+				g_banner = online::InviteText(v, &Get);
+				g_banner_until = now + kBannerMs;
+				hooklog::Write("online: an invite: the main menu's banner for %u s", kBannerMs / 1000);
+				if (!v.made_up && !v.cannot)
+					autojoin::Start(v.lobby, v.host, v.name, "a Steam invite");
+			}
 		}
+		for (int i = 0; i < g_status.invite_count; ++i)
+			autojoin::Update(g_status.invites[i].lobby, g_status.invites[i].host);
+	}
+	autojoin::Frame(g_top, g_boxed);
+	std::string who;
+	g_join_shown = g_lan && !g_boxed ? autojoin::State(&who) : online::JoinState::kNone;
+	g_join_name = who;
+	if (!steam) {
+		g_button_shown = false;
+		return g_join_shown != online::JoinState::kNone;  // (loopback: only the auto-join's line)
+	}
+	if (g_boxed && !overlay::ModalOpen(kName)) {  // a game message box over the screen: nothing of ours over it
+		g_button_shown = false;
+		g_button_down = false;
+		return false;
 	}
 	// Steam's dialog did not open: our own list instead
 	if (g_dialog_at && now - g_dialog_at >= kDialogWaitMs) {
@@ -346,7 +403,11 @@ ImU32 ColourOf(online::Tone tone)
 void DrawStatus(const overlay::Frame &frame)
 {
 	const float k = frame.height / kRefH;
-	const std::vector<online::Line> lines = online::StatusLines(g_status, &Get, OPEN_HOMM5_VERSION);
+	std::vector<online::Line> lines = online::StatusLines(g_status, &Get, OPEN_HOMM5_VERSION);
+	if (g_join_shown != online::JoinState::kNone) {  // the auto-join, first after the title
+		const online::Line join = online::JoinLine(g_join_shown, g_join_name.c_str(), &Get);
+		lines.insert(lines.empty() ? lines.end() : lines.begin() + 1, join);
+	}
 	ImDrawList *draw = ImGui::GetBackgroundDrawList();  // (over the game, under any panel of ours)
 	const ImVec2 at = ScreenAt(kStatusX, kStatusY, frame.width, frame.height);
 	const float width = kStatusW * k, bottom = kStatusBottom * k;
@@ -530,7 +591,7 @@ void Draw(const overlay::Frame &frame)
 		DrawPicker(frame);
 		return;
 	}
-	if (g_lan)
+	if (g_lan && !g_boxed)
 		DrawStatus(frame);
 	if (g_button_shown)
 		DrawButton(frame);
@@ -547,29 +608,42 @@ void OnInvite(const online::Invite &invite)
 
 }  // namespace
 
-void InstallOnlineUiEarly()
+namespace {
+
+vlan::Mode ModeSetting()
 {
 	wchar_t path[MAX_PATH], mode[32];
 	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
 	GetPrivateProfileStringW(L"online", L"mode", L"off", mode, 32, path);
-	if (vlan::ParseMode(mode) == vlan::Mode::kSteam)
+	return vlan::ParseMode(mode);
+}
+
+}  // namespace
+
+void InstallOnlineUiEarly()
+{
+	if (ModeSetting() != vlan::Mode::kOff)
 		overlay::InstallEarly();  // (an overlay client: the Direct3D import before the game's device)
 }
 
 void ApplyOnlineUiFromSettings()
 {
-	online::Status s;
-	OnlineStatus(&s);
-	if (s.state == online::State::kOff)
-		return;  // [online] mode is not steam: nothing to show
-	vlan::SetSteamInviteHandler(&OnInvite);
+	// mode=steam: everything; mode=loopback (the robot's two copies): only the auto-join, for its tests
+	const vlan::Mode mode = ModeSetting();
+	if (mode == vlan::Mode::kOff || (mode == vlan::Mode::kLoopback && !VirtualLanOn()))
+		return;  // (steam without Steam: the LAN screen says why)
+	if (mode == vlan::Mode::kSteam)
+		vlan::SetSteamInviteHandler(&OnInvite);
+	const bool join = autojoin::Install();
+	autojoin::InstallBoxWatch();
 	const overlay::Client client = {kName, &Wanted, &Prepare, &Draw};
 	if (!overlay::AddClient(client)) {
 		hooklog::Write("online: no overlay in this game: no Steam lines on the LAN screen, no Invite friends... button");
 		return;
 	}
 	overlay::EnableModalInput();
-	hooklog::Write("online: the online UI is on: Steam's lines on the LAN screen, Invite friends... in the waiting room");
+	hooklog::Write("online: the online UI is on: Steam's lines on the LAN screen, Invite friends... in the waiting room%s",
+	               join ? "; an invite joins its game by itself" : "");
 }
 
 }  // namespace mods

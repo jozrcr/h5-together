@@ -264,6 +264,7 @@ const Setting kSettings[] = {
 	HIDDEN("online", "loopback_port", "47100", kInt, 1, 65535),  // the virtual LAN's robot tests
 	HIDDEN("online", "loopback_peers", "", kText, 0, 0),
 	HIDDEN("online", "ui_test", "0", kBool, 0, 1),  // the online UI with made-up friends (robot screenshots)
+	HIDDEN("online", "test_drop_join", "0", kBool, 0, 1),  // the virtual LAN loses our join requests (the game's timeout box)
 };
 
 #undef ROW
