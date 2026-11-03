@@ -793,9 +793,10 @@ private:
 		for (int i = 0; i < count; ++i) {
 			if (i && i % kScanYieldEvery == 0) {
 				// Let the game's sends and reads in: under Proton a whole scan held the
-				// lock 17 ms on average (27 at most), and they waited for it.
+				// lock 17 ms on average (27 at most), and they waited for it. A real
+				// sleep: with SwitchToThread this thread took the lock back at once.
 				LeaveCriticalSection(lock_);
-				SwitchToThread();
+				Sleep(1);
 				EnterCriticalSection(lock_);
 			}
 			const uint64_t id = s_.api.friend_by_index(s_.friends, i, kFriendFlagImmediate);

@@ -14,9 +14,9 @@
 // move with the game's timings, 0.6 s with the timings below.
 //
 // What this mod changes, on this PC:
-//   keepalive_ms       an idle link sends (and so acknowledges) every 50 ms
+//   keepalive_ms       an idle link sends (and so acknowledges) every 10 ms
 //                      instead of every 1000 ms;
-//   send_interval_ms   a link may send a packet every 10 ms instead of 50 ms;
+//   send_interval_ms   a link may send a packet every 2 ms instead of 50 ms;
 //   batched_segments   a PC with nothing to say reports each finished command
 //                      segment at once (0) instead of holding the reports back
 //                      and sending them in batches (the game's
@@ -118,8 +118,11 @@ void ApplyNetTuningFromSettings()
 		hooklog::Write("net tuning: off (h5-together.ini)");
 		return;
 	}
-	ApplyNetTuning(GetPrivateProfileIntW(L"net", L"keepalive_ms", 50, path),
-	               GetPrivateProfileIntW(L"net", L"send_interval_ms", 10, path),
+	// 10 and 2 since the two-PC Steam tests of 2026-11-04 (50 and 10 before): with 10 ms
+	// the AI's big commands filled the host's link and its segment reports waited behind
+	// them up to 2.4 s (docs/plans/online-steam-test2.md, run 3).
+	ApplyNetTuning(GetPrivateProfileIntW(L"net", L"keepalive_ms", 10, path),
+	               GetPrivateProfileIntW(L"net", L"send_interval_ms", 2, path),
 	               static_cast<int>(GetPrivateProfileIntW(L"net", L"batched_segments", 0, path)));
 }
 

@@ -24,8 +24,8 @@ The mod changes three network timings on the PC that runs it:
 
 | Setting | Game | Mod |
 |---|---|---|
-| `keepalive_ms`: how often an idle link sends (and so acknowledges) | 1000 | 50 |
-| `send_interval_ms`: how often a link may send a packet | 50 | 10 |
+| `keepalive_ms`: how often an idle link sends (and so acknowledges) | 1000 | 10 |
+| `send_interval_ms`: how often a link may send a packet | 50 | 2 |
 | `batched_segments`: how many "segment done" reports an idle PC holds back | 3 | 0 |
 
 Game commands still run in the same order on every PC; only the network gets faster. **Every player should run it**: each PC only speeds up what it sends.
@@ -44,14 +44,16 @@ Game commands still run in the same order on every PC; only the network gets fas
 ```ini
 [net]
 tuning=1             ; 0 = the game's original timings
-keepalive_ms=50
-send_interval_ms=10
+keepalive_ms=10
+send_interval_ms=2
 batched_segments=0
 ```
 
-The DLL's log (`h5-together.log`) says what it changed, for example `net tuning: links may send every 10 ms (game: 50)`.
+The DLL's log (`h5-together.log`) says what it changed, for example `net tuning: links may send every 2 ms (game: 50)`.
 
-**MMH5.5 RC19k** sets the send interval to 20 ms itself (`<TransmissionInterval>` in `MMH55Stats.xml`, applied by `55u.dll` at start-up). The mod also accepts that value and still makes it 10 ms; the log then says `(game: 50, MMH5.5: 20)`. Measured on RC19k (A1M4, robot LAN run): 0.46 s per AI step with MMH5.5's 20 ms, 0.26 s with 10 ms (RC19d with 10 ms: 0.26 s). `send_interval_ms=0` keeps MMH5.5's 20 ms.
+**Since 0.3.1** the defaults are 10 ms and 2 ms (50 and 10 before). In two-PC tests over Steam (a Windows host and a Linux laptop, 2026-11-04), the AI's big commands filled the host's link at 10 ms, and its segment reports waited behind them for up to 2.4 s; with 2 ms the reports arrived within 0.2 s, the host's average wait per segment went from 389 ms to 124 ms and the laptop's from 682 ms to 178 ms. A busy link now sends up to about 140 KB/s, an idle one a small packet every 10 ms.
+
+**MMH5.5 RC19k** sets the send interval to 20 ms itself (`<TransmissionInterval>` in `MMH55Stats.xml`, applied by `55u.dll` at start-up). The mod also accepts that value and makes it the mod's own (2 ms); the log then says `(game: 50, MMH5.5: 20)`. Measured on RC19k (A1M4, robot LAN run): 0.46 s per AI step with MMH5.5's 20 ms, 0.26 s with 10 ms (RC19d with 10 ms: 0.26 s). `send_interval_ms=0` keeps MMH5.5's 20 ms.
 
 ## LAN games over VPNs (`lan_discovery.cpp`, on by default)
 
