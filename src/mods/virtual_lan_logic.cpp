@@ -329,6 +329,16 @@ bool PeerTable::IdOf(uint32_t address, uint64_t *id) const
 	return true;
 }
 
+bool PeerTable::Find(uint64_t id, uint32_t *address) const
+{
+	const int i = IndexOfId(id);
+	if (i < 0)
+		return false;
+	if (address)
+		*address = addresses_[i];
+	return true;
+}
+
 size_t EncodeMessage(uint16_t source_port, uint32_t sender_address, const uint8_t *packet, size_t size, uint8_t *out,
                      size_t out_size)
 {

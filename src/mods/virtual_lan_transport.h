@@ -13,6 +13,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <vector>
+
+#include "online_ui_logic.h"
 #include "virtual_lan_logic.h"
 
 namespace vlan {
@@ -78,6 +81,22 @@ public:
 	virtual int Members(Member *out, int max) const = 0;
 	// For the log: "127.0.0.1:47101, other copies at 47102".
 	virtual void Describe(char *out, size_t size) const = 0;
+
+	// --- the online UI (online_ui.cpp; step 4). Only the Steam transport has these. -----
+	// They too are called with the core's lock held; the Steam calls they need are made
+	// by the transport's own thread on its next tick (the UI only asks and reads).
+	// What Steam play looks like now (state kOn and what follows; the core fills the rest).
+	virtual void GetStatus(online::Status *out) const { (void)out; }
+	// The invite picker is open: keep its list of friends fresh (every 2 s).
+	virtual void WantFriends(bool on) { (void)on; }
+	// The picker's list: online friends, sorted (online_ui_logic.h), with what was sent.
+	virtual void GetFriends(std::vector<online::Friend> *out) const { out->clear(); }
+	// Opens Steam's own invite dialog for our lobby (the overlay). False: no lobby.
+	virtual bool AskInviteDialog() { return false; }
+	// Invites this friend to our lobby (InviteUserToLobby). False: no lobby.
+	virtual bool AskInvite(uint64_t friend_id) { (void)friend_id; return false; }
+	// How many times Steam's overlay opened so far (GameOverlayActivated_t).
+	virtual int OverlayOpened() const { return 0; }
 };
 
 // [online] mode=loopback: listens on 127.0.0.1:own_port; the other copies of the
@@ -89,5 +108,8 @@ Transport *MakeLoopbackTransport(uint16_t own_port, const uint16_t *peer_ports, 
 // core's lock. `reliable`: Steam sends a lost message again (as on a LAN, where
 // nothing is lost); false = each message once, as UDP.
 Transport *MakeSteamTransport(CRITICAL_SECTION *lock, uint32_t app_id, bool reliable);
+// The online UI's handler of a new invite (the pop-up, the taskbar flash): called by the
+// Steam transport's thread, outside the core's lock.
+void SetSteamInviteHandler(void (*handler)(const online::Invite &invite));
 
 }  // namespace vlan

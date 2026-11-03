@@ -95,6 +95,8 @@ public:
 	uint32_t Learn(uint64_t id, uint32_t declared, Learned *what = nullptr);
 	// Whose address is it? False for an address nobody has.
 	bool IdOf(uint32_t address, uint64_t *id) const;
+	// The address of a known id (nothing added); false if the id is not known.
+	bool Find(uint64_t id, uint32_t *address) const;
 	int Count() const { return count_; }  // ourselves included
 
 private:

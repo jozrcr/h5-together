@@ -45,6 +45,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "steam_runtime.h"
 #include "virtual_lan.h"
 #include "virtual_lan_logic.h"
 #include "virtual_lan_transport.h"
@@ -79,6 +80,17 @@ vlan::Received g_received;
 char g_host_name[256] = "";
 bool g_said_self = false;
 uint32_t g_self_checked_at = 0;
+
+// The online UI (step 4)
+bool g_steam_wanted = false;  // [online] mode=steam
+bool g_no_hooks = false;      // ... but the game's network imports were not found
+int g_boot = 0;               // Steam's start: 0 not yet, 1 done, -1 failed
+bool g_ui_test = false;       // [online] ui_test=1: made-up friends, for robot screenshots
+bool g_test_drop_join = false;  // [online] test_drop_join=1: our join requests (01) are lost (the game's timeout box)
+bool g_said_drop_join = false;
+std::vector<online::Friend> g_test_friends;
+online::Invite g_test_invite;
+uint32_t g_test_invites = 0;
 
 const uint32_t kStaleMs = 3000;  // a message older than this when the game asks is dropped
 const uint32_t kStatsEveryMs = 30000;
@@ -317,6 +329,13 @@ int WINAPI VlanSendTo(SOCKET s, const char *buf, int len, int flags, const socka
 			break;
 		case vlan::Route::kToPeer: {
 			uint64_t id = 0;
+			if (g_test_drop_join && size && packet[0] == 0x01) {  // test: the join request is lost (the game's timeout box)
+				if (!g_said_drop_join) {
+					g_said_drop_join = true;
+					hooklog::Write("vlan: test: our game's join request dropped ([online] test_drop_join=1)");
+				}
+				break;
+			}
 			if (g_peers.IdOf(destination, &id)) {
 				if (!vlan::IsQuery(packet, size)) {
 					LockSelf("our game's first packet to a peer");  // (before it goes: its header holds the address)
@@ -499,6 +518,11 @@ void InstallVirtualLan()
 	if (mode == vlan::Mode::kOff)
 		return;
 	InitializeCriticalSection(&g_lock);
+	g_steam_wanted = mode == vlan::Mode::kSteam;
+	g_ui_test = g_steam_wanted && GetPrivateProfileIntW(L"online", L"ui_test", 0, path) != 0;
+	g_test_drop_join = GetPrivateProfileIntW(L"online", L"test_drop_join", 0, path) != 0;
+	if (g_ui_test)
+		hooklog::Write("vlan: [online] ui_test=1: the online UI shows made-up friends (for screenshots); no invite to them is sent");
 	if (mode == vlan::Mode::kSteam) {
 		UINT app_id = GetPrivateProfileIntW(L"online", L"app_id", 15370, path);
 		if (app_id < 1 || app_id > 0x7fffffff)
@@ -525,6 +549,7 @@ void InstallVirtualLan()
 		hookpatch::PatchImport("WSOCK32.dll", "gethostbyname", reinterpret_cast<void *>(&VlanGetHostByName)));
 	if (!g_gethostbyname) {
 		hooklog::Write("vlan: the game's gethostbyname import was not found: virtual LAN off");
+		g_no_hooks = true;
 		return;
 	}
 	g_sendto = reinterpret_cast<SendToFn>(hookpatch::PatchImport("WSOCK32.dll", "sendto", reinterpret_cast<void *>(&VlanSendTo)));
@@ -532,6 +557,7 @@ void InstallVirtualLan()
 		hookpatch::PatchImport("WSOCK32.dll", "recvfrom", reinterpret_cast<void *>(&VlanRecvFrom)));
 	if (!g_sendto || !g_recvfrom) {
 		hooklog::Write("vlan: the game's sendto/recvfrom imports were not found: virtual LAN off");
+		g_no_hooks = true;
 		return;
 	}
 	g_mode = mode;
@@ -552,12 +578,16 @@ void StartVirtualLan()
 		return;
 	if (!g_transport->Boot()) {
 		g_on = false;  // (before any LAN screen: the game's sockets come later)
+		EnterCriticalSection(&g_lock);
+		g_boot = -1;
+		LeaveCriticalSection(&g_lock);
 		hooklog::Write("vlan: the %s transport cannot carry the game's packets (see above): the game's own LAN play "
 		               "instead, as with mode=off",
 		               g_transport->Name());
 		return;
 	}
 	EnterCriticalSection(&g_lock);
+	g_boot = 1;
 	HaveSelf();
 	LeaveCriticalSection(&g_lock);
 }
@@ -565,6 +595,171 @@ void StartVirtualLan()
 bool VirtualLanOn()
 {
 	return g_on;
+}
+
+// --- the online UI ---------------------------------------------------------------------------
+namespace {
+
+online::Why WhyOf(steamrt::Failure f)
+{
+	switch (f) {
+	case steamrt::Failure::kNoDll: return online::Why::kNoDll;
+	case steamrt::Failure::kOldDll: return online::Why::kOldDll;
+	case steamrt::Failure::kNoSteam: return online::Why::kNoSteam;
+	case steamrt::Failure::kSteamTooOld: return online::Why::kSteamTooOld;
+	case steamrt::Failure::kNoAnswer: return online::Why::kNoAnswer;
+	default: return online::Why::kRefused;
+	}
+}
+
+// Only with the Steam transport (mode=steam), its lock initialized.
+bool SteamUi()
+{
+	return g_steam_wanted && !g_no_hooks && g_transport;
+}
+
+}  // namespace
+
+void OnlineStatus(online::Status *out)
+{
+	*out = online::Status();
+	if (!g_steam_wanted)
+		return;  // kOff: the game as it was
+	if (!SteamUi()) {
+		out->state = online::State::kUnavailable;
+		out->why = online::Why::kNoHooks;
+		return;
+	}
+	EnterCriticalSection(&g_lock);
+	if (g_boot == 0)
+		out->state = online::State::kStarting;
+	else if (g_boot < 0) {
+		out->state = online::State::kUnavailable;
+		out->why = WhyOf(steamrt::LastFailure());
+	}
+	else
+		g_transport->GetStatus(out);
+	if (g_ui_test && out->state == online::State::kOn) {
+		online::AddTestFriends(out);
+		if (g_test_invites) {
+			const int n = out->invite_count < online::Status::kMaxInvites ? out->invite_count : online::Status::kMaxInvites - 1;
+			for (int i = n; i > 0; --i)
+				out->invites[i] = out->invites[i - 1];
+			out->invites[0] = g_test_invite;
+			out->invite_count = n + 1;
+			out->invite_serial += g_test_invites;
+		}
+	}
+	LeaveCriticalSection(&g_lock);
+}
+
+void OnlineWantFriends(bool on)
+{
+	if (!SteamUi())
+		return;
+	EnterCriticalSection(&g_lock);
+	if (g_boot > 0)
+		g_transport->WantFriends(on && !g_ui_test);
+	LeaveCriticalSection(&g_lock);
+}
+
+void OnlineFriends(std::vector<online::Friend> *out)
+{
+	out->clear();
+	if (!SteamUi())
+		return;
+	EnterCriticalSection(&g_lock);
+	if (g_ui_test) {
+		if (g_test_friends.empty())
+			g_test_friends = online::TestFriends();
+		*out = g_test_friends;
+	}
+	else if (g_boot > 0)
+		g_transport->GetFriends(out);
+	LeaveCriticalSection(&g_lock);
+}
+
+bool OnlineInviteDialog()
+{
+	if (!SteamUi() || g_ui_test)
+		return false;
+	EnterCriticalSection(&g_lock);
+	const bool ok = g_boot > 0 && g_transport->AskInviteDialog();
+	LeaveCriticalSection(&g_lock);
+	return ok;
+}
+
+bool OnlineInvite(uint64_t friend_id)
+{
+	if (!SteamUi())
+		return false;
+	EnterCriticalSection(&g_lock);
+	bool ok = false;
+	if (g_ui_test) {
+		for (online::Friend &f : g_test_friends)
+			if (f.id == friend_id) {
+				f.invited = 1;
+				ok = true;
+				hooklog::Write("vlan: ui_test: a made-up friend marked as invited (nothing sent to Steam)");
+			}
+	}
+	else if (g_boot > 0)
+		ok = g_transport->AskInvite(friend_id);
+	LeaveCriticalSection(&g_lock);
+	return ok;
+}
+
+int OnlineOverlayOpened()
+{
+	if (!SteamUi())
+		return 0;
+	EnterCriticalSection(&g_lock);
+	const int n = g_boot > 0 ? g_transport->OverlayOpened() : 0;
+	LeaveCriticalSection(&g_lock);
+	return n;
+}
+
+bool OnlineHostAddress(uint64_t host, uint32_t *address)
+{
+	if (!g_on || !g_transport || !host)
+		return false;
+	EnterCriticalSection(&g_lock);
+	bool found = g_peers.Count() != 0 && host != g_peers.SelfId() && g_peers.Find(host, address);
+	if (!found) {  // not heard from yet: the address its lobby declares
+		const vlan::KnownHosts &hosts = g_transport->Hosts();
+		int at = -1;
+		if (hosts.Has(host, &at) && hosts.At(at).address) {
+			*address = hosts.At(at).address;
+			found = true;
+		}
+	}
+	LeaveCriticalSection(&g_lock);
+	return found;
+}
+
+uint64_t OnlineFirstHost()
+{
+	if (!g_on || !g_transport)
+		return 0;
+	EnterCriticalSection(&g_lock);
+	uint64_t id = 0;
+	const vlan::KnownHosts &hosts = g_transport->Hosts();
+	for (int i = 0; i < hosts.Count() && !id; ++i)
+		if (hosts.At(i).id != g_peers.SelfId())
+			id = hosts.At(i).id;
+	LeaveCriticalSection(&g_lock);
+	return id;
+}
+
+void OnlineTestInvite()
+{
+	if (!SteamUi() || !g_ui_test)
+		return;
+	EnterCriticalSection(&g_lock);
+	g_test_invite = online::TestInvite();
+	++g_test_invites;
+	LeaveCriticalSection(&g_lock);
+	hooklog::Write("vlan: ui_test: a made-up invite (as if from Steam's friends list)");
 }
 
 }  // namespace mods

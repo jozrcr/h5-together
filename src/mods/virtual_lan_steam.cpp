@@ -25,6 +25,13 @@
 //   from our Steam friends and from members of our lobby. Others are ignored.
 // - A thread of ours runs Steam's callbacks every 20 ms (manual dispatch: never
 //   on the game's threads), under the core's lock, as every other call here.
+// - For the online UI (step 4, online_ui.cpp): our rich presence says that we
+//   play with H5 Together's online play (so friends can count us); the friends'
+//   games we cannot join, the invites (Steam's GameLobbyJoinRequested_t, and
+//   "+connect_lobby" on the command line), whether Steam's overlay is enabled,
+//   and the friends for the invite picker go into a Status the UI reads. The UI
+//   only asks; the invites themselves (Steam's dialog, InviteUserToLobby) are
+//   sent by this thread on its next tick.
 // Log lines start with "vlan steam:". No SteamID or name goes to the log: ids
 // and lobby ids are short hashes ("#3f2a", vlan::FormatShortId).
 #include <windows.h>
@@ -62,6 +69,17 @@ const int kMaxMembers = 16;
 const int kMaxWatched = 16;
 const int kSelfQueue = 64;
 const int kMaxSessions = 32;
+// the online UI
+const char kPresenceKey[] = "h5t_version";  // our rich presence: friends count who plays with H5 Together
+const uint32_t kInviteKeepMs = 10 * 60000;  // an invite's host is looked for this long
+const int kMaxInvites = online::Status::kMaxInvites;
+const uint32_t kFriendsEveryMs = 2000;      // the picker's list, while it is open
+const int kMaxFriends = 200;
+const uint32_t kOverlayEveryMs = 5000;      // IsOverlayEnabled, again
+const int kMaxAsked = 64;                   // friends whose rich presence we asked for
+
+// The UI's handler of a new invite (online_ui.cpp), called by our thread outside the lock.
+void (*g_invite_handler)(const online::Invite &invite) = nullptr;
 
 // A friend's lobby we look at.
 struct Watched {
@@ -77,6 +95,20 @@ struct Watched {
 	bool logged;
 	HostCheck logged_check;
 	uint16_t logged_port;
+	char name[online::kNameSize];  // the friend's Steam name, for the UI only (never logged)
+};
+
+// An invite (Steam's GameLobbyJoinRequested_t), or "+connect_lobby" on the command line.
+struct InviteEntry {
+	uint64_t lobby;
+	uint64_t from;      // the friend it came through (0: not known)
+	uint32_t at_ms;
+	uint32_t asked_ms;  // RequestLobbyData
+	bool asked;
+	LobbyInfo info;
+	HostCheck check;
+	bool logged;
+	char name[online::kNameSize];
 };
 
 // Somebody who sent us a message or asked for a session.
@@ -153,6 +185,23 @@ public:
 		               s_.init_ms, s_.steam_app_id, me, game_,
 		               reliable_ ? "messages reliable (a lost one is sent again, as on a LAN)"
 		                         : "messages unreliable (each sent once, as UDP)");
+		// the online UI: friends see that we play with H5 Together's online play
+		const bool presence = s_.api.set_rich_presence(s_.friends, kPresenceKey, OPEN_HOMM5_VERSION);
+		boot_ms_ = GetTickCount();
+		overlay_enabled_ = s_.api.overlay_enabled(s_.utils);
+		overlay_checked_ = boot_ms_;
+		hooklog::Write("vlan steam: our rich presence %s=%s %s; Steam's overlay %s at Steam's start (%s)", kPresenceKey,
+		               OPEN_HOMM5_VERSION, presence ? "set" : "NOT set", overlay_enabled_ ? "enabled" : "not enabled",
+		               s_.launched_by_steam ? "Steam started the game" : "the game was started without Steam");
+		const uint64_t connect = online::ConnectLobby(GetCommandLineW());
+		if (connect) {
+			char lobby[12];
+			Short(connect, lobby, sizeof(lobby));
+			hooklog::Write("vlan steam: Steam started the game for lobby %s (+connect_lobby): its host is looked for", lobby);
+			EnterCriticalSection(lock_);
+			AddInvite(connect, 0, GetTickCount(), false);
+			LeaveCriticalSection(lock_);
+		}
 		HANDLE thread = CreateThread(nullptr, 0, &ThreadMain, this, 0, nullptr);
 		if (!thread) {
 			hooklog::Write("vlan steam: cannot start our thread for Steam's callbacks (error %lu)", GetLastError());
@@ -292,6 +341,37 @@ public:
 		_snprintf_s(out, size, _TRUNCATE, "Steam app %u, friends-only lobbies", app_id_);
 	}
 
+	// --- the online UI (the core's lock is held) ---------------------------------------
+	void GetStatus(online::Status *out) const override { *out = status_; }
+
+	void WantFriends(bool on) override
+	{
+		if (on && !want_friends_)
+			friends_at_ = GetTickCount() - kFriendsEveryMs;  // (at once)
+		want_friends_ = on;
+	}
+
+	void GetFriends(std::vector<online::Friend> *out) const override { *out = friends_; }
+
+	bool AskInviteDialog() override
+	{
+		if (!OwnLobby())
+			return false;
+		ask_dialog_ = true;
+		return true;
+	}
+
+	bool AskInvite(uint64_t friend_id) override
+	{
+		if (!OwnLobby() || !friend_id)
+			return false;
+		if (asks_.size() < 16)
+			asks_.push_back(friend_id);
+		return true;
+	}
+
+	int OverlayOpened() const override { return overlay_opened_; }
+
 private:
 	// Our thread, for as long as the game runs.
 	static DWORD WINAPI ThreadMain(LPVOID self)
@@ -300,10 +380,20 @@ private:
 		for (;;) {
 			EnterCriticalSection(t->lock_);
 			t->Tick(GetTickCount());
+			online::Invite fresh[kMaxInvites];
+			int fresh_count = 0;
+			for (; fresh_count < t->fresh_count_ && fresh_count < kMaxInvites; ++fresh_count)
+				fresh[fresh_count] = t->fresh_[fresh_count];
+			t->fresh_count_ = 0;
 			LeaveCriticalSection(t->lock_);
+			for (int i = 0; i < fresh_count; ++i)  // (outside the lock: the pop-up, the flash)
+				if (g_invite_handler)
+					g_invite_handler(fresh[i]);
 			Sleep(kTickMs);
 		}
 	}
+
+	bool OwnLobby() const { return plan_.Where() == LobbyPlan::In::kOwn && plan_.Lobby() && hosting_port_; }
 
 	void Tick(uint32_t now)
 	{
@@ -319,11 +409,20 @@ private:
 			if (plan_.Where() != LobbyPlan::In::kNone && member_data_dirty_)
 				WriteMemberData();
 		}
-		if (scan_now_ || now - scanned_at_ >= kScanEveryMs)
+		if (scan_now_ || now - scanned_at_ >= kScanEveryMs) {
 			ScanFriends(now);
+			FollowInvites(now);
+		}
 		hosts_.Expire(now);
 		LogSessions(now);
 		LogStats(now);
+		// the online UI
+		DoAsks();
+		if (want_friends_ && now - friends_at_ >= kFriendsEveryMs)
+			ReadFriends(now);
+		if (now - overlay_checked_ >= kOverlayEveryMs)
+			CheckOverlay(now);
+		UpdateStatus();
 	}
 
 	// --- Steam's callbacks ---------------------------------------------------------
@@ -368,6 +467,26 @@ private:
 		case kCallSessionFailed:
 			if (msg.size >= static_cast<int>(sizeof(SessionFailed)))
 				OnSessionFailed(static_cast<const SessionFailed *>(p)->info);
+			return;
+		case kCallGameLobbyJoinRequested:
+			if (msg.size >= static_cast<int>(sizeof(GameLobbyJoinRequested))) {
+				const GameLobbyJoinRequested *r = static_cast<const GameLobbyJoinRequested *>(p);
+				char lobby[12], who[12];
+				Short(r->lobby, lobby, sizeof(lobby));
+				Short(r->friend_id, who, sizeof(who));
+				hooklog::Write("vlan steam: an invite (or \"Join game\" in Steam's friends list): lobby %s, through %s", lobby,
+				               r->friend_id ? who : "nobody known");
+				AddInvite(r->lobby, r->friend_id, now, true);
+			}
+			return;
+		case kCallGameOverlayActivated:
+			if (msg.size >= static_cast<int>(sizeof(GameOverlayActivated))) {
+				const GameOverlayActivated *o = static_cast<const GameOverlayActivated *>(p);
+				if (o->active)
+					++overlay_opened_;
+				hooklog::Write("vlan steam: Steam's overlay %s%s", o->active ? "opened" : "closed",
+				               o->user_initiated ? " (by the player)" : "");
+			}
 			return;
 		default:
 			return;  // (LobbyEnter_t also comes for our own lobby: the call results tell us)
@@ -630,13 +749,15 @@ private:
 		scanned_at_ = now;
 		scan_now_ = false;
 		const int count = s_.api.friend_count(s_.friends, kFriendFlagImmediate);
-		int playing = 0, in_lobbies = 0;
+		int playing = 0, in_lobbies = 0, with_us = 0;
 		for (int i = 0; i < count; ++i) {
 			const uint64_t id = s_.api.friend_by_index(s_.friends, i, kFriendFlagImmediate);
 			FriendGameInfo game = {};
 			if (!id || !s_.api.friend_game(s_.friends, id, &game) || steamspike::AppIdOfGameId(game.game_id) != app_id_)
 				continue;
 			++playing;
+			if (WithUs(id))
+				++with_us;
 			const uint64_t lobby = LobbyOf(game);
 			if (!lobby)
 				continue;
@@ -645,6 +766,7 @@ private:
 			if (!w)
 				continue;
 			w->seen_ms = now;
+			online::CopyName(s_.api.friend_name(s_.friends, id), w->name, sizeof(w->name));
 			const bool member = lobby == plan_.Lobby();
 			if (!member && (!w->asked || now - w->asked_ms >= kAskDataEveryMs)) {
 				if (!w->asked)
@@ -679,12 +801,227 @@ private:
 			else
 				++i;
 		}
-		if (!scanned_once_ || playing != friends_playing_ || in_lobbies != friends_in_lobbies_)
-			hooklog::Write("vlan steam: %d of our %d Steam friends play app %u now, %d of them in a lobby", playing, count,
-			               app_id_, in_lobbies);
+		if (!scanned_once_ || playing != friends_playing_ || in_lobbies != friends_in_lobbies_ || with_us != friends_with_us_)
+			hooklog::Write("vlan steam: %d of our %d Steam friends play app %u now, %d of them with H5 Together's online "
+			               "play, %d in a lobby",
+			               playing, count, app_id_, with_us, in_lobbies);
 		scanned_once_ = true;
 		friends_playing_ = playing;
 		friends_in_lobbies_ = in_lobbies;
+		friends_with_us_ = with_us;
+	}
+
+	// Does this friend (playing the game) play with H5 Together's online play? Their rich
+	// presence says so; Steam sends it for friends in the same game, and we ask once more.
+	bool WithUs(uint64_t id)
+	{
+		const char *v = s_.api.friend_rich_presence(s_.friends, id, kPresenceKey);
+		if (v && v[0])
+			return true;
+		for (int i = 0; i < asked_count_; ++i)
+			if (asked_[i] == id)
+				return false;
+		if (asked_count_ < kMaxAsked) {
+			asked_[asked_count_++] = id;
+			s_.api.request_rich_presence(s_.friends, id);
+		}
+		return false;
+	}
+
+	// --- the online UI: invites ----------------------------------------------------------
+	void AddInvite(uint64_t lobby, uint64_t from, uint32_t now, bool notify)
+	{
+		if (!lobby)
+			return;
+		InviteEntry *e = nullptr;
+		for (int i = 0; i < invite_count_ && !e; ++i)
+			if (invites_[i].lobby == lobby)
+				e = &invites_[i];
+		if (!e) {
+			if (invite_count_ == kMaxInvites) {  // the oldest goes
+				int oldest = 0;
+				for (int i = 1; i < invite_count_; ++i)
+					if (now - invites_[i].at_ms > now - invites_[oldest].at_ms)
+						oldest = i;
+				invites_[oldest] = invites_[--invite_count_];
+			}
+			e = &invites_[invite_count_++];
+			*e = InviteEntry();
+			e->lobby = lobby;
+			e->check = HostCheck::kNoData;
+		}
+		e->from = from ? from : e->from;
+		e->at_ms = now ? now : 1;
+		e->asked = false;
+		if (e->from)
+			online::CopyName(s_.api.friend_name(s_.friends, e->from), e->name, sizeof(e->name));
+		++invite_serial_;
+		scan_now_ = true;
+		if (notify && fresh_count_ < kMaxInvites) {
+			online::Invite &v = fresh_[fresh_count_++];
+			v = online::Invite();
+			memcpy(v.name, e->name, sizeof(v.name));
+		}
+	}
+
+	// Each invite's lobby: its data (without joining), and its host as a known host.
+	void FollowInvites(uint32_t now)
+	{
+		for (int i = 0; i < invite_count_;) {
+			InviteEntry &e = invites_[i];
+			if (now - e.at_ms >= kInviteKeepMs) {
+				invites_[i] = invites_[--invite_count_];
+				continue;
+			}
+			++i;
+			const bool member = e.lobby == plan_.Lobby();
+			if (!member && (!e.asked || now - e.asked_ms >= kAskDataEveryMs)) {
+				e.asked = true;
+				e.asked_ms = now;
+				s_.api.request_lobby_data(s_.mm, e.lobby);
+			}
+			ReadLobby(e.lobby, &e.info);
+			const uint64_t host = e.info.host ? e.info.host : e.from;
+			e.check = CheckHost(e.info, host, game_);
+			if (!e.name[0] && e.info.host && e.info.host != me_)
+				online::CopyName(s_.api.friend_name(s_.friends, e.info.host), e.name, sizeof(e.name));
+			if (e.check == HostCheck::kOk && e.info.host != me_)
+				hosts_.Update(e.info.host, e.info.port, now, e.info.address);
+			if (!e.logged && e.check != HostCheck::kNoData) {
+				e.logged = true;
+				char lobby[12];
+				Short(e.lobby, lobby, sizeof(lobby));
+				hooklog::Write("vlan steam: the invite's lobby %s: %s%s", lobby, HostCheckName(e.check),
+				               e.check == HostCheck::kOk ? ": its host gets our queries (its game shows in the LAN list)" : "");
+			}
+		}
+	}
+
+	// --- the online UI: the picker, Steam's dialog, the overlay -----------------------------
+	void DoAsks()
+	{
+		if (!ask_dialog_ && asks_.empty())
+			return;
+		char lobby[12];
+		Short(plan_.Lobby(), lobby, sizeof(lobby));
+		if (ask_dialog_) {
+			ask_dialog_ = false;
+			if (OwnLobby()) {
+				overlay_enabled_ = s_.api.overlay_enabled(s_.utils);
+				s_.api.invite_dialog(s_.friends, plan_.Lobby());
+				hooklog::Write("vlan steam: Steam's invite dialog asked for, lobby %s (overlay %s)", lobby,
+				               overlay_enabled_ ? "enabled" : "NOT enabled");
+			}
+		}
+		for (const uint64_t id : asks_) {
+			if (!OwnLobby())
+				break;
+			const bool ok = s_.api.invite_user(s_.mm, plan_.Lobby(), id);
+			bool found = false;
+			for (auto &r : invited_)
+				if (r.first == id) {
+					r.second = ok ? 1 : -1;
+					found = true;
+				}
+			if (!found)
+				invited_.push_back({id, ok ? 1 : -1});
+			for (online::Friend &f : friends_)
+				if (f.id == id)
+					f.invited = ok ? 1 : -1;
+			char who[12];
+			Short(id, who, sizeof(who));
+			hooklog::Write("vlan steam: invited friend %s to our lobby %s -> %s", who, lobby, ok ? "sent" : "REFUSED by Steam");
+		}
+		asks_.clear();
+	}
+
+	void ReadFriends(uint32_t now)
+	{
+		friends_at_ = now;
+		std::vector<online::Friend> list;
+		const int count = s_.api.friend_count(s_.friends, kFriendFlagImmediate);
+		for (int i = 0; i < count && static_cast<int>(list.size()) < kMaxFriends; ++i) {
+			const uint64_t id = s_.api.friend_by_index(s_.friends, i, kFriendFlagImmediate);
+			const int persona = id ? s_.api.friend_state(s_.friends, id) : 0;
+			if (!online::KeepFriend(persona))
+				continue;
+			online::Friend f = {};
+			f.id = id;
+			f.persona = persona;
+			online::CopyName(s_.api.friend_name(s_.friends, id), f.name, sizeof(f.name));
+			FriendGameInfo game = {};
+			f.playing = s_.api.friend_game(s_.friends, id, &game) && steamspike::AppIdOfGameId(game.game_id) == app_id_;
+			if (f.playing) {
+				const char *v = s_.api.friend_rich_presence(s_.friends, id, kPresenceKey);
+				f.with_us = v && v[0];
+			}
+			for (const auto &r : invited_)
+				if (r.first == id)
+					f.invited = r.second;
+			list.push_back(f);
+		}
+		online::SortFriends(&list);
+		const bool changed = list.size() != friends_.size();
+		friends_.swap(list);
+		if (changed || !friends_logged_) {
+			friends_logged_ = true;
+			hooklog::Write("vlan steam: the invite list: %d of our %d Steam friends are online", static_cast<int>(friends_.size()),
+			               count);
+		}
+	}
+
+	void CheckOverlay(uint32_t now)
+	{
+		overlay_checked_ = now;
+		const bool on = s_.api.overlay_enabled(s_.utils);
+		if (on != overlay_enabled_)
+			hooklog::Write("vlan steam: Steam's overlay is %s now, %u s after Steam's start (%s)", on ? "enabled" : "not enabled",
+			               (now - boot_ms_) / 1000, s_.launched_by_steam ? "Steam started the game" : "started without Steam");
+		overlay_enabled_ = on;
+	}
+
+	void UpdateStatus()
+	{
+		online::Status s;
+		s.state = online::State::kOn;
+		s.relay_ok = relay_ok_;
+		s.friends_playing = friends_playing_;
+		s.friends_with_us = friends_with_us_;
+		for (int i = 0; i < hosts_.Count(); ++i)
+			s.hosts += hosts_.At(i).id != me_;
+		for (int i = 0; i < watched_count_ && s.problem_count < online::Status::kMaxProblems; ++i) {
+			const Watched &w = watched_[i];
+			if ((w.check != HostCheck::kOtherGame && w.check != HostCheck::kOtherProtocol) || w.info.host == me_)
+				continue;
+			online::Problem &p = s.problems[s.problem_count++];
+			memcpy(p.name, w.name, sizeof(p.name));
+			p.check = w.check;
+			strcpy_s(p.version, sizeof(p.version), w.info.version);
+		}
+		// the invites, the newest first
+		int order[kMaxInvites];
+		for (int i = 0; i < invite_count_; ++i)
+			order[i] = i;
+		const uint32_t now = GetTickCount();
+		for (int i = 1; i < invite_count_; ++i)
+			for (int j = i; j > 0 && now - invites_[order[j]].at_ms < now - invites_[order[j - 1]].at_ms; --j) {
+				const int t = order[j];
+				order[j] = order[j - 1];
+				order[j - 1] = t;
+			}
+		for (int i = 0; i < invite_count_; ++i) {
+			const InviteEntry &e = invites_[order[i]];
+			online::Invite &v = s.invites[s.invite_count++];
+			memcpy(v.name, e.name, sizeof(v.name));
+			v.visible = e.check == HostCheck::kOk && hosts_.Has(e.info.host);
+			v.cannot = e.check == HostCheck::kOtherGame || e.check == HostCheck::kOtherProtocol;
+			v.lobby = e.lobby;
+			v.host = e.check == HostCheck::kOk ? e.info.host : 0;
+		}
+		s.invite_serial = invite_serial_;
+		s.own_lobby = OwnLobby();
+		s.overlay = overlay_enabled_;
+		status_ = s;
 	}
 
 	Watched *Watch(uint64_t lobby, uint64_t friend_id, uint32_t now)
@@ -957,6 +1294,26 @@ private:
 	long sent_ = 0, refused_ = 0, received_ = 0, bad_ = 0, to_self_ = 0, accepted_ = 0, ignored_ = 0;
 	uint32_t stats_at_ = 0;
 	long stats_logged_ = -1;
+
+	// the online UI
+	int friends_with_us_ = 0;
+	uint64_t asked_[kMaxAsked] = {};
+	int asked_count_ = 0;
+	InviteEntry invites_[kMaxInvites] = {};
+	int invite_count_ = 0;
+	uint32_t invite_serial_ = 0;
+	online::Invite fresh_[kMaxInvites] = {};  // new invites for the UI's handler (pop-up, flash)
+	int fresh_count_ = 0;
+	bool want_friends_ = false, friends_logged_ = false;
+	uint32_t friends_at_ = 0;
+	std::vector<online::Friend> friends_;
+	std::vector<std::pair<uint64_t, int>> invited_;  // friend -> 1 sent, -1 refused
+	bool ask_dialog_ = false;
+	std::vector<uint64_t> asks_;
+	uint32_t boot_ms_ = 0, overlay_checked_ = 0;
+	bool overlay_enabled_ = false;
+	int overlay_opened_ = 0;
+	online::Status status_;
 };
 
 }  // namespace
@@ -964,6 +1321,11 @@ private:
 Transport *MakeSteamTransport(CRITICAL_SECTION *lock, uint32_t app_id, bool reliable)
 {
 	return new SteamTransport(lock, app_id, reliable);
+}
+
+void SetSteamInviteHandler(void (*handler)(const online::Invite &invite))
+{
+	g_invite_handler = handler;
 }
 
 }  // namespace vlan

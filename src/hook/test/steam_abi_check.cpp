@@ -121,6 +121,18 @@ SAME_VALUE(kMemberKicked, k_EChatMemberStateChangeKicked);
 SAME_VALUE(kMemberBanned, k_EChatMemberStateChangeBanned);
 SAME_VALUE(kEnterSuccess, k_EChatRoomEnterResponseSuccess);
 static_assert(sizeof(f::Microseconds) == sizeof(SteamNetworkingMicroseconds), "Microseconds size");
+// added for step 4, the online UI
+SAME_ID(kCallGameLobbyJoinRequested, GameLobbyJoinRequested_t);
+SAME_SIZE(GameLobbyJoinRequested, GameLobbyJoinRequested_t);
+SAME_AT(GameLobbyJoinRequested, lobby, GameLobbyJoinRequested_t, m_steamIDLobby);
+SAME_AT(GameLobbyJoinRequested, friend_id, GameLobbyJoinRequested_t, m_steamIDFriend);
+SAME_AT(GameOverlayActivated, active, GameOverlayActivated_t, m_bActive);
+SAME_AT(GameOverlayActivated, app_id, GameOverlayActivated_t, m_nAppID);
+SAME_VALUE(kPersonaOffline, k_EPersonaStateOffline);
+SAME_VALUE(kPersonaOnline, k_EPersonaStateOnline);
+SAME_VALUE(kPersonaBusy, k_EPersonaStateBusy);
+SAME_VALUE(kPersonaAway, k_EPersonaStateAway);
+SAME_VALUE(kPersonaSnooze, k_EPersonaStateSnooze);
 
 // The shape of a function: what a 32-bit __cdecl call puts on the stack and gets back.
 template <typename A, typename B>
@@ -193,6 +205,12 @@ SAME_FN(InitRelayFn, SteamAPI_ISteamNetworkingUtils_InitRelayNetworkAccess);
 SAME_FN(GetRelayStatusFn, SteamAPI_ISteamNetworkingUtils_GetRelayNetworkStatus);
 SAME_FN(GetLocalTimestampFn, SteamAPI_ISteamNetworkingUtils_GetLocalTimestamp);
 SAME_FN(ReleaseMessageFn, SteamAPI_SteamNetworkingMessage_t_Release);
+SAME_FN(SetRichPresenceFn, SteamAPI_ISteamFriends_SetRichPresence);
+SAME_FN(GetFriendRichPresenceFn, SteamAPI_ISteamFriends_GetFriendRichPresence);
+SAME_FN(RequestFriendRichPresenceFn, SteamAPI_ISteamFriends_RequestFriendRichPresence);
+SAME_FN(GetFriendPersonaStateFn, SteamAPI_ISteamFriends_GetFriendPersonaState);
+SAME_FN(ActivateInviteDialogFn, SteamAPI_ISteamFriends_ActivateGameOverlayInviteDialog);
+SAME_FN(InviteUserToLobbyFn, SteamAPI_ISteamMatchmaking_InviteUserToLobby);
 
 int main()
 {

@@ -63,6 +63,13 @@ struct Api {
 	steamflat::GetRelayStatusFn relay_status;
 	steamflat::GetLocalTimestampFn local_timestamp;
 	steamflat::ReleaseMessageFn release;
+	// step 4, the online UI
+	steamflat::SetRichPresenceFn set_rich_presence;
+	steamflat::GetFriendRichPresenceFn friend_rich_presence;
+	steamflat::RequestFriendRichPresenceFn request_rich_presence;
+	steamflat::GetFriendPersonaStateFn friend_state;
+	steamflat::ActivateInviteDialogFn invite_dialog;
+	steamflat::InviteUserToLobbyFn invite_user;
 };
 
 struct Steam {
@@ -73,6 +80,7 @@ struct Steam {
 	uint32_t app_id;         // the app id we asked for ([online] app_id, 15370 by default)
 	uint32_t steam_app_id;   // the one Steam says we run as
 	uint32_t init_ms;        // how long SteamAPI_InitFlat took
+	bool launched_by_steam;  // SteamAppId was set before ours: Steam started the game
 };
 
 // Loads steam_api.dll and starts Steam as `app_id`, on the calling thread (the
@@ -81,5 +89,17 @@ struct Steam {
 // steam_api.dll, Steam not running, ...). Only the first call does the work;
 // later ones get its answer.
 const Steam *Start(uint32_t app_id, const char *who);
+
+// Why Steam did not start (for the online UI's "Steam is not available" line).
+enum class Failure {
+	kNone,         // it started (or was never tried)
+	kNoDll,        // no steam_api.dll in bin\h5-together\ (a GOG copy, or not installed)
+	kOldDll,       // a steam_api.dll without the functions we call (an older SDK)
+	kNoSteam,      // SteamAPI_InitFlat: the Steam client is not running (or not reachable from Proton)
+	kSteamTooOld,  // SteamAPI_InitFlat: the Steam client must be updated
+	kRefused,      // SteamAPI_InitFlat failed otherwise (not logged in? the game not owned on Steam?)
+	kNoAnswer,     // started, but an interface or our SteamID is missing
+};
+Failure LastFailure();
 
 }  // namespace steamrt

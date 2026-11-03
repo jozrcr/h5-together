@@ -1,6 +1,6 @@
 # Plan: online play over Steam (a "virtual LAN")
 
-Status: **the spike passed (2026-11-02): two Steam accounts' games talk through Steam under app 15370.** Solo: Steam starts in the game's process, the relay network comes up, and a friends-only lobby is created ([results](#solo-spike-results-2026-11-02)), even when the robot, not Steam, started the game. Two PCs: a Linux laptop under Proton, on a phone's 4G connection, found the Windows host's friends-only lobby through the friends list, joined it, and 100 of 100 messages came back (median round trip 82 ms) ([results](#two-pc-test-results-2026-11-02)). **Steps 1 and 2 done too (2026-11-02):** the packet map shows every address in the game's packets comes from one Winsock call, and the virtual LAN core carried a whole robot LAN game (two copies on one PC, through a local stand-in for Steam) with all checksums equal and no real address in any packet ([results](#steps-1-and-2-the-packet-map-and-the-virtual-lan-core-2026-11-02)). **Step 3 built (2026-11-02):** the Steam transport (`[online] mode=steam`): on one PC, Steam starts in the game, the relays come up, a friends-only lobby is made when the game hosts, and a loopback robot LAN game still has all checksums equal ([results](#step-3-the-steam-transport-2026-11-02)). Next: the two-PC test of the real game over Steam ([online-steam-test2.md](online-steam-test2.md)), then step 4, the UI. Code: `src/mods/virtual_lan*.cpp`, `src/mods/steam_runtime.cpp`; the spike `src/mods/steam_spike.cpp` (`[online] spike`, off by default). SDK 1.65 is at `ref\steamworks_sdk_165\` (never committed).
+Status: **the spike passed (2026-11-02): two Steam accounts' games talk through Steam under app 15370.** Solo: Steam starts in the game's process, the relay network comes up, and a friends-only lobby is created ([results](#solo-spike-results-2026-11-02)), even when the robot, not Steam, started the game. Two PCs: a Linux laptop under Proton, on a phone's 4G connection, found the Windows host's friends-only lobby through the friends list, joined it, and 100 of 100 messages came back (median round trip 82 ms) ([results](#two-pc-test-results-2026-11-02)). **Steps 1 and 2 done too (2026-11-02):** the packet map shows every address in the game's packets comes from one Winsock call, and the virtual LAN core carried a whole robot LAN game (two copies on one PC, through a local stand-in for Steam) with all checksums equal and no real address in any packet ([results](#steps-1-and-2-the-packet-map-and-the-virtual-lan-core-2026-11-02)). **Step 3 built (2026-11-02):** the Steam transport (`[online] mode=steam`): on one PC, Steam starts in the game, the relays come up, a friends-only lobby is made when the game hosts, and a loopback robot LAN game still has all checksums equal ([results](#step-3-the-steam-transport-2026-11-02)). The two-PC test of the real game over Steam passed ([online-steam-test2.md](online-steam-test2.md)). **Step 4 built (2026-11-03):** the online UI: an "Online play: Off / Steam" row in Options > H5 Together, Steam's lines on the game's LAN screen, "Invite friends..." next to "Rules..." in the waiting room (Steam's own dialog, or our list), and an invite's banner and pop-up ([results](#step-4-the-online-ui-2026-11-03)). Code: `src/mods/virtual_lan*.cpp`, `src/mods/steam_runtime.cpp`; the spike `src/mods/steam_spike.cpp` (`[online] spike`, off by default). SDK 1.65 is at `ref\steamworks_sdk_165\` (never committed).
 
 Goal: friends join each other's games **from inside the game**, with no GameRanger and no ZeroTier. This is phase 6 of the project ("built-in online play"). This plan picks Steam as the first way to do it. The older idea (our own lobby server plus GameNetworkingSockets) becomes the fallback.
 
@@ -189,9 +189,9 @@ From the robot's two copies on one PC (host ports 8889/8888, client ports 8891/8
   - The `07` probes then go between fake addresses. The lobby's member list tells every PC which SteamID is behind each fake address, so the clients can reach each other too.
   - Each Steam message also says who sent it, so a PC learns the reverse direction on the first packet.
 - **Session requests:** accepted only from members of our lobby, or from Steam friends running the add-on. Anything else is ignored (privacy).
-- **Invites (step 4):**
-  - "Invite friends..." in our panel uses the overlay's invite dialog if it is there, or our own friend list with `InviteUserToLobby`.
-  - An invite accepted while the game runs arrives as `GameLobbyJoinRequested_t`. The add-on adds that host to the known hosts and shows a toast: "Pierre invites you: open Multiplayer > LAN".
+- **Invites (step 4, built: [results](#step-4-the-online-ui-2026-11-03)):**
+  - "Invite friends..." next to "Rules..." in the waiting room uses the overlay's invite dialog if it is there, or our own friend list with `InviteUserToLobby`.
+  - An invite accepted while the game runs arrives as `GameLobbyJoinRequested_t`. The add-on adds that host to the known hosts and shows a banner on the main menu, and the pop-up and taskbar flash when the game is in the background: "Pierre invites you to play: open Multiplayer > LAN".
   - Started by Steam with `+connect_lobby` (game not running): this only works if the player's Steam launch option starts MMH5.5's exe. Steam's own `H5_Game.exe` is the 2025 rebuild, which our DLL doesn't know. For v1: invites work best while the game is running.
 
 ### Threads and timing
@@ -226,12 +226,14 @@ keep_lan=0        ; later: also accept plain LAN/ZeroTier players in a Steam gam
 log=1             ; log lobby events and each new peer (fake address <-> SteamID)
 ```
 
-Built so far (steps 2 and 3): `mode=off|steam|loopback`, `app_id` (a hidden key, shared with the spike), and for the loopback `loopback_port` / `loopback_peers`. Lobbies are always friends only (`lobby=` comes with the UI if ever needed). The shipped `h5-together.ini` has only `;mode=off`, in an `[online]` section of its own. The peer log is always on (a few lines per game), so `log` is not needed yet.
+Built so far (steps 2 and 3): `mode=off|steam|loopback`, `app_id` (a hidden key, shared with the spike), and for the loopback `loopback_port` / `loopback_peers`. Lobbies are always friends only (`lobby=` comes with the UI if ever needed). The shipped `h5-together.ini` has only `;mode=off`, in an `[online]` section of its own. The peer log is always on (a few lines per game), so `log` is not needed yet. Step 4: `mode` is a row of the Options page (Off / Steam; `loopback` stays a file value for the robot), and the hidden `ui_test=1` shows made-up friends for the robot's screenshots.
 
 - **Off by default** at first. It changes no gameplay (only gameplay changes must default to the original), so it can be turned on by default once it has proven itself.
-- **Picking Steam or LAN:** a small ImGui box on the game's LAN screen: "Play over: Steam / LAN", with Steam's status ("Steam: 3 friends online with H5 Together"). It applies the next time the LAN screen opens, because the game creates its sockets then.
-- **The list:** the games stay in the game's own LAN list. Our box beside it lists Steam games with problems ("needs H5 Together 0.3.1") and has "Invite friends...".
-- **Reuse:** the ImGui overlay (`src/hook/overlay.cpp`), the button-on-a-game-screen code of the template builder (`rmg_screen.cpp`), the toast and taskbar flash (`notify.cpp`), French texts (`languages`).
+- **As built in step 4** ([details](#step-4-the-online-ui-2026-11-03)), which changed the first idea (an ImGui box on the LAN screen with a "Play over: Steam / LAN" choice):
+  - **Picking Steam or LAN:** a row of the game's own Options screen (Options > H5 Together > Online play: Off / Steam), applied after a restart: the hooks and Steam start long before the LAN screen.
+  - **The list:** the games stay in the game's own LAN list. Steam's status, invites and the games with problems are lines in the empty box under that list, in the game's colours.
+  - **"Invite friends..."** sits next to "Rules..." in the waiting room, for the host.
+  - **Reuse:** the overlay (`src/hook/overlay.cpp`), the "Rules..." button's way (`host_rules_panel.cpp`), the game's button and panel art (`rmg_builder_widgets.h`), the pop-up and taskbar flash (`notify.cpp`), our texts files (`src/mods/texts`).
 
 ## Testing
 
@@ -426,6 +428,106 @@ What this settles:
 
 **Not covered yet:** the two-PC test (the real game between two Steam accounts: [online-steam-test2.md](online-steam-test2.md)); whether Steam shows a friends-only lobby's data to a friend outside it (else the fallback above); three PCs; a relayed path.
 
+## Step 4: the online UI (2026-11-03)
+
+The owner's rule for any UI in the game: as close to the game's own look as possible (its art, frames, fonts and buttons; its own screens as the entry points; no modern windows). So each piece sits on the game screen where a player looks for it.
+
+### What the player sees, screen by screen
+
+| Where | What | How it is made |
+|---|---|---|
+| **Options > H5 Together**, page 2, first group "Online play" | A row **"Online play \*"** with a list: **Off (local network)** (the default) / **Steam**. Under it one line: "Friends' games: Multiplayer, LAN", or, when `bin\h5-together\steam_api.dll` is missing, "No steam_api.dll: Steam not available". The tooltip says what Steam mode does and that it needs Steam and the game bought on Steam. | The settings menu's own rows (the game's Options screen, served `uiconsts` file: `settings_table.cpp` ROW, group `kOnline`, `settings_menu_data.cpp`). The "\*" means "after a restart" (below). Greyed out during a multiplayer game, like the host's and the advanced rows. |
+| **Multiplayer > LAN** (`NUI::CLobbyScreen`) | In the big empty box under the games list (the ubi.com chat's box, unused in LAN play): "Online play over Steam", then "Steam: 2 friends are playing with H5 Together." (or none), "1 more is playing Heroes V without H5 Together's online play.", the invites ("Lucas invites you: their game is in the list above."), and the friends' games this PC **cannot** join ("Pierre hosts a game you cannot join: another version of MMH5.5 or of the game.", "Marie hosts with H5 Together 0.4.0, which cannot play with yours (0.3.0): update."). Steam not available: "Steam is not available: Valve's steam_api.dll is missing from bin\h5-together." (or: Steam is not running; must be updated; refused; did not answer), then "The list shows the games of your local network, as without H5 Together." The games themselves stay in the game's own list above. | Drawn by our overlay (`online_ui.cpp`) in the game's colours and with the shadowed text of the waiting room's versions line. |
+| **The waiting room** (`NUI::CMPWaitScreen`), host only | **"Invite friends..."** next to "Rules...", the game's own button picture. It opens **Steam's own invite dialog** (the overlay) when the overlay is enabled in this game; else, or if the overlay did not open within 2.5 s, **our list**: a panel in the game rules panel's look, "Invite friends", the Steam friends who are online (in Heroes V with H5 Together first, then in Heroes V, online, busy, away), each with an "Invite" button that becomes "Invited". | The Rules button's way (overlay, the game's button art, `NineSlice` so the wider button keeps its ends); the list is a modal overlay panel like the Rules panel. Shown once our Steam lobby exists (a second after the game is created). |
+| **An invite** (accepted in Steam, "Join game" in Steam's friends list, or Steam starting the game with `+connect_lobby <id>`) | On the main menu, for 20 s, a banner above the menu's scroll: "Lucas invites you to play: open Multiplayer > LAN." When the game is not the window in front: the taskbar button flashes, the sound and the Windows pop-up of the "your turn" notification (with `[notify] sound=` and `popup=`). The inviting friend's game is looked for (its lobby's data, without joining) and goes into the known hosts, so it shows in the LAN list even if Steam's friends list does not show its lobby. **Then the game joins by itself** (the evening's follow-up, [below](#follow-ups-2026-11-03-evening-auto-join-and-the-games-message-boxes)): it opens Multiplayer > LAN, waits for the host's game in the list, chooses it and presses Join. | Overlay banner (the update notice's look); `notify.cpp`'s flash and pop-up (`NotifyInvite`); the game's own menu command and Join (`online_join.cpp`). |
+
+French words: every text is in `src/mods/texts/en.txt` and `fr.txt` (`[online]` and `[settings]`); the French uses the game's own names "Multijoueur > Réseau local" (from the game's `texts.pak`). The robot's screenshots are French because the test copy's game is French and `[ui] language=auto` follows the game's texts ("texts: fr, from the game's texts (the red player is "Joueur rouge")").
+
+### Why these techniques
+
+- **The Options row** is fully native (the game's own list control), as the rest of our settings menu.
+- **The LAN screen's lines** are drawn, not served. A served text file (as the Options page does) is read by the game once, when it builds the screen. These lines change while the screen is open: a friend starts hosting, an invite comes, a friend's lobby data arrives two seconds later. Drawing also needs no new knowledge of the screen's code. They use the game's colours and the shadowed text of the "Rules..." button and the waiting room's versions line, which the owner already accepted. The font is the overlay's (Tahoma Bold), as in our other panels: the game's own italic serif is not a font file our overlay can load today (the game's data has no `.ttf`; a closer font would be a change to the shared overlay, for every panel at once).
+- **"Invite friends..."** copies the "Rules..." button exactly (same picture, same row, same input handling: it reads the mouse itself, the game behind gets nothing to click there).
+- **Steam's dialog first**: it is Steam's own window, which players know, and it shows every friend. Our list is the fallback when the overlay is off.
+- **Joining by itself after an invite**: first left out (a hook in the main menu's pages, and moving the player unasked). The owner tested invites on 2026-11-03 and asked for it, so it was added in the evening ([below](#follow-ups-2026-11-03-evening-auto-join-and-the-games-message-boxes)): the game's own commands, as if the player clicked.
+
+### When the setting applies, and the no-Steam case
+
+- **After a restart** (the "\*" mark): the Winsock hooks go in when the DLL loads and Steam starts at the game's first DirectInput call, both long before the LAN screen; with `mode=off` nothing is hooked or loaded at all (the promise of the default). Making it apply at the next LAN screen would mean hooking with `mode=off` too, and starting Steam in the middle of a session; not worth it for a setting a player sets once.
+- **No `steam_api.dll`** (a GOG copy, or the file not installed): the Options row still shows, with "No steam_api.dll: Steam not available" under it. With `mode=steam` the add-on logs it, the LAN screen says why in its first line, and the game plays its own LAN, as with `off`. Nothing else changes. The other reasons (Steam not running, Steam too old, Steam refused, Steam did not answer) are told the same way (`steamrt::LastFailure`).
+
+### How it works inside
+
+- **Friends who play with H5 Together**: when Steam starts, the add-on sets our **rich presence** `h5t_version=<our version>`. Steam passes rich presence to friends playing the same game. A friend playing app 15370 whose `h5t_version` is set has online play on; one without it plays Heroes V without it (or an older H5 Together). The add-on asks Steam once per friend (`RequestFriendRichPresence`).
+- **The status**: the Steam transport's thread fills an `online::Status` at every tick (20 ms) under the core's lock: Steam's state, the relay network, the friends' counts, the known hosts, the games that cannot be joined (from `HostCheck`: another game build, another protocol), the invites (newest first), whether our lobby exists, whether the overlay is enabled. The UI copies it each frame (`mods::OnlineStatus`).
+- **Steam calls stay on the transport's thread**: the UI only asks (`OnlineInviteDialog`, `OnlineInvite`, `OnlineWantFriends`); the thread makes the calls (`ActivateGameOverlayInviteDialog`, `InviteUserToLobby`, the friends list) on its next tick. The pop-up and the flash of a new invite are called by that thread after it has left the lock.
+- **Invites**: `GameLobbyJoinRequested_t` (callback 333) and `+connect_lobby` both add the lobby to a list kept 10 minutes. Every 2 s the lobby's data is asked for (`RequestLobbyData`, without joining) and checked like a friend's lobby (`CheckHost`); a joinable host goes into the known hosts, so our queries reach it and its game shows in the LAN list. When the player then joins from the list, the usual path (step 3) joins the host's lobby.
+- **New flat functions** (`steam_api_flat.h`, checked by `steam_abi_check.cpp` against SDK 1.65): `SetRichPresence`, `GetFriendRichPresence`, `RequestFriendRichPresence`, `GetFriendPersonaState`, `ActivateGameOverlayInviteDialog`, `InviteUserToLobby`; the callback `GameLobbyJoinRequested_t`; `GameOverlayActivated_t`'s fields; `EPersonaState` values.
+- **Logs** (no names, no SteamIDs): `online: ...` lines (the UI), `vlan steam: our rich presence ...`, `Steam's overlay is enabled now, N s after Steam's start`, `Steam's invite dialog asked for`, `Steam's overlay opened`, `an invite ...: lobby #…`, `the invite's lobby #…: ok: its host gets our queries`, `invited friend #… -> sent`.
+- **Tests**: `src/hook/test/online_ui_test.cpp` (the LAN screen's lines in every state, the banner's words in English and French, Steam names cut for the screen, the list's order, `+connect_lobby` parsing, the made-up friends, every word in both files). `settings_test.cpp` checks the new row with the others. **For screenshots with one PC**: the hidden setting `[online] ui_test=1` adds made-up friends (two with H5 Together, a game of another MMH5.5, one of another H5 Together, a list of six friends) and the robot's `panel|online test_invite`; inviting a made-up friend calls no Steam function. Robot steps: `panel|online invite` (as a click), `picker`, `close`, `pick <row>` (ui_test only: a robot never invites a real friend).
+
+### IsOverlayEnabled
+
+| Case | Result |
+|---|---|
+| The robot started the game (not Steam), 3 runs on 2026-11-03 | **not enabled at Steam's start, enabled 5 s later** (`Steam's overlay is enabled now, 5 s after Steam's start (started without Steam)`). "Invite friends..." then asked for Steam's dialog and **the overlay opened** 16 ms later (`vlan steam: Steam's overlay opened`). |
+| The spike (2026-11-02), robot-started | the same: not at init, yes at 45 s (then checked only once more) |
+| Steam started the game | **not checked yet** (the test copy is not Steam's game folder). The log line says it: `Steam's overlay ... at Steam's start (Steam started the game)` and later changes. The laptop of the two-PC test starts the game from Steam: its log will tell. |
+
+So the add-on checks again every 5 s and decides at the click; if the dialog does not open within 2.5 s, our own list opens.
+
+### Robot runs (test copy `C:\Games\H5_test_k`, MMH5.5 RC19k, French; results in the branch worktree's `build/robot/`)
+
+| Run | What | Result |
+|---|---|---|
+| `20261103-074333`, `mode=steam`, `ui_test=1` | the whole UI with made-up friends | the banner on the main menu, the Options row ("Jeu en ligne \*: Steam"), the LAN screen's lines (2 friends with H5 Together, 1 without, an invite, two games that cannot be joined), the waiting room's "Inviter des amis..." next to "Règles...", our list (6 made-up friends), two of them "Invité" (no Steam call: `ui_test: a made-up friend marked as invited (nothing sent to Steam)`); the lobby was made as in step 3 |
+| `20261103-074550`, `mode=steam` | the real thing (0 of 85 friends playing) | "Steam : aucun de vos amis ne joue avec H5 Together pour l'instant."; the button; Steam's invite dialog asked for, the overlay opened (no invite sent: nobody clicked in it) |
+| `20261103-074712`, `mode=steam` **without** `steam_api.dll` | the no-Steam case | the Options line "Pas de steam_api.dll : pas de Steam"; the row set to "Désactivé (réseau local)" as a click would; the LAN screen: "Steam n'est pas disponible : le fichier steam_api.dll de Valve manque dans bin\h5-together." and "La liste montre les parties de votre réseau local..."; the game's own LAN as before |
+
+**Not covered yet** (needs two PCs and two Steam accounts, the evening test): an invite received for real (`GameLobbyJoinRequested_t`) and from the friends list's "Join game"; `+connect_lobby` when Steam starts the game (only parsing is unit-tested); the pop-up of an invite while the game is in the background; "N friends playing with H5 Together" counting a real friend (rich presence between two accounts); a friend's game of another MMH5.5 for real; `IsOverlayEnabled` when Steam started the game (and under Proton).
+
+**The owner's hand test (2026-11-03 evening, package dev.201):** the desktop hosted and clicked "Inviter des amis...": Steam's overlay dialog opened. The laptop's game was not running: accepting the invite in Steam started it with `+connect_lobby`, the main menu's banner showed, and the host's game was in the LAN list at once. "It works extremely well." Two follow-ups came out of it (next section).
+
+### Follow-ups (2026-11-03 evening): auto-join, and the game's message boxes
+
+**1. Joining by itself after an invite** (`src/mods/online_join.cpp`, the owner's answer to question 3). When an invite comes (Steam's, or `+connect_lobby` at launch) and the player is on the main menu (or comes back to it within 10 minutes), the add-on does what the player would click, with the game's own code:
+
+| Step | How | Robot finding |
+|---|---|---|
+| Main menu → Multiplayer > LAN | the Multiplayer page's own command `"lan"` (`NUI::CMultiPlayerSubmenu::OnCommand`, `0x00699730`, slot 1 of vftable `0x00e318b8`); the page object comes from a hook on slot 0 (`SetOwner`, `0x006994a0`, called when the main menu is built), stacked under the robot's own hook of that slot | the LAN screen opens in the same frame |
+| Wait for the host's game in the list | every 250 ms, the list's rows (as `robot_lobby.cpp`'s `PickGame`); a row's game data (`NUI::CGameData`) holds the host's server address at **+0x18** (its `sockaddr_in` at +0x14: the join code `0x006fb9a0` reads data + 0xc onwards). The virtual LAN gives each player one fake address (the host's: from its lobby data, or from the peer table once heard), so the right row is the one whose +0x18 is the host's | the host's 198.18.161.134 at +0x18 (`its data +0x18`) |
+| Choose it, then Join | the list's own "highlight" (`IListControl` slot 10, as a click), then, **on a later frame** (0.6 s), the LAN screen's own `"join"` (its `IProgrammedReactionsAndChecks`, found from the object's RTTI; React `0x006fd4f0`, which passes `"join"` to its base's `0x006f7a00`) | Join pressed in the same frame as the highlight did nothing: the screen takes the highlighted row as its choice in its own update |
+| Done | the waiting room (`NUI::CMPWaitScreen`) on top | 2 s from the invite to the waiting room, and the game played |
+
+What the LAN screen says meanwhile, in the box under the list: "Lucas vous invite : en attente de sa partie dans la liste ci-dessus, puis connexion automatique.", then "Lucas vous invite : connexion à sa partie...". If the host's game does not show in 20 s: "... mais sa partie n'est pas apparue dans la liste : choisissez-la quand elle apparaît, puis Rejoindre." If Join does not lead to the waiting room (a message box, or 30 s): "... mais la connexion à sa partie n'a pas marché : choisissez-la dans la liste et cliquez à nouveau sur Rejoindre." The player stays on the LAN screen in both cases.
+
+Safety: it acts only on the main menu and the LAN screen (never in a game, the waiting room, Options...), never while a message box or the name box is open over the LAN screen (it waits, and its 20 s start again), once per invite, and an invite older than 10 minutes is dropped. If the player leaves the LAN screen, it stops. If the game's code is not as expected (the vftable slot, the screen's buttons), it does nothing and the banner remains.
+
+**The player's name:** joining does not need the LAN screen's name to be typed: the game takes it from the profile (`lan_last_login`, set the first time the player enters a name). If the name box (`NUI::CSimpleEditBox`, a screen over the LAN screen) is open, the auto-join waits until it closes. (An empty name could not be made in a robot run: the game keeps the last one; a host with a broken name could not create its game at all, `20261103-193931-lan`.)
+
+**2. Our lines were drawn over the game's message boxes** (the laptop's screenshot: "Timeout. May be no more free slots available in the game. Error code 0.18.0" with our lines over its left edge). What the robot found:
+
+| Box | What it is | Seen by TopScreen? |
+|---|---|---|
+| the exit question (main menu, `msg|main_menu_exit`) | `NUI::CExitGameQuestionScreen`, a screen pushed on the list | yes |
+| the LAN screen's name box (`ui|NUI::CLobbyScreen changename`) | `NUI::CSimpleEditBox`, a screen | yes |
+| the join's "Temps écoulé... Code d'erreur 0.18.0" (reproduced with the new hidden `[online] test_drop_join=1`: the virtual LAN loses our join request) | `NUI::CCommonMsgBox`, **not in the screen list**: TopScreen still says `NUI::CLobbyScreen` | **no**: hence the bug |
+
+So the add-on now watches the game's common message boxes itself: a hook on the call sites of `NUI::CCommonMsgBox`'s constructor (`0x0067a730`, 9 sites; it also builds `CCommonMsgBoxWithUpdatableText`) remembers each box; a box lives until its destructor changes its vftable. Not every box is shown: after the error box closed, another one was made (at `0x0067af1b`) and never shown; comparing the two objects in the log gave the test: a shown box has its fields +0x14 and +0x18 set (+0x18 looks like its parent window), the never-shown one has both 0. While a box is shown, nothing of ours is drawn (the LAN screen's lines, the banner, the button), and the auto-join waits. Log: `online: game message boxes shown: 1; new: .?AVCCommonMsgBox@NUI@@, made at 0067919d; one shown`.
+
+**Robot runs** (two copies, the loopback virtual LAN, `run_lan_test.py --vlan --client-autojoin 20`; French; screenshots in the session's scratchpad `online-ui-shots\autojoin\`):
+
+| Run | Result |
+|---|---|
+| `20261103-194501-lan` | the client gets a made-up invite on the main menu; the LAN screen opens, "Lucas vous invite : en attente...", the host's game shows 1 s later, chosen, Join; the waiting room 2 s after the invite; the game started and played |
+| `20261103-194549-lan` (`--client-online test_drop_join=1`) | the join request is lost: the game's error box after 6 s, with **nothing of ours over it**; after the box closed, "Un ami vous invite, mais la connexion à sa partie n'a pas marché : ..." |
+| `20261103-191759-lan` (before the fix) | the same box with our line over it, as on the laptop |
+| `20261103-194255-lan` | the name box opened over the LAN screen before the host's game showed: the auto-join waited (no "stopped") |
+
+New robot tools: `panel|online test_autojoin [name]` (an invite to the first host this PC hears of), `panel|online games` (each row's game data, and where a fake address sits in it), `run_lan_test.py --client-autojoin N`, `--host-online` / `--client-online KEY=VALUE`, `--client-setvar`.
+
+**Not covered yet:** the auto-join after a real Steam invite between two PCs (the robot's invites are made up; the real path only adds the invite's host and lobby), and after `+connect_lobby` (the lobby's data must come first: then the host is known).
+
 ## Steps and effort
 
 A session is one focused working block of a few hours.
@@ -436,7 +538,7 @@ A session is one focused working block of a few hours.
 | 1 | Packet map: the robot's `net_log` logs whole packets; find the address lists inside `01` and `03`; write it up in [multiplayer-sync.md](../subsystems/multiplayer-sync.md). **Done 2026-11-02** ([results](#steps-1-and-2-the-packet-map-and-the-virtual-lan-core-2026-11-02)) | 0.5 |
 | 2 | Virtual LAN core with the loopback transport: Winsock hooks (stacked with `lan_discovery`), fake addresses, `gethostbyname` answer, hosting detection, unit tests, robot LAN game (checksums, no real IP in packets). **Done 2026-11-02** ([results](#steps-1-and-2-the-packet-map-and-the-virtual-lan-core-2026-11-02)) | 2 |
 | 3 | Steam transport: lazy loading, init, our callback thread, lobbies, known hosts, sessions, version data; logs. **Built 2026-11-02** ([results](#step-3-the-steam-transport-2026-11-02)); the two-PC test of the real game is [online-steam-test2.md](online-steam-test2.md) | 2 |
-| 4 | UI: the box on the LAN screen (Steam/LAN choice, status, games with problems), "Invite friends...", invite toast, French texts | 2 |
+| 4 | UI: the Options row (Off/Steam), Steam's lines on the LAN screen (status, games with problems, invites), "Invite friends..." (Steam's dialog or our list), the invite's banner and pop-up, French texts. **Built 2026-11-03** ([results](#step-4-the-online-ui-2026-11-03)) | 2 |
 | 5 | Real tests with the owner and friends (Windows, Linux, 3 PCs) and fixes | 1–2 |
 | 6 | Package: `steam_api.dll` in `bin\h5-together\`, install guide, release notes | 0.5 |
 
