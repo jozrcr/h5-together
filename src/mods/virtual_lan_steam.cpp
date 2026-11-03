@@ -889,6 +889,8 @@ private:
 	// --- the online UI: the picker, Steam's dialog, the overlay -----------------------------
 	void DoAsks()
 	{
+		if (!ask_dialog_ && asks_.empty())
+			return;
 		char lobby[12];
 		Short(plan_.Lobby(), lobby, sizeof(lobby));
 		if (ask_dialog_) {
