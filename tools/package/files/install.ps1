@@ -1022,7 +1022,8 @@ try {
     Write-Host "     If its first line says ""H5 Together hook DLL $version loaded"", the add-on is running."
     Write-Host "  3. Everyone in the same co-op game should install the same version."
     Write-Host ""
-    Write-Host "To change a setting, open h5-together.ini in that folder: every line says what it does."
+    Write-Host "To change a setting: in the game, Options > H5 Together (or press F3)."
+    Write-Host "Or open h5-together.ini in that folder: every line says what it does."
     Write-Host "To remove H5 Together, run uninstall.bat. If something goes wrong, run bug-report.bat."
 
     $publicNets = @(Get-PublicZeroTier)

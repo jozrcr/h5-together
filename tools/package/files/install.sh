@@ -873,6 +873,7 @@ echo "         $bin"
 echo "     If its first line says \"H5 Together hook DLL $version loaded\", the add-on is running."
 echo "  4. Everyone in the same co-op game should install the same version."
 echo
-echo "To change a setting, open h5-together.ini in that folder: every line says what it does."
+echo "To change a setting: in the game, Options > H5 Together (or press F3)."
+echo "Or open h5-together.ini in that folder: every line says what it does."
 echo "To remove H5 Together, run: bash uninstall.sh. If something goes wrong, run: bash bug-report.sh"
 exit 0

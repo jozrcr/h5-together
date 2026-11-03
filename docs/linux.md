@@ -7,7 +7,7 @@ A step-by-step guide for a player on Linux who joins a co-op game hosted on Wind
 - Our DLL now also sends that message into every network, ZeroTier included (`src/mods/lan_discovery.cpp`).
 - **Both players need the new DLL**, and the Windows host's ZeroTier network must be **Private** (step 3 of the host's part).
 
-**Status:** the mod is tested on Windows (two copies of the game on one PC, no desync in long games). The Linux and ZeroTier parts follow the standard steps but nobody has tried them with this game yet. If something doesn't work, the [troubleshooting](#troubleshooting) table says what to check, and [what to send back](#what-to-send-back) lists what helps us fix it.
+**Status:** the mod is tested on Windows (two copies of the game on one PC, no desync in long games), and a Windows host and a Linux friend (Steam with Proton) have played together over ZeroTier. The Steam Deck and other launchers (Lutris, Heroic) are not tried. If something doesn't work, the [troubleshooting](#troubleshooting) table says what to check, and [what to send back](#what-to-send-back) lists what helps us fix it.
 
 **Words used here:** the *host* is the Windows player who creates the game. *You* are the Linux player who joins. Only the host's PC runs the AI, so the faster PC should host.
 
