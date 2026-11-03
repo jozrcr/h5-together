@@ -161,6 +161,7 @@ volatile LONG g_in_reset = 0;
 volatile DWORD g_present_tick = 0, g_reset_tick = 0;
 volatile LONG g_presents = 0;
 volatile HRESULT g_present_result = S_OK;
+IDirect3DDevice9 *volatile g_presented = nullptr;  // PresentedDevice()
 
 void ReportForWatchdog()
 {
@@ -184,6 +185,7 @@ HRESULT STDMETHODCALLTYPE HookPresent(IDirect3DDevice9 *self, const RECT *source
 {
 	const DeviceTable *t = DeviceTableOf(*reinterpret_cast<void ***>(self));
 	const PresentFn next = t && t->present ? t->present : g_last_present;
+	g_presented = self;
 	g_in_present = 1;
 	for (int i = 0; i < g_present_count; ++i) {
 		__try {
@@ -282,6 +284,11 @@ bool Install(bool late)
 HWND DeviceWindow()
 {
 	return g_window;
+}
+
+IDirect3DDevice9 *PresentedDevice()
+{
+	return g_presented;
 }
 
 }  // namespace d3dhook

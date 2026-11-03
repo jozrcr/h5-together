@@ -243,6 +243,7 @@ Besides starting a map, the DLL runs a script of timed steps (`--step`, or `--ho
 | `key` | `F1`..`F12` | presses one of **our overlay's** keys (the DLL's own key handling sees it; the game does not): e.g. `F11` opens the template builder on the random map screen, `F9` is not covered (the player list reads its key itself) |
 | `dik` | `<hex DIK code> [hold ms]` | presses a **game** key through the robot's DirectInput keyboard (`robot_input.cpp`), held 150 ms or the given time: e.g. `d1 1500` = Page Down (zoom out) for 1.5 s, `c9 1500` = Page Up |
 | `wheel` | `<notches> [steps]` | turns the mouse wheel: that many notches (+ up = zoom in, - down = zoom out), one per read of the game's mouse events, as positions (the running sum, as Windows gives them) or with `steps` as +-120 steps (as Wine gives them, to check `[camera] wheel_fix`) |
+| `mouse` | `<x> <y>` or `off` | from then on, the game hears that the mouse is at that point of its window (client pixels: 1008×729 in robot runs, the 1024×768 window minus its frame; the back buffer has the same size), wherever the real mouse is, so it draws its cursor there: the exe's `GetCursorPos` import goes through the robot when the script has a `mouse` step. `off` gives the real mouse back. Our modal panels follow that cursor too (hover); no click. For screenshots of the cursor over our panels |
 | `panel` | a command | for our open panel, what a click would do (the robot cannot click): the template builder takes `preset <n>`, `distance on\|off`, `scroll <units>\|end`, `use`, `save`, `cancel` and `open` (`rmg_builder.cpp`) |
 | `peek` | `<screen class> <hex offset> ...` | research: logs the objects along a pointer chain from a screen, with their class names |
 
@@ -267,7 +268,7 @@ In robot mode the DLL:
 | Measures the AI | the AI turn trace (`src/hook/ai_trace.cpp`): one log line per AI step |
 | Stops | after `--turns` AI turns, or `--seconds` |
 | Shows what the game says | copies `printf` / `fprintf` / `OutputDebugStringA` output to the log; the console goes to `console.txt`; message boxes are logged (and plain "OK" boxes answered) |
-| Takes screenshots | saves the back buffer just before `IDirect3DDevice9::Present` shows it, after the player list overlay drew on it (`robot_screen.cpp`, through the shared Direct3D hooks of `src/hook/d3d9_hook.cpp`) |
+| Takes screenshots | saves the back buffer just before `IDirect3DDevice9::Present` shows it, after the overlay drew on it and with the game's own cursor (`robot_screen.cpp`, through the shared Direct3D hooks of `src/hook/d3d9_hook.cpp`) |
 
 ## LAN games (two copies on one PC)
 

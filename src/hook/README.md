@@ -55,6 +55,20 @@ The panels' **words** are not the overlay's: they come from our texts files, one
 
 Each frame, the overlay asks every client "do you draw now?", lets those that do load pictures and ask for fonts, then runs one ImGui frame in which they draw in the order they registered (the player list first). A client that crashes is caught, turned off and logged.
 
+### Under the game's cursor (`overlay_cursor.cpp`)
+
+The game draws **its own cursor** (`ui_use_hwcursor = 0`, the default) as one more picture of its frame, after every window of the screen. Our panels used to be drawn after the whole frame, just before `Present`, so they covered the cursor (it "went under" them). Now the frame of the overlay is drawn **just before the game draws its cursor**, inside the game's own scene, and the cursor lands on top of our panels, on every screen:
+
+- the cursor's "draw" is a virtual function of `NUI::CCursor` (vftable `0x00e49494`, slot 2 = `0x00836440`); that vftable slot points to us (a data patch, checked like the others) and we call the game's function after drawing;
+- every screen on the game's stack of screens draws the cursor (the waiting room: the main menu, the lobby's background, the waiting room itself), the lower ones first; only the last one shows. We draw under the last one: the one that was last in the frame before (its place among the frame's calls and its stack address), so just after a change of screens one frame may be drawn at `Present` instead;
+- the clients are still asked "do you draw?" at `Present` (what they do then may act on the game, which must not happen in the middle of the game's drawing); the frame drawn under the cursor shows what they said at the previous `Present`, one frame (about 16 ms) earlier;
+- the game draws its 2D pictures in batches (`NGScene::C2DScene`: quads of one texture wait in a renderer and are drawn when the texture changes). The last windows' batch may still be waiting when the cursor comes, so we have it drawn first, with the game's own function (`0x00a46bc0`), as the scene does itself; otherwise those windows would land over our panels;
+- only when the game's device is the one whose frames we see, and it draws on the screen (its back buffer) at that moment.
+
+When a frame has no cursor drawn (a screen that does not draw it) or something is not as expected (code bytes at start, vftables at each frame), that frame is drawn at `Present` as before, over everything, and the log says why, once. Log lines: `overlay: the game's cursor draw goes through us: ...` at start, `overlay: our panels are drawn just under the game's cursor (first frame)` once it works. Details and addresses: [docs/subsystems/ui-drawing.md](../../docs/subsystems/ui-drawing.md).
+
+**Hover: the game's pictures of light.** Our clickable things knew when the game's cursor was over them (the buttons of modal panels through ImGui, which follows the game's cursor; the buttons drawn on the game's screens, "Rules...", "Template...", the hero screen's Look button, by each panel's own test while the game's window is in front), but the hover did not show: the game's highlight pictures (`Button_122_34_Highlight`, `ComboBtnHighlight`) have **no alpha at all**, only colours to **add** to what is behind (their `.xdb` says `ConversionType` `CONVERT_TRANSPARENT_ADD`). ImGui blends every picture by its alpha, so they were invisible. Now `overlay_textures.cpp` marks such pictures when it loads them, and the overlay draws every draw command that uses one with adding (a callback before it that sets the device's blending to add, ImGui's own "reset" callback after it), for every client, also the ones that use the shared widgets (`src/mods/rmg_builder_widgets.cpp`) or `ui::NineSlice`. The drop-down's arrow now draws its normal picture with the highlight over it (it drew the highlight alone, so the arrow vanished on hover).
+
 ### Modal panels: the game gets no input (`overlay_input.cpp`, `input_mute.cpp`, `dinput_hook.cpp`)
 
 A modal panel (the template builder, the hero looks, the game rules, the test panel) takes the whole mouse and keyboard while it is open. **When no modal panel is open, everything passes through untouched** (the player list is display-only, as before).
@@ -234,6 +248,7 @@ On **Linux** (Wine/Proton) Wine prefers its own built-in `dinput8.dll`. Tell it 
 | `overlay_input.cpp` | modal panels: the window procedure, the ImGui feed, the DirectInput mute, the safety nets |
 | `input_mute.cpp/.h` | the rules of what is held back from the game while a modal panel is open (pure code, tested) |
 | `overlay_textures.cpp` | pictures from the game's data, as textures |
+| `overlay_cursor.cpp` | the overlay's frame drawn just under the game's own cursor (its draw call goes through us) |
 | `overlay_test_panel.cpp` | the test panel (`[ui] overlay_test_panel=1`) |
 | `third_party/imgui/` | Dear ImGui v1.91.9b (MIT): core + DirectX 9 renderer, for the overlay |
 | `../mods/online_ui*.cpp`, `online_join.cpp` | online play's UI, an overlay client (step 4 of docs/plans/online-steam.md): Steam's lines on the LAN screen, "Invite friends..." and its list, an invite's banner, the auto-join after an invite, the watch of the game's message boxes; robot steps `panel\|online ...` ([src/mods/README.md](../mods/README.md#online-play-over-steam-the-ui-online_uicpp)) |
