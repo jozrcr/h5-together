@@ -11,7 +11,7 @@ python tools\package\make_package.py --version 0.1.0
 python tools\package\make_package.py --rebuild  # build the DLL again first
 ```
 
-`build\` is not committed. The script lists the zip's contents and its SHA-256 at the end.
+`build\` is not committed. The script lists the zip's contents and its SHA-256 at the end. For Valve's `steam_api.dll` (online play over Steam), see "Valve's steam_api.dll" below: `--steam-api` and `--add-steam-api`.
 
 ## What is in the zip
 
@@ -28,6 +28,7 @@ python tools\package\make_package.py --rebuild  # build the DLL again first
 | `THIRD-PARTY-NOTICES.txt` | the licence notices of what else is inside `dinput8.dll`: Dear ImGui (its `LICENSE.txt` is pasted in word for word, with the version from `imgui.h`), the stb files it carries (Sean Barrett) and its built-in ProggyClean font (Tristan Grimmer). The MIT licences ask for the notice to go along with copies. The text is the template `files/THIRD-PARTY-NOTICES.txt`; if third-party code is added to the DLL, add it there (and see `licence_checks` in `test_scripts.py`) |
 | `h5-together/templates/OH-*.xdb` | the ready random map templates (see below) |
 | `h5-together/texts/<code>.txt` | our language files, the words of the add-on's panels: `en.txt`, `fr.txt` (see below) |
+| `h5-together/steam_api.dll` | **only in a package it was added to** (not in GitHub's build): Valve's file for online play over Steam (see below) |
 
 The scripts and text files are in `tools/package/files/`. Everything is in one top folder, `h5-together-<version>/`, so that unzipping on Linux does not spread the files around. Line endings are set when the zip is written: CRLF for `.bat`, `.ps1`, `.txt` and `.ini` (Notepad, cmd.exe), LF for `.sh`, which also get the executable bit. In the repo, `.gitattributes` keeps `.bat` as CRLF and `.sh` as LF.
 
@@ -48,6 +49,33 @@ The scripts and text files are in `tools/package/files/`. Everything is in one t
 - The English in the DLL is built in from `en.txt` (`src/hook/build.ps1`): a missing or damaged texts folder only loses the other languages.
 - `python tools/lang/ui_texts.py check` (run by `build.ps1 -Test`) checks the files against the code before they are packed.
 
+## Valve's steam_api.dll
+
+Online play over Steam (`[online] mode=steam`, Options > H5 Together > Online play) needs Valve's `steam_api.dll` in the game's `bin\h5-together\` folder: our DLL loads it from there when the player turns that on (`src/mods/steam_runtime.cpp`), and never otherwise. Valve's Steamworks SDK Access Agreement allows shipping the SDK's `redistributable_bin` files with software that uses Steam (summary in [docs/plans/online-steam.md](../../docs/plans/online-steam.md), "3. Licence of steam_api.dll").
+
+- **Never in the repo.** No DLL and no part of the SDK is ever committed. The SDK sits in `ref\steamworks_sdk_165\` (not committed), and GitHub's build has no copy of it, so **the zip that GitHub builds has no `steam_api.dll`**. It is added on the owner's PC.
+- Only the **32-bit** file, `ref\steamworks_sdk_165\sdk\redistributable_bin\steam_api.dll` (the game is 32-bit; `win64\steam_api64.dll` is for 64-bit programs). `make_package.py` refuses a file that is not called `steam_api.dll` or is not a 32-bit Windows DLL (the PE header's machine must be `0x14c`).
+- In the zip it is `h5-together/steam_api.dll`, the last file.
+
+**Build the zip with it:**
+
+```
+python tools\package\make_package.py --steam-api ref\steamworks_sdk_165\sdk\redistributable_bin\steam_api.dll
+```
+
+**Add it to a zip built already** (the one GitHub's tag build puts in the draft release):
+
+```
+python tools\package\make_package.py --add-steam-api h5-together-0.3.0.zip ref\steamworks_sdk_165\sdk\redistributable_bin\steam_api.dll
+```
+
+It changes the zip in place (on a copy first, so a failure leaves it as it was). Every other file in the zip keeps its name, its place and its bytes, compressed as they were: the new file is appended, and only the zip's table of contents at its end is written again. The script checks that before it replaces the zip, then prints the new zip's SHA-256. The same file twice: nothing to do. Another `steam_api.dll` in a zip that has one: refused (start again from the zip without it). Both ways make the same zip, byte for byte (`test_scripts.py` checks it).
+
+**What the scripts do with it:**
+- `install.ps1` / `install.sh`: if the package has `h5-together\steam_api.dll`, it is copied to `bin\h5-together\steam_api.dll`, over any copy there (that folder is ours; on Linux also a copy under another spelling, which Wine would find too). The summary has one line: `installed Valve's steam_api.dll in h5-together (online play over Steam, off until you turn it on in Options)`. A package without it changes nothing there and says nothing about it.
+- `uninstall.ps1` / `uninstall.sh`: if the package has it and the file in `bin\h5-together` is byte for byte the same (the same SHA-256), it is removed (then the `h5-together` folder too, once it is empty). A file that differs (another version, put there by hand) is kept, and the uninstaller says so. A package without it leaves the file alone.
+- `THIRD-PARTY-NOTICES.txt` has a section for it (Valve's file, under the Steamworks SDK Access Agreement, not under our MIT licence), and `README.txt` a line. They are in every package, so they say "if this package has it".
+
 ## What the scripts do
 
 - Windows (`install.ps1`, Windows PowerShell 5.1, French Windows included):
@@ -57,12 +85,13 @@ The scripts and text files are in `tools/package/files/`. Everything is in one t
   - copies `h5-together.ini` if there is none, and otherwise **refreshes** the player's file (see "The settings file" below);
   - copies the templates into `bin\h5-together\templates\` (making the folder). It overwrites its own `OH-*.xdb` files there (by name) and touches no other file, so a player's own templates stay. The summary says how many templates were installed (and how many replaced older copies of ours, and how many other files it left alone);
   - copies the language files into `bin\h5-together\texts\` the same way: ours are overwritten, a translation of the player's own (`de.txt`) stays; the summary names them (`en, fr`);
+  - copies Valve's `steam_api.dll` into `bin\h5-together\` if the package has it (see "Valve's steam_api.dll" above);
   - looks at the network profiles and explains how to make a Public ZeroTier network Private. It changes no Windows setting and no firewall rule;
   - ends with "All done", what to do next (start the game, look for `h5-together.log`, its first line) and "Press Enter to close this window".
 - Linux (`install.sh`): the same screens, looking for Steam in `~/.steam/steam`, `~/.local/share/Steam`, the Flatpak and the Snap folders (no GOG, no folder window; a number or a pasted folder). It prints the Steam launch option `WINEDLLOVERRIDES="dinput8=n,b" %command%`, and which exe to start. It does not edit Steam's files.
 - "Ours" means the file contains the text `H5 Together hook DLL` (a string in `src/hook/dllmain.cpp`), or `open-homm5 hook DLL` (the DLLs of 0.2.7 and older). `make_package.py` refuses to pack a DLL without the first.
 - The Linux installer also reuses an existing `h5-together\templates` folder and existing template files under another upper/lower case spelling (Wine reads them either way), so it never makes a second copy.
-- Uninstall finds and shows the game the same way (without the MMH5.5 warnings), asks to close the game if it runs, then removes our `dinput8.dll`, `h5-together.log` (and `h5-together.old.log`, the older log the DLL keeps once the log passes 5 MB), and `h5-together.ini` after asking. The same question covers the installer's backups of it (`h5-together.ini.bak`, `.bak2`, `.bak3`): "yes" removes the file and its backups (they are copies of the settings the player asked to delete), "no" keeps them all. It also removes the language files and the templates: only the `<code>.txt` and `OH-*.xdb` names that are in the package it runs from, never another file. If the `texts` and `templates` folders are then empty they are removed, and then `h5-together` too if it is empty. The same files under the old name (`open-homm5.log`, `open-homm5.ini` and its copies, `open-homm5\templates`) go the same way. Nothing else: the hero looks' file (`h5-together-skins.ini`) and the French packs (`lang\fr`) stay.
+- Uninstall finds and shows the game the same way (without the MMH5.5 warnings), asks to close the game if it runs, then removes our `dinput8.dll`, `h5-together.log` (and `h5-together.old.log`, the older log the DLL keeps once the log passes 5 MB), and `h5-together.ini` after asking. The same question covers the installer's backups of it (`h5-together.ini.bak`, `.bak2`, `.bak3`): "yes" removes the file and its backups (they are copies of the settings the player asked to delete), "no" keeps them all. It also removes the language files and the templates: only the `<code>.txt` and `OH-*.xdb` names that are in the package it runs from, never another file. Valve's `steam_api.dll` goes only if the package it runs from has it and the file is byte for byte that one. If the `texts` and `templates` folders are then empty they are removed, and then `h5-together` too if it is empty. The same files under the old name (`open-homm5.log`, `open-homm5.ini` and its copies, `open-homm5\templates`) go the same way. Nothing else: the hero looks' file (`h5-together-skins.ini`) and the French packs (`lang\fr`) stay.
   - A template that an older version of the package installed, and a newer one no longer has, is not in the newer package's list: uninstalling from the newer package leaves it. This is on purpose (the alternative is deleting every `OH-*.xdb`, which would also delete a player's own template made with the template maker page).
 
 ## Finding the game, and what the scripts say about it
@@ -181,7 +210,15 @@ For the templates it checks that the zip holds every source file byte for byte, 
 
 For the language files it checks that the zip holds every `src/mods/texts/*.txt` and nothing else, each as its source with a byte-order mark and CRLF, that `fr.txt` keeps its accents, and that every other file of the package is plain ASCII. Then (Windows and Linux alike): an install puts exactly ours in `bin/h5-together/texts` and names them; a re-install overwrites our `fr.txt` changed by hand and keeps a player's own `de.txt` and notes; an uninstall removes only ours, and install then uninstall leaves the game folder as it was; a package without its `texts` folder is refused (exit 7).
 
-For the licence files it checks that `LICENSE.txt` is the repo's `LICENSE`, that `THIRD-PARTY-NOTICES.txt` carries Dear ImGui's licence file word for word and names the stb files and the font, and that Dear ImGui still bundles exactly the three stb files the notices list.
+For the licence files it checks that `LICENSE.txt` is the repo's `LICENSE`, that `THIRD-PARTY-NOTICES.txt` carries Dear ImGui's licence file word for word and names the stb files and the font, has the section for Valve's `steam_api.dll`, and that Dear ImGui still bundles exactly the three stb files the notices list.
+
+For Valve's `steam_api.dll` it never uses the real file: a tiny **fake** `steam_api.dll` (only the headers of a 32-bit Windows DLL) is made in the work folder. It checks that:
+- the zip built without the option has none;
+- `--add-steam-api` refuses a file that is not a DLL, a 64-bit DLL, a `steam_api64.dll` and a program (the zip unchanged each time), and a zip that is not our package;
+- it adds the fake as `<top folder>/h5-together/steam_api.dll`, last, prints the new zip's SHA-256, and leaves every other file of the zip byte for byte as it was (same names, order, headers and compressed data); the same file again changes nothing, another one is refused;
+- `--steam-api` builds byte for byte the zip that a build and then `--add-steam-api` make (with the same `SOURCE_DATE_EPOCH`), and refuses a 64-bit DLL without building anything;
+- then, Windows and Linux alike, with that package and with the one without it: a package without it installs none and says nothing; the package with it copies it to `bin/h5-together/steam_api.dll` (one line in the summary) and overwrites another copy there; an uninstall from a package without it leaves it alone; an uninstall from the package with it removes it and then the empty `h5-together` folder (the game folder is as before); a copy that differs is kept and the uninstaller says so;
+- on Linux, a copy under another spelling (`H5-Together/Steam_API.dll`) is overwritten, not doubled, and removed by the uninstaller.
 
 For the bug report script (Windows and Linux alike, on fake folders with a log, an older log, the settings, a skins file, a version pak, and things that must stay out: a save, a map, an old `.bak`) it checks that:
 - the zip holds exactly those four files, byte for byte, and `system.txt`, and nothing else;
@@ -211,7 +248,8 @@ The zip is then a download on the run's page (Actions tab).
 2. Write the release notes in `docs/releases/<version>.md`, in plain words for players. Their "Check that it works" says: the first line of `h5-together.log` (in the game's `bin` folder) is `H5 Together hook DLL <version> loaded`. The first release with the new name also tells players that open-homm5 is now H5 Together, and that the installer moves their files (`open-homm5.ini` becomes `h5-together.ini`, the folder `open-homm5` becomes `h5-together`).
 3. Merge to `main`.
 4. Tag that commit `v<version>` and push the tag (`git tag v0.1.0`, then `git push origin v0.1.0`). GitHub then builds and tests everything, and creates a **draft** release with the zip and the notes.
-5. The owner reads the draft on the repo's Releases page and publishes it.
+5. From 0.3.0, on the owner's PC: add Valve's `steam_api.dll` to the draft's zip (GitHub's build has none). Download the zip from the draft, run `python tools\package\make_package.py --add-steam-api <the zip> ref\steamworks_sdk_165\sdk\redistributable_bin\steam_api.dll`, and put the new zip in the draft in place of the old one (same file name; on the draft's edit page, or `gh release upload v<version> <the zip> --clobber`). If the notes give the zip's SHA-256, use the one the script printed.
+6. The owner reads the draft on the repo's Releases page and publishes it.
 
 `make_package.py` refuses a release version that is not the one in `version.h`, and a DLL built from another version. Test builds use a version with a `-`, like `0.1.0-test2`.
 

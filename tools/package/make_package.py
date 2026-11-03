@@ -16,11 +16,25 @@ and cmd read them in the Windows code page); only the language files hold other 
 
 If build/hook/dinput8.dll is missing it is built with src/hook/build.ps1 (Windows
 with Visual Studio only). Nothing is uploaded or published; the zip stays local.
+
+Valve's steam_api.dll (online play over Steam) is never in the repo, and GitHub's build has
+no copy of it, so the package is built without it. On a PC that has the Steamworks SDK
+(ref/ is not committed), it goes in as h5-together/steam_api.dll, the install scripts copy
+it to the game's bin/h5-together/ folder. Only the 32-bit file, redistributable_bin/steam_api.dll:
+
+    python tools/package/make_package.py --steam-api ref/steamworks_sdk_165/sdk/redistributable_bin/steam_api.dll
+    python tools/package/make_package.py --add-steam-api build/package/h5-together-0.3.0.zip ref/steamworks_sdk_165/sdk/redistributable_bin/steam_api.dll
+
+The first builds the zip with it. The second adds it to a zip that was built already (the
+one GitHub's tag build puts in the draft release): the zip is changed in place, every other
+file in it keeps its name, its place and its bytes, and the new zip's SHA-256 is printed.
+Both refuse a file that is not a 32-bit Windows DLL called steam_api.dll.
 """
 import argparse
 import hashlib
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -86,6 +100,14 @@ TEMPLATE_NAME = re.compile(r"OH-[A-Za-z0-9.-]+\.xdb")
 TEXTS_SRC = REPO / "src" / "mods" / "texts"
 TEXTS_IN_ZIP = "h5-together/texts"
 TEXT_NAME = re.compile(r"[a-z]{2,3}(-[a-z0-9]{1,8})?\.txt")
+
+# Valve's steam_api.dll: the DLL loads it from bin\h5-together\ when the player turns on
+# online play over Steam (src/mods/steam_runtime.cpp). Last in the zip, whichever way it
+# was added (--steam-api or --add-steam-api). The game is 32-bit, so the DLL must be too.
+STEAM_API_NAME = "steam_api.dll"
+STEAM_API_IN_ZIP = "h5-together/" + STEAM_API_NAME
+PE_MACHINE_I386 = 0x14C
+PE_FILE_DLL = 0x2000
 
 # Line endings inside the zip: Windows files get CRLF (Notepad, cmd.exe), shell
 # scripts must stay LF. The repo keeps LF (and CRLF for .bat, see .gitattributes).
@@ -220,6 +242,115 @@ def text_files():
     return out
 
 
+def pe_header(data):
+    """(machine, characteristics) of a Windows program or DLL (a PE file), or None if it is not one."""
+    if len(data) < 0x40 or data[:2] != b"MZ":
+        return None
+    pe = int.from_bytes(data[0x3C:0x40], "little")
+    if pe + 24 > len(data) or data[pe:pe + 4] != b"PE\0\0":
+        return None
+    # after "PE\0\0": Machine (2 bytes), 16 bytes of counts and offsets, Characteristics (2 bytes)
+    return int.from_bytes(data[pe + 4:pe + 6], "little"), int.from_bytes(data[pe + 22:pe + 24], "little")
+
+
+def steam_api_bytes(path):
+    """The bytes of Valve's steam_api.dll, after checking that it is a 32-bit Windows DLL
+    called steam_api.dll (the SDK's redistributable_bin/steam_api.dll)."""
+    path = Path(path)
+    if not path.is_file():
+        fail(f"{path} does not exist")
+    if path.name.lower() != STEAM_API_NAME:
+        fail(f"{path.name}: the file must be called {STEAM_API_NAME} (the SDK's redistributable_bin/steam_api.dll; "
+             "not steam_api64.dll, which is for 64-bit programs)")
+    data = path.read_bytes()
+    header = pe_header(data)
+    if header is None:
+        fail(f"{path} is not a Windows DLL")
+    machine, characteristics = header
+    if machine != PE_MACHINE_I386:
+        fail(f"{path} is not a 32-bit DLL (machine 0x{machine:x}; 32-bit is 0x14c): the game is 32-bit, "
+             "use the SDK's redistributable_bin/steam_api.dll")
+    if not characteristics & PE_FILE_DLL:
+        fail(f"{path} is a program, not a DLL")
+    return data
+
+
+def zip_entry(name, stamp):
+    """How every file goes in the zip: compressed, dated stamp, Unix permissions (so that
+    unzip on Linux keeps the .sh scripts executable). name is the full name in the zip."""
+    info = zipfile.ZipInfo(name, stamp)
+    info.compress_type = zipfile.ZIP_DEFLATED
+    info.create_system = 3  # Unix, so that unzip on Linux honours the mode below
+    mode = 0o755 if Path(name).suffix in EXECUTABLE_SUFFIXES else 0o644
+    info.external_attr = (0o100000 | mode) << 16
+    return info
+
+
+def show(path):
+    return path.relative_to(REPO) if path.is_relative_to(REPO) else path
+
+
+def add_steam_api(zip_path, dll_path):
+    """Adds Valve's steam_api.dll to a package zip built already (GitHub's tag build makes
+    it without). The new file goes at the end. The zip is appended to, not rebuilt: the
+    files already in it keep their bytes (compressed as they were), names and order; only
+    the zip's table of contents, at its end, is written again. Works on a copy, which then
+    replaces the zip, so a failure leaves the zip as it was."""
+    zip_path = Path(zip_path)
+    data = steam_api_bytes(dll_path)
+    if not zip_path.is_file():
+        fail(f"{zip_path} does not exist")
+    try:
+        with zipfile.ZipFile(zip_path) as z:
+            infos = z.infolist()
+            damaged = z.testzip()
+    except zipfile.BadZipFile as e:
+        fail(f"{zip_path} is not a zip file ({e})")
+    if damaged is not None:
+        fail(f"{zip_path} is damaged ({damaged}): download it again")
+    tops = {i.filename.split("/", 1)[0] for i in infos}
+    top = tops.pop() if len(tops) == 1 else ""
+    names = [i.filename for i in infos]
+    if not top.startswith("h5-together-") or not all(n.startswith(top + "/") for n in names) \
+            or f"{top}/dinput8.dll" not in names:
+        fail(f"{zip_path} is not an H5 Together package (one folder h5-together-<version> with dinput8.dll in it)")
+    name = f"{top}/{STEAM_API_IN_ZIP}"
+    if name in names:
+        with zipfile.ZipFile(zip_path) as z:
+            if z.read(name) != data:
+                fail(f"{zip_path} already holds another {STEAM_API_NAME}: start again from the zip without it")
+        print(f"{show(zip_path)} already holds this {STEAM_API_NAME}: nothing to do")
+        print(f"  sha256 {hashlib.sha256(zip_path.read_bytes()).hexdigest()}")
+        return
+    stamp = infos[names.index(f"{top}/dinput8.dll")].date_time  # the date of the package's other files
+
+    old = zip_path.read_bytes()
+    tmp_path = zip_path.with_name(zip_path.name + ".tmp")
+    shutil.copyfile(zip_path, tmp_path)
+    try:
+        with zipfile.ZipFile(tmp_path, "a", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
+            z.writestr(zip_entry(name, stamp), data)
+        new = tmp_path.read_bytes()
+        with zipfile.ZipFile(tmp_path) as z:
+            after = z.infolist()
+            ok = z.testzip() is None and z.read(name) == data
+        # the files that were there: the same entries in the same order, and every byte up
+        # to the new file (their headers and compressed data) unchanged
+        fields = lambda i: (i.filename, i.CRC, i.compress_size, i.file_size, i.header_offset, i.date_time, i.external_attr)
+        ok = ok and [fields(i) for i in after[:-1]] == [fields(i) for i in infos] and after[-1].filename == name
+        ok = ok and new[:after[-1].header_offset] == old[:after[-1].header_offset]
+        if not ok:
+            fail("adding the file changed the zip in a way it should not (nothing was changed)")
+        os.replace(tmp_path, zip_path)
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink()
+    print(f"added {name} to {show(zip_path)}")
+    print(f"  {len(data):>9}  {name}  (sha256 {hashlib.sha256(data).hexdigest()})")
+    print(f"  the {len(infos)} other files are unchanged")
+    print(f"  sha256 {hashlib.sha256(new).hexdigest()}  (the new zip)")
+
+
 def zip_time():
     epoch = int(os.environ.get("SOURCE_DATE_EPOCH", time.time()))
     t = time.localtime(max(epoch, 315532800))  # a zip cannot hold dates before 1980
@@ -233,7 +364,18 @@ def main():
     ap.add_argument("--dll", type=Path, default=DEFAULT_DLL, help="the DLL to pack (default build/hook/dinput8.dll)")
     ap.add_argument("--rebuild", action="store_true", help="build the DLL first, even if there is one")
     ap.add_argument("--out-dir", type=Path, default=OUT_DIR, help="where the zip goes (default build/package)")
+    ap.add_argument("--steam-api", type=Path, metavar="DLL",
+                    help="also pack Valve's steam_api.dll (32-bit) as h5-together/steam_api.dll")
+    ap.add_argument("--add-steam-api", type=Path, nargs=2, metavar=("ZIP", "DLL"),
+                    help="add Valve's steam_api.dll to a package zip built already (changes ZIP in place; builds nothing)")
     args = ap.parse_args()
+
+    if args.add_steam_api:
+        if args.steam_api or args.rebuild or args.version:
+            fail("--add-steam-api changes a zip that was built already: it takes no other option")
+        add_steam_api(*args.add_steam_api)
+        return
+    steam_api = steam_api_bytes(args.steam_api) if args.steam_api else None
 
     if args.version is None:
         args.version = source_version()
@@ -255,17 +397,14 @@ def main():
     entries = [(name, file_bytes(name, source, args.dll, args.version)) for name, source in CONTENTS]
     entries += [(f"{TEMPLATES_IN_ZIP}/{n}", data) for n, data in template_files()]
     entries += [(f"{TEXTS_IN_ZIP}/{n}", data) for n, data in text_files()]
+    if steam_api is not None:
+        entries.append((STEAM_API_IN_ZIP, steam_api))
     with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
         for name, data in entries:
-            info = zipfile.ZipInfo(f"h5-together-{args.version}/{name}", stamp)  # one top folder
-            info.compress_type = zipfile.ZIP_DEFLATED
-            info.create_system = 3  # Unix, so that unzip on Linux honours the mode below
-            mode = 0o755 if Path(name).suffix in EXECUTABLE_SUFFIXES else 0o644
-            info.external_attr = (0o100000 | mode) << 16
-            z.writestr(info, data)
+            z.writestr(zip_entry(f"h5-together-{args.version}/{name}", stamp), data)  # one top folder
     os.replace(tmp_path, zip_path)
 
-    print(f"wrote {zip_path.relative_to(REPO) if zip_path.is_relative_to(REPO) else zip_path}")
+    print(f"wrote {show(zip_path)}")
     with zipfile.ZipFile(zip_path) as z:
         for i in z.infolist():
             print(f"  {i.file_size:>9}  {i.filename}")
