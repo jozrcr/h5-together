@@ -86,7 +86,8 @@ Transport *MakeLoopbackTransport(uint16_t own_port, const uint16_t *peer_ports, 
 
 // [online] mode=steam: Steam's messages and lobbies as `app_id` (virtual_lan_steam.cpp).
 // Its own thread (Steam's callbacks, the lobby, the friends' games) takes `lock`, the
-// core's lock.
-Transport *MakeSteamTransport(CRITICAL_SECTION *lock, uint32_t app_id);
+// core's lock. `reliable`: Steam sends a lost message again (as on a LAN, where
+// nothing is lost); false = each message once, as UDP.
+Transport *MakeSteamTransport(CRITICAL_SECTION *lock, uint32_t app_id, bool reliable);
 
 }  // namespace vlan

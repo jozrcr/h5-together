@@ -260,6 +260,7 @@ const Setting kSettings[] = {
 	HIDDEN("online", "spike_ping_bytes", "300", kInt, 0, 1200),
 	HIDDEN("online", "loopback_port", "47100", kInt, 1, 65535),  // the virtual LAN's robot tests
 	HIDDEN("online", "loopback_peers", "", kText, 0, 0),
+	HIDDEN("online", "reliable", "1", kBool, 0, 1),  // 0 = Steam sends each message once, as UDP
 };
 
 #undef ROW
