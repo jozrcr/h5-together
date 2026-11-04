@@ -130,6 +130,11 @@ Message Decode(unsigned value)
 	return m;
 }
 
+unsigned ChoiceCountsAt(unsigned sender_reports)
+{
+	return sender_reports <= kSendBy ? 0 : sender_reports + kChangeDelay;
+}
+
 bool Receive(Remotes &remotes, const Message &m, const Catalog &catalog, unsigned fingerprint, std::string *note)
 {
 	char line[200];

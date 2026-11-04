@@ -56,7 +56,11 @@
 //      looks are on for this game, and every PC rebuilds the same figures in
 //      the same order (by object number); otherwise every hero keeps its look,
 //      on every PC. From then on the game builds new figures with the looks,
-//      at the same moments on every PC.
+//      at the same moments on every PC. A choice changed later (the panel)
+//      counts on every PC, its sender too, at the segment skins::ChoiceCountsAt
+//      gives for the sender's report count (hero_skins_logic.h).
+//   6. The panel and the hero screen's Look button are for the hero the hero
+//      screen shows, else for the selected hero (PanelTarget).
 // Who decides a look (hero_skins_logic.cpp, Decide): the hero's owner, if
 // human: in single player and hot seat this PC's file for every human; in
 // multiplayer each player's own file. Computer players' heroes keep their looks.
@@ -144,6 +148,7 @@ const DWORD kHeroScreenPending = 0x720;    // an object: its close asks "are you
 const DWORD kHeroScreenMode = 0x7dc;       // 0: a hero of its owner's, alone (the only mode with the 3D figure
                                            // that its "next hero" serves; 0x006c05e0, 0x006c49c0)
 const DWORD kHeroScreenSwitch = 0x006c4880;  // __thiscall(screen, hero): closes it and queues a new one for the hero
+const DWORD kHeroScreenFigureCall = 0x006c710b;  // the hero screen's 3D figure (0x006c7030) asks slot 0x248 (trace only)
 const DWORD kReleaseResource = 0x008c6150; // __fastcall(object): frees it when both counts are 0
 const DWORD kUpdateCall = 0x0060895e;      // in 0x00608930: call 0x006082f0 (the adventure controller's frame)
 const DWORD kUpdate = 0x006082f0;          // __thiscall, 5 stack arguments
@@ -164,11 +169,10 @@ const DWORD kReleaseStrong = 0x008c61d0;   // __thiscall(object, mask)
 // Transceiver fields (as the co-op guard reads them)
 const DWORD kNet = 0x34, kReports = 0x3c, kReportsEnd = 0x40, kMe = 0x54;
 
-// Multiplayer timing (in segments, see the top of this file)
-const DWORD kSendAt = 2;     // own report after which this PC sends its looks
-const DWORD kSendBy = 10;    // messages after the sender's report kSendBy do not count
-const DWORD kDecideAt = 20;  // the segment at whose start every PC decides and rebuilds
-const DWORD kChangeDelay = 10;  // a choice changed during the game counts at the sender's report + this
+// Multiplayer timing (in segments, see the top of this file and hero_skins_logic.h)
+using skins::kSendAt;
+using skins::kSendBy;
+using skins::kDecideAt;
 
 // The code whose layout this file relies on; checked before anything is changed.
 struct Code {
@@ -342,8 +346,9 @@ BYTE *g_screen_hero = nullptr;           // its hero (compared only)
 DWORD g_screen_since = 0;
 DWORD g_screen_tries = 0;                // frames it waited for the screen to finish loading
 void ServeHeroScreen();
-char g_robot_screen[32] = {};  // a robot helper asked for (8.), done at the next adventure frame
+char g_robot_screen[400] = {};  // a robot helper asked for (8.), done at the next adventure frame
 void ServeRobot(const BYTE *controller);
+void LogFigures(const char *why);
 
 int g_logged = 0;  // log lines about figures and messages (capped)
 const int kMaxLog = 300;
@@ -590,6 +595,9 @@ void *Answer(void *hero_ptr, void *edx, SlotFn next, DWORD field, const char *sl
 		EnsureFields(index, look);
 		if (look >= 0)
 			look_field = g_shared[look] + field;
+		if (g_trace && caller == kHeroScreenFigureCall && index >= 0 && CanLog())
+			hooklog::Write("hero skins: trace: the hero screen builds the 3D figure of %s (%s)", g_catalog[index].name.c_str(),
+			               look >= 0 ? (g_catalog[look].name + "'s look").c_str() : "its own look");
 	}
 	if (look_field) {
 		void *character = reinterpret_cast<GetFn>(kGetCharacter)(look_field);
@@ -804,13 +812,19 @@ void __fastcall MpStepHook(void *self, void *edx)
 			NewGame(t);
 		g_last_reports = reports;
 		// A choice changed during the game (the panel): sent now, and taken in
-		// by every PC (this one too) at this report + kChangeDelay.
+		// by every PC (this one too) when ChoiceCountsAt says, the same rule the
+		// others apply when it arrives (CheckHook).
 		if (g_sent && !g_outgoing.empty()) {
 			values.swap(g_outgoing);
-			for (DWORD v : values)
-				g_pending.push_back({reports + kChangeDelay, skins::Decode(v)});
+			const DWORD at = skins::ChoiceCountsAt(reports);
+			for (DWORD v : values) {
+				if (at == 0)  // with this PC's first looks, before the decision
+					skins::Receive(g_remotes, skins::Decode(v), g_catalog, g_fingerprint, nullptr);
+				else
+					g_pending.push_back({at, skins::Decode(v)});
+			}
 			hooklog::Write("hero skins: sent to the other PCs: %d changed look(s) (after this PC's report %lu; they count "
-			               "at segment %lu)", static_cast<int>(values.size()), reports, reports + kChangeDelay);
+			               "at segment %lu)", static_cast<int>(values.size()), reports, at ? at : kDecideAt);
 		}
 		// Looks are sent once, between this PC's reports kSendAt and kSendBy;
 		// show_others=0: this PC takes no part (it sends nothing).
@@ -872,13 +886,14 @@ void __fastcall CheckHook(void *self, void *edx, int pc, const BYTE *cmd)
 			// Counted only if it came before its sender's report kSendBy + 1:
 			// the same messages count on every PC.
 			const DWORD sender_reports = Reports(t, pc);
-			if (sender_reports > kSendBy) {
+			const DWORD at = skins::ChoiceCountsAt(sender_reports);
+			if (at != 0) {
 				// A choice changed during the game: every PC takes it in at the same segment.
 				if (m.kind == skins::Message::kChoice && g_header_ok[pc]) {
-					g_pending.push_back({sender_reports + kChangeDelay, m});
+					g_pending.push_back({at, m});
 					if (CanLog())
 						hooklog::Write("hero skins: from PC %d: a changed look for player %d (counts at segment %lu)", pc,
-						               m.player, sender_reports + kChangeDelay);
+						               m.player, at);
 				}
 				else if (CanLog())
 					hooklog::Write("hero skins: from PC %d: a message after its report %lu: too late, not counted", pc,
@@ -902,6 +917,7 @@ void __fastcall CheckHook(void *self, void *edx, int pc, const BYTE *cmd)
 void __fastcall SegmentHook(void *transceiver8, void *edx, DWORD time)
 {
 	std::vector<BYTE *> rebuild;
+	std::vector<int> changed_heroes;  // whose choice changed at this segment (catalog positions)
 	if (!g_disabled) {
 		const BYTE *t = static_cast<const BYTE *>(transceiver8) - 8;
 		Lock lock;
@@ -939,7 +955,10 @@ void __fastcall SegmentHook(void *transceiver8, void *edx, DWORD time)
 				}
 				if (g_agreed && g_catalog_ok) {
 					std::string note;
-					changed = skins::Receive(g_remotes, g_pending[i].message, g_catalog, g_fingerprint, &note) || changed;
+					if (skins::Receive(g_remotes, g_pending[i].message, g_catalog, g_fingerprint, &note)) {
+						changed = true;
+						changed_heroes.push_back(g_pending[i].message.hero);
+					}
 					if (!note.empty() && CanLog())
 						hooklog::Write("hero skins: segment %lu: %s", g_segments, note.c_str());
 				}
@@ -953,8 +972,14 @@ void __fastcall SegmentHook(void *transceiver8, void *edx, DWORD time)
 	// After the game set the segment's time, before its commands: the same point on every PC.
 	for (BYTE *object : rebuild)
 		g_figure_cell_next(object, nullptr);
-	if (!rebuild.empty()) {  // this PC's hero screen, if open on one of them, opens again (7.)
-		std::vector<int> heroes;
+	// This PC's hero screen, if open on one of these heroes, opens again (7.):
+	// the heroes whose map figure was rebuilt, and those whose choice changed,
+	// also when no figure was rebuilt. In the owner's game of 2026-11-03 three
+	// changes in a row rebuilt nothing on any PC (the hero had no map figure
+	// then, likely in a town's garrison after a tavern visit), so the hero
+	// screen stayed as it was and the Apply seemed to do nothing.
+	if (!rebuild.empty() || !changed_heroes.empty()) {
+		std::vector<int> heroes = changed_heroes;
 		Lock lock;
 		for (BYTE *object : rebuild) {
 			const int index = HeroIndex(reinterpret_cast<BYTE *>(Read(object, kFigureHero)));
@@ -1158,6 +1183,39 @@ const Handler kAdvShowTown = {"adv_show_town", 0x0058c320,  // (message), ret 4
                               {0x56, 0x8b, 0xf1, 0x8b, 0x8e, 0xf4, 0x05, 0x00, 0x00, 0xe8, 0x32, 0x72}, 12};
 const Handler kTownHeroAttributes = {"hero_attributes", 0x006194b0,  // (message), ret 4: ... push 1; call 0x00619320
                                      {0x56, 0x8b, 0xf1, 0x8b, 0x86, 0x4c, 0x01, 0x00, 0x00, 0x39, 0x00, 0x75, 0x24}, 13};
+// The hero screen's own arrows (its key handler 0x006c85b0: case 3 next, case 1 previous;
+// the message argument is not read): the next / previous hero of the shown hero's owner,
+// through 0x006c4880 (the screen closes and a new one opens for that hero).
+const Handler kHeroScreenNext = {"next hero", 0x006c49c0,  // (message), ret 4
+                                 {0x80, 0x3d, 0xb4, 0xf0, 0xfd, 0x00, 0x00, 0x56, 0x8b, 0xf1, 0x75, 0x21}, 12};
+const Handler kHeroScreenPrev = {"previous hero", 0x006c4a80,
+                                 {0x80, 0x3d, 0xb4, 0xf0, 0xfd, 0x00, 0x00, 0x56, 0x8b, 0xf1, 0x75, 0x21}, 12};
+// The adventure controller's own script machine (+0x40, made where "console script
+// commands" are allowed: single player). 0x00603b20 runs a text in it with its slot 0:
+// mov ecx,[esi+0x40]; mov edx,[esp+8]; mov eax,[ecx]; add esp,4; push edx; call [eax].
+const DWORD kControllerScript = 0x40;
+const Code kScriptRunCode = {0x00603ba4, {0x8b, 0x4e, 0x40, 0x8b, 0x54, 0x24, 0x08, 0x8b, 0x01, 0x83, 0xc4, 0x04, 0x52, 0xff, 0x10}, 15};
+
+// Robot only: a line of Lua in the controller's script machine, as the console's
+// script commands run (e.g. SetObjectOwner, to give the robot's player a second hero).
+void RunScript(const BYTE *controller, const char *code)
+{
+	BYTE *script = reinterpret_cast<BYTE *>(Read(controller, kControllerScript));
+	if (!Matches(kScriptRunCode.address, kScriptRunCode.bytes, kScriptRunCode.size) || !script || Dying(script)) {
+		hooklog::Write("hero skins: robot: no script machine in this game (or its code is not as expected): \"%s\" not run",
+		               code);
+		return;
+	}
+	__try {
+		reinterpret_cast<void(__fastcall *)(void *, void *, const char *)>(Read(reinterpret_cast<const void *>(Read(script, 0)), 0))(
+		    script, nullptr, code);
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER) {
+		hooklog::Write("hero skins: robot: the script \"%s\" crashed (caught)", code);
+		return;
+	}
+	hooklog::Write("hero skins: robot: script run: %s", code);
+}
 
 bool CallHandler(const Handler &h, BYTE *screen, DWORD a, DWORD b, bool two)
 {
@@ -1181,7 +1239,7 @@ bool CallHandler(const Handler &h, BYTE *screen, DWORD a, DWORD b, bool two)
 
 void ServeRobot(const BYTE *controller)
 {
-	char text[32];
+	char text[sizeof(g_robot_screen)];
 	{
 		Lock lock;
 		if (!g_robot_screen[0])
@@ -1192,6 +1250,23 @@ void ServeRobot(const BYTE *controller)
 	char top[96] = {};
 	overlay::TopScreen(top, sizeof(top));
 	BYTE *screen = static_cast<BYTE *>(overlay::TopScreenObject());
+	if (strncmp(text, "lua ", 4) == 0) {
+		RunScript(controller, text + 4);
+		return;
+	}
+	if (strcmp(text, "figures") == 0) {
+		LogFigures("robot");
+		return;
+	}
+	if (strcmp(text, "hero_screen_next") == 0 || strcmp(text, "hero_screen_prev") == 0) {
+		BYTE *hero_screen = HeroScreenOnTop();
+		if (!hero_screen) {
+			hooklog::Write("hero skins: robot: \"%s\": no hero screen on top (%s)", text, top);
+			return;
+		}
+		CallHandler(text[12] == 'n' ? kHeroScreenNext : kHeroScreenPrev, hero_screen, 0, 0, false);
+		return;
+	}
 	if (strcmp(text, "town_hero_screen") == 0) {
 		if (!screen || Read(screen, 0) != kTownScreenVftable) {
 			hooklog::Write("hero skins: robot: \"%s\": no town screen on top (%s)", text, top);
@@ -1210,6 +1285,63 @@ void ServeRobot(const BYTE *controller)
 	else if (strncmp(text, "town", 4) == 0 &&
 	         CallHandler(kAdvSelectTown, screen, 0, static_cast<DWORD>(atoi(text + 4)), true))
 		CallHandler(kAdvShowTown, screen, 0, 0, false);
+}
+
+// Robot only ("figures"): every map figure this PC knows, with the look it was
+// built with and the look its hero wears now, and what this PC's player selected.
+void LogFigures(const char *why)
+{
+	Lock lock;
+	std::string line;
+	for (const Figure &f : g_figures) {
+		if (Dying(f.object) || reinterpret_cast<BYTE *>(Read(f.object, kFigureHero)) != f.hero)
+			continue;
+		int index = -1;
+		const int look = LookOf(f.hero, &index);
+		if (index < 0)
+			continue;
+		const skins::Owner o = OwnerOf(f.hero);
+		char owner[48];
+		_snprintf_s(owner, sizeof(owner), _TRUNCATE, "%s%d, faction %u", o.present ? "player " : "no owner ", o.number,
+		            g_catalog[index].town);
+		line += (line.empty() ? "" : "; ") + g_catalog[index].name + " (" + owner + "): " +
+		        (look >= 0 ? g_catalog[look].name + "'s look" : std::string("its own look")) +
+		        (f.built != look ? ", its figure still shows another" : "");
+	}
+	BYTE *selected = g_local_iplayer ? reinterpret_cast<BYTE *>(Read(g_local_iplayer, kPlayerSelected)) : nullptr;
+	const int s = selected && !Dying(selected) ? HeroIndex(selected) : -1;
+	hooklog::Write("hero skins: figures (%s): %s; selected hero: %s", why, line.empty() ? "none" : line.c_str(),
+	               s >= 0 ? g_catalog[s].name.c_str() : "none");
+}
+
+// The hero the panel and the hero screen's Look button are for (under g_lock):
+// the hero the hero screen shows when it is on top, else this PC's player's
+// selected hero. The hero screen is not always about the selected hero: its own
+// "next hero" / "previous hero" arrows and the town screen's portraits open it
+// for other heroes, and the selection on the map stays where it was (found by the
+// owner, 2026-11-03: "hero A change impacts hero B"). Null: no hero, or the
+// screen shows a hero whose look this PC's player does not choose; *why says so.
+BYTE *PanelTarget(const char **why)
+{
+	*why = "no selected hero of this PC's player";
+	if (!g_local_iplayer)
+		return nullptr;
+	if (BYTE *screen = HeroScreenOnTop()) {
+		BYTE *hero = reinterpret_cast<BYTE *>(Read(screen, kHeroScreenHero));
+		*why = "the hero screen shows no hero";
+		if (!hero || Dying(hero))
+			return nullptr;
+		// Whose choice counts (Decide): in single player and hot seat every human
+		// owner's (this PC's file); in multiplayer each player's own.
+		const BYTE *player = reinterpret_cast<const BYTE *>(Read(hero, kHeroOwner));
+		const bool human = player && Read(player, 0) == kPlayerVftable && Read(player, kPlayerHuman) == 0;
+		*why = "the hero screen shows a hero of another player (its owner chooses its look)";
+		if (!human || (g_kind == kMulti && player != g_local_iplayer))
+			return nullptr;
+		return hero;
+	}
+	BYTE *hero = reinterpret_cast<BYTE *>(Read(g_local_iplayer, kPlayerSelected));
+	return hero && !Dying(hero) ? hero : nullptr;
 }
 
 }  // namespace
@@ -1240,14 +1372,15 @@ void RefreshHeroScreen(const std::vector<int> &heroes, const char *why)
 	g_screen_tries = 0;
 }
 
-bool SelectedLookPortrait(std::string *dds)
+bool PanelLookPortrait(std::string *dds)
 {
 	dds->clear();
 	if (g_disabled || !g_local_iplayer || !g_catalog_ok)
 		return false;
 	Lock lock;
-	BYTE *hero = reinterpret_cast<BYTE *>(Read(g_local_iplayer, kPlayerSelected));
-	if (!hero || Dying(hero))
+	const char *why = nullptr;
+	BYTE *hero = PanelTarget(&why);
+	if (!hero)
 		return false;
 	const int index = HeroIndex(hero);
 	if (index < 0)
@@ -1263,21 +1396,24 @@ std::string NameFile(int hero)
 	return hero >= 0 && hero < static_cast<int>(g_catalog.size()) ? NameFileOf(hero) : std::string();
 }
 
-bool PanelHero(PanelData *out)
+bool PanelHero(PanelData *out, const char **why)
 {
 	*out = PanelData();
+	*why = "the looks are off";
 	if (g_disabled || !g_local_iplayer)
 		return false;
 	Lock lock;
 	if (!EnsureCatalog())
 		return false;
-	BYTE *hero = reinterpret_cast<BYTE *>(Read(g_local_iplayer, kPlayerSelected));
-	if (!hero || Dying(hero))
+	BYTE *hero = PanelTarget(why);
+	if (!hero)
 		return false;
 	const int target = HeroIndex(hero);
+	*why = "a hero not in the game's list of all heroes";
 	if (target < 0)
 		return false;
 	out->hero = target;
+	out->from_hero_screen = HeroScreenOnTop() != nullptr;
 	out->internal = g_catalog[target].name;
 	out->name_file = NameFileOf(target);
 	out->portrait = PortraitOf(target);

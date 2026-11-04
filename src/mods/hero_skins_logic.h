@@ -64,6 +64,22 @@ struct Message {
 // kNone when the value is not one of ours.
 Message Decode(unsigned value);
 
+// When the messages count, in segments (each PC's segment reports; every PC
+// counts the same segments). See hero_skins.cpp, 5.
+const unsigned kSendAt = 2;       // a PC sends its looks after its own report kSendAt...
+const unsigned kSendBy = 10;      // ...and up to its report kSendBy; later choices are changes
+const unsigned kDecideAt = 20;    // the segment at whose start every PC decides and rebuilds
+const unsigned kChangeDelay = 10; // a change counts at its sender's report + this
+// When a choice counts, from its sender's report count when it was sent (the
+// sender itself) or received (the other PCs: the same number, as messages
+// arrive in order). 0: at once, with the sender's first looks, so it is part of
+// the decision at kDecideAt; else the segment at whose start every PC takes it
+// in. The sender and the others must use this same rule, or the PCs rebuild a
+// figure at different moments (2026-11-04: a change sent between the sender's
+// reports kSendAt and kSendBy counted at once on the others but only after the
+// decision on the sender).
+unsigned ChoiceCountsAt(unsigned sender_reports);
+
 // What this PC knows of another player's choices.
 struct Remote {
 	bool header = false;     // its header arrived

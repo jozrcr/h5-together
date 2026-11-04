@@ -100,6 +100,14 @@ int main()
 	printf("      note: %s\n", note.c_str());
 	Check(!Receive(remotes, Decode(EncodeHeader(0, fp)), cat, fp, &note), "player 0 is ignored");
 
+	// --- when a changed choice counts (the sender and the others use the same rule) ---
+	Check(ChoiceCountsAt(kSendAt) == 0 && ChoiceCountsAt(kSendAt + 1) == 0 && ChoiceCountsAt(kSendBy) == 0,
+	      "a change sent up to the sender's report kSendBy counts at once, with its first looks");
+	Check(kSendBy < kDecideAt, "...which is before the decision of segment kDecideAt");
+	Check(ChoiceCountsAt(kSendBy + 1) == kSendBy + 1 + kChangeDelay && ChoiceCountsAt(500) == 500 + kChangeDelay,
+	      "a later change counts kChangeDelay segments after the sender's report");
+	Check(ChoiceCountsAt(kSendBy + 1) > kDecideAt, "...after the decision");
+
 	// --- deciding ---
 	// multiplayer: player 1 is this PC (its own messages are taken in too), player 2 another PC
 	Remotes rs;
@@ -117,6 +125,11 @@ int main()
 	Check(Decide(godric, human1, unknown, local, rs, cat) == -1, "decide: nothing while the kind of game is unknown");
 	Check(Decide(godric, human1, single, local, rs, cat) == freyda, "single player: this PC's choice");
 	Check(Decide(godric, human2, single, local, rs, cat) == freyda, "hot seat: this PC's choice for every human");
+	Check(Decide(axel, human1, single, local, rs, cat) == -1, "two heroes of one player: the other one keeps its look");
+	Choices both = local;
+	both[axel] = godric;  // Axel wears Godric's look while Godric wears Freyda's
+	Check(Decide(axel, human1, single, both, rs, cat) == godric && Decide(godric, human1, single, both, rs, cat) == freyda,
+	      "two heroes of one player: each its own choice, also when one wears the other's look");
 	Check(Decide(godric, ai3, single, local, rs, cat) == -1, "a computer player's hero keeps its look");
 	Check(Decide(godric, nobody, single, local, rs, cat) == -1, "a hero without an owner keeps its look");
 	Check(Decide(godric, human1, multi, local, rs, cat) == freyda, "multiplayer: player 1's choice, as it sent it");
