@@ -5,6 +5,7 @@
 #include "crash.h"
 #include "game_build.h"
 #include "log.h"
+#include "patch.h"
 #include "overlay.h"
 #include "watchdog.h"
 #include "../mods/ai_pacing.h"
@@ -144,6 +145,7 @@ void InstallAll()
 	mods::ApplyQuickResumeFromSettings();  // [coop] resume_save (host's); after the autosave mod: it stacks on its save hook
 	mods::ApplyUpdateCheckFromSettings();  // [update] check (off by default)
 	mods::ApplySettingsMenuFromSettings();  // Options, H5 Together: Accept writes h5-together.ini; F3; the first-start question
+	hooklog::Write("patch: %d hooks in the game's code (room for %d)", hookpatch::RecordsUsed(), hookpatch::RecordsCapacity());
 }
 
 void InstallUnknownBuild()
