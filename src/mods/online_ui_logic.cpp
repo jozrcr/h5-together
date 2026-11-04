@@ -187,6 +187,17 @@ const char *FriendStateKey(const Friend &f)
 	}
 }
 
+Room WaitingRoom(const char *screen)
+{
+	if (!screen)
+		return Room::kNone;
+	if (strcmp(screen, ".?AVCMPWaitScreen@NUI@@") == 0)
+		return Room::kNewGame;
+	if (strcmp(screen, ".?AVCMPUbiComLoadScreen@NUI@@") == 0)
+		return Room::kLoadedGame;
+	return Room::kNone;
+}
+
 uint64_t ConnectLobby(const wchar_t *command_line)
 {
 	if (!command_line)

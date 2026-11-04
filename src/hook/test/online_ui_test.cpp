@@ -261,6 +261,17 @@ void TestConnectLobby()
 	      "+connect_lobby: only the whole word counts");
 }
 
+void TestRooms()
+{
+	Check(WaitingRoom(".?AVCMPWaitScreen@NUI@@") == Room::kNewGame, "rooms: a new game's waiting room");
+	Check(WaitingRoom(".?AVCMPUbiComLoadScreen@NUI@@") == Room::kLoadedGame, "rooms: a loaded game's waiting room");
+	Check(WaitingRoom(".?AVCMPCreateScreen@NUI@@") == Room::kNone && WaitingRoom(".?AVCLobbyScreen@NUI@@") == Room::kNone &&
+	          WaitingRoom(".?AV?$CUbiComLoadScreen@USLanSaveHeaderInfo@@@NUI@@") == Room::kNone &&
+	          WaitingRoom(".?AV?$CLoadScreen@USLanSaveHeaderInfo@@@NUI@@") == Room::kNone,
+	      "rooms: the setup screen, the LAN screen and the save picker are not waiting rooms");
+	Check(WaitingRoom("") == Room::kNone && WaitingRoom(nullptr) == Room::kNone, "rooms: no screen");
+}
+
 void TestWords(const std::string &dir)
 {
 	texts::Book en, fr;
@@ -302,6 +313,7 @@ int main(int argc, char **argv)
 {
 	TestNames();
 	TestConnectLobby();
+	TestRooms();
 	if (argc > 1)
 		TestWords(argv[1]);
 	else

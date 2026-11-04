@@ -127,9 +127,22 @@ void DescribeStrings(const BYTE *object, size_t size, char *out, size_t out_size
 // to), save entries at +0x18c..+0x190 (each with its row at +0xa8). The "click"
 // message makes the highlighted row the selected save (0x00800a40), "load" loads
 // it (0x00809840; from the main menu without asking).
+// The multiplayer setup screen's load ("msg|load") opens the same template for LAN
+// saves (NUI::CLoadScreen<SLanSaveHeaderInfo>, then NUI::CUbiComLoadScreen<...>, the
+// owner's log of 2026-11-03), with the same list and entries (robot run
+// 20261104-074146) but bigger entries: the row's place in them is found from the row
+// the list highlights when it opens (the first save's).
 bool PickSave(const char *wanted)
 {
-	BYTE *screen = static_cast<BYTE *>(FindScreen(".?AV?$CLoadScreen@USHeaderInfo@@@NUI@@"));
+	const char *const kinds[] = {".?AV?$CLoadScreen@USHeaderInfo@@@NUI@@", ".?AV?$CUbiComLoadScreen@USLanSaveHeaderInfo@@@NUI@@",
+	                             ".?AV?$CLoadScreen@USLanSaveHeaderInfo@@@NUI@@"};
+	BYTE *screen = nullptr;
+	bool lan = false;
+	for (const char *kind : kinds)
+		if (!screen && (screen = static_cast<BYTE *>(FindScreen(kind))) != nullptr && kind != kinds[0]) {
+			lan = true;
+			hooklog::Write("robot: save list: the LAN load screen %s", kind);
+		}
 	if (!screen)
 		return false;
 	bool picked = false;
@@ -139,13 +152,25 @@ bool PickSave(const char *wanted)
 		BYTE **end = *reinterpret_cast<BYTE ***>(screen + 0x190);
 		void **vt = *static_cast<void ***>(container);
 		hooklog::Write("robot: save list: %d saves", static_cast<int>(end - begin));
+		DWORD row_at = 0xa8;
+		if (lan) {
+			void *first = reinterpret_cast<GetSelectedFn>(vt[5])(container, nullptr);
+			row_at = 0;
+			for (BYTE **it = begin; it != end && !row_at; ++it)
+				for (DWORD off = 4; off < 0x400 && !row_at; off += 4)
+					if (first && *reinterpret_cast<void **>(*it + off) == first)
+						row_at = off;
+			hooklog::Write("robot: save list: a LAN save's row at +0x%x", static_cast<unsigned>(row_at));
+			if (!row_at)
+				return false;
+		}
 		for (BYTE **it = begin; it != end; ++it) {
 			char text[1024];
-			DescribeStrings(*it, 0xa8, text, sizeof(text));
+			DescribeStrings(*it, row_at, text, sizeof(text));
 			const bool match = !picked && wanted[0] && ContainsNoCase(text, wanted);
 			hooklog::Write("robot: save %d%s: %s", static_cast<int>(it - begin), match ? " (picked)" : "", text);
 			if (match) {
-				void *row = *reinterpret_cast<void **>(*it + 0xa8);
+				void *row = *reinterpret_cast<void **>(*it + row_at);
 				reinterpret_cast<SelectFn>(vt[4])(container, nullptr, row);
 				reinterpret_cast<SelectFn>(vt[7])(container, nullptr, row);
 				picked = reinterpret_cast<GetSelectedFn>(vt[5])(container, nullptr) == row;

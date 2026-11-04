@@ -9,8 +9,9 @@
 //     works (and if not, why), how many Steam friends play with H5 Together, the
 //     invites, and friends' games this PC cannot join (another MMH5.5 or H5
 //     Together). The games themselves are in the game's own list above;
-//   - the waiting room (NUI::CMPWaitScreen), for the host whose Steam lobby
-//     exists: an "Invite friends..." button next to "Rules...". It opens Steam's
+//   - the waiting room (NUI::CMPWaitScreen, or a loaded game's
+//     NUI::CMPUbiComLoadScreen), for the host whose Steam lobby exists: an
+//     "Invite friends..." button (next to "Rules..." in a new game's). It opens Steam's
 //     own invite dialog (its overlay) when the overlay is enabled in this game;
 //     else, or when the overlay did not open within 2.5 s, our own list of the
 //     Steam friends who are online, each with an "Invite" button (Steam's
@@ -63,7 +64,6 @@ namespace ui = builder_ui;
 
 const char kName[] = "online";
 const char kLobbyScreen[] = ".?AVCLobbyScreen@NUI@@";
-const char kWaitScreen[] = ".?AVCMPWaitScreen@NUI@@";
 const char kMainMenu[] = ".?AVCMainMenuScreen@NUI@@";
 const char kNameBox[] = ".?AVCSimpleEditBox@NUI@@";  // the LAN screen's "Nom du joueur" box, a screen over it
 
@@ -73,7 +73,8 @@ const float kRefH = 768.0f, kScreenW = 1024.0f;
 // the box is about 70..664 x 363..612).
 const float kStatusX = 84.0f, kStatusY = 372.0f, kStatusW = 566.0f, kStatusBottom = 606.0f;
 const float kStatusTitleFont = 17.0f, kStatusFont = 14.0f, kStatusGap = 5.0f;
-// The waiting room: our button right of "Rules..." (500..622), on the title row.
+// The waiting room: our button right of "Rules..." (500..622), on the title row. A loaded
+// game's waiting room has the same title row, without "Rules..." (robot run 20261104-074436).
 const float kInviteX = 632.0f, kInviteY = 56.0f, kInviteW = 168.0f, kInviteH = 34.0f, kButtonFont = 15.0f;
 // The main menu's banner: just above the menu's scroll (Solo, Multiplayer...), its right
 // end at the scroll's (clear of the logo at the top left and of the version lines).
@@ -107,6 +108,7 @@ ImVec2 ScreenAt(float x, float y, float w, float h)
 online::Status g_status;
 char g_top[96] = "";
 bool g_lan = false, g_wait = false, g_menu = false;
+online::Room g_room = online::Room::kNone;
 // the waiting room's button
 bool g_button_shown = false, g_button_down = false, g_button_hovered = false;
 float g_back_w = 1024.0f, g_back_h = 768.0f;
@@ -227,10 +229,17 @@ void RobotCommand(const char *text)
 }
 
 // --- the waiting room's button ---------------------------------------------------------------------
+// Its corners in back buffer pixels.
+void ButtonRect(float w, float h, ImVec2 *p0, ImVec2 *p1)
+{
+	*p0 = ScreenAt(kInviteX, kInviteY, w, h);
+	*p1 = ScreenAt(kInviteX + kInviteW, kInviteY + kInviteH, w, h);
+}
+
 void ButtonInput()
 {
-	const ImVec2 p0 = ScreenAt(kInviteX, kInviteY, g_back_w, g_back_h);
-	const ImVec2 p1 = ScreenAt(kInviteX + kInviteW, kInviteY + kInviteH, g_back_w, g_back_h);
+	ImVec2 p0, p1;
+	ButtonRect(g_back_w, g_back_h, &p0, &p1);
 	float x, y;
 	HWND window = overlay::GameWindow();
 	const bool front = window && GetAncestor(GetForegroundWindow(), GA_ROOTOWNER) == GetAncestor(window, GA_ROOTOWNER);
@@ -275,7 +284,8 @@ bool Wanted()
 	LogScreens();
 	g_boxed = Boxed();
 	g_lan = strcmp(g_top, kLobbyScreen) == 0;
-	g_wait = strcmp(g_top, kWaitScreen) == 0;
+	g_room = online::WaitingRoom(g_top);
+	g_wait = g_room != online::Room::kNone;
 	g_menu = strcmp(g_top, kMainMenu) == 0;
 	if (steam) {
 		NotifyGameInFront();
@@ -459,15 +469,16 @@ void NineButton(ImDrawList *draw, ImVec2 p0, ImVec2 p1, const char *label, float
 void DrawButton(const overlay::Frame &frame)
 {
 	const float k = frame.height / kRefH;
-	const ImVec2 p0 = ScreenAt(kInviteX, kInviteY, frame.width, frame.height);
-	const ImVec2 p1 = ScreenAt(kInviteX + kInviteW, kInviteY + kInviteH, frame.width, frame.height);
+	ImVec2 p0, p1;
+	ButtonRect(frame.width, frame.height, &p0, &p1);
 	NineButton(ImGui::GetForegroundDrawList(), p0, p1, Get("online.invite_button"), k, g_button_hovered,
 	           g_button_down && g_button_hovered);
-	static bool told = false;
-	if (!told) {
-		told = true;
-		hooklog::Write("online: our Invite friends... button is drawn in the waiting room (Steam's overlay %s)",
-		               g_status.overlay ? "enabled: its dialog" : "not enabled: our own list");
+	static bool told[2] = {false, false};  // (once in a new game's waiting room, once in a loaded game's)
+	const bool loaded = g_room == online::Room::kLoadedGame;
+	if (!told[loaded]) {
+		told[loaded] = true;
+		hooklog::Write("online: our Invite friends... button is drawn in the waiting room%s (Steam's overlay %s)",
+		               loaded ? " of a loaded game" : "", g_status.overlay ? "enabled: its dialog" : "not enabled: our own list");
 	}
 }
 
