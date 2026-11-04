@@ -95,6 +95,84 @@ DWORD WINAPI Sampler(LPVOID)
 
 }  // namespace
 
+// With profile_all: how often MMH5.5's main script loop runs. Each pass of
+// H55_ContinuesActivator (H55-Core.lua) calls the script function GetPlayerState 8 times
+// (for i = 1, 8), so its calls per second (logged with the frame times) / 8 = passes per
+// second, at most. The game's script functions are a table of {name, function}
+// (GetPlayerState: name 0x00e24f54, function 0x005c1390 at 0x00f34c2c), read when a map's
+// script engine starts: the entry is replaced at start-up.
+const DWORD kGetPlayerStateCell = 0x00f34c2c, kGetPlayerState = 0x005c1390;
+typedef int(__fastcall *ScriptFn)(void *self, void *edx);
+ScriptFn g_get_player_state = nullptr;
+volatile LONG g_get_player_state_calls = 0;
+
+int __fastcall GetPlayerStateHook(void *self, void *edx)
+{
+	InterlockedIncrement(&g_get_player_state_calls);
+	return g_get_player_state(self, edx);
+}
+
+// And what a script's sleep(n) waits. The script function sleep (0x004bfe80; the base
+// table's "sleep" at 0x00f7bcb8 and the game's "Sleep" at 0x00f2df00) stores n in the
+// script thread (+0x2c of the thread at +0x10 of its first argument); the scheduler's tick
+// (0x004c0720, from the world's update: script_rhythm.cpp) takes 1 from every sleeping
+// thread's count and wakes the threads at 0. Logged with the frame times: the ticks per
+// second (run and held back by the script rhythm) and the sleeps by value (2: MMH5.5's
+// main loop).
+const DWORD kSleep = 0x004bfe80, kSleepCells[] = {0x00f7bcbc, 0x00f2df04};
+ScriptFn g_sleep = nullptr;
+volatile LONG g_sleeps[3] = {};  // sleeps: of 2, of 1, others
+volatile LONG g_ticks_ran = 0, g_ticks_held = 0;
+
+int SleepCount(void *self)
+{
+	__try {
+		const BYTE *thread = *reinterpret_cast<BYTE *const *>(static_cast<BYTE *>(self) + 0x10);
+		return thread ? *reinterpret_cast<const int *>(thread + 0x2c) : -1;
+	} __except (EXCEPTION_EXECUTE_HANDLER) {
+		return -1;
+	}
+}
+
+int __fastcall SleepHook(void *self, void *edx)
+{
+	const int r = g_sleep(self, edx);
+	const int n = SleepCount(self);
+	InterlockedIncrement(&g_sleeps[n == 2 ? 0 : n == 1 ? 1 : 2]);
+	return r;
+}
+
+bool ReplaceCell(DWORD at, DWORD expected, const void *with)
+{
+	DWORD *cell = reinterpret_cast<DWORD *>(at);
+	DWORD old;
+	if (*cell != expected || !VirtualProtect(cell, 4, PAGE_READWRITE, &old))
+		return false;
+	*cell = reinterpret_cast<DWORD>(with);
+	VirtualProtect(cell, 4, old, &old);
+	return true;
+}
+
+void InstallScriptCounter()
+{
+	g_get_player_state = reinterpret_cast<ScriptFn>(kGetPlayerState);
+	if (!ReplaceCell(kGetPlayerStateCell, kGetPlayerState, &GetPlayerStateHook)) {
+		hooklog::Write("robot: script counter: the script function table is not as expected");
+		return;
+	}
+	g_sleep = reinterpret_cast<ScriptFn>(kSleep);
+	bool sleep_ok = true;
+	for (DWORD at : kSleepCells)
+		sleep_ok = ReplaceCell(at, kSleep, &SleepHook) && sleep_ok;
+	hooklog::Write("robot: script counter on (the script function GetPlayerState's calls; sleep: %s)",
+	               sleep_ok ? "counted" : "not as expected");
+}
+
+void CountScriptTick(bool held)
+{
+	InterlockedIncrement(held ? &g_ticks_held : &g_ticks_ran);
+}
+
 void StartAiProfiler(bool all)
 {
 	g_all = all;
@@ -118,6 +196,8 @@ void StartAiProfiler(bool all)
 		CloseHandle(t);
 	}
 	hooklog::Write("robot: %s profiler on, samples go to %ls", all ? "main thread (all the time)" : "AI", path);
+	if (all)
+		InstallScriptCounter();
 }
 
 // Frame times, for profile_all (single player has no lockstep line with them): every 10 s,
@@ -148,8 +228,14 @@ void NoteFrameForProfiler()
 			sorted[j] = sorted[j - 1];
 			sorted[j - 1] = t;
 		}
-	hooklog::Write("robot: frames: %.0f/s, median %.1f ms, p95 %.1f ms, longest %.0f ms", count * 1000.0 / (tick - window_start),
-	               sorted[count / 2], sorted[count * 95 / 100], sorted[count - 1]);
+	const LONG calls = InterlockedExchange(&g_get_player_state_calls, 0);
+	const double secs = (tick - window_start) / 1000.0;
+	const LONG ran = InterlockedExchange(&g_ticks_ran, 0), held = InterlockedExchange(&g_ticks_held, 0);
+	hooklog::Write("robot: frames: %.0f/s, median %.1f ms, p95 %.1f ms, longest %.0f ms; script GetPlayerState %.1f calls/s; "
+	               "scheduler %.1f ticks/s (%.1f held back); sleeps/s: %.1f of 2, %.1f of 1, %.1f others",
+	               count / secs, sorted[count / 2], sorted[count * 95 / 100], sorted[count - 1], calls / secs,
+	               ran / secs, held / secs, InterlockedExchange(&g_sleeps[0], 0) / secs,
+	               InterlockedExchange(&g_sleeps[1], 0) / secs, InterlockedExchange(&g_sleeps[2], 0) / secs);
 	count = 0;
 	window_start = tick;
 }

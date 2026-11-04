@@ -145,6 +145,7 @@ void *PatchImport(const char *dll, const char *function, void *replacement);
 void StartAiProfiler(bool all = false);  // all: the main thread all the time (profile_all=1)
 void NoteMainThreadForProfiler();      // from the main loop: which thread profile_all samples
 void NoteFrameForProfiler();           // from the main loop, before each frame: frame times every 10 s in the log
+void CountScriptTick(bool held);       // the script scheduler's tick (script_rhythm.cpp): run, or held back
 void OnAiThinking(bool thinking);
 
 // Virtual clock (robot_clock.cpp), when virtual_clock_ms=N: the main thread's

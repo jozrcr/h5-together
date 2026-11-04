@@ -1,6 +1,6 @@
 # Turn features: undo End Turn, resume after a crash, parallel AI turns
 
-Status (2026-11-04): part 1, undo End Turn, **built** (`[coop] undo_end_turn`, off by default; robot-tested, waiting for a hand test); part 2, quick resume, **built** (the save at the drop and its transfer over the virtual LAN; robot-tested over the loopback, not yet over real Steam); part 3, parallel AI turns, an **experiment that works** (`[ai] parallel_turns`, hidden, robot-tested). Three ideas from the owner's games of 2026-11-03 and 04, in the order we plan to build them. Each one is a setting that is **off by default** (the original game), chosen by the host for the whole game. Addresses are in the vanilla 3.1 exe (the same in `MMH55_Utility(_64).exe`). What players, turn states and "pressed End Turn" are: [players.md](../subsystems/players.md). How the PCs stay in step: [multiplayer-sync.md](../subsystems/multiplayer-sync.md).
+Status (2026-11-04): part 1, undo End Turn, **built** (`[coop] undo_end_turn`, off by default; robot-tested, waiting for a hand test); part 2, quick resume, **built** (the save at the drop and its transfer over the virtual LAN; robot-tested over the loopback, not yet over real Steam); part 3, parallel AI turns, **built** as the host's setting (`[ai] parallel_turns`, off by default, multiplayer only, agreed between the PCs by the co-op features' hello; robot-tested). Three ideas from the owner's games of 2026-11-03 and 04, in the order we plan to build them. Each one is a setting that is **off by default** (the original game), chosen by the host for the whole game. Addresses are in the vanilla 3.1 exe (the same in `MMH55_Utility(_64).exe`). What players, turn states and "pressed End Turn" are: [players.md](../subsystems/players.md). How the PCs stay in step: [multiplayer-sync.md](../subsystems/multiplayer-sync.md).
 
 ## 1. Undo End Turn (while the others still play)
 
@@ -98,7 +98,7 @@ So a save made **after** the drop no longer has that player in the game: reloadi
 
 ### The experiment (2026-11-04): it works, and the computer players' part of the day is ~40% shorter with two of them
 
-`src/mods/parallel_ai.cpp`, the hidden setting `[ai] parallel_turns=1` (off by default; **every PC of a game must have the same**: no agreement between PCs yet).
+`src/mods/parallel_ai.cpp`, the host's setting `[ai] parallel_turns` (off by default). Every PC must do it, or none: each PC's DLL says in its hello at the game's start which features it knows (`src/mods/coop_features.cpp`, as undo End Turn's hello), and a phase starts only inside the multiplayer segment runner, in a game where every PC knows it and the host wants it. Single player: not used (yet).
 
 **What the game assumes, and the four hooks:**
 
@@ -119,7 +119,9 @@ So a save made **after** the drop no longer has that player in the game: reloadi
 | Single player, the owner's MAP_JoacJoz (with its map script: MMH5.5's scripts run), 1 human + **3 computer players**, normal (`20261104-112338`) | **18.8 s** on average (10 days in 4 minutes) | |
 | the same, parallel (`20261104-112741`) | **10.2 s** on average (14 days in 4 minutes): **46% shorter** | `W C C C`: three playing at once; the same script messages as the normal run (MMH5.5's own "not belong to AI player", on purpose); no freeze |
 
-**Not looked at yet:** big maps with long AI turns, MMH5.5's scripts (events per player turn), battles between two computer players moving at the same time, how the game's own screens show two players "thinking", an agreement between PCs (hellos, as undo End Turn) before this can be a host setting.
+With the agreement (2026-11-04, `20261104-133921-lan`, the same random map, 2 humans + 2 computer players, the script clock on too): 20 phases, 3.3 s median, **4071 world checks, all equal**.
+
+**Not looked at yet:** big maps with long AI turns, MMH5.5's scripts (events per player turn), battles between two computer players moving at the same time, how the game's own screens show two players "thinking".
 
 ## Order
 
