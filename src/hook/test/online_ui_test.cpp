@@ -97,6 +97,17 @@ void TestLines(texts::Book &en)
 	s = Status();
 	s.state = State::kOn;
 	s.relay_ok = true;
+	s.resume = 1;
+	s.resume_percent = 45;
+	l = StatusLines(s, &Words, "0.3.0");
+	Check(Has(l, "coming: 45%", Tone::kBody), "lines: a friend's resume save arriving, with its percent", Join(l));
+	s.resume = 2;
+	l = StatusLines(s, &Words, "0.3.0");
+	Check(Has(l, "join their loaded game", Tone::kGood), "lines: the resume save is here", Join(l));
+	s.resume = 3;
+	l = StatusLines(s, &Words, "0.3.0");
+	Check(Has(l, "send you the file", Tone::kWarn), "lines: the resume save did not come", Join(l));
+	s.resume = 0;
 	l = StatusLines(s, &Words, "0.3.0");
 	Check(l.size() == 2 && Has(l, "none of your friends", Tone::kBody), "lines: Steam on, no friend playing", Join(l));
 	s.relay_ok = false;

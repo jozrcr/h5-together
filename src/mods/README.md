@@ -137,6 +137,25 @@ turn undo: segment 166: player 1 plays again (PC 0 asked; before: 1h:1/1 2h:0/0 
 
 How turns end in the game, and the robot runs: [docs/plans/turn-features.md](../../docs/plans/turn-features.md), part 1.
 
+## Quick resume after a crash (`quick_resume.cpp`, `resume_transfer*.cpp`; on, the host's choice)
+
+**What it does:** when a player's game crashes (or loses its connection), the host's game drops that player after about 20 s and plays on without them: they count as defeated, and a save made after that cannot bring them back. With this, just before that defeat, the host has every PC save the game as **"Reprise"** ("Resume"), with the player still in it; a banner on the map says so. To play on together, everyone goes to Multiplayer, LAN, Create, Load, "Reprise".
+
+**The friend who crashed** has no copy of that save, and the game lets a PC join a loaded game only with its own copy. With online play over Steam, the add-on sends it: the friend's add-on asks the hosts it knows whether they offer a resume save, fetches it if it lacks it, checks it and writes it as `h5together-reprise.sav` in its saves folder. The LAN screen says "Your friend's resume save is here: join their loaded game". (GameRanger or a real LAN: send the file by hand, any name in the Saves folder.)
+
+**Setting:** `[coop] resume_save=1` (the host's). It changes nothing in the game itself: one more save, at the moment a player drops.
+
+`h5-together.log`:
+
+```
+quick resume: PC 1 left the game (this PC is 0): the host saves before the game takes its player out
+quick resume: the resume save sent to every PC 94 ms after PC 1 left, just before the defeat of player 2
+resume transfer: this PC offers its resume save (sauvegarde_3.sav, 1143948 bytes, CRC 6d00dc41) to players who lack it
+resume transfer: the host's resume save is here (1143948 bytes, checked), written as h5together-reprise.sav: ...
+```
+
+What the game does when a player drops, and the robot runs: [docs/plans/turn-features.md](../../docs/plans/turn-features.md), part 2.
+
 ## Quicker lockstep (`lockstep.cpp`; the drain and the trace on by default)
 
 Why multiplayer clicks feel slow, and the measurements: [docs/plans/responsiveness.md](../../docs/plans/responsiveness.md). Each setting works on this PC only, so it needs no agreement between the PCs, and none of them changes what happens in the game world.

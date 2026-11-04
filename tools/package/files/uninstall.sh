@@ -411,7 +411,7 @@ fi
 if [ -z "$(find_ci "$bin" h5-together.log)" ] && [ -z "$(find_ci "$bin" open-homm5.log)" ]; then
     echo "  - no h5-together.log here"
 fi
-for name in h5-together.log h5-together.old.log open-homm5.log open-homm5.old.log; do
+for name in h5-together.log h5-together.old.log open-homm5.log open-homm5.old.log h5-together-resume.txt; do
     log="$(find_ci "$bin" "$name")"
     [ -n "$log" ] || continue
     if rm -f "$log"; then

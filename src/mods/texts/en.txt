@@ -324,6 +324,9 @@ picker.invite = Invite
 picker.invited = Invited
 picker.refused = Refused
 picker.close = Close
+resume_arriving = Your friend's resume save is coming: {n}%.
+resume_here = Your friend's resume save is here: join their loaded game.
+resume_failed = Your friend's resume save did not come through. Ask them to send you the file.
 
 # Undo End Turn: a button under the game's "Please wait for the other players..." banner,
 # while another human still plays (simultaneous turns).

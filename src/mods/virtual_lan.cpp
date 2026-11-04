@@ -47,6 +47,7 @@
 
 #include "steam_runtime.h"
 #include "virtual_lan.h"
+#include "resume_transfer.h"
 #include "virtual_lan_logic.h"
 #include "virtual_lan_transport.h"
 
@@ -327,6 +328,7 @@ int WINAPI VlanSendTo(SOCKET s, const char *buf, int len, int flags, const socka
 	if (Ready()) {
 		g_transport->Poll(now);
 		AddMembers();
+		ResumeTransferPoll(g_transport, g_peers.SelfId(), now);  // (a resume save for a player who lacks it)
 		CheckSelf(now, false);
 		if (vlan::IsGameInfo(packet, size)) {  // only a game that hosts sends its description
 			g_hosting.OnGameInfoSent(now);
@@ -420,6 +422,7 @@ int WINAPI VlanRecvFrom(SOCKET s, char *buf, int len, int flags, sockaddr *from,
 	if (Ready()) {
 		g_transport->Poll(now);
 		AddMembers();
+		ResumeTransferPoll(g_transport, g_peers.SelfId(), now);  // (a resume save for a player who lacks it)
 		CheckSelf(now, false);
 		UpdateHosting(now);
 		LogStats(now, false);
@@ -668,6 +671,8 @@ void OnlineStatus(online::Status *out)
 	}
 	else
 		g_transport->GetStatus(out);
+	if (out->state == online::State::kOn)
+		out->resume = mods::ResumeTransferState(&out->resume_percent);
 	if (g_ui_test && out->state == online::State::kOn) {
 		online::AddTestFriends(out);
 		if (g_test_invites) {

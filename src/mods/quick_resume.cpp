@@ -101,6 +101,74 @@ std::wstring g_save_name;    // "Reprise", in the add-on's language
 const wchar_t kEnglishName[] = L"Resume";  // also ours on a PC whose host plays in English
 DWORD g_banner_until = 0;
 std::string g_banner;
+// Files: this PC's saves folder (learnt from the game's own searches of it, FindFirstFileA
+// "...\Saves\*"), and the file of the last resume save this PC wrote (its CreateFileA
+// while our save command runs).
+char g_saves_folder[MAX_PATH] = "";
+char g_resume_file[MAX_PATH] = "";
+volatile bool g_in_resume_save = false;
+typedef HANDLE(WINAPI *FindFirstFileAFn)(LPCSTR, LPWIN32_FIND_DATAA);
+typedef HANDLE(WINAPI *CreateFileAFn)(LPCSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES, DWORD, DWORD, HANDLE);
+FindFirstFileAFn g_find_first_next = nullptr;
+CreateFileAFn g_create_file_next = nullptr;
+
+// The first "\Saves\" in a path, in any case, or nullptr.
+const char *FindSaves(const char *path)
+{
+	static const char kPart[] = "\\saves\\";
+	for (const char *p = path; *p; ++p)
+		if (_strnicmp(p, kPart, sizeof(kPart) - 1) == 0)
+			return p;
+	return nullptr;
+}
+
+HANDLE WINAPI FindFirstFileAHook(LPCSTR pattern, LPWIN32_FIND_DATAA data)
+{
+	if (pattern) {
+		const char *saves = FindSaves(pattern);
+		if (saves) {
+			char folder[MAX_PATH];
+			const size_t n = static_cast<size_t>(saves - pattern) + 7;
+			if (n < sizeof(folder)) {
+				memcpy(folder, pattern, n);
+				folder[n] = 0;
+				if (_stricmp(folder, g_saves_folder) != 0) {
+					lstrcpynA(g_saves_folder, folder, sizeof(g_saves_folder));
+					hooklog::Write("quick resume: this PC's saves folder is known now (the game searched it)");
+				}
+			}
+		}
+	}
+	return g_find_first_next(pattern, data);
+}
+
+HANDLE WINAPI CreateFileAHook(LPCSTR path, DWORD access, DWORD share, LPSECURITY_ATTRIBUTES sa, DWORD how, DWORD flags,
+                              HANDLE templ)
+{
+	// The profile's settings, read at start-up and when the player changes profiles
+	// ("...\Profiles\<name>\user_a2.cfg", robot run 20261104-095411): its folder + "Saves\".
+	static const char kProfileFile[] = "\\user_a2.cfg";
+	const size_t len = path ? strlen(path) : 0;
+	if (len > sizeof(kProfileFile) && len < MAX_PATH - 8 && _stricmp(path + len - (sizeof(kProfileFile) - 1), kProfileFile) == 0) {
+		char folder[MAX_PATH];
+		const size_t dir = len - (sizeof(kProfileFile) - 1) + 1;  // with its last backslash
+		memcpy(folder, path, dir);
+		lstrcpynA(folder + dir, "Saves\\", static_cast<int>(sizeof(folder) - dir));
+		if (_stricmp(folder, g_saves_folder) != 0) {
+			lstrcpynA(g_saves_folder, folder, sizeof(g_saves_folder));
+			hooklog::Write("quick resume: this PC's saves folder is known (its profile's settings were read)");
+		}
+	}
+	if (g_in_resume_save && path && (access & GENERIC_WRITE)) {
+		const size_t n = strlen(path);
+		if (n > 4 && _stricmp(path + n - 4, ".sav") == 0) {
+			lstrcpynA(g_resume_file, path, sizeof(g_resume_file));
+			const char *name = strrchr(path, '\\');
+			hooklog::Write("quick resume: the resume save's file: %s", name ? name + 1 : path);
+		}
+	}
+	return g_create_file_next(path, access, share, sa, how, flags, templ);
+}
 
 DWORD Read(const void *p, DWORD off)
 {
@@ -184,7 +252,19 @@ bool Ours(const void *command)
 bool __fastcall ExecuteHook(void *command, void *edx)
 {
 	const bool ours = !g_save_name.empty() && Ours(command);
+	g_in_resume_save = ours;
 	const bool ok = g_execute_next(command, edx);
+	g_in_resume_save = false;
+	if (ours && g_resume_file[0]) {  // the file the others may need: kept for later (and a restart)
+		wchar_t state[MAX_PATH];
+		hooklog::PathNextToExe(L"h5-together-resume", L".txt", state, MAX_PATH);
+		HANDLE f = CreateFileW(state, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+		if (f != INVALID_HANDLE_VALUE) {
+			DWORD written = 0;
+			WriteFile(f, g_resume_file, static_cast<DWORD>(strlen(g_resume_file)), &written, nullptr);
+			CloseHandle(f);
+		}
+	}
 	if (ours) {
 		g_banner = texts::Get("resume.banner");
 		g_banner_until = GetTickCount() + kBannerMs;
@@ -239,6 +319,37 @@ bool CodeAsExpected()
 
 }  // namespace
 
+bool ResumeOfferFile(char *out, size_t size)
+{
+	if (g_resume_file[0]) {
+		lstrcpynA(out, g_resume_file, static_cast<int>(size));
+		return true;
+	}
+	wchar_t state[MAX_PATH];
+	hooklog::PathNextToExe(L"h5-together-resume", L".txt", state, MAX_PATH);
+	HANDLE f = CreateFileW(state, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
+	if (f == INVALID_HANDLE_VALUE)
+		return false;
+	char path[MAX_PATH] = "";
+	DWORD got = 0;
+	const bool ok = ReadFile(f, path, sizeof(path) - 1, &got, nullptr) && got > 0;
+	CloseHandle(f);
+	if (!ok)
+		return false;
+	path[got] = 0;
+	lstrcpynA(g_resume_file, path, sizeof(g_resume_file));
+	lstrcpynA(out, path, static_cast<int>(size));
+	return true;
+}
+
+bool ResumeSavesFolder(char *out, size_t size)
+{
+	if (!g_saves_folder[0])
+		return false;
+	lstrcpynA(out, g_saves_folder, static_cast<int>(size));
+	return true;
+}
+
 void ApplyQuickResumeFromSettings()
 {
 	wchar_t path[MAX_PATH];
@@ -256,6 +367,12 @@ void ApplyQuickResumeFromSettings()
 		g_on = false;
 		return;
 	}
+	g_find_first_next = reinterpret_cast<FindFirstFileAFn>(
+		hookpatch::PatchImport("KERNEL32.dll", "FindFirstFileA", reinterpret_cast<void *>(&FindFirstFileAHook)));
+	g_create_file_next = reinterpret_cast<CreateFileAFn>(
+		hookpatch::PatchImport("KERNEL32.dll", "CreateFileA", reinterpret_cast<void *>(&CreateFileAHook)));
+	if (!g_find_first_next || !g_create_file_next)
+		hooklog::Write("quick resume: the game's file imports are not as expected: the save cannot be sent to a player");
 	const overlay::Client client = {kName, &Wanted, &Prepare, &Draw};
 	overlay::AddClient(client);
 	hooklog::Write("quick resume: %s", g_on ? "on (as the host, this PC asks every PC for a resume save when a player's game drops out)"

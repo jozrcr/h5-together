@@ -77,6 +77,10 @@ struct Status {
 	bool own_lobby = false;   // this PC's game hosts and its Steam lobby exists: friends can be invited
 	bool overlay = false;     // Steam's overlay is enabled in this game (its invite dialog works)
 	bool test = false;        // [online] ui_test=1: made-up friends (robot screenshots), no invite really sent
+	// Quick resume: a host's resume save coming to this PC (resume_transfer.cpp):
+	// 0 nothing, 1 arriving (resume_percent), 2 here, 3 failed.
+	int resume = 0;
+	unsigned resume_percent = 0;
 };
 
 // A line of the LAN screen's status block, and how it looks.

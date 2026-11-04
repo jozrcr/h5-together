@@ -79,6 +79,25 @@ python tools\robot\run_lan_test.py --game C:\Games\H5_test_k --simultaneous --cl
 - `panel|turn request`: as a click on the button (only when the button would show); `panel|turn force_request`: a request even when it is not allowed (every PC must refuse it the same way); `panel|turn states`: every player's turn state in the log (`1h:1/1`: player 1, human, state 1, pressed End Turn).
 - Look for `turn undo: on for this game`, `request sent ... it counts at segment N` on the asking PC, `PC 0 asks ...` on the others, and `segment N: player 1 plays again` (or `refused: ...`) at the same N on both copies; world checksums equal.
 
+## Checking quick resume (`quick_resume.cpp`, `resume_transfer*.cpp`)
+
+Two runs over the loopback virtual LAN. First a game whose client copy is killed in the middle (the robot cannot crash a copy itself: kill it from outside, by the process number its log gives, `robot: single-copy mutex renamed to NIVAL_H5-robot-<pid>` in `bin\h5-together-client.log`, about 112 s in):
+
+```
+python tools\robot\run_lan_test.py --game C:\Games\H5_test_k --vlan --seconds 175 --turns 20 --no-stuck-exit --host-step "133|shot|after-drop-banner"
+```
+
+Then the host loads the resume save, and a fresh client fetches it before it joins (with `--host-load`, the client joins at 36 s instead of 26 s):
+
+```
+python tools\robot\run_lan_test.py --game C:\Games\H5_test_k --vlan --host-load reprise --seconds 120 --turns 4 --client-step "44|shot|client-in-loaded-room"
+```
+
+- `--host-load <part of a save's name>`: the host's setup screen loads that multiplayer save (`msg|load`, `save|...`, `msg|load`) instead of starting `--map`. The robot's `save|` step works on the LAN load screen too.
+- `--trace-mp` logs every command a PC sends (`mp-send cmd=<vftable>`): that is how the defeat after a drop was found (`00e0e75c`, `NWorld::CDefeatPlayerCmd`).
+- Look for `quick resume: the resume save sent to every PC ... just before the defeat` (host), then in the second run `resume transfer: ... written as h5together-reprise.sav` (client) and the client in its seat in the loaded game's waiting room.
+- The waiting-room steps (`arrow|...`) do not work in a loaded game's waiting room yet: the robot cannot start a loaded game.
+
 ## Checking the "your turn" notification (the notify mod)
 
 ```

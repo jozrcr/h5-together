@@ -269,6 +269,9 @@ def main():
         "%d|arrow|1 ready" % args.client_ready_at,
         "%d|shot|client-started" % (args.start_at + 12),
     ] + args.client_step
+    if args.host_load:  # the client joins later: its add-on may first fetch the host's save (quick resume)
+        client_steps = [{"26|game|0": "36|game|0", "27|ui|NUI::CLobbyScreen join": "37|ui|NUI::CLobbyScreen join"}.get(step, step)
+                        for step in client_steps]
     if args.client_autojoin:
         # the online UI's auto-join instead of the robot's own clicks: an "invite" to the host's
         # game while the client is on the main menu (src/mods/online_join.cpp; needs --vlan)

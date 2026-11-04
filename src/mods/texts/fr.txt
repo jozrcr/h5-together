@@ -288,6 +288,9 @@ picker.invite = Inviter
 picker.invited = Invité
 picker.refused = Refusé
 picker.close = Fermer
+resume_arriving = La sauvegarde de reprise de votre ami arrive : {n} %.
+resume_here = La sauvegarde de reprise de votre ami est là : rejoignez sa partie chargée.
+resume_failed = La sauvegarde de reprise de votre ami n'est pas arrivée. Demandez-lui de vous envoyer le fichier.
 
 [turn]
 undo_button = Reprendre mon tour
