@@ -99,7 +99,7 @@ Keep the extracted folder: `uninstall.bat` and `bug-report.bat` (or the `.sh` fi
 
 Start the game as you do for co-op games (GameRanger, or `MMH55_Utility_64.exe`).
 
-- **In the main menu**, a line **"H5 Together 0.3.0"** (your version) sits above MMH5.5's "Version" line, at the bottom left.
+- **In the main menu**, a line **"H5 Together 0.3.1"** (your version) sits above MMH5.5's "Version" line, at the bottom left.
 - **The log:** a file **`h5-together.log`** appears in the same `bin` folder. Its first line says `H5 Together hook DLL <version> loaded`.
 - **The first time**, a small box asks "Check for new versions of H5 Together once a day? Yes / No". It is your choice; the default is off. See [Updating](#updating).
 - **In the waiting room** of a multiplayer game, a line at the bottom says whether every player has the same H5 Together version (and who has another one, or none).

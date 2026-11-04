@@ -55,6 +55,8 @@
 
 #include "rmg_factions.h"
 
+#include "autosave.h"
+
 #include "../hook/log.h"
 #include "../hook/patch.h"
 
@@ -845,11 +847,26 @@ void RebuildFor(Cdbid *id)
 }
 
 // A client reads the start message: build the map before the game looks it up.
-// The same code writes the message on the host, inside its start: not then.
+// The same code writes the message on the host, inside its start: not then. It also
+// reads the setup inside every save's info when the game looks through the saves
+// folder (each autosave, the load lists: 0x007f30d0 > 0x007e67b0 > 0x00753110 >
+// 0x005a1400 > here): not then either. Before, an old save of a rebuilt map gave
+// "REBUILD FAILED" lines at autosaves (its original map was gone), and could have
+// built a map during an autosave.
 void __fastcall StartReadHook(BYTE *data, void *edx, void *stream)
 {
-	if (!g_in_host_start)
+	if (SaveListingOnStack()) {
+		static bool told = false;
+		if (!told) {
+			told = true;
+			hooklog::Write("rmg factions: a save's setup read for the saves list: no map rebuilt for it (logged once)");
+		}
+	}
+	else if (!g_in_host_start) {
+		if (g_trace)
+			hooklog::Write("rmg factions: a game setup read (a start message, or a save being loaded): %s", Text(&reinterpret_cast<Cdbid *>(data + 4)->path).c_str());
 		RebuildFor(reinterpret_cast<Cdbid *>(data + 4));
+	}
 	g_start_read_next(data, edx, stream);
 }
 

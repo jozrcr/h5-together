@@ -96,6 +96,10 @@ const DWORD kHeroPoolCall = kHeroPoolArgs + 4;
 const DWORD kHeroPool = 0x00c9f4a0;  // __fastcall(map, setup), plain ret; writes only globals
 const DWORD kListingRead = 0x007f3207;  // in the folder scan 0x007f30d0: call 0x007e67b0 (one save's info)
 const DWORD kListingReadReturn = kListingRead + 5;
+// The other caller of 0x007e67b0: the load screens' list of the saves folder (robot run
+// 20261104-075409: the LAN load screen's reads did not come through 0x007f3207).
+const DWORD kListAllRead = 0x007f39cb;
+const DWORD kListAllReadReturn = kListAllRead + 5;
 const BYTE kHeroPoolArgsBytes[] = {0x8b, 0xd6, 0x8b, 0xcf, 0xe8, 0xa5, 0xe9, 0xff, 0xff};
 const BYTE kHeroPoolBytes[] = {0x83, 0xec, 0x38, 0x53, 0x55, 0x56, 0x8b, 0xf2, 0x33, 0xdb, 0x3b, 0xf3, 0x8b, 0xe9};
 const BYTE kListingReadBytes[] = {0xe8, 0xa4, 0x35, 0xff, 0xff};
@@ -369,17 +373,23 @@ struct AutosaveScope {
 	~AutosaveScope() { g_autosave_thread = previous; }
 };
 
-// The return address of the folder scan's per-file read is on this thread's
-// stack (between here and the stack's base, at most 16 KB up).
-bool ListingReadOnStack()
+// One of two return addresses is on this thread's stack (between here and the
+// stack's base, at most 16 KB up).
+bool ReturnOnStack(DWORD a, DWORD b)
 {
 	const DWORD *p = static_cast<const DWORD *>(_AddressOfReturnAddress());
 	const DWORD *base = static_cast<const DWORD *>(reinterpret_cast<const NT_TIB *>(NtCurrentTeb())->StackBase);
 	const DWORD *end = p + 4096 < base ? p + 4096 : base;
 	for (; p < end; ++p)
-		if (*p == kListingReadReturn)
+		if (*p == a || *p == b)
 			return true;
 	return false;
+}
+
+// The return address of the folder scan's per-file read is on this thread's stack.
+bool ListingReadOnStack()
+{
+	return ReturnOnStack(kListingReadReturn, kListingReadReturn);
 }
 
 typedef void(__fastcall *HeroPoolFn)(void *map, void *setup);
@@ -700,6 +710,11 @@ void ApplyAutosaveFromSettings()
 		               g_every);
 	if (g_trace)
 		hooklog::Write("autosave: trace on");
+}
+
+bool SaveListingOnStack()
+{
+	return ReturnOnStack(kListingReadReturn, kListAllReadReturn);
 }
 
 }  // namespace mods
