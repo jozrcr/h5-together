@@ -10,7 +10,8 @@ void ApplyAiPacingFromSettings();
 // Called by the AI turn driver hook (src/hook/ai_trace.cpp) around each call of
 // the game's turn driver: false = do not call it now (it gets its turn in a
 // later frame); after the call, how many commands it produced and its stage.
-bool AiPacingAllowsStep();
-void AiPacingAfterStep(int commands, unsigned long stage_before, unsigned long stage_after);
+// `ai`: the AI object whose turn driver is called (each AI waits only for its own commands).
+bool AiPacingAllowsStep(const void *ai);
+void AiPacingAfterStep(const void *ai, int commands, unsigned long stage_before, unsigned long stage_after);
 
 }  // namespace mods

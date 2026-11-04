@@ -60,13 +60,41 @@ LONG g_pumps = 0;           // runner calls (one at the end of each pump call)
 bool g_pending = false;     // a segment record was left after the last run
 LONG g_lowest = 0;          // the lowest number of those
 
-// The AI's side.
-LONG g_call_pump = -1;      // g_pumps when the turn driver was last called
-bool g_waiting = false;     // its last call produced commands that have not run yet
-LONG g_wait_segment = 0;    // the segment they joined
-DWORD g_wait_since = 0;
-bool g_wait_held = false;   // that wait held back at least one call
+// The AI's side: one record per AI player's AI object. The game runs one AI at a time;
+// with [ai] parallel_turns (parallel_ai.cpp) several play side by side, and each one
+// waits only for its own commands (another AI's moves do not hold it).
+struct Ai {
+	const void *ai = nullptr;
+	LONG call_pump = -1;     // g_pumps when its turn driver was last called
+	bool waiting = false;    // its last call produced commands that have not run yet
+	LONG wait_segment = 0;   // the segment they joined
+	DWORD wait_since = 0;
+	bool wait_held = false;  // that wait held back at least one call
+};
+const int kAis = 8;
+Ai g_ais[kAis];
+int g_next_slot = 0;
 bool g_valve_told = false;
+
+Ai &RecordOf(const void *ai)
+{
+	for (Ai &a : g_ais)
+		if (a.ai == ai)
+			return a;
+	Ai &slot = g_ais[g_next_slot];  // (a new AI object: the oldest record goes)
+	g_next_slot = (g_next_slot + 1) % kAis;
+	slot = Ai();
+	slot.ai = ai;
+	return slot;
+}
+
+bool AnyWaiting()
+{
+	for (const Ai &a : g_ais)
+		if (a.ai && a.waiting)
+			return true;
+	return false;
+}
 // For the log, per AI turn: calls held for the next frame, held until the AI's
 // own commands had run, and the longest of those waits.
 LONG g_held_frame = 0, g_held_commands = 0;
@@ -137,54 +165,56 @@ void ReportForWatchdog()
 	}
 	hooklog::Write("watchdog: ai pacing: %s; segments still to run: %s %ld; this turn %ld calls held for the next "
 	               "frame, %ld until the AI's own commands had run",
-	               g_waiting ? "the AI waits for its commands to run" : "the AI does not wait",
+	               AnyWaiting() ? "an AI waits for its commands to run" : "no AI waits",
 	               g_pending ? "from" : "none,", g_lowest, g_held_frame, g_held_commands);
 }
 
 }  // namespace
 
-bool AiPacingAllowsStep()
+bool AiPacingAllowsStep(const void *ai)
 {
+	Ai &a = RecordOf(ai);
 	if (!g_on || !InMultiplayer()) {
-		g_waiting = false;
+		a.waiting = false;
 		return true;
 	}
-	if (g_call_pump == g_pumps) {
+	if (a.call_pump == g_pumps) {
 		++g_held_frame;  // already called since the last pump: this frame
 		return false;
 	}
-	if (g_waiting) {
-		const DWORD waited = GetTickCount() - g_wait_since;
-		const bool ran = !g_pending || g_lowest > g_wait_segment;
+	if (a.waiting) {
+		const DWORD waited = GetTickCount() - a.wait_since;
+		const bool ran = !g_pending || g_lowest > a.wait_segment;
 		if (!ran && waited < kMaxWaitMs) {
 			++g_held_commands;
-			g_wait_held = true;
+			a.wait_held = true;
 			return false;
 		}
 		if (!ran && !g_valve_told) {
 			g_valve_told = true;
 			hooklog::Write("ai pacing: the AI waited %lu ms for its commands of segment %ld to run (segments from %ld "
-			               "still to run): letting it go on (said once)", waited, g_wait_segment, g_lowest);
+			               "still to run): letting it go on (said once)", waited, a.wait_segment, g_lowest);
 		}
-		if (g_wait_held && waited > g_longest_wait)
+		if (a.wait_held && waited > g_longest_wait)
 			g_longest_wait = waited;  // (only waits that held a call: the AI is not called at all most of the time)
-		g_waiting = false;
-		g_wait_held = false;
+		a.waiting = false;
+		a.wait_held = false;
 	}
-	g_call_pump = g_pumps;
+	a.call_pump = g_pumps;
 	return true;
 }
 
-void AiPacingAfterStep(int commands, unsigned long stage_before, unsigned long stage_after)
+void AiPacingAfterStep(const void *ai, int commands, unsigned long stage_before, unsigned long stage_after)
 {
 	if (!g_on || !InMultiplayer())
 		return;
 	if (commands > 0) {
 		const LONG segment = OpenSegment();
 		if (segment >= 0) {
-			g_waiting = true;
-			g_wait_segment = segment;
-			g_wait_since = GetTickCount();
+			Ai &a = RecordOf(ai);
+			a.waiting = true;
+			a.wait_segment = segment;
+			a.wait_since = GetTickCount();
 		}
 	}
 	if (stage_before != 0 && stage_after == 0) {  // the turn is over (CEndOfTurn)
