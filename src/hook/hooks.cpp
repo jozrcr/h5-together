@@ -8,6 +8,7 @@
 #include "overlay.h"
 #include "watchdog.h"
 #include "../mods/ai_pacing.h"
+#include "../mods/anim_throttle.h"
 #include "../mods/audio_volume.h"
 #include "../mods/autosave.h"
 #include "../mods/coop_features.h"
@@ -130,6 +131,7 @@ void InstallAll()
 	mods::ApplyRmgBuilderFromSettings();
 	overlay::ApplyTestPanelFromSettings();
 	mods::ApplyCameraFromSettings();
+	mods::ApplyAnimThrottleFromSettings();  // [camera] anim_saver (off by default; anim_every: testing)
 	mods::ApplyWheelFromSettings();  // its DirectInput filter goes first (order -10)
 	mods::ApplyEdgeSkyFromSettings();  // [camera] edge_sky: before the first map reads its light
 	mods::ApplyHostRulesFromSettings();  // [rules]: the host's rules, served as H55-Settings.lua

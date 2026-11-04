@@ -8,6 +8,8 @@ Where a click's time goes, and what is already built: [responsiveness.md](respon
 
 ## Frames on the adventure map
 
+The drawing itself (big maps zoomed out, the CPU's work on the 3D models, the first fix): [map-drawing.md](map-drawing.md).
+
 ### Robot profiles (tooling added the same day)
 
 - `run_ai_test.py --profile-all` / `run_lan_test.py --host-profile-all`: the sampling profiler (`src/hook/robot_profile.cpp`) samples the game's main thread every ~2 ms all the time (not only while the AI thinks), with a time mark every 0.5 s (`# t <ms>`, the log's clock): `tools/robot/profile_report.py --from-ms N --to-ms M` keeps a time window (the map, not the menus).
