@@ -870,6 +870,52 @@ std::vector<int> OfferedSkills(const ClassTable &table)
 	return skills;
 }
 
+std::vector<int> SharedSkills(const ClassTable &table)
+{
+	const size_t faction = table.size() / 8;  // a faction's worth of classes (MMH5.5: 3)
+	std::vector<int> out;
+	for (int s : OfferedSkills(table)) {
+		size_t classes = 0;
+		for (const ClassSkillList &c : table)
+			for (const SkillProb &p : c.probs)
+				if (p.skill == s) {
+					++classes;
+					break;
+				}
+		if (classes > faction)
+			out.push_back(s);
+	}
+	return out;
+}
+
+int Mmh55ClassFaction(int class_id)
+{
+	// classes 1..24: Haven 1 2 9, Sylvan 10 11 12, Academy 19 21 22, Dungeon 6 18 20,
+	// Necropolis 7 15 16, Inferno 3 4 13, Fortress 5 14 23, Stronghold 8 17 24
+	static const int kFaction[25] = {0, 1, 1, 6, 6, 7, 4, 5, 8, 1, 2, 2, 2, 6, 7, 5, 5, 8, 4, 3, 4, 3, 3, 7, 8};
+	return class_id >= 1 && class_id <= 24 ? kFaction[class_id] : 0;
+}
+
+std::vector<int> UnlockedSkillsFor(const ClassTable &table, int class_id, const int *factions, int faction_count)
+{
+	const int mine = factions && class_id >= 0 && class_id < faction_count ? factions[class_id] : 0;
+	if (mine == 0)
+		return SharedSkills(table);
+	std::vector<int> out;
+	for (const ClassSkillList &c : table) {
+		if (c.id < 0 || c.id >= faction_count || factions[c.id] != mine)
+			continue;
+		for (const SkillProb &p : c.probs) {
+			size_t at = 0;
+			while (at < out.size() && out[at] < p.skill)
+				++at;
+			if (at == out.size() || out[at] != p.skill)
+				out.insert(out.begin() + at, p.skill);
+		}
+	}
+	return out;
+}
+
 std::vector<SkillProb> UnlockedList(const std::vector<SkillProb> &own, const std::vector<int> &skills, int chance)
 {
 	std::vector<SkillProb> out = own;
@@ -891,6 +937,18 @@ int ClassChance(const std::string &chance)
 
 bool ClassTableFor(const ClassTable &mmh55, const std::string &mode, const std::string &chance, ClassTable *out, std::string *why)
 {
+	if (ClassTableHash(mmh55) == kMmh55ClassTableHash) {
+		int factions[25];
+		for (int c = 0; c < 25; ++c)
+			factions[c] = Mmh55ClassFaction(c);
+		return ClassTableForWith(mmh55, mode, chance, factions, 25, out, why);
+	}
+	return ClassTableForWith(mmh55, mode, chance, nullptr, 0, out, why);
+}
+
+bool ClassTableForWith(const ClassTable &mmh55, const std::string &mode, const std::string &chance, const int *factions,
+                       int faction_count, ClassTable *out, std::string *why)
+{
 	if (mode.empty() || mode == kClassLocked)
 		return false;
 	if (mode != kClassUnlocked) {
@@ -902,11 +960,10 @@ bool ClassTableFor(const ClassTable &mmh55, const std::string &mode, const std::
 		*why = "the class table: " + problem;
 		return false;
 	}
-	const std::vector<int> skills = OfferedSkills(mmh55);
 	const int c = ClassChance(chance);
 	ClassTable t = mmh55;
 	for (ClassSkillList &list : t)
-		list.probs = UnlockedList(list.probs, skills, c);
+		list.probs = UnlockedList(list.probs, UnlockedSkillsFor(mmh55, list.id, factions, faction_count), c);
 	*out = t;
 	return true;
 }
