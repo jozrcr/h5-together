@@ -1,5 +1,5 @@
-// Mod (EXPERIMENT): the computer players take their turns at the same time
-// ([ai] parallel_turns=1, hidden, off by default; docs/plans/turn-features.md, part 3).
+// Mod: the computer players take their turns at the same time ([ai] parallel_turns: the
+// host's choice, off by default; docs/plans/turn-features.md, part 3).
 //
 // Why: an AI turn is mostly waiting. After each move the AI waits until the move has
 // run (ai-turn.md: the AI manager asks the world "is this player still busy as of 400 ms
@@ -28,8 +28,10 @@
 //   4. inside that next turn (its call at 0x009980a9): "the computer player playing
 //      now" is the last of the phase in player order, so the day moves on as it does
 //      after the last computer player.
-// Hooks 1, 3 and 4 change the world: every PC of a multiplayer game must have the same
-// setting (an experiment: no agreement between PCs yet).
+// Hooks 1, 3 and 4 change the world, so every PC of a multiplayer game must do it, or
+// none: a phase starts only inside the multiplayer segment runner, in a game whose co-op
+// features include parallel_ai (every PC knows it, the host wants it: coop_features.cpp).
+// Single player: not used (yet).
 #include "parallel_ai.h"
 
 #include <windows.h>
@@ -37,6 +39,9 @@
 #include <string.h>
 
 #include <string>
+
+#include "coop_features.h"
+#include "coop_features_logic.h"
 
 #include "../hook/log.h"
 #include "../hook/patch.h"
@@ -82,6 +87,7 @@ EndTurnFn g_end_turn_next = nullptr;
 
 // The phase: which computer players (by number, 1..8) play side by side, which are done.
 bool g_phase = false;
+const void *g_phase_world = nullptr;  // the world of the phase (a new game's is another)
 bool g_member[9], g_done[9];
 int g_rotation = 0;            // the AI manager's next pick
 DWORD g_phase_started = 0;     // GetTickCount(), for the log
@@ -180,7 +186,11 @@ std::string Members()
 // 1. Before the world's tick: the computer players' part of the day begins.
 void __fastcall TickHook(void *world, void *edx)
 {
-	if (!g_phase) {
+	if (g_phase && world != g_phase_world) {
+		g_phase = false;
+		hooklog::Write("parallel ai: phase %d ends with its game", g_phase_count);
+	}
+	if (!g_phase && InMultiplayerSegment() && CoopFeatureOn(features::kParallelAi)) {
 		P players[8];
 		const int n = ReadPlayers(static_cast<const BYTE *>(world) + kPlayers, players, 8);
 		int playing_ai = 0, playing_human = 0, other_ai = 0;
@@ -204,6 +214,7 @@ void __fastcall TickHook(void *world, void *edx)
 					                                                                                              nullptr, 0);
 			}
 			g_phase = true;
+			g_phase_world = world;
 			memset(g_picks, 0, sizeof(g_picks));
 			memset(g_busy, 0, sizeof(g_busy));
 			memset(g_reached, 0, sizeof(g_reached));
@@ -298,9 +309,9 @@ bool CodeAsExpected()
 
 void ApplyParallelAiFromSettings()
 {
-	wchar_t path[MAX_PATH];
-	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
-	if (GetPrivateProfileIntW(L"ai", L"parallel_turns", 0, path) == 0 || !CodeAsExpected())
+	// Every PC hooks it, whatever its own setting: the host's [ai] parallel_turns decides
+	// for each multiplayer game (coop_features.cpp); the hooks act only in such a game.
+	if (!CodeAsExpected())
 		return;
 	g_manager_find_next = reinterpret_cast<FindFn>(hookpatch::RedirectCall(kManagerFindCall, kFindPlaying, &ManagerFindHook));
 	g_next_turn_find_next = reinterpret_cast<FindFn>(hookpatch::RedirectCall(kNextTurnFindCall, kFindPlaying, &NextTurnFindHook));
@@ -314,8 +325,7 @@ void ApplyParallelAiFromSettings()
 		               g_manager_find_next != nullptr, g_next_turn_find_next != nullptr, g_tick_next != nullptr, g_end_turn_next != nullptr);
 		return;
 	}
-	hooklog::Write("parallel ai: ON (EXPERIMENT): the computer players take their turns at the same time; every PC of a "
-	               "multiplayer game must have [ai] parallel_turns=1");
+	hooklog::Write("parallel ai: ready (the host's [ai] parallel_turns decides at each multiplayer game's start)");
 }
 
 }  // namespace mods

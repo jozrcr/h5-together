@@ -107,6 +107,11 @@ void Close()
 	LeaveCriticalSection(&g_lock);
 }
 
+unsigned long Milliseconds()
+{
+	return GetTickCount() - g_start;
+}
+
 void Write(const char *fmt, ...)
 {
 	char line[1100];

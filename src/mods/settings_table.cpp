@@ -98,6 +98,8 @@ const Setting kSettings[] = {
 	    "settings.coop.resume_save", "settings.coop.resume_save.help"),
 	ROW("coop", "undo_end_turn", "0", kBool, 0, 1, nullptr, 0, nullptr, kHost, kNextGame, kHostGroup, kCheck,
 	    "settings.coop.undo_end_turn", "settings.coop.undo_end_turn.help"),
+	ROW("coop", "script_rhythm", "1", kBool, 0, 1, nullptr, 0, nullptr, kHost, kNextGame, kHostGroup, kCheck,
+	    "settings.coop.script_rhythm", "settings.coop.script_rhythm.help"),
 	ROW("coop", "segment_ms", "50", kChoice, 0, 0, kSteps, COUNT(kSteps), "settings.unit.ms", kGroup, kRestart, kAdvanced, kList,
 	    "settings.coop.segment_ms", "settings.coop.segment_ms.help"),
 	// [ai]
@@ -110,7 +112,8 @@ const Setting kSettings[] = {
 	FILE_ONLY("ai", "port_expand", "1", kBool, 0, 1, kTester, kRestart),
 	FILE_ONLY("ai", "fast_ashore", "1", kBool, 0, 1, kTester, kRestart),
 	FILE_ONLY("ai", "ashore_check", "0", kBool, 0, 1, kTester, kRestart),
-	HIDDEN("ai", "parallel_turns", "0", kBool, 0, 1),  // EXPERIMENT: computer players side by side (parallel_ai.cpp)
+	ROW("ai", "parallel_turns", "0", kBool, 0, 1, nullptr, 0, nullptr, kHost, kNextGame, kHostGroup, kCheck,
+	    "settings.ai.parallel_turns", "settings.ai.parallel_turns.help"),
 	FILE_ONLY("ai", "one_decision_per_frame", "1", kBool, 0, 1, kTester, kRestart),
 	FILE_ONLY("ai", "max_expansions", "0", kInt, 0, 1000000, kTester, kRestart),
 	// [save]

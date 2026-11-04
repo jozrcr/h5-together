@@ -10,6 +10,7 @@
 #include "../mods/ai_pacing.h"
 #include "../mods/audio_volume.h"
 #include "../mods/autosave.h"
+#include "../mods/coop_features.h"
 #include "../mods/camera.h"
 #include "../mods/coop_guard.h"
 #include "../mods/edge_sky.h"
@@ -33,6 +34,7 @@
 #include "../mods/rmg_factions.h"
 #include "../mods/rmg_teams.h"
 #include "../mods/rmg_templates.h"
+#include "../mods/script_rhythm.h"
 #include "../mods/settings_menu.h"
 #include "../mods/steam_spike.h"
 #include "../mods/update_check.h"
@@ -115,7 +117,7 @@ void InstallAll()
 	mods::ApplyCoopGuardFromSettings();
 	mods::ApplyLockstepFromSettings();
 	mods::ApplyAiPacingFromSettings();
-	mods::ApplyParallelAiFromSettings();  // [ai] parallel_turns: EXPERIMENT, off by default
+	mods::ApplyParallelAiFromSettings();  // [ai] parallel_turns (host's, off by default): acts when the co-op features agree
 	mods::ApplyAutosaveFromSettings();
 	mods::ApplyNotifyFromSettings();
 	mods::ApplyRmgTeamsFromSettings();
@@ -135,6 +137,8 @@ void InstallAll()
 	mods::ApplyAudioVolumeFromSettings();
 	mods::ApplyHeroSkinsFromSettings();  // after notify and the co-op guard: it stacks on their hooks
 	mods::ApplyTurnUndoFromSettings();  // [coop] undo_end_turn (host's); after hero looks: it stacks on their hooks
+	mods::ApplyCoopFeaturesFromSettings();  // the host's script_rhythm and parallel_turns, agreed at each game's start
+	mods::ApplyScriptRhythmFromSettings();  // [coop] script_rhythm (host's, on by default); after the co-op features
 	mods::ApplyQuickResumeFromSettings();  // [coop] resume_save (host's); after the autosave mod: it stacks on its save hook
 	mods::ApplyUpdateCheckFromSettings();  // [update] check (off by default)
 	mods::ApplySettingsMenuFromSettings();  // Options, H5 Together: Accept writes h5-together.ini; F3; the first-start question

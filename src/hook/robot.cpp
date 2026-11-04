@@ -46,6 +46,7 @@ bool g_trace_segments = false;
 bool g_trace_mp = false;
 bool g_trace_crc = false;
 bool g_profile_ai = false;
+bool g_profile_all = false;  // the profiler samples the main thread all the time (frames, scripts), not only the AI
 int g_trace_paths = 0;
 DWORD g_virtual_clock_ms = 0;  // virtual clock: ms per frame, 0 = real time (robot_clock.cpp)
 DWORD g_segment_ms = 0;
@@ -323,6 +324,11 @@ PeekMessageAFn g_real_PeekMessageA = nullptr;
 BOOL WINAPI RobotPeekMessageA(LPMSG msg, HWND hwnd, UINT min, UINT max, UINT remove)
 {
 	const BOOL result = g_real_PeekMessageA(msg, hwnd, min, max, remove);
+	if (g_profile_all) {
+		NoteMainThreadForProfiler();  // (once: it keeps the first thread it sees)
+		if (!result)
+			NoteFrameForProfiler();   // no more messages: a frame is about to run
+	}
 	if (g_virtual_clock_ms) {
 		InstallVirtualClock(g_virtual_clock_ms);  // once, from the main thread
 		if (!result)
@@ -806,6 +812,8 @@ bool ReadConfig(const wchar_t *path)
 			g_trace_crc = atol(value) != 0;
 		else if (strcmp(line, "profile_ai") == 0)
 			g_profile_ai = atol(value) != 0;
+		else if (strcmp(line, "profile_all") == 0)
+			g_profile_all = atol(value) != 0;
 		else if (strcmp(line, "trace_paths") == 0)
 			g_trace_paths = static_cast<int>(atol(value));
 		else if (strcmp(line, "virtual_clock_ms") == 0)
@@ -907,8 +915,8 @@ void Init()
 	}
 	if (g_shot_dir[0])
 		InstallScreenshots(g_shot_dir);
-	if (g_profile_ai)
-		StartAiProfiler();
+	if (g_profile_ai || g_profile_all)
+		StartAiProfiler(g_profile_all);
 	if (g_net_log || g_share_udp_ports || g_relay_ports[0] || g_net_scan)
 		InstallNetLog(g_share_udp_ports, g_relay_ports, g_net_log_packets, g_net_log_bytes, g_net_scan);
 	// The main loop hook runs the script and keeps the game active.

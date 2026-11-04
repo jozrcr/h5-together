@@ -137,6 +137,28 @@ turn undo: segment 166: player 1 plays again (PC 0 asked; before: 1h:1/1 2h:0/0 
 
 How turns end in the game, and the robot runs: [docs/plans/turn-features.md](../../docs/plans/turn-features.md), part 1.
 
+## The co-op features' agreement (`coop_features*.cpp`)
+
+Some of our changes act on the game world, so every PC of a multiplayer game must use them, or none. At the start of each multiplayer game every PC's DLL sends one hello (next to the world checksums, as undo End Turn's): the features it knows and, from the host, the ones the host wants. At segment 20 every PC decides the same: a feature is on only if every PC knows it and the host wants it. These features act only inside the multiplayer segment runner, where every PC changes its world alike; never in single player. The log:
+
+```
+co-op features: this game (2 PCs): on: script_rhythm parallel_ai
+```
+
+## MMH5.5's scripts at their own pace (`script_rhythm.cpp`; on, the host's choice)
+
+**What it does:** map scripts (MMH5.5's above all) count their waits in "ticks" of the game's script clock, one per segment. MMH5.5 was made for the game's 200 ms segments; with our 50 ms co-op segments its main loop checked every hero four times as often (more work on every PC, a choppier map). With this, the script clock ticks once per 200 ms of game time, as in the original game: every script keeps its original pace.
+
+**Setting:** `[coop] script_rhythm=1` (Options, H5 Together, the host's settings; on by default). Only the host's value counts, from the next game; every PC needs a DLL that knows it.
+
+**How:** the world's update ends with the script clock's tick; during a multiplayer world update, the tick goes through only when the update's game time is in a new 200 ms step. Every PC runs the same updates with the same times, so every PC ticks the same. Measures and the addresses: [docs/plans/performance.md](../../docs/plans/performance.md), "The script clock".
+
+## Computer players side by side (`parallel_ai.cpp`; off, the host's choice)
+
+**What it does:** the computer players take their turns at the same time instead of one after another (robot: their part of a day about 40% shorter with two or three). They may decide differently than in the original game, so it is off by default. Multiplayer only.
+
+**Setting:** `[ai] parallel_turns=1` (Options, H5 Together, the host's settings). Only the host's value counts, from the next game; every PC needs a DLL that knows it. How: [docs/plans/turn-features.md](../../docs/plans/turn-features.md), part 3.
+
 ## Quick resume after a crash (`quick_resume.cpp`, `resume_transfer*.cpp`; on, the host's choice)
 
 **What it does:** when a player's game crashes (or loses its connection), the host's game drops that player after about 20 s and plays on without them: they count as defeated, and a save made after that cannot bring them back. With this, just before that defeat, the host has every PC save the game as **"Reprise"** ("Resume"), with the player still in it; a banner on the map says so. To play on together, everyone goes to Multiplayer, LAN, Create, Load, "Reprise".
