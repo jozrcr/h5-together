@@ -110,3 +110,14 @@ The first autosave of a session still takes ~0.9 s (the files' first read). The 
 1. Measure the owner's real game with the trace on: the freeze per PC, and how many saves each friend has.
 2. If the first autosave of a session (~1 s) matters: remember each save's info between lookups (key: file name, size and time). The info is a 0x28c-byte object with strings (copied by `0x007f1290`, freed by `0x006f9ff0`), and `0x007e67b0` takes its path in `eax`, so this needs care.
 3. Without the mod, the quick fix is to move old multiplayer saves out of the profile's `Saves` folder.
+
+## Each game its own autosaves (`[save] game_names`, 2026-11-04)
+
+The game names an autosave from the text of the key `autosavename` ("Sauvegarde auto <value=id>" in French; the request `0x007f9e10` takes it with `0x007c3f50` at `0x007f9f21`, puts N = 1, 2, 3 in the `<value=id>` place, looks each name up and overwrites the first missing or the oldest), so every game shared the same three files (the owner, 2026-11-04: an evening's autosaves replaced the previous day's game). With `game_names=1` (the default) that text becomes `<map> [tag] - <text>`:
+
+- The map: the game's settings (`0x0058e2f0`, the same the multiplayer save uses at `0x00822670`) hold its id at `+4` (an NDb CDBID: the path at `+0x14`, e.g. `/Maps/RMG/65012FB6-.../map.xdb#xpointer(/AdvMapDesc)`). The name shown: a map made by the generator, its name in its generator settings (the description `+0x254`, `+0x48`: "6P-epic-3v1v1v1"); else the map's folder ("A1M4").
+- The tag: 4 hex digits of the FNV-1a hash of the path (without its `#` part). A random map's folder is its own generated id, so each generated map has its own tag.
+- Multiplayer: the PC that asks builds the name and the save command carries it (robot `20261104-202223-lan`: both PCs saved "... [7697] - Sauvegarde auto 1, 2, 3, 1").
+- After a load the game's settings hold the loaded game's map: the same tag (robot `20261104-202849`: "6P-epic-3v1v1v1 [9D92] - Sauvegarde auto 2" loaded, the next autosaves under the same name).
+- Quick saves, "Reprise" and the names a player types are not touched (only the key `autosavename`). The old "Sauvegarde auto N" files stay as they are.
+

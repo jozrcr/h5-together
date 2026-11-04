@@ -122,6 +122,8 @@ const Setting kSettings[] = {
 	// [save]
 	ROW("save", "fast_save_list", "1", kBool, 0, 1, nullptr, 0, nullptr, kPlayer, kRestart, kAdvanced, kCheck,
 	    "settings.save.fast_save_list", "settings.save.fast_save_list.help"),
+	ROW("save", "game_names", "1", kBool, 0, 1, nullptr, 0, nullptr, kPlayer, kRestart, kAdvanced, kCheck,
+	    "settings.save.game_names", "settings.save.game_names.help"),
 	FILE_ONLY("save", "trace_autosave", "1", kBool, 0, 1, kTester, kRestart),
 	ROW("save", "compression", "1", kInt, -1, 9, kCompression, COUNT(kCompression), nullptr, kPlayer, kLive, kAdvanced, kList,
 	    "settings.save.compression", "settings.save.compression.help"),
