@@ -5,6 +5,7 @@
 
 #include "autosave.h"
 #include "camera.h"
+#include "frame_limit.h"
 #include "hero_skins_internal.h"
 #include "host_rules_internal.h"
 #include "lan_discovery.h"
@@ -42,6 +43,8 @@ void Reload(const char *section, const char *key)
 		ReloadLanDiscoverySettings();
 	else if (strcmp(section, "camera") == 0)
 		ReloadCameraSettings();
+	else if (is("video", "fps_limit"))
+		ReloadFrameLimitSettings();
 	else if (is("debug", "hang_seconds"))
 		watchdog::ReloadSettings();
 	else

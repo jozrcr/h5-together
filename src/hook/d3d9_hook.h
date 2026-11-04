@@ -19,6 +19,7 @@
 #include <windows.h>
 
 struct IDirect3DDevice9;
+struct _D3DPRESENT_PARAMETERS_;
 
 namespace d3dhook {
 
@@ -32,6 +33,11 @@ typedef void (*ResetCallback)(IDirect3DDevice9 *device, bool after, bool ok);
 // so they show the overlay.
 void AddPresentCallback(PresentCallback callback, int order);
 void AddResetCallback(ResetCallback callback);
+
+// Called with the game's presentation settings just before the device is made or
+// reset, so a mod can change them (frame_limit.cpp: the vertical sync). One filter.
+typedef void (*PresentParamsFilter)(_D3DPRESENT_PARAMETERS_ *params);
+void SetPresentParamsFilter(PresentParamsFilter filter);
 
 // Put the hooks in (once; later calls do nothing more). `late` = the game may
 // already have made its Direct3D object (after DllMain): then the CreateDevice

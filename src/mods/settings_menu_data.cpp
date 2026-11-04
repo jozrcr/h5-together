@@ -201,7 +201,7 @@ const Name kOrder[] = {
 	{"ui", "player_list"}, {"ui", "player_list_key"}, {"ui", "player_list_top"}, {"ui", "player_list_left"},
 	{"notify", "turn"}, {"notify", "sound"}, {"notify", "popup"}, {"rules", "key"}, {"rules", "button"},
 	{"skins", "skins"}, {"skins", "key"}, {"skins", "hero_screen_button"}, {"skins", "show_others"},
-	{"camera", "zoom_out"}, {"camera", "combat_zoom_out"}, {"camera", "start_zoom"}, {"camera", "edge_sky"}, {"camera", "anim_saver"}, {"menu", "scene"},
+	{"camera", "zoom_out"}, {"camera", "combat_zoom_out"}, {"camera", "start_zoom"}, {"camera", "edge_sky"}, {"camera", "anim_saver"}, {"video", "fps_limit"}, {"video", "vsync"}, {"menu", "scene"},
 	{"camera", "wheel_fix"}, {"audio", "original_music"}, {"audio", "volume_curve"}, {"ui", "language"},
 	{"lang", "texts"}, {"rmg", "builder"}, {"rmg", "builder_key"}, {"rmg", "teams"}, {"rmg", "lobby_teams"},
 	{"rmg", "recipe_teams"}, {"rmg", "faction_terrain"}, {"coop", "undo_end_turn"}, {"coop", "script_rhythm"}, {"ai", "parallel_turns"}, {"coop", "resume_save"}, {"coop", "guard"}, {"coop", "segment_ms"},

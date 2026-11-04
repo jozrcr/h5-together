@@ -47,6 +47,7 @@ int g_d3d_next = 0, g_devices_next = 0;  // the entry to reuse when all are take
 CreateDeviceFn g_last_create_device = nullptr;  // for an object we somehow do not know
 PresentFn g_last_present = nullptr;
 ResetFn g_last_reset = nullptr;
+d3dhook::PresentParamsFilter g_params_filter = nullptr;
 CRITICAL_SECTION g_lock;
 
 struct PresentClient {
@@ -144,6 +145,8 @@ HRESULT STDMETHODCALLTYPE HookCreateDevice(IDirect3D9 *self, UINT adapter, D3DDE
 {
 	const D3dTable *t = D3dTableOf(*reinterpret_cast<void ***>(self));
 	const CreateDeviceFn next = t && t->create_device ? t->create_device : g_last_create_device;
+	if (g_params_filter && params)
+		g_params_filter(params);
 	const HRESULT hr = next(self, adapter, type, window, flags, params, device);
 	if (SUCCEEDED(hr) && device && *device) {
 		HookDevice(*device);
@@ -214,6 +217,8 @@ HRESULT STDMETHODCALLTYPE HookReset(IDirect3DDevice9 *self, D3DPRESENT_PARAMETER
 	g_reset_tick = GetTickCount();
 	for (int i = 0; i < g_reset_count; ++i)
 		g_reset[i](self, false, false);
+	if (g_params_filter && params)
+		g_params_filter(params);
 	const HRESULT hr = next(self, params);
 	g_in_reset = 0;
 	HookDevice(self);  // (in case the reset gave the device other entries)
@@ -245,6 +250,11 @@ void AddPresentCallback(PresentCallback callback, int order)
 		--i;
 	}
 	g_present[i] = {callback, order};
+}
+
+void SetPresentParamsFilter(PresentParamsFilter filter)
+{
+	g_params_filter = filter;
 }
 
 void AddResetCallback(ResetCallback callback)
