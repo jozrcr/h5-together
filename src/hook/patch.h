@@ -33,4 +33,8 @@ DWORD PatchPointer(DWORD slot_address, DWORD original, const void *replacement);
 // turn), or nullptr if the exe does not import it. Stacks like the above.
 void *PatchImport(const char *dll, const char *function, void *replacement);
 
+// How many hooks the table holds now, and at most (for the log after start-up).
+int RecordsUsed();
+int RecordsCapacity();
+
 }  // namespace hookpatch

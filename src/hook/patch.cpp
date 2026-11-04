@@ -1,5 +1,7 @@
 #include "patch.h"
 
+#include "log.h"
+
 namespace hookpatch {
 namespace {
 
@@ -8,7 +10,11 @@ struct Record {
 	DWORD original;
 	DWORD replacement;
 };
-const int kMaxRecords = 128;
+// Every hook put in is recorded (so that another can be stacked on it). 128 was too few
+// once 0.3.2 added its co-op features: with all of a player's settings on, the table was
+// full before the settings menu's hooks (put in last), and Accept could not save the
+// Options page (the owner's game, 2026-11-04). A full table is now said in the log.
+const int kMaxRecords = 1024;
 Record g_records[kMaxRecords];
 int g_count = 0;
 
@@ -55,12 +61,33 @@ void *PatchSlot(IMAGE_THUNK_DATA32 *slot, void *replacement)
 	return original;
 }
 
+void TableFull(DWORD at)
+{
+	static int told = 0;
+	if (told++ < 5)
+		hooklog::Write("patch: the table of hooks is full (%d): the hook at %08lx is NOT put in", kMaxRecords, at);
+}
+
 }  // namespace
+
+int RecordsUsed()
+{
+	return g_count;
+}
+
+int RecordsCapacity()
+{
+	return kMaxRecords;
+}
 
 DWORD RedirectCalls(const DWORD *sites, int count, DWORD original, const void *replacement)
 {
-	if (count <= 0 || g_count + count > kMaxRecords)
+	if (count <= 0)
 		return 0;
+	if (g_count + count > kMaxRecords) {
+		TableFull(sites[0]);
+		return 0;
+	}
 	const DWORD previous = CallTarget(sites[0]);
 	for (int i = 0; i < count; ++i) {
 		const DWORD target = CallTarget(sites[i]);
@@ -84,7 +111,11 @@ DWORD PatchPointer(DWORD slot_address, DWORD original, const void *replacement)
 {
 	DWORD *slot = reinterpret_cast<DWORD *>(slot_address);
 	const DWORD previous = *slot;
-	if (g_count >= kMaxRecords || (previous != original && !HookedOver(slot_address, original, previous)))
+	if (g_count >= kMaxRecords) {
+		TableFull(slot_address);
+		return 0;
+	}
+	if (previous != original && !HookedOver(slot_address, original, previous))
 		return 0;
 	DWORD old;
 	if (!VirtualProtect(slot, sizeof(DWORD), PAGE_READWRITE, &old))
