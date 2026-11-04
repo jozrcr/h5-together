@@ -51,7 +51,7 @@ WHAT IT DOES
 - Linux: the mouse wheel zooms out again (automatic).
 
 
-NEW IN 0.3.2 (a pre-release)
+NEW IN 0.3.2
 
 - A smoother map: big maps zoomed far out run about twice as fast (the game gets more room for its 3D models; far-away animations get lighter when the map runs slow), and MMH5.5's scripts run at their own pace again with the faster co-op steps.
 - Computers play together (the host's choice, off by default): the computer players take their turns at the same time.
