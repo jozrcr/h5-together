@@ -9,5 +9,10 @@ namespace mods {
 void ApplyAutosaveFromSettings();
 // From the settings menu: compression and autosave_every again, at once.
 void ReloadAutosaveSettings();
+// Is this thread inside the game's look through the saves folder (one save's info read
+// by 0x007e67b0, from the folder scans: an autosave's name lookups, the load screens'
+// lists)? Every PC, whatever the settings. rmg_factions.cpp uses it: a listed save
+// never rebuilds a map.
+bool SaveListingOnStack();
 
 }  // namespace mods
