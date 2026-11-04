@@ -39,6 +39,8 @@
 // for ~10 s; zlib was ~0.1 s of it.
 //
 // What this mod does, settings in h5-together.ini [save]:
+//   game_names=1       each game its own 3 autosaves: "<map> [tag] - Autosave N"
+//                      (below, "each game its own autosaves").
 //   trace_autosave=1   one log line per request (which PC asks, the folder
 //                      lookups) and per save (which PC, how long, each phase,
 //                      the zlib time and sizes, the file flushes).
@@ -58,7 +60,10 @@
 #include <intrin.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
+
+#include <string>
 
 #include "autosave.h"
 
@@ -611,6 +616,110 @@ void ReloadAutosaveSettings()
 	               every > 1 && !g_day_ok ? " (the world code is not as expected: every day)" : "");
 }
 
+// --- each game its own autosaves ([save] game_names=1) -------------------------------------
+// The game names an autosave "<text of autosavename> N" (in French "Sauvegarde auto N"),
+// N = 1, 2, 3, and overwrites the oldest of the three: the request NUI::CSavesCreator
+// slot 7 (0x007f9e10) takes the text of its key (0x007c3f50, called at 0x007f9f21),
+// adds " " (0x00e45b5c) and N (0x00b8efa0), and looks each name up (0x007f6050,
+// 0x007e6d70). So every game shared the same three files (the owner, 2026-11-04: an
+// evening's autosaves replaced the day before's game). Here the text becomes
+// "<map> [tag] - <text>": the map's name (a random map's from its generator settings,
+// else the map's folder) and 4 hex digits of the map file's path (a random map's folder
+// is its own generated id), so each game rotates its own three. The map: the game's
+// settings (0x0058e2f0) +4 hold its id (an NDb CDBID: the path at +0x14), the same the
+// save resolves (0x00822670). Multiplayer: the PC that asks builds the name and the save
+// command carries it, so every PC saves under the same name. Quick saves, "Reprise" and
+// the saves a player names: untouched (only the key "autosavename").
+namespace {
+const DWORD kTextCall = 0x007f9f21, kText = 0x007c3f50;  // __thiscall(const nstl::string *key): const nstl::wstring *
+const DWORD kGameSettings = 0x0058e2f0;                    // (): the game's settings, or 0
+const DWORD kDbGet = 0x009b0f60;                           // __fastcall(const CDBID *): the resource, or 0
+const DWORD kRmgProps = 0x254, kRmgMapName = 0x48;         // SAdvMapDesc: sRMGProps; its map name (wide)
+const BYTE kTextCallBytes[] = {0x8d, 0x4c, 0x24, 0x4c, 0xe8};  // lea ecx, [esp+4Ch]; call
+
+struct WideString {  // nstl::wstring
+	wchar_t *begin, *end, *cap;
+};
+struct NarrowString {  // nstl::string
+	char *begin, *end, *cap;
+};
+typedef const WideString *(__fastcall *TextFn)(const void *key, void *edx);
+typedef void *(__cdecl *SettingsFn)();
+typedef void *(__fastcall *DbGetFn)(const void *id, void *edx);
+TextFn g_text_next = nullptr;
+bool g_game_names = false;
+wchar_t g_name_buffer[160];
+WideString g_name = {};
+LONG g_names_logged = 0;
+
+bool IsAutosaveKey(const void *key)
+{
+	const NarrowString *k = static_cast<const NarrowString *>(key);
+	static const char kKey[] = "autosavename";
+	return k && k->begin && k->end - k->begin == static_cast<int>(sizeof(kKey) - 1) &&
+	       memcmp(k->begin, kKey, sizeof(kKey) - 1) == 0;
+}
+
+// The current map: its path and a name to show (empty when unknown).
+bool CurrentMap(std::string *path, std::wstring *name)
+{
+	__try {
+		const BYTE *settings = static_cast<const BYTE *>(reinterpret_cast<SettingsFn>(kGameSettings)());
+		if (!settings)
+			return false;
+		const BYTE *id = settings + 4;
+		const NarrowString *p = reinterpret_cast<const NarrowString *>(id + 0x14);
+		if (!p->begin || p->end <= p->begin || p->end - p->begin > 400)
+			return false;
+		path->assign(p->begin, p->end);
+		const BYTE *desc = static_cast<const BYTE *>(reinterpret_cast<DbGetFn>(kDbGet)(id, nullptr));
+		if (desc) {
+			const WideString *n = reinterpret_cast<const WideString *>(desc + kRmgProps + kRmgMapName);
+			if (n->begin && n->end > n->begin && n->end - n->begin < 60)
+				name->assign(n->begin, n->end);
+		}
+		return true;
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER) {
+		return false;
+	}
+}
+
+const WideString *__fastcall TextHook(const void *key, void *edx)
+{
+	const WideString *text = g_text_next(key, edx);
+	if (!g_game_names || !text || !text->begin || !IsAutosaveKey(key))
+		return text;
+	std::string path;
+	std::wstring name;
+	if (!CurrentMap(&path, &name)) {
+		if (InterlockedIncrement(&g_names_logged) <= 3)
+			hooklog::Write("autosave: game names: the current map is not known here: the game's own names");
+		return text;
+	}
+	const std::string file = path.substr(0, path.find('#'));  // without "#xpointer(/AdvMapDesc)"
+	if (name.empty()) {  // a map without generator settings: its folder ("/Maps/Multiplayer/A1M4/map.xdb" -> A1M4)
+		const size_t end = file.find_last_of('/');
+		const size_t begin = end == std::string::npos || end == 0 ? std::string::npos : file.find_last_of('/', end - 1);
+		if (begin != std::string::npos)
+			for (size_t i = begin + 1; i < end && name.size() < 40; ++i)
+				name += static_cast<wchar_t>(static_cast<unsigned char>(file[i]));
+	}
+	uint32_t hash = 2166136261u;  // FNV-1a of the path, its # part left out
+	for (char c : file)
+		hash = (hash ^ static_cast<unsigned char>(c)) * 16777619u;
+	const std::wstring own(text->begin, text->end);
+	_snwprintf_s(g_name_buffer, _countof(g_name_buffer), _TRUNCATE, L"%ls%ls[%04X] - %ls", name.c_str(), name.empty() ? L"" : L" ",
+	             (hash ^ (hash >> 16)) & 0xffff, own.c_str());
+	g_name.begin = g_name_buffer;
+	g_name.end = g_name_buffer + wcslen(g_name_buffer);
+	g_name.cap = g_name.end + 1;
+	if (InterlockedIncrement(&g_names_logged) <= 20)
+		hooklog::Write("autosave: game names: \"%ls N\" (the map %s)", g_name_buffer, path.c_str());
+	return &g_name;
+}
+}  // namespace
+
 void ApplyAutosaveFromSettings()
 {
 	wchar_t path[MAX_PATH];
@@ -619,6 +728,7 @@ void ApplyAutosaveFromSettings()
 	g_level = ReadInt(path, L"compression", 1);
 	g_every = ReadInt(path, L"autosave_every", 1);
 	g_fast_list = ReadInt(path, L"fast_save_list", 1) != 0;
+	g_game_names = ReadInt(path, L"game_names", 1) != 0;
 	LARGE_INTEGER freq;
 	QueryPerformanceFrequency(&freq);
 	g_freq = freq.QuadPart ? freq.QuadPart : 1;
@@ -704,6 +814,14 @@ void ApplyAutosaveFromSettings()
 		if (g_day_ok)
 			g_world_day_next =
 				reinterpret_cast<WorldDayFn>(hookpatch::PatchPointer(kWorldDaySlot, kWorldDay, &WorldDayHook));
+	}
+	if (g_game_names) {
+		if (Matches(kTextCall - 4, kTextCallBytes, sizeof(kTextCallBytes)))
+			g_text_next = reinterpret_cast<TextFn>(hookpatch::RedirectCall(kTextCall, kText, &TextHook));
+		if (g_text_next)
+			hooklog::Write("autosave: game names on: each game keeps its own 3 autosaves (\"<map> [tag] - ...\")");
+		else
+			hooklog::Write("autosave: the autosave name code is not as expected: the game's own names (shared by every game)");
 	}
 	if (g_every > 1)
 		hooklog::Write("autosave: only on days 1, %d, %d... (autosave_every=%d)", 1 + g_every, 1 + 2 * g_every,
