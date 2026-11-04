@@ -23,7 +23,7 @@ H5 Together was called **open-homm5** until version 0.2.7. If you have an old ve
 2. Close the game. **Extract the whole zip** (Windows: right-click it, **Extract All**).
 3. **Windows:** double-click `install.bat`. **Linux:** run `bash install.sh` in the folder.
 
-The installer finds your game, shows you what it found ("Your game": the folder, Steam or GOG, the language, which MMH5.5 you have), copies the files in and tells you what to do next. Start the game as you always do. In the main menu, a line **"H5 Together 0.3.1"** now sits above MMH5.5's version line: the add-on is running.
+The installer finds your game, shows you what it found ("Your game": the folder, Steam or GOG, the language, which MMH5.5 you have), copies the files in and tells you what to do next. Start the game as you always do. In the main menu, a line **"H5 Together 0.3.2"** now sits above MMH5.5's version line: the add-on is running.
 
 ![The main menu with the H5 Together version line](docs/images/main-menu.png)
 
@@ -109,6 +109,16 @@ The defaults keep the original game: the speed-ups, fixes and panels are on, and
 - **No long autosave freeze** at the start of each round (7 to 10 s down to a fraction of a second when the `Saves` folder holds many multiplayer saves).
 - **LAN games over ZeroTier** and other virtual networks show up in the LAN list, so a friend (on Linux too) can join without GameRanger.
 - **The waiting room shows versions.** A line at the bottom says whether every player has the same H5 Together, and who has another version or none.
+- **Computers play together** (new in 0.3.2, the host's choice, off by default). The computer players take their turns at the same time instead of one after another: their part of each day about 40% shorter with two or three of them.
+- **Undo End Turn** (new in 0.3.2, the host's choice, off by default). With simultaneous turns, a player who ended the turn too early can take it back while another human still plays.
+- **Quick resume after a crash** (new in 0.3.2, on). When a player's game crashes, every PC saves the game as "Reprise" with that player still in it; the player who crashed gets the save over Steam.
+- **Each game its own autosaves** (new in 0.3.2). Autosaves are named after their game's map, so a new game no longer overwrites yesterday's.
+
+### A smoother map
+
+- **Big maps zoomed out run about twice as fast** (new in 0.3.2): the add-on gives the game more room for its 3D models, and far-away animations get lighter when the map runs slow (robot, a 6-player map at 2560x1440 zoomed out to 250%: 33 to 70 frames a second).
+- **MMH5.5's scripts at their own pace** (new in 0.3.2): with the faster co-op steps, MMH5.5's script loop ran four times as often as intended; it runs at its original pace again.
+- **A frame rate limit and the vertical sync** (new in 0.3.2, off by default), in Options, H5 Together.
 
 ### Stability
 

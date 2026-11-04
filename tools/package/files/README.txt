@@ -51,6 +51,19 @@ WHAT IT DOES
 - Linux: the mouse wheel zooms out again (automatic).
 
 
+NEW IN 0.3.2 (a pre-release)
+
+- A smoother map: big maps zoomed far out run about twice as fast (the game gets more room for its 3D models; far-away animations get lighter when the map runs slow), and MMH5.5's scripts run at their own pace again with the faster co-op steps.
+- Computers play together (the host's choice, off by default): the computer players take their turns at the same time.
+- Undo End Turn (the host's choice, off by default): with simultaneous turns, take back an End Turn while another human still plays.
+- Quick resume after a crash (on): every PC saves "Reprise" with the player who crashed; they get the save over Steam.
+- Each game its own autosaves: named after their map, so a new game no longer overwrites yesterday's.
+- A frame rate limit and the vertical sync (off by default), in Options, H5 Together.
+- Game rules, "Skills of each class: Unlocked": the skills of the other classes of the hero's own faction only, never another faction's.
+- Fixed: the Options page sometimes did not save with many settings on.
+- Every player needs 0.3.2 for the co-op features and the host's game rules.
+
+
 NEW IN 0.3.1
 
 - Co-op games no longer lag: a PC that falls behind now catches up (before, every other PC waited for it at each step), and the game's connection sends five times more often, so the computer players' big moves no longer hold up everything else. In our tests over Steam, a click on the map went from about 0.5 s to 0.12 s, and the computer players' moves from 0.57 s apart to 0.15 s. Also for LAN and GameRanger games.
