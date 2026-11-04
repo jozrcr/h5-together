@@ -20,7 +20,8 @@
 //      gets the command "join", as from its Join button (its
 //      IProgrammedReactionsAndChecks part, found through the object's RTTI;
 //      React = 0x006fd4f0, the LAN screen's own, which passes "join" to its base's 0x006f7a00);
-//   4. done when the waiting room (NUI::CMPWaitScreen) is on top. If the row does
+//   4. done when the waiting room (NUI::CMPWaitScreen, or a loaded game's
+//      NUI::CMPUbiComLoadScreen) is on top. If the row does
 //      not come in 20 s, or Join does not lead there (a message box, or 30 s), the
 //      player stays on the LAN screen and a line there says so.
 // Never in a game, the waiting room, or any screen but these two; never while a
@@ -57,7 +58,6 @@ const DWORD kListVftable = 0x00e94870;      // CWindowListCtrl's IListControl pa
 const DWORD kDynamicCast = 0x00d119fc;      // the game's __RTDynamicCast
 const DWORD kLobbyView = 0x1dc, kViewList = 8, kListRows = 0x20;
 const char kLobbyScreen[] = ".?AVCLobbyScreen@NUI@@";
-const char kWaitScreen[] = ".?AVCMPWaitScreen@NUI@@";
 const char kMainMenu[] = ".?AVCMainMenuScreen@NUI@@";
 const char kReactions[] = ".?AUIProgrammedReactionsAndChecks@@";
 const DWORD kKeepMs = 10 * 60000, kOpenMs = 10000, kRowMs = 20000, kJoinMs = 30000, kScanMs = 250, kPickMs = 600;
@@ -508,7 +508,8 @@ void Frame(const char *top, bool boxed)
 	if (g.step == Step::kIdle)
 		return;
 	const DWORD now = GetTickCount();
-	const bool lan = strcmp(top, kLobbyScreen) == 0, menu = strcmp(top, kMainMenu) == 0, wait = strcmp(top, kWaitScreen) == 0;
+	const online::Room room = online::WaitingRoom(top);
+	const bool lan = strcmp(top, kLobbyScreen) == 0, menu = strcmp(top, kMainMenu) == 0, wait = room != online::Room::kNone;
 	switch (g.step) {
 	case Step::kWaitMenu:
 		if (now - g.since > kKeepMs) {
@@ -565,7 +566,8 @@ void Frame(const char *top, bool boxed)
 		return;
 	case Step::kJoining:
 		if (wait) {
-			hooklog::Write("online: auto-join: done, the waiting room is open (%lu s after the invite)", (now - g.since) / 1000);
+			hooklog::Write("online: auto-join: done, the waiting room%s is open (%lu s after the invite)",
+			               room == online::Room::kLoadedGame ? " of a loaded game" : "", (now - g.since) / 1000);
 			g.step = Step::kIdle;
 			return;
 		}

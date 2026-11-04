@@ -528,6 +528,16 @@ New robot tools: `panel|online test_autojoin [name]` (an invite to the first hos
 
 **Not covered yet:** the auto-join after a real Steam invite between two PCs (the robot's invites are made up; the real path only adds the invite's host and lobby), and after `+connect_lobby` (the lobby's data must come first: then the host is known).
 
+### Follow-up (2026-11-04): a loaded game's waiting room
+
+In 0.3.0 a host who loaded a saved game had no "Invite friends..." button (a known issue of the 0.3.0 release, from the owner's game of 2026-11-03). The owner's log said why: a loaded game's waiting room is another screen, `NUI::CMPUbiComLoadScreen` (over the setup screen), not `NUI::CMPWaitScreen`. The way there: setup screen, **Load** (`NUI::CLoadScreen<SLanSaveHeaderInfo>`, the LAN saves), then `NUI::CUbiComLoadScreen<SLanSaveHeaderInfo>` for a moment, then the waiting room. The friend who joins a loaded game gets the same screen, over the LAN screen. The Steam lobby is made as for a new game (the game hosts as soon as the waiting room opens).
+
+- `online::WaitingRoom(screen)` (`online_ui_logic.cpp`, unit-tested) says whether a screen is a waiting room, a new game's or a loaded game's. The button and our friends list use it, and so does the auto-join's last step (before, a friend's auto-join into a loaded game ended after 30 s with "another screen" instead of "done"; harmless, but the log was wrong).
+- The button is at the same place: a loaded game's waiting room has the same title row, without "Rules..." (a loaded game keeps its rules).
+- The robot's `save|<name>` step now also picks a save on the LAN load screen. Its entries are bigger than single-player ones; the row's place in them (+0x298 in RC19k) is found from the row the list highlights when it opens.
+
+Robot run `20261104-074436` (test copy `C:\Games\H5_test_k`, French, `mode=steam`, `ui_test=1`; the host's multiplayer autosave "Sauvegarde auto 1" copied in): Multiplayer, LAN, Create, Load, the save, Load. The log says `our Invite friends... button is drawn in the waiting room of a loaded game`; the screenshot shows "Inviter des amis..." on the title row of "Options du mode Standard"; `panel|online invite` opened our list of made-up friends, and Close closed it.
+
 ## Steps and effort
 
 A session is one focused working block of a few hours.

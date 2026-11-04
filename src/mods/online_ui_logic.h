@@ -131,6 +131,14 @@ bool KeepFriend(int persona);  // not offline (0), not invisible (7)
 // The key of the words under a friend's name ("online.picker.playing_us"...).
 const char *FriendStateKey(const Friend &f);
 
+// --- the game's screens ------------------------------------------------------------------
+// The waiting room of a multiplayer game, from the name of the screen on top (its RTTI
+// name, as overlay::TopScreen gives it): a new game's (NUI::CMPWaitScreen), or a loaded
+// game's (NUI::CMPUbiComLoadScreen, over the setup screen; the players' logs of
+// 2026-11-03, host and friend).
+enum class Room { kNone, kNewGame, kLoadedGame };
+Room WaitingRoom(const char *screen);
+
 // --- Steam's command line --------------------------------------------------------------
 // "... +connect_lobby 109775240000000123 ..." -> that lobby; 0 if there is none.
 uint64_t ConnectLobby(const wchar_t *command_line);
