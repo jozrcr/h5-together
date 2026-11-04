@@ -245,6 +245,7 @@ def prepare(game, args, out, instance="", net_port=None):
         ("trace_mp", int(bool(getattr(args, "trace_mp", False)))),
         ("trace_crc", int(bool(getattr(args, "trace_crc", False)))),
         ("profile_ai", int(bool(getattr(args, "profile_ai", False)))),
+        ("profile_all", int(bool(getattr(args, "profile_all", False)))),
         ("virtual_clock_ms", getattr(args, "virtual_clock", 0) or 0),
         ("trace_paths", 3 if getattr(args, "trace_helpers", False) else 2 if getattr(args, "trace_paths_all", False)
          else int(bool(getattr(args, "trace_paths", False)))),
@@ -470,6 +471,8 @@ def main():
     p.add_argument("--command",help="console command to run instead of the default advmap line")
     p.add_argument("--net-tuning", choices=["on", "off"], default="on",
                    help="the LAN link tuning mod (src/mods/net_tuning.cpp); only matters in multiplayer")
+    p.add_argument("--profile-all", action="store_true",
+                   help="sample the game's main thread all the time (frames, scripts, AI), into ai-profile.txt")
     p.add_argument("--profile-ai", action="store_true",
                    help="sample where the AI spends its thinking time (ai-profile.txt, profile_report.py)")
     p.add_argument("--dll", help="hook DLL to install (default build/hook/dinput8.dll), e.g. a frozen copy for batch runs")
