@@ -143,6 +143,12 @@ How turns end in the game, and the robot runs: [docs/plans/turn-features.md](../
 
 **Setting:** `[camera] anim_saver=1` (the default; 0 = the game's own way. Options, H5 Together, camera group; restart). `[camera] anim_every=N` (hidden, testing): a fixed 1 in N; 0 = 1, 2, 3, 4 in turn, 20 s each, with the numbers in the log. Study and addresses: [docs/plans/map-drawing.md](../../docs/plans/map-drawing.md).
 
+## A bigger vertex pool (`vertex_pool.cpp`; on)
+
+**What it does:** the game keeps the 3D models' vertices in a shared pool that it sized for its own zoom. Zoomed far out on a big map it overflows every other frame, throws everything away and builds every model again. This makes the pool 4 times as large (about 80 MB more video memory): robot, 2560x1440 zoomed out to 250%, 36 -> 49 frames a second (70 with lighter animations). The picture is the same.
+
+**Setting:** `[camera] vertex_pool=4` (in the file only; 1 = the game's own size, up to 16; restart). `[camera] vb_trace=1` (hidden, research): why and how often the models are built again, every 10 s. Study: [docs/plans/map-drawing.md](../../docs/plans/map-drawing.md).
+
 ## The co-op features' agreement (`coop_features*.cpp`)
 
 Some of our changes act on the game world, so every PC of a multiplayer game must use them, or none. At the start of each multiplayer game every PC's DLL sends one hello (next to the world checksums, as undo End Turn's): the features it knows and, from the host, the ones the host wants. At segment 20 every PC decides the same: a feature is on only if every PC knows it and the host wants it. These features act only inside the multiplayer segment runner, where every PC changes its world alike; never in single player. The log:

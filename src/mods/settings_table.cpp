@@ -197,6 +197,8 @@ const Setting kSettings[] = {
 	ROW("camera", "anim_saver", "1", kBool, 0, 1, nullptr, 0, nullptr, kPlayer, kRestart, kCamera, kCheck,
 	    "settings.camera.anim_saver", "settings.camera.anim_saver.help"),
 	HIDDEN("camera", "anim_every", "1", kInt, 0, 8),  // testing: 3D models animated on one frame in N (anim_throttle.cpp)
+	FILE_ONLY("camera", "vertex_pool", "4", kInt, 1, 16, kTester, kRestart),  // the dynamic vertex pool N times as large (vertex_pool.cpp)
+	HIDDEN("camera", "vb_trace", "0", kBool, 0, 1),  // research: why the models' vertices are built again (vertex_pool.cpp)
 	FILE_ONLY("camera", "edge_sky_test_light", "", kText, 0, 0, kTester, kRestart),
 	// [menu]
 	ROW("menu", "scene", "default", kChoice, 0, 0, kMenuScene, COUNT(kMenuScene), nullptr, kPlayer, kRestart, kCamera, kList,
