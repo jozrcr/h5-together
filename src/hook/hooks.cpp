@@ -16,6 +16,7 @@
 #include "../mods/fast_paths.h"
 #include "../mods/hero_skins.h"
 #include "../mods/turn_undo.h"
+#include "../mods/parallel_ai.h"
 #include "../mods/quick_resume.h"
 #include "../mods/hero_skins_internal.h"
 #include "../mods/host_rules.h"
@@ -114,6 +115,7 @@ void InstallAll()
 	mods::ApplyCoopGuardFromSettings();
 	mods::ApplyLockstepFromSettings();
 	mods::ApplyAiPacingFromSettings();
+	mods::ApplyParallelAiFromSettings();  // [ai] parallel_turns: EXPERIMENT, off by default
 	mods::ApplyAutosaveFromSettings();
 	mods::ApplyNotifyFromSettings();
 	mods::ApplyRmgTeamsFromSettings();

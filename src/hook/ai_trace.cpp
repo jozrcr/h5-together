@@ -190,7 +190,7 @@ void __fastcall TurnDriverHook(void *self, void *edx, void *commands, int flag)
 {
 	// Held for a later frame (src/mods/ai_pacing.cpp): the manager then sends
 	// the empty list, as after a call that decided nothing.
-	if (!mods::AiPacingAllowsStep())
+	if (!mods::AiPacingAllowsStep(self))
 		return;
 	const DWORD stage_before = Field(self, kOffStage);
 	if (watchdog::OnAiStep(stage_before))
@@ -219,7 +219,7 @@ void __fastcall TurnDriverHook(void *self, void *edx, void *commands, int flag)
 	char types[96];
 	CommandTypes(commands, types, sizeof(types));
 	const int cmds = CommandCount(commands);
-	mods::AiPacingAfterStep(cmds, stage_before, stage_after);
+	mods::AiPacingAfterStep(self, cmds, stage_before, stage_after);
 	const double think = Ms(t0, t1);
 	Step &s = g_steps[g_step_count % kSteps];
 	s = {GetTickCount(), self, stage_before, stage_after, cmds, static_cast<float>(think), static_cast<float>(gap),

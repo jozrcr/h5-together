@@ -1,6 +1,6 @@
 # Turn features: undo End Turn, resume after a crash, parallel AI turns
 
-Status (2026-11-04): part 1, undo End Turn, **built** (`[coop] undo_end_turn`, off by default; robot-tested, waiting for a hand test); part 2, quick resume, **built** (the save at the drop and its transfer over the virtual LAN; robot-tested over the loopback, not yet over real Steam); part 3 is a **study**. Three ideas from the owner's games of 2026-11-03 and 04, in the order we plan to build them. Each one is a setting that is **off by default** (the original game), chosen by the host for the whole game. Addresses are in the vanilla 3.1 exe (the same in `MMH55_Utility(_64).exe`). What players, turn states and "pressed End Turn" are: [players.md](../subsystems/players.md). How the PCs stay in step: [multiplayer-sync.md](../subsystems/multiplayer-sync.md).
+Status (2026-11-04): part 1, undo End Turn, **built** (`[coop] undo_end_turn`, off by default; robot-tested, waiting for a hand test); part 2, quick resume, **built** (the save at the drop and its transfer over the virtual LAN; robot-tested over the loopback, not yet over real Steam); part 3, parallel AI turns, an **experiment that works** (`[ai] parallel_turns`, hidden, robot-tested). Three ideas from the owner's games of 2026-11-03 and 04, in the order we plan to build them. Each one is a setting that is **off by default** (the original game), chosen by the host for the whole game. Addresses are in the vanilla 3.1 exe (the same in `MMH55_Utility(_64).exe`). What players, turn states and "pressed End Turn" are: [players.md](../subsystems/players.md). How the PCs stay in step: [multiplayer-sync.md](../subsystems/multiplayer-sync.md).
 
 ## 1. Undo End Turn (while the others still play)
 
@@ -96,8 +96,33 @@ So a save made **after** the drop no longer has that player in the game: reloadi
 - **Determinism is not the risk** (only the host thinks; everyone runs its commands in order). The risks are the AI's own assumptions (one AI moving at a time) and battles between two AIs that both move.
 - First step: a robot experiment where the turn manager gives the turn to all computer players at once, on a test map, AI only. Off by default, host's choice, like the rest.
 
+### The experiment (2026-11-04): it works, and the computer players' part of the day is ~40% shorter with two of them
+
+`src/mods/parallel_ai.cpp`, the hidden setting `[ai] parallel_turns=1` (off by default; **every PC of a game must have the same**: no agreement between PCs yet).
+
+**What the game assumes, and the four hooks:**
+
+- The AI manager (`0x006082f0`) drives the AI of "the computer player playing now", found by `0x0098d480` (players, dl = 0, 1), which answers **nothing when two are at state 0**. Hook at `0x00608658`: during a phase, the next computer player of the phase not done yet. The pick moves on only once that AI has really been driven (`0x00608180` reached, hooked at `0x006086d2`): the manager skips a pass right after another AI's move (the controller's state `+0x44`), and a strict alternation starved one AI (robot `20261104-104844`: player 2 picked 23 times, driven 9, all after player 3 ended).
+- The wait between two steps of one AI is per player: the world's "is this player busy?" (slot `0xa4`, `0x0098e1c0`: that player's actions in progress, list `+0x5c`, against the game time minus 400 ms, `0x007c8b00`). It never said "busy" in these runs.
+- Start of the computer players' part of the day: the world's tick (`0x00998520`, hooked at its call `0x0099892e`), before it runs: when one computer player has just got the turn and no human plays, every other computer player in the game gets state 0 (its own setter, slot `0x48`). They make up the phase.
+- A computer player's End Turn (the world's slot `0xd0`, `0x00998760`), which would call the next turn at once: during a phase it is only marked done, unless it is the last. Then the game's own End Turn runs; inside its next turn (`0x00998060`), the call at `0x009980a9` gets "the computer player playing now" = the last of the phase in player order, so the day moves on as after the last computer player, and every player of the phase (still at state 0) gets the game's end-of-turn work (`0x0099827a`: its heroes' slot `0x1e4`, its slot `0x60`).
+- Our AI pacing (`ai_pacing.cpp`, one decision per frame, and never before the AI's own last moves ran) now keeps its wait **per AI**: with a single AI at a time it is exactly as before.
+
+**Results** (test copy `C:\Games\H5_test_k`, robot):
+
+| Run | Computer players' part of a day | Notes |
+|---|---|---|
+| Single player, A1M4, 1 human + 2 computer players, normal (`20261104-103747`) | days every 11.9 s | |
+| the same, parallel (`20261104-105314`) | days every 9.4 s | the game's console: `GiveTurnToNextPlayers before: W C C`, two current players; no crash. The AI manager makes one decision per game step (200 ms in single player): that limits it. |
+| LAN, two copies, random map EDD31DF8, 2 humans + 2 computer players, normal (`20261104-105824-lan`) | **4.9 s** on average (14 days) | 2953 world checks, all equal |
+| the same, parallel (`20261104-110218-lan`) | **3.0 s** on average (15 days): **39% shorter** (ideal with two: 50%) | **2958 world checks, all equal**: both PCs ran the parallel turns the same |
+| Single player, the owner's MAP_JoacJoz (with its map script: MMH5.5's scripts run), 1 human + **3 computer players**, normal (`20261104-112338`) | **18.8 s** on average (10 days in 4 minutes) | |
+| the same, parallel (`20261104-112741`) | **10.2 s** on average (14 days in 4 minutes): **46% shorter** | `W C C C`: three playing at once; the same script messages as the normal run (MMH5.5's own "not belong to AI player", on purpose); no freeze |
+
+**Not looked at yet:** big maps with long AI turns, MMH5.5's scripts (events per player turn), battles between two computer players moving at the same time, how the game's own screens show two players "thinking", an agreement between PCs (hellos, as undo End Turn) before this can be a host setting.
+
 ## Order
 
 1. Undo End Turn: built (2026-11-04). Next: the owner's hand test (a real click on the button), then a release.
 2. Quick resume: find when the world removes a dropped player; then the host's save at the drop, the banner, the robot test (kill a copy, reload, rejoin).
-3. Parallel AI turns: the experiment above, then a decision with the owner.
+3. Parallel AI turns: the experiment works (2026-11-04, ~40% shorter computer phases with two computer players, PCs in step). Three computer players on a script map: 46% shorter. Next: a multiplayer game with three computer players and the owner's hand test, then the agreement between PCs and a host setting (off by default).
