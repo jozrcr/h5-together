@@ -330,6 +330,12 @@ picker.close = Close
 [turn]
 undo_button = Resume my turn
 
+# Quick resume: a player's game dropped out; the host had every PC save the game just before.
+# save_name is the save's name in the game's load list (keep it short).
+[resume]
+save_name = Resume
+banner = A player left. Saved as "Resume": Multiplayer, LAN, Create, Load to play on together.
+
 # The settings menu: the "H5 Together" page of the game's Options screen (Options,
 # H5 Together). Each setting has a name (<section>.<key>) and a line that explains it
 # (<section>.<key>.help, shown when the mouse rests on the row). Keep the names short
@@ -477,6 +483,8 @@ coop.segment_ms = Co-op step length
 coop.segment_ms.help = Shorter steps make the computer's moves faster.
 coop.undo_end_turn = Undo End Turn
 coop.undo_end_turn.help = With simultaneous turns, a player who ended the turn can take it back while another human still plays. Every PC needs the add-on.
+coop.resume_save = Save when a player drops
+coop.resume_save.help = When a player's game crashes or loses its connection, every PC saves the game as "Resume" with that player still in it.
 net.view_delay_ms = Move display delay
 net.view_delay_ms.help = Lower: moves start sooner after a click; too low for your connection: a small jump. The log suggests a value.
 net.tuning = Faster network

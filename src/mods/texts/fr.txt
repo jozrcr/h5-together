@@ -292,6 +292,10 @@ picker.close = Fermer
 [turn]
 undo_button = Reprendre mon tour
 
+[resume]
+save_name = Reprise
+banner = Un joueur est parti. Sauvegarde « Reprise » : Multijoueur, Réseau local, Créer, Charger pour continuer ensemble.
+
 [settings]
 category = H5 Together
 category.title = Options de H5 Together
@@ -433,6 +437,8 @@ coop.segment_ms = Durée des étapes
 coop.segment_ms.help = Des étapes plus courtes accélèrent les mouvements de l'ordinateur.
 coop.undo_end_turn = Annuler la fin de tour
 coop.undo_end_turn.help = Avec les tours simultanés, un joueur qui a fini son tour peut le reprendre tant qu'un autre humain joue encore. Chaque PC doit avoir le module.
+coop.resume_save = Sauvegarde si un joueur part
+coop.resume_save.help = Si le jeu d'un joueur plante ou perd la connexion, chaque PC sauvegarde la partie sous « Reprise », avec ce joueur encore dedans.
 net.view_delay_ms = Délai d'affichage
 net.view_delay_ms.help = Plus bas : les mouvements partent plus tôt après un clic ; trop bas pour votre connexion : un petit saut. Le journal suggère une valeur.
 net.tuning = Réseau rapide
