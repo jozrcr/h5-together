@@ -224,7 +224,7 @@ The owner ([lobby-audio-classes.md](lobby-audio-classes.md), item 4: "per game i
 | `[rules] class_skills` | Panel | What |
 |---|---|---|
 | `0` or empty (default) | MMH5.5 (locked) / MMH5.5 (verrouillées) | MMH5.5's way: each of the 24 classes is only ever offered the 12 skills of its list |
-| `1` | Unlocked / Débloquées | every class keeps MMH5.5's list and chances; **each of the other skills MMH5.5 offers to some class** gets chance 2 (vanilla ToE's rare skills: every vanilla class has 13 skills adding up to 100, the rarest at 2) |
+| `1` | Unlocked / Débloquées | every class keeps MMH5.5's list and chances; **each skill another class of its own faction has** gets chance 2 (vanilla ToE's rare skills: every vanilla class has 13 skills adding up to 100, the rarest at 2). Never another faction's skills: "class-unlocked, faction-locked" (the owner, 2026-11-04, after an Academy hero was offered Gating, Inferno's racial skill, under the first version that spread every skill MMH5.5 offers to any class). |
 | (later `2`) | (Vanilla classes) | not built: vanilla's 8 classes and chances (`ClassTableFor` refuses "2" today, and so does `Decode`) |
 
 A hidden testing value, `class_chance` (1 to 50, empty = 2), sets that chance; it travels with the rules (every PC uses the host's), it is not in the panel. Attribute growth stays MMH5.5's (only the skill lists change). Under the list, with "Unlocked" chosen: "Skills unlocked: MMH5.5's skill wheel (hero screen) still shows each class's own tree, and the witch huts keep MMH5.5's lists."
@@ -343,3 +343,12 @@ Screenshots: the session's `scratchpad\rules-shots\`.
 | The class table (`HeroClass.xdb`) | holder made by `0x00ae2980` (static initialisers, `0x00dd2d15`; size `push 9` at `0x00ae29df`, MMH5.5's exe 74), registered by `0x00ccc110` (list `0x010dbd7c`), loaded at start-up by `0x00836b80` → `0x00cccd60(0)`; class *c* = `[0x01024c54] + 8 + c * 0x44` (`0x00ad5af0`): `+4` name, `+0x10` SkillsProbs vector (12-byte items: word, skill, chance), `+0x20..+0x2c` attribute chances (`0x00b50a50`), `+0x30` preferred spells |
 | The level-up's offer | `0x00b52810` (skill 1, skill 2, perk 1, perk 2); new skill `0x00b50db0` (`__thiscall(hero, excluded)`, ret 4; called at `0x00b52885`, `0x00b52909`; the hero's class `+0xa4`; skill count compare `0x00b50de5`, MMH5.5's 8 slots) → candidates `0x00875e20` + faction skill `0x00875550`, weights `0x00b50be0` → `0x00875ba0` (`__fastcall(skill, class)`), draw `0x00b509b0` → `0x00b4f2f0` (shared random, `[0, sum-1]`); upgrade `0x00b4f400`; perks `0x00b4f5c0` (hero slot `0x188`) |
 | The world's serializer | `NWorld::CWorld`'s `CObjectBase` vtable `0x00e625d8` (at world `+0x1e8`), slot 3, cell `0x00e625e4` = `0x009a2340` (`sub ecx,[ecx-4]; jmp 0x009a2350`, ret 4): chunks 1 to `0x3e`; ours `0x4f` (64 bytes). A save: `0x008219a0` (`0x0050da80(saver, 1, ...)` the world pointer) |
+
+### The faction lock (2026-11-04, protocol 5)
+
+MMH5.5's class table (`HeroClass.xdb` in `MMH55-Index.pak`) has no faction field. Each class's faction comes from MMH5.5's heroes (`<Class>` and `<TownType>` of the 206 hero files), each class's list matched to the table's class numbers by its exact skills and chances: **8 factions of 3 classes**, by class number: Haven 1 2 9, Sylvan 10 11 12, Academy 19 21 22, Dungeon 6 18 20, Necropolis 7 15 16, Inferno 3 4 13, Fortress 5 14 23, Stronghold 8 17 24. The factions' own skills confirm it: Artificer only in Academy's three, Runelore only in Fortress's three, Gating only in class 4 (Inferno), Avenger only in 11 (Sylvan), Demonic Rage only in 8 (Stronghold). MMH5.5 itself spreads the rest widely (Training in 9 classes, Necromancy 6, Invocation 12, the Shatter skills 6 to 12).
+
+- With MMH5.5 RC19's table (`ClassTableHash` `18338061`, RC19d and RC19k alike), each class gets the skills of its faction's other classes that it lacks (`UnlockedSkillsFor`, the factions in `Mmh55ClassFaction`).
+- With another table (a later MMH5.5), the factions are unknown: each class gets only the skills more than a faction's worth of classes have (`SharedSkills`: more than classes / 8), never a faction's own.
+- Every PC must build the same table: the rules' protocol is 5 since this change (a PC with 0.3.2-test3 or older gets no host's rules).
+

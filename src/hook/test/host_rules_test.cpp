@@ -96,7 +96,7 @@ void TestTable()
 	for (int r = 0; r < kRuleCount; ++r)
 		hidden = hidden && kRules[r].hidden == (r == kClassChance);
 	Check(hidden, "only class_chance is hidden from the panel");
-	Check(kProtocol == 4, "protocol 4 (class_skills): a PC with version 1 to 3 gets no rules");
+	Check(kProtocol == 5, "protocol 5 (class_skills spreads no faction's own skill): a PC with version 1 to 4 gets no rules");
 	bool plain = true;
 	for (int r = 0; r < kRuleCount; ++r)
 		for (const char *c = kRules[r].key; *c; ++c)
@@ -709,6 +709,76 @@ void TestClassTable()
 	bad = t;
 	bad[0].probs[1].skill = bad[0].probs[0].skill;
 	Check(!ClassTableFor(bad, kClassUnlocked, "", &out, &why) && !why.empty(), "a bad table is not unlocked");
+
+	// a faction's own skills (MMH5.5 RC19's table: 24 classes): never spread
+	{
+		ClassTable mm;
+		for (int id = 1; id <= 24; ++id) {
+			ClassSkillList c;
+			c.id = id;
+			c.probs.push_back(SkillProb{7, 1, 50});  // Logistics: every class
+			c.probs.push_back(SkillProb{7, 15, 0});  // (a placeholder, replaced below)
+			mm.push_back(c);
+		}
+		for (int id = 1; id <= 24; ++id)
+			mm[id - 1].probs[1] = SkillProb{7, id <= 6 ? 15 : 12, 50};  // Necromancy: 6 classes; Summoning: 18
+		mm[3].probs.push_back(SkillProb{7, 14, 10});   // Gating: class 4 only
+		mm[18].probs.push_back(SkillProb{7, 17, 10});  // Artificer: classes 19, 21, 22
+		mm[20].probs.push_back(SkillProb{7, 17, 10});
+		mm[21].probs.push_back(SkillProb{7, 17, 10});
+		const std::vector<int> shared = SharedSkills(mm);
+		Check(shared == std::vector<int>({1, 12, 15}),
+		      "shared: Logistics (24 classes), Summoning (18), Necromancy (6); not Gating (1) nor Artificer (3, a faction's worth)");
+		Check(ClassTableFor(mm, kClassUnlocked, "", &out, &why) && out[2].probs.size() == 3 && out[2].probs[2].skill == 12 &&
+		          out[18].probs.size() == 4 && out[18].probs[3].skill == 15 && out[19].probs.size() == 3 &&
+		          out[19].probs[2].skill == 15 && out[3].probs.size() == 4 && out[3].probs[2].skill == 14 &&
+		          out[3].probs[3].skill == 12,
+		      "unlocked: each class gets the shared skills it lacks (Summoning, Necromancy), never Gating or Artificer; "
+		      "class 4 keeps its Gating, the Artificer classes theirs");
+		bool gating = false;
+		for (const ClassSkillList &c : out)
+			for (const SkillProb &p : c.probs)
+				gating = gating || (p.skill == 14 && c.id != 4);
+		Check(!gating, "Gating stays with its one class");
+		Check(SharedSkills(t) == OfferedSkills(t), "a small table (3 classes: less than a faction's worth each): every skill is shared");
+
+		// MMH5.5's factions known: class-unlocked, faction-locked (the owner's rule)
+		int factions[25];
+		for (int c = 0; c < 25; ++c)
+			factions[c] = Mmh55ClassFaction(c);
+		Check(factions[4] == 6 && factions[3] == 6 && factions[13] == 6 && factions[19] == 3 && factions[21] == 3 &&
+		          factions[22] == 3 && factions[0] == 0,
+		      "MMH5.5's factions: classes 3, 4, 13 Inferno; 19, 21, 22 Academy; none for 0");
+		int per[9] = {};
+		for (int c = 1; c <= 24; ++c)
+			++per[factions[c]];
+		bool three = per[0] == 0;
+		for (int f = 1; f <= 8; ++f)
+			three = three && per[f] == 3;
+		Check(three, "8 factions of 3 classes each");
+		Check(ClassTableForWith(mm, kClassUnlocked, "", factions, 25, &out, &why), "unlocked with the factions");
+		auto has = [&](int id, int skill) {
+			for (const ClassSkillList &c : out)
+				if (c.id == id)
+					for (const SkillProb &p : c.probs)
+						if (p.skill == skill)
+							return true;
+			return false;
+		};
+		Check(has(3, 14) && has(13, 14) && has(3, 12), "an Inferno class gets Gating and Summoning from its faction's classes");
+		Check(!has(19, 14) && !has(19, 15) && !has(21, 14) && !has(22, 15),
+		      "an Academy class gets neither Gating nor Necromancy: no Academy class has them");
+		Check(has(20, 15) && !has(20, 17), "a Dungeon class gets Necromancy (Dungeon's class 6 has it), never Artificer");
+		bool artificer = true;
+		for (const ClassSkillList &c : out)
+			if (has(c.id, 17))
+				artificer = artificer && factions[c.id] == 3;
+		Check(artificer, "Artificer stays with Academy's classes");
+		Check(UnlockedSkillsFor(mm, 3, nullptr, 0) == SharedSkills(mm) && UnlockedSkillsFor(mm, 0, factions, 25) == SharedSkills(mm),
+		      "factions unknown (another MMH5.5) or a class without one: the shared skills (never a faction's own)");
+		Check(ClassTableFor(mm, kClassUnlocked, "", &out, &why) && !has(3, 14),
+		      "a table that is not MMH5.5's (another hash): the shared skills, so no Gating outside its class");
+	}
 
 	// what a save keeps
 	Values v = NoValues();
