@@ -206,7 +206,7 @@ const Name kOrder[] = {
 	{"lang", "texts"}, {"rmg", "builder"}, {"rmg", "builder_key"}, {"rmg", "teams"}, {"rmg", "lobby_teams"},
 	{"rmg", "recipe_teams"}, {"rmg", "faction_terrain"}, {"coop", "undo_end_turn"}, {"coop", "script_rhythm"}, {"ai", "parallel_turns"}, {"coop", "resume_save"}, {"coop", "guard"}, {"coop", "segment_ms"},
 	{"net", "view_delay_ms"}, {"net", "tuning"}, {"ai", "fast_paths"}, {"net", "lan_all_adapters"}, {"net", "lan_peers"},
-	{"save", "fast_save_list"}, {"save", "compression"}, {"save", "autosave_every"}, {"rmg", "templates"},
+	{"save", "fast_save_list"}, {"save", "game_names"}, {"save", "compression"}, {"save", "autosave_every"}, {"rmg", "templates"},
 	{"rules", "enabled"}, {"skins", "live_hero_screen"}, {"debug", "hang_watchdog"}, {"debug", "hang_seconds"},
 	{"debug", "crash_report"}, {"chain", "dll"}, {"update", "check"}, {"online", "mode"},
 };
