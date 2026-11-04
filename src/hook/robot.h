@@ -142,7 +142,9 @@ void *PatchImport(const char *dll, const char *function, void *replacement);
 
 // AI profiler (robot_profile.cpp), when profile_ai=1: samples the main thread
 // while the AI thinks (OnAiThinking from the AI trace) into h5-together-profile.txt.
-void StartAiProfiler();
+void StartAiProfiler(bool all = false);  // all: the main thread all the time (profile_all=1)
+void NoteMainThreadForProfiler();      // from the main loop: which thread profile_all samples
+void NoteFrameForProfiler();           // from the main loop, before each frame: frame times every 10 s in the log
 void OnAiThinking(bool thinking);
 
 // Virtual clock (robot_clock.cpp), when virtual_clock_ms=N: the main thread's

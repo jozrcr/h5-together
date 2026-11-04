@@ -25,6 +25,8 @@ void Open(HMODULE self);
 void Close();
 // printf-style; adds a timestamp (ms since the DLL loaded) and the thread id.
 void Write(const char *fmt, ...);
+// The log's clock: milliseconds since the log was opened (the first column of its lines).
+unsigned long Milliseconds();
 
 // --- for the crash report (crash.cpp) ---------------------------------------------------
 // The same as Write, but it gives up (and writes nothing) when another thread holds the

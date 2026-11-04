@@ -82,7 +82,7 @@ def instance_args(args, name, steps):
         online_setting=online,
         setting=args.setting + (args.host_setting if name == "host" else args.client_setting),
         resolution=args.resolution,
-        fast_paths=args.fast_paths, ai_setting=args.ai_setting,
+        fast_paths=args.fast_paths, ai_setting=args.ai_setting, profile_all=args.host_profile_all and name == "host",
         # the client never runs the AI (the host does), so "no AI step for 4
         # turn ends" means nothing there
         stuck_exit=name == "host" and not args.no_stuck_exit)
@@ -224,6 +224,8 @@ def main():
                    help="with --vlan: at that time the client gets an 'invite' to the host's game on the main menu, and "
                         "the online UI's auto-join opens the LAN screen and joins (instead of the robot's own clicks)")
     p.add_argument("--texts-dir", help="language files for bin/h5-together/texts (default src/mods/texts), as run_ai_test.py")
+    p.add_argument("--host-profile-all", action="store_true",
+                   help="the host's main thread sampled all the time (tools/robot/profile_report.py on host/ai-profile.txt)")
     p.add_argument("--host-load", metavar="PART_OF_NAME",
                    help="the host loads this saved multiplayer game (from its robot profile) instead of starting --map")
     args = p.parse_args()

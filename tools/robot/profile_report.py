@@ -76,6 +76,9 @@ def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("samples")
     p.add_argument("--top", type=int, default=25)
+    p.add_argument("--from-ms", type=int, default=0,
+                   help="only samples from this time on (the log's milliseconds; profiles with '# t <ms>' lines)")
+    p.add_argument("--to-ms", type=int, default=0, help="only samples before this time (0: to the end)")
     p.add_argument("--dll-base", help="load address of our DLL (hex), for profiles without a '# dll' line")
     p.add_argument("--map", type=pathlib.Path, default=REPO / "build" / "hook" / "dinput8.map",
                    help="linker map of the DLL that ran (default: the one last built)")
@@ -85,11 +88,17 @@ def main():
     dll_starts, dll_names = load_dll_map(args.map)
     self_count, incl_count, dll_count = collections.Counter(), collections.Counter(), collections.Counter()
     total = 0
+    now = 0  # the time of the last '# t' line (the log's milliseconds)
     for line in open(args.samples, encoding="ascii", errors="replace"):
         if line.startswith("# dll "):
             dll_base = int(line.split()[2], 16)
             continue
+        if line.startswith("# t "):
+            now = int(line.split()[2])
+            continue
         if line.startswith("#"):
+            continue
+        if now < args.from_ms or (args.to_ms and now >= args.to_ms):
             continue
         addrs = [int(x, 16) for x in line.split() if x]
         if not addrs:
