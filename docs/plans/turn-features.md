@@ -116,11 +116,13 @@ So a save made **after** the drop no longer has that player in the game: reloadi
 | the same, parallel (`20261104-105314`) | days every 9.4 s | the game's console: `GiveTurnToNextPlayers before: W C C`, two current players; no crash. The AI manager makes one decision per game step (200 ms in single player): that limits it. |
 | LAN, two copies, random map EDD31DF8, 2 humans + 2 computer players, normal (`20261104-105824-lan`) | **4.9 s** on average (14 days) | 2953 world checks, all equal |
 | the same, parallel (`20261104-110218-lan`) | **3.0 s** on average (15 days): **39% shorter** (ideal with two: 50%) | **2958 world checks, all equal**: both PCs ran the parallel turns the same |
+| Single player, the owner's MAP_JoacJoz (with its map script: MMH5.5's scripts run), 1 human + **3 computer players**, normal (`20261104-112338`) | **18.8 s** on average (10 days in 4 minutes) | |
+| the same, parallel (`20261104-112741`) | **10.2 s** on average (14 days in 4 minutes): **46% shorter** | `W C C C`: three playing at once; the same script messages as the normal run (MMH5.5's own "not belong to AI player", on purpose); no freeze |
 
-**Not looked at yet:** three or more computer players (the owner's games: the gain should grow), big maps with long AI turns, MMH5.5's scripts (events per player turn), battles between two computer players moving at the same time, how the game's own screens show two players "thinking", an agreement between PCs (hellos, as undo End Turn) before this can be a host setting.
+**Not looked at yet:** big maps with long AI turns, MMH5.5's scripts (events per player turn), battles between two computer players moving at the same time, how the game's own screens show two players "thinking", an agreement between PCs (hellos, as undo End Turn) before this can be a host setting.
 
 ## Order
 
 1. Undo End Turn: built (2026-11-04). Next: the owner's hand test (a real click on the button), then a release.
 2. Quick resume: find when the world removes a dropped player; then the host's save at the drop, the banner, the robot test (kill a copy, reload, rejoin).
-3. Parallel AI turns: the experiment works (2026-11-04, ~40% shorter computer phases with two computer players, PCs in step). Next: three computer players and a big map with MMH5.5's scripts, then the agreement between PCs and a host setting (off by default).
+3. Parallel AI turns: the experiment works (2026-11-04, ~40% shorter computer phases with two computer players, PCs in step). Three computer players on a script map: 46% shorter. Next: a multiplayer game with three computer players and the owner's hand test, then the agreement between PCs and a host setting (off by default).
