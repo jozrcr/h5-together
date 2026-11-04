@@ -50,5 +50,20 @@ The setting picks N by itself, every half second: below 55 frames a second two h
 
 1. **Vertex building** (~7 ms a frame left with the fix): `CVBCombiner` builds most models' vertices again each frame even when their skeleton did not change. Keeping each model's last result while its skeleton's version is the same would save most of it. Needs a closer look at the combiner's records (`0x00c6b4a0` and around).
 2. **Models nobody sees**: skip the skeletons of models under the black fog of war (and off screen), which the game animates anyway.
-3. **The driver** (~6 to 11 ms): DXVK (Direct3D 9 on Vulkan) usually costs less CPU for old Direct3D 9 games; the Linux players already run through it (Proton). A test on Windows needs a download (the owner's OK) and a file next to the test copy's exe.
+3. ~~DXVK on Windows~~: tried (below), a small gain only on this PC.
 4. **Hitches**: a frame of 1.4 to 1.7 s at each new day in single player (likely the autosave); in multiplayer, the owner's game had a frame of 100 to 400 ms every few seconds (MMH5.5's scripts: fixed by `[coop] script_rhythm` in 0.3.2-test2; to check in the owner's next logs).
+
+## DXVK on Windows (tried, 2026-11-04)
+
+DXVK turns the game's Direct3D 9 into Vulkan; the Linux players already run through it (Proton). Tried on the owner's PC with its OK: DXVK 3.1.1 (the official release, `dxvk-3.1.1.tar.gz` sha256 `40565b4a...`, its 32-bit `x32/d3d9.dll`, sha256 `265888c3...`) next to the test copy's exe, AMD Radeon RX 7900 XT (the card with the screen; the PC also has an RX 7900 XTX), AMD driver 32.0.32015.2008. It runs: our overlay draws, no crash, DXVK's log clean (one unhandled render state, 26).
+
+| Robot run | Without DXVK | With DXVK |
+|---|---|---|
+| Normal zoom, camera still, the robot's settings (`20261104-160347` / `-160155`) | 187 fps | 185 fps |
+| Zoomed out, the owner's settings, every frame (`-151859` / `-155729`) | 35.7 | 39.9 |
+| the same, 1 in 2 | 43.2 | 47.8 |
+| the same, 1 in 3 | 47.8 | 51.8 |
+| the same, 1 in 4 | 50.0 | 53.9 |
+
+About +10% zoomed out, nothing at the normal zoom: the game's own CPU work (skeletons, vertex building, the scene walk) is the limit, not the driver. Not worth shipping or asking players to install for now; a PC with a slow Direct3D 9 driver might gain more.
+
