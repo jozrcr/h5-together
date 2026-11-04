@@ -611,6 +611,61 @@ void ReloadAutosaveSettings()
 	               every > 1 && !g_day_ok ? " (the world code is not as expected: every day)" : "");
 }
 
+// --- research (trace_autosave): what the save's info is made from ----------------------------
+// 0x00822990 (the save proper) makes the save's info (0x007f0880) and fills it from the
+// running game (0x007f88e0, __fastcall(game, info); its one caller 0x008229c1): the map's
+// name from the game object's slot 2 result +0x64 into info +0x1ec. Logged the first
+// times: the game object's class and every wide string in the info.
+namespace {
+typedef void(__fastcall *FillInfoFn)(void *game, void *info);
+FillInfoFn g_fill_info_next = nullptr;
+LONG g_fill_logged = 0;
+
+void ClassNameOf(const void *object, char *out, size_t size)
+{
+	__try {
+		const DWORD vtable = *static_cast<const DWORD *>(object);
+		const DWORD col = *reinterpret_cast<const DWORD *>(vtable - 4);
+		const DWORD td = *reinterpret_cast<const DWORD *>(col + 12);
+		_snprintf_s(out, size, _TRUNCATE, "%s", reinterpret_cast<const char *>(td + 8));
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER) {
+		_snprintf_s(out, size, _TRUNCATE, "?");
+	}
+}
+
+void InfoStrings(const BYTE *info, char *out, size_t size)
+{
+	out[0] = 0;
+	__try {
+		for (DWORD o = 0; o + 12 <= 0x28c; o += 4) {
+			const wchar_t *b = *reinterpret_cast<wchar_t *const *>(info + o);
+			const wchar_t *e = *reinterpret_cast<wchar_t *const *>(info + o + 4);
+			const wchar_t *c = *reinterpret_cast<wchar_t *const *>(info + o + 8);
+			if (!b || e <= b || c < e || e - b > 200 || reinterpret_cast<DWORD>(b) < 0x10000)
+				continue;
+			char item[300];
+			_snprintf_s(item, sizeof(item), _TRUNCATE, " +%03lx \"%.*ls\";", o, static_cast<int>(e - b), b);
+			strncat_s(out, size, item, _TRUNCATE);
+		}
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER) {
+		strncat_s(out, size, " (stopped: unreadable)", _TRUNCATE);
+	}
+}
+
+void __fastcall FillInfoProbe(void *game, void *info)
+{
+	g_fill_info_next(game, info);
+	if (InterlockedIncrement(&g_fill_logged) > 3)
+		return;
+	char cls[96], strings[3000];
+	ClassNameOf(game, cls, sizeof(cls));
+	InfoStrings(static_cast<const BYTE *>(info), strings, sizeof(strings));
+	hooklog::Write("autosave: research: the save's info is filled from %s (%p):%s", cls, game, strings);
+}
+}  // namespace
+
 void ApplyAutosaveFromSettings()
 {
 	wchar_t path[MAX_PATH];
@@ -700,6 +755,7 @@ void ApplyAutosaveFromSettings()
 				hookpatch::PatchImport("ole32.dll", "CoCreateGuid", reinterpret_cast<void *>(&CoCreateGuidHook)));
 		g_guid_ok = g_co_create_guid != nullptr;
 		g_save_next = reinterpret_cast<SaveFn>(hookpatch::RedirectCall(kSaveCall, kSave, &SaveHook));
+		g_fill_info_next = reinterpret_cast<FillInfoFn>(hookpatch::RedirectCall(0x008229c1, 0x007f88e0, &FillInfoProbe));
 		g_own_step_next = reinterpret_cast<OwnStepFn>(hookpatch::PatchPointer(kOwnStepSlot, kOwnStep, &OwnStepHook));
 		if (g_day_ok)
 			g_world_day_next =
