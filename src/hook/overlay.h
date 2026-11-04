@@ -132,6 +132,12 @@ bool OpenModal(const char *owner);
 void CloseModal(const char *owner);
 // Is `owner`'s panel open? The overlay may have closed it (Esc, its screen, the timeout).
 bool ModalOpen(const char *owner);
+// A button of `owner`'s over the game's screen, without a modal panel: in draw, every
+// frame it shows, its rectangle (back buffer pixels, of a back buffer back_w x back_h).
+// While the cursor is inside, the game gets no mouse button and no wheel (keys and
+// motion still pass), so a click on the button does not also click the map under it.
+// The zone lapses when no frame renews it for 250 ms. Needs EnableModalInput.
+void BlockClicksIn(const char *owner, float x0, float y0, float x1, float y1, float back_w, float back_h);
 
 // The overlay test panel ([ui] overlay_test_panel=1, F10; overlay_test_panel.cpp).
 void InstallTestPanelEarly();

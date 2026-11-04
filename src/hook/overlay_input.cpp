@@ -20,6 +20,12 @@
 // When muted: "a panel is open, its screen is on top (checked at every frame),
 // and a frame was drawn with it in the last 2 s". The input hooks check the
 // time themselves, so input comes back even when no frame is drawn at all.
+//
+// Click zones (BlockClicksIn, a button of ours over the game's screen, without a
+// modal panel): while the cursor is inside one, the game's mouse buttons and wheel
+// are held back as when muted (its keyboard and the mouse's motion are not), so a
+// click on our button does not also click the map under it. A press held back
+// keeps its release hidden too. A zone lapses when no frame renews it for 250 ms.
 #define DIRECTINPUT_VERSION 0x0800
 #include <windows.h>
 #include <dinput.h>
@@ -53,6 +59,34 @@ volatile DWORD g_mouse_message_at = 0;  // the last mouse message to the game's 
 bool Muted()
 {
 	return g_active && GetTickCount() - g_drawn_at < kTimeoutMs;
+}
+
+// --- click zones (all on the game's main thread: its frames, window procedure and
+// DirectInput polls) ---------------------------------------------------------------------------
+const DWORD kZoneMs = 250;
+struct Zone {
+	char owner[32];
+	float x0, y0, x1, y1;  // back buffer pixels
+	float w, h;            // of a back buffer this size
+	DWORD at;              // GetTickCount() when a frame last set it
+};
+const int kZones = 4;
+Zone g_zones[kZones];
+
+bool CursorInBackBuffer(float w, float h, float *x, float *y, bool *from_game);
+
+bool CursorInZone()
+{
+	const DWORD now = GetTickCount();
+	for (const Zone &z : g_zones) {
+		if (!z.owner[0] || now - z.at >= kZoneMs)
+			continue;
+		float x, y;
+		bool from_game;
+		if (CursorInBackBuffer(z.w, z.h, &x, &y, &from_game) && x >= z.x0 && x < z.x1 && y >= z.y0 && y < z.y1)
+			return true;
+	}
+	return false;
 }
 
 // Once per panel opening: the first input the game did not get (a log line, so
@@ -253,7 +287,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 			if ((msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN) && wp == VK_ESCAPE)
 				InterlockedExchange(&g_escape, 1);
 		}
-		switch (g_messages.Filter(msg, wp, lp, muted)) {
+		bool down;
+		const bool clicks = msg == WM_MOUSEWHEEL || msg == WM_MOUSEHWHEEL || inputmute::MessageButton(msg, wp, &down) >= 0;
+		const bool zone = !muted && clicks && CursorInZone();
+		if (zone)
+			HeldBack("window message in a click zone", msg);
+		switch (g_messages.Filter(msg, wp, lp, muted || zone)) {
 		case inputmute::kSwallow:
 			HeldBack("window message", msg);
 			return 0;
@@ -375,7 +414,7 @@ HRESULT MuteState(dihook::DeviceKind kind, void *device, DWORD size, void *data,
 			if (s->lZ)
 				Push(kWheel, kFromDirectInput, 0, s->lZ);
 		}
-		g_di.MouseState(data, size, muted);
+		g_di.MouseState(data, size, muted || CursorInZone());
 	}
 	return hr;
 }
@@ -403,7 +442,7 @@ HRESULT MuteData(dihook::DeviceKind kind, void *device, DWORD size, DIDEVICEOBJE
 				Push(kWheel, kFromDirectInput, 0, static_cast<LONG>(e->dwData));
 		}
 	}
-	*count = g_di.Events(kind == dihook::kKeyboard, data, size, *count, muted);
+	*count = g_di.Events(kind == dihook::kKeyboard, data, size, *count, muted || (kind == dihook::kMouse && CursorInZone()));
 	return hr;
 }
 
@@ -574,6 +613,23 @@ void CloseModal(const char *owner)
 bool ModalOpen(const char *owner)
 {
 	return g_open && strcmp(g_owner, owner) == 0;
+}
+
+void BlockClicksIn(const char *owner, float x0, float y0, float x1, float y1, float back_w, float back_h)
+{
+	Zone *slot = nullptr;
+	for (Zone &z : g_zones)
+		if (strcmp(z.owner, owner) == 0)
+			slot = &z;
+	const DWORD now = GetTickCount();
+	for (Zone &z : g_zones)
+		if (!slot && (!z.owner[0] || now - z.at >= kZoneMs))
+			slot = &z;
+	if (!slot)
+		return;
+	lstrcpynA(slot->owner, owner, sizeof(slot->owner));
+	slot->x0 = x0, slot->y0 = y0, slot->x1 = x1, slot->y1 = y1, slot->w = back_w, slot->h = back_h;
+	slot->at = now;
 }
 
 bool CursorInBackBuffer(float w, float h, float *x, float *y)

@@ -15,6 +15,7 @@
 #include "../mods/edge_sky.h"
 #include "../mods/fast_paths.h"
 #include "../mods/hero_skins.h"
+#include "../mods/turn_undo.h"
 #include "../mods/hero_skins_internal.h"
 #include "../mods/host_rules.h"
 #include "../mods/lan_discovery.h"
@@ -130,6 +131,7 @@ void InstallAll()
 	mods::ApplyOnlineUiFromSettings();  // [online] mode=steam: Steam's lines on the LAN screen, Invite friends... (after the rules' button)
 	mods::ApplyAudioVolumeFromSettings();
 	mods::ApplyHeroSkinsFromSettings();  // after notify and the co-op guard: it stacks on their hooks
+	mods::ApplyTurnUndoFromSettings();  // [coop] undo_end_turn (host's); after hero looks: it stacks on their hooks
 	mods::ApplyUpdateCheckFromSettings();  // [update] check (off by default)
 	mods::ApplySettingsMenuFromSettings();  // Options, H5 Together: Accept writes h5-together.ini; F3; the first-start question
 }

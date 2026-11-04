@@ -1,0 +1,91 @@
+# Turn features: undo End Turn, resume after a crash, parallel AI turns
+
+Status (2026-11-04): part 1, undo End Turn, **built** (`[coop] undo_end_turn`, off by default; robot-tested, waiting for a hand test); parts 2 and 3 are a **study**. Three ideas from the owner's games of 2026-11-03 and 04, in the order we plan to build them. Each one is a setting that is **off by default** (the original game), chosen by the host for the whole game. Addresses are in the vanilla 3.1 exe (the same in `MMH55_Utility(_64).exe`). What players, turn states and "pressed End Turn" are: [players.md](../subsystems/players.md). How the PCs stay in step: [multiplayer-sync.md](../subsystems/multiplayer-sync.md).
+
+## 1. Undo End Turn (while the others still play)
+
+**The wish** (owner, 2026-11-04): with simultaneous turns, a player who pressed End Turn too early can take it back while the other humans have not finished.
+
+### How the game ends a human's turn (static reading, 2026-11-04)
+
+- **End Turn** (`NWorld::CEndOfTurn` → the world's slot `0xd0`, `0x00998760`): for a living player whose turn state is 0, a human only gets "pressed End Turn" (`+0x178` = 1, the player's slot `0x50`, `0x00500c50`, which also tells the player's watchers that it changed: `0x0050c020`). A computer player's End Turn goes straight to the next turn (`0x00998060`).
+- **Every world tick** (`0x009987b0`, which ends with `0x00998520`), the turn manager `0x00998520` decides:
+  - if a computer player is at state 0 (it is moving): nothing;
+  - **if some player at state 0 has not pressed End Turn** (`0x0098d570`): someone is still playing. With simultaneous turns (`world +0x90`), each player at state 0 who **has** pressed End Turn gets state **1** ("done for today"; state 2 instead when `world +0x8a` is set). That is why a human who presses End Turn gets state 1 "at once" (robot, 2026-10-25);
+  - else (everyone at state 0 has pressed End Turn) and nobody is at state 2 (`0x0098d5c0`): **the next turn** (`0x00998060`, "GiveTurnToNextPlayers"), in the same tick: every `+0x178` is cleared and the computer players' turns begin.
+- Without simultaneous turns the humans play one after the other, so there is nothing to undo.
+
+### What "undo" would do
+
+Set the player back to **state 0** and **`+0x178` = 0** (the player's own setters, slots `0x48` and `0x50`, so the game's watchers hear of it). The next tick then sees one more player still playing, as before the click.
+
+It must happen **at the same moment of the game on every PC** (it changes the world). The way our other shared changes do it (hero looks, `hero_skins.cpp` part 5): the request travels as one of our small messages next to the world checksums, and every PC applies it **at the start of the same segment** (the segment runner's call `0x007c9a67`, before that segment's commands). At that moment every PC checks, on the same world, that the undo is still allowed:
+
+- simultaneous turns are still on (they stop for the rest of the game when human heroes meet: `CBreakSimultaneousTurnsCmd`);
+- the player is alive, human, at state 1 (or 0) with `+0x178` = 1;
+- **another human is still playing** (at state 0, End Turn not pressed). If the last human ended the turn in the meantime, the computer players have started and the undo is refused, the same way on every PC.
+
+**On screen:** a button in the game's own style, next to the player list's "Turn ended" line or near the End Turn button, only while the undo is possible, and a key. Words in en/fr.
+
+### Robot experiment (2026-11-04): it works
+
+`src/mods/turn_undo.cpp`, robot runs only (no setting, no button yet): the robot step `panel|turn undo <player> <segment>` (given to both copies) undoes the player's End Turn at the first segment from `<segment>` on where it is allowed, on every PC; `panel|turn states` logs every player's state. To get a picture of the "ended" screen, the undo waits 30 segments after it is first allowed, and a second picture comes 30 segments after it. New robot options: `run_lan_test.py --client-end-turn-every N` (the client plays on while the host has ended its turn) and `--no-stuck-exit` (the host's robot would else close a copy that waits for the other's End Turn).
+
+| Run (test copy `C:\Games\H5_test_k`, A1M4, 2 humans + 1 computer, simultaneous turns) | Result |
+|---|---|
+| `20261104-082135-lan` | Both PCs: `segment 60: player 1 plays again (before: 1h:1/1 2h:0/0 3ai:1/0; after: 1h:0/0 ...)` (number, human, state / pressed). The host's robot pressed End Turn again 5 s later, and it counted (`1h:1/1` at segment 355): the game takes the player's End Turn again. The day went on (the client ended, the computer played, day 3). **2254 world checks, all equal.** |
+| `20261104-082502-lan` | The undo also works between the click and the next world tick (`1h:0/1` → `1h:0/0`). 1868 checks equal. |
+| `20261104-082900-lan` | Pictures of the host: **before** (segment 150), the game's own banner "Veuillez attendre les autres joueurs..." and the player list "1/2 Prêts", the host ticked; **after** the undo (segment 180, the picture at 210), the banner is gone, "0/2 Prêts", the host back to "playing". Both PCs at the same segments. 1668 checks equal. |
+
+So **the game's screen follows the state change by itself**: nothing else needs calling. Both open questions are answered (state 1 does nothing else here: `world +0x8a` is 0 in these games, so the turn manager uses state 1, not 2).
+
+### Built (2026-11-04)
+
+How it works for players, the setting and the log lines: [src/mods/README.md](../../src/mods/README.md), "Undo End Turn". In short: a hello from each PC at each game's start (the host's says whether it allows it), one decision at segment 20; a click sends "undo player P", which every PC takes in at the same segment (the sender's report + 10) and checks there on the same world (`undo::Allowed`, unit-tested in `src/hook/test/turn_undo_test.cpp`); a button "Reprendre mon tour" under the game's banner, whose clicks the overlay keeps from the game (`overlay::BlockClicksIn`, new). The robot experiment's direct undo (`panel|turn undo`) is gone: the robot now asks as a player would (`panel|turn request`).
+
+| Run (test copy `C:\Games\H5_test_k`, A1M4, 2 humans + 1 computer, simultaneous turns) | Result |
+|---|---|
+| `20261104-084713-lan`, the host's `undo_end_turn=1` | Hellos both ways, `on for this game` on both at segment 20. The host ended its turn: the button "Reprendre mon tour" shows under "Veuillez attendre les autres joueurs...". The robot's click: `request sent for player 1 (after this PC's report 156; it counts at segment 166)`; the client `PC 0 asks to undo player 1's End Turn (counts at segment 166)`; **both** `segment 166: player 1 plays again`. The picture after: banner and button gone, "0/2 Prêts". 1840 world checks equal. |
+| `20261104-085100-lan`, a forced request while the host still plays | Both PCs at segment 49: `PC 0's request for player 1 refused: the player has not ended its turn`. 1066 checks equal. |
+| `20261104-085254-lan`, the default (`undo_end_turn=0`) | Both: `off for this game (the host does not allow it)`; no button (`robot: no button now`). 1065 checks equal. |
+
+**Not covered by the robot:** a real mouse click (the robot cannot click): that the click on the button does not also send the selected hero to the map tile under it. The owner's hand test checks it. Also not yet: three PCs, and a request that crosses the last other human's End Turn (the rule is the same as the forced request above: refused on every PC, the computer players play).
+
+## 2. Resume after a crash
+
+**The wish** (owner, 2026-11-04): a friend's game crashed; could they come back?
+
+### What happens today (robot run `20261104-080739-lan`, two copies, the client's process killed in the middle of day 8)
+
+- The host's lockstep stops: no segment for ~20 s (the client's reports no longer come).
+- Then the host's transceiver **drops the player**: `0x007c8d10` (`CMultiPlayerTransceiver`, just before the pacing slot `0x007c8dd0`) clears the player's bit in the active players mask (`+0x58`), sets its reported segment to -1 and prints `Drop player 1` to the game's console.
+- The host gets the game's box "Infos multijoueur: Robot-client a été déconnecté" (OK), and **the game goes on without that player**: from the next turn its letter is `N` (not in the game) in `GiveTurnToNextPlayers`, and our player list no longer shows it.
+
+So a save made **after** the drop no longer has that player in the game: reloading it would not bring the friend back. Today the group can reload the **last autosave** (the start of the day, if autosaves are on), losing part of a day.
+
+### Plan, in two steps
+
+1. **Quick resume** (smaller): when the host drops a human, the host's add-on saves the game **at that moment**, before the player is taken out of the world, as "Reprise - <player>" ("Resume"). A banner says: "<player> left. Saved as Resume: Multiplayer, LAN, Create, Load to play on with them." Everyone (the friend included, after restarting the game) joins the loaded game; the loaded game's waiting room now has "Invite friends..." (0.3.1). To find: when exactly the world takes the player out (a command after the drop, or the next turn), and how to make one save on the host alone (the save code our autosave speed-up already knows: `autosave.cpp`, [save.md](../subsystems/save.md)). The world is the same on every PC, so the host's save is enough.
+2. **True reconnect** (big, later): the friend joins the running game. The host would send its world to the friend (the save, a few MB), the friend loads it and joins the lockstep at the right segment. A project of its own.
+
+## 3. Computer players' turns in parallel
+
+**The wish** (owner, 2026-11-03): AI turns are long with 3+ computer players. Either the computer players move **at the same time as each other** (a separate phase, after the humans), or even **at the same time as the humans**.
+
+### What we know
+
+- The turn manager above starts the computer players one after another, in player order (`0x00998060`; one AI at state 0 at a time).
+- Only the host runs the AI; its decisions are commands sent to everyone ([ai-turn.md](../subsystems/ai-turn.md)). The AI's thinking happens between frames on the host.
+- The game has its own "simultaneous turns" for **humans** (the setup screen's `simultaneus` option), which stops when human heroes meet.
+
+### To study before any code
+
+- Can two computer players be at state 0 at the same time without the AI code breaking? (Each AI object thinks for its own player; they share the world, the pathfinder and the "AI busy" machinery.)
+- **Determinism is not the risk** (only the host thinks; everyone runs its commands in order). The risks are the AI's own assumptions (one AI moving at a time) and battles between two AIs that both move.
+- First step: a robot experiment where the turn manager gives the turn to all computer players at once, on a test map, AI only. Off by default, host's choice, like the rest.
+
+## Order
+
+1. Undo End Turn: built (2026-11-04). Next: the owner's hand test (a real click on the button), then a release.
+2. Quick resume: find when the world removes a dropped player; then the host's save at the drop, the banner, the robot test (kill a copy, reload, rejoin).
+3. Parallel AI turns: the experiment above, then a decision with the owner.

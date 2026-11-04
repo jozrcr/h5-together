@@ -325,6 +325,11 @@ picker.invited = Invited
 picker.refused = Refused
 picker.close = Close
 
+# Undo End Turn: a button under the game's "Please wait for the other players..." banner,
+# while another human still plays (simultaneous turns).
+[turn]
+undo_button = Resume my turn
+
 # The settings menu: the "H5 Together" page of the game's Options screen (Options,
 # H5 Together). Each setting has a name (<section>.<key>) and a line that explains it
 # (<section>.<key>.help, shown when the mouse rests on the row). Keep the names short
@@ -470,6 +475,8 @@ coop.guard = Faster co-op timing
 coop.guard.help = Shorter co-op steps, only when every PC has the add-on with the same settings.
 coop.segment_ms = Co-op step length
 coop.segment_ms.help = Shorter steps make the computer's moves faster.
+coop.undo_end_turn = Undo End Turn
+coop.undo_end_turn.help = With simultaneous turns, a player who ended the turn can take it back while another human still plays. Every PC needs the add-on.
 net.view_delay_ms = Move display delay
 net.view_delay_ms.help = Lower: moves start sooner after a click; too low for your connection: a small jump. The log suggests a value.
 net.tuning = Faster network

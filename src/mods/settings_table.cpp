@@ -94,6 +94,8 @@ const Setting kSettings[] = {
 	    "settings.coop.guard", "settings.coop.guard.help"),
 	// fast_segments and segment_ms: one row of the menu (segment_ms's, "200" = fast_segments=0)
 	{"coop", "fast_segments", "1", kBool, 0, 1, nullptr, 0, nullptr, kGroup, kRestart, kAdvanced, kNone, nullptr, nullptr, true},
+	ROW("coop", "undo_end_turn", "0", kBool, 0, 1, nullptr, 0, nullptr, kHost, kNextGame, kHostGroup, kCheck,
+	    "settings.coop.undo_end_turn", "settings.coop.undo_end_turn.help"),
 	ROW("coop", "segment_ms", "50", kChoice, 0, 0, kSteps, COUNT(kSteps), "settings.unit.ms", kGroup, kRestart, kAdvanced, kList,
 	    "settings.coop.segment_ms", "settings.coop.segment_ms.help"),
 	// [ai]

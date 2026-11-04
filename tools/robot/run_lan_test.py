@@ -56,7 +56,8 @@ def instance_args(args, name, steps):
                (["mp_check_crc = 1"] if args.crc else []) + args.setvar +
                (args.client_setvar if name == "client" else []),
         turns=args.turns, seconds=args.seconds, command_delay=8,
-        end_turn_every=args.end_turn_every, press_enter_every=0,
+        end_turn_every=(args.client_end_turn_every if name == "client" and args.client_end_turn_every
+                        else args.end_turn_every), press_enter_every=0,
         repeat_command=None, repeat_every=0, trace_segments=False, segment_ms=0,
         shot_every=args.shot_every, step=steps, net_log=True, relay_ports=others, trace_mp=args.trace_mp, trace_crc=True,
         net_log_packets=args.net_log_packets, net_log_bytes=args.net_log_bytes, net_scan=args.net_scan,
@@ -84,7 +85,7 @@ def instance_args(args, name, steps):
         fast_paths=args.fast_paths, ai_setting=args.ai_setting,
         # the client never runs the AI (the host does), so "no AI step for 4
         # turn ends" means nothing there
-        stuck_exit=name == "host")
+        stuck_exit=name == "host" and not args.no_stuck_exit)
 
 
 def main():
@@ -97,6 +98,10 @@ def main():
     p.add_argument("--shot-every", type=int, default=0, help="seconds between screenshots (0 = only shot steps)")
     p.add_argument("--end-turn-every", type=int, default=5,
                    help="the DLL ends its human player's turn (when no AI is playing) at most every N seconds")
+    p.add_argument("--no-stuck-exit", action="store_true",
+                   help="never close a copy whose human player seems stuck (a copy waiting for the other's End Turn)")
+    p.add_argument("--client-end-turn-every", type=int, default=0,
+                   help="the same for the client only (e.g. 40: the client plays on while the host has ended its turn)")
     p.add_argument("--setvar", action="append", default=[], help="extra profile setting for both copies")
     p.add_argument("--client-setvar", action="append", default=[],
                    help='extra profile setting for the client only (e.g. \'lan_last_login = ""\': no player name)')

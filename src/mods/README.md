@@ -116,6 +116,27 @@ fast_segments=1   ; 0 = ask for the game's 200 ms, so nobody switches
 segment_ms=50     ; 50 or 100 (50 by default since 0.2.0)
 ```
 
+## Undo End Turn (`turn_undo*.cpp`; off by default, the host's choice)
+
+**What it does:** with simultaneous turns, a player who pressed End Turn too early can take it back while another human still plays. A button **"Resume my turn"** ("Reprendre mon tour") shows under the game's own banner "Please wait for the other players..."; a click gives the turn back on every PC at the same moment. Once the last other human has ended the turn, the computer players start and the button goes.
+
+**Setting:** `[coop] undo_end_turn=1` (Options, H5 Together, the host's settings). Only the host's value counts, from the next game. Every PC needs a DLL that knows it (whatever its own setting); otherwise it stays off for that game.
+
+**How:**
+1. At the start of each multiplayer game, every PC's DLL sends a small hello; the host's says whether it allows the undo. At segment 20 every PC decides the same: on only if every PC sent its hello and the host allows it.
+2. A click sends "undo player P" after this PC's next segment report R. Every PC, the sender too, takes it in at the start of segment R + 10, before that segment's commands, and checks there, on the same world, that it is still allowed. Then the player's own setters put "pressed End Turn" and its turn state back to 0 (the game's banner and player list follow by themselves).
+3. The button is drawn by the overlay, in the game's button art; the overlay holds back the game's clicks under it (`overlay::BlockClicksIn`), so the click does not reach the map.
+
+`h5-together.log` says what happened:
+
+```
+turn undo: on for this game (all 2 PCs know it, the host allows it)
+turn undo: request sent for player 1 (after this PC's report 156; it counts at segment 166)
+turn undo: segment 166: player 1 plays again (PC 0 asked; before: 1h:1/1 2h:0/0 3ai:1/0; after: 1h:0/0 2h:0/0 3ai:1/0)
+```
+
+How turns end in the game, and the robot runs: [docs/plans/turn-features.md](../../docs/plans/turn-features.md), part 1.
+
 ## Quicker lockstep (`lockstep.cpp`; the drain and the trace on by default)
 
 Why multiplayer clicks feel slow, and the measurements: [docs/plans/responsiveness.md](../../docs/plans/responsiveness.md). Each setting works on this PC only, so it needs no agreement between the PCs, and none of them changes what happens in the game world.
