@@ -16,6 +16,7 @@
 #include "../mods/camera.h"
 #include "../mods/coop_guard.h"
 #include "../mods/edge_sky.h"
+#include "../mods/frame_limit.h"
 #include "../mods/fast_paths.h"
 #include "../mods/hero_skins.h"
 #include "../mods/turn_undo.h"
@@ -134,6 +135,7 @@ void InstallAll()
 	overlay::ApplyTestPanelFromSettings();
 	mods::ApplyCameraFromSettings();
 	mods::ApplyAnimThrottleFromSettings();  // [camera] anim_saver (on by default; anim_every: testing)
+	mods::ApplyFrameLimitFromSettings();  // [video] fps_limit, vsync (off, the game's own by default)
 	mods::ApplyVertexPoolFromSettings();  // [camera] vertex_pool (4: a bigger pool; vb_trace: research, hidden)
 	mods::ApplyWheelFromSettings();  // its DirectInput filter goes first (order -10)
 	mods::ApplyEdgeSkyFromSettings();  // [camera] edge_sky: before the first map reads its light

@@ -298,9 +298,13 @@ bool Unlock(const std::string &mode, const std::string &chance, const char *why)
 	size_t added = 0;
 	for (size_t i = 0; i < t.size(); ++i)
 		added += t[i].probs.size() - g_mmh55[i].probs.size();
+	const bool by_faction = ClassTableHash(g_mmh55) == kMmh55ClassTableHash;
 	hooklog::Write("rules: class skills: UNLOCKED for this game (%s): %u classes, %u skills added at chance %d (MMH5.5's "
-	               "lists: each class's chances add up to 100); table hash %08x",
-	               why, static_cast<unsigned>(t.size()), static_cast<unsigned>(added), ClassChance(chance), ClassTableHash(t));
+	               "lists: each class's chances add up to 100), %s; table hash %08x",
+	               why, static_cast<unsigned>(t.size()), static_cast<unsigned>(added), ClassChance(chance),
+	               by_faction ? "each class gets its own faction's other skills (MMH5.5's table: the factions are known)"
+	                          : "each class gets the skills shared by several factions (an unknown table: never a faction's own)",
+	               ClassTableHash(t));
 	return true;
 }
 

@@ -259,6 +259,23 @@ uint32_t ClassTableHash(const ClassTable &table);
 // The skills some class can be offered (MMH5.5: 24; never the ones no class
 // lists, such as vanilla's Barbarian Learning and Voice), from low to high.
 std::vector<int> OfferedSkills(const ClassTable &table);
+// Those the unlock spreads: the offered skills that more than a faction's worth of
+// classes have (MMH5.5: 8 factions, 24 classes: more than 24 / 8 = 3). The others are a
+// faction's own (MMH5.5 RC19: Gating in 1 class, Avenger 1, Demonic Rage 1, Artificer 3,
+// Runelore 3; every other skill is in 6 classes or more): the unlock never gives them to
+// another faction's classes (the owner, 2026-11-04: an Academy hero offered Gating).
+std::vector<int> SharedSkills(const ClassTable &table);
+// MMH5.5 RC19's class table (RC19d and RC19k: the same lists): its ClassTableHash, and
+// the faction of each class (by class number, 1..24; 0 = none), from MMH5.5's heroes
+// (the town of every hero of that class, MMH55-Index.pak and the game's data): 8
+// factions of 3 classes. 1 Haven, 2 Sylvan, 3 Academy, 4 Dungeon, 5 Necropolis,
+// 6 Inferno, 7 Fortress, 8 Stronghold.
+const uint32_t kMmh55ClassTableHash = 0x18338061;
+int Mmh55ClassFaction(int class_id);
+// The skills the unlock adds to a class: with factions known (factions[class id], 0 =
+// unknown), those of the other classes of its faction ("class-unlocked, faction-locked":
+// the owner, 2026-11-04); without, SharedSkills (never a faction's own skill).
+std::vector<int> UnlockedSkillsFor(const ClassTable &table, int class_id, const int *factions, int faction_count);
 // A list with the rule: its own items, unchanged and in their order, then each
 // skill of `skills` it lacks, at `chance` (head: the list's first item's).
 std::vector<SkillProb> UnlockedList(const std::vector<SkillProb> &own, const std::vector<int> &skills, int chance);
@@ -266,6 +283,9 @@ std::vector<SkillProb> UnlockedList(const std::vector<SkillProb> &own, const std
 // "0" or "" (false: nothing to change), every list unlocked for "1". False and
 // why for a value it does not know (a later "2", vanilla classes) or a bad table.
 bool ClassTableFor(const ClassTable &mmh55, const std::string &mode, const std::string &chance, ClassTable *out, std::string *why);
+// The same with the factions given (tests): nullptr = unknown (SharedSkills).
+bool ClassTableForWith(const ClassTable &mmh55, const std::string &mode, const std::string &chance, const int *factions,
+                       int faction_count, ClassTable *out, std::string *why);
 // The chance used: class_chance's value, or vanilla's 2 when it has none.
 int ClassChance(const std::string &chance);
 
@@ -280,9 +300,11 @@ bool DecodeWorld(const std::string &text, Values *values);
 // --- the lobby hello (a waiting-room request the game ignores: rmg_factions.cpp) ---
 // "This PC applies the host's rules, version N": type kHelloType, byte N.
 const uint32_t kHelloType = 0x4f52;  // 'OR'
-// 2: the start rules (game mode, ToE bonuses); 3: map_scripts; 4: class_skills.
-// A PC with an older version gets no rules (as a PC without the add-on).
-const uint8_t kProtocol = 4;
+// 2: the start rules (game mode, ToE bonuses); 3: map_scripts; 4: class_skills;
+// 5: class_skills=1 unlocks within each faction only (UnlockedSkillsFor): every PC must
+// build the same table. A PC with an older version gets no rules (as a PC without
+// the add-on).
+const uint8_t kProtocol = 5;
 // A hash: the mark in the type's top byte, its low 24 bits in the rest, its top
 // 8 bits in the byte. Marks: 'N' the settings file without the rules' values,
 // 'S' the whole settings file, 'X' MMH5.5's stats files, 'A' the start script's

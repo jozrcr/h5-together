@@ -143,6 +143,12 @@ How turns end in the game, and the robot runs: [docs/plans/turn-features.md](../
 
 **Setting:** `[camera] anim_saver=1` (the default; 0 = the game's own way. Options, H5 Together, camera group; restart). `[camera] anim_every=N` (hidden, testing): a fixed 1 in N; 0 = 1, 2, 3, 4 in turn, 20 s each, with the numbers in the log. Study and addresses: [docs/plans/map-drawing.md](../../docs/plans/map-drawing.md).
 
+## Frame rate limit and vertical sync (`frame_limit.cpp`; off, each player's choice)
+
+**What it does:** the game draws as many frames as it can (about 400 a second in its menus), which only heats the PC. `[video] fps_limit=N` (30 to 240; Options, H5 Together, camera group; at once) waits at each frame until 1/N s has passed: a short sleep, then a busy wait for the last half millisecond, so the pace is even (robot: 60 -> every frame 16.6 ms; changed to 120 from the Options page, 8.3 ms at once). `[video] vsync` = `game` (the game's own, its hidden `gfx_vsync`), `1` (each frame at the screen's refresh: robot, 180 Hz screen, 180 frames a second) or `0` (never wait); from the next start.
+
+**How:** the limit is the last frame callback of our Direct3D hook, just before the game's Present (after our overlay); the clock's ticks are 1 ms while it is on. The vertical sync is the presentation interval, set by a filter our hook calls just before the game makes or resets its device (`d3dhook::SetPresentParamsFilter`). With a limit, the lighter animations count "fast" from 95% of it (else a limit of 60 would keep them light). Display only.
+
 ## A bigger vertex pool (`vertex_pool.cpp`; on)
 
 **What it does:** the game keeps the 3D models' vertices in a shared pool that it sized for its own zoom. Zoomed far out on a big map it overflows every other frame, throws everything away and builds every model again. This makes the pool 4 times as large (about 80 MB more video memory): robot, 2560x1440 zoomed out to 250%, 36 -> 49 frames a second (70 with lighter animations). The picture is the same.
