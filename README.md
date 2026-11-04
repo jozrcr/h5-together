@@ -23,7 +23,7 @@ H5 Together was called **open-homm5** until version 0.2.7. If you have an old ve
 2. Close the game. **Extract the whole zip** (Windows: right-click it, **Extract All**).
 3. **Windows:** double-click `install.bat`. **Linux:** run `bash install.sh` in the folder.
 
-The installer finds your game, shows you what it found ("Your game": the folder, Steam or GOG, the language, which MMH5.5 you have), copies the files in and tells you what to do next. Start the game as you always do. In the main menu, a line **"H5 Together 0.3.0"** now sits above MMH5.5's version line: the add-on is running.
+The installer finds your game, shows you what it found ("Your game": the folder, Steam or GOG, the language, which MMH5.5 you have), copies the files in and tells you what to do next. Start the game as you always do. In the main menu, a line **"H5 Together 0.3.1"** now sits above MMH5.5's version line: the add-on is running.
 
 ![The main menu with the H5 Together version line](docs/images/main-menu.png)
 
@@ -64,10 +64,10 @@ New in 0.3.0: play over the internet with your **Steam friends**, without GameRa
 
 Good to know:
 
-- **Everyone needs H5 Together 0.3.0 with Online play on Steam,** and the host's Steam friends are the ones who see the game (the game is for friends only).
+- **Everyone needs the same H5 Together (0.3.0 or newer) with Online play on Steam,** and the host's Steam friends are the ones who see the game (the game is for friends only).
 - **While it is on, the LAN list shows only games through Steam**, not games on your local network. For a real LAN game or GameRanger, set Online play back to **Off**.
 - **Steam picks the way:** straight between the PCs when it can, or through Valve's relay servers (on a phone's 4G connection, for example). The LAN screen shows a few lines about Steam: whether it is on, and which friends play with H5 Together.
-- **Tested** with two PCs (Windows, and Linux with Proton), on home Wi-Fi and over 4G. Not yet with three or more players: tell us how it goes.
+- **Tested** with two PCs (Windows, and Linux with Proton), on home Wi-Fi and over 4G, and played by three friends over the internet. Tell us how it goes with more.
 - **Not for GOG copies:** it needs the game bought on Steam. A group with a GOG player keeps using LAN, ZeroTier or GameRanger.
 - It uses Valve's `steam_api.dll`, which comes with the zip (see [Legal](#legal)).
 

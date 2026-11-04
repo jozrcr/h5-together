@@ -51,6 +51,12 @@ WHAT IT DOES
 - Linux: the mouse wheel zooms out again (automatic).
 
 
+NEW IN 0.3.1
+
+- Co-op games no longer lag: a PC that falls behind now catches up (before, every other PC waited for it at each step), and the game's connection sends five times more often, so the computer players' big moves no longer hold up everything else. In our tests over Steam, a click on the map went from about 0.5 s to 0.12 s, and the computer players' moves from 0.57 s apart to 0.15 s. Also for LAN and GameRanger games.
+- Hero looks: the Look button on the hero screen now changes the hero the screen shows (before, the hero selected on the map). In multiplayer, the hero screen shows the new look at once, also for a hero in a town.
+
+
 NEW IN 0.3.0 (a test release)
 
 - Online play with your Steam friends, without GameRanger: Options, H5 Together, Online play: Steam, then restart the game (every player). Your friends' games show in Multiplayer, LAN. The host invites friends with "Invite friends..." ("Inviter des amis..." in French) in the waiting room; an invited friend's game joins by itself. While it is on, the LAN list shows only games through Steam: for GameRanger, set it back to Off. Needs the Steam game and Steam running; tested with two PCs.

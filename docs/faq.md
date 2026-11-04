@@ -86,9 +86,9 @@ Only one file can have that name. Rename the other mod's `dinput8.dll` to `dinpu
 
 Three signs:
 
-- In the main menu, a line **"H5 Together 0.3.0"** (your version) above MMH5.5's "Version" line.
+- In the main menu, a line **"H5 Together 0.3.1"** (your version) above MMH5.5's "Version" line.
 - `h5-together.log` in the game's `bin` folder, whose first line says `H5 Together hook DLL <version> loaded`.
-- In a multiplayer waiting room, a line at the bottom: "Every player has H5 Together 0.3.0."
+- In a multiplayer waiting room, a line at the bottom: "Every player has H5 Together 0.3.1."
 
 ![The main menu with the version line](images/main-menu.png)
 
@@ -108,7 +108,7 @@ We have not tried the H5 Lobby app. If you do, please tell us.
 
 Yes, with your **Steam friends**, from 0.3.0 (a test for now). Every player sets **Options, H5 Together, Online play: Steam** and restarts the game. The host creates a LAN game as usual and clicks **Invite friends...** in the waiting room; the friends accept the invite in Steam, and their game joins by itself (or they pick the host's game in **Multiplayer, LAN**). Everything else is the game's own LAN play. Details: [the README](../README.md#online-play-over-steam-new-a-test).
 
-It needs the game bought on Steam (not GOG), Steam running, and H5 Together 0.3.0 with online play on, for every player. While it is on, the LAN list shows only games through Steam: for GameRanger or a real LAN game, set it back to **Off**.
+It needs the game bought on Steam (not GOG), Steam running, and the same H5 Together (0.3.0 or newer) with online play on, for every player. While it is on, the LAN list shows only games through Steam: for GameRanger or a real LAN game, set it back to **Off**.
 
 ### Online play: my friend's game is not in the LAN list
 
