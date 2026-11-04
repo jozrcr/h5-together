@@ -19,6 +19,7 @@
 #include "../mods/fast_paths.h"
 #include "../mods/hero_skins.h"
 #include "../mods/turn_undo.h"
+#include "../mods/vertex_pool.h"
 #include "../mods/parallel_ai.h"
 #include "../mods/quick_resume.h"
 #include "../mods/hero_skins_internal.h"
@@ -132,7 +133,8 @@ void InstallAll()
 	mods::ApplyRmgBuilderFromSettings();
 	overlay::ApplyTestPanelFromSettings();
 	mods::ApplyCameraFromSettings();
-	mods::ApplyAnimThrottleFromSettings();  // [camera] anim_saver (off by default; anim_every: testing)
+	mods::ApplyAnimThrottleFromSettings();  // [camera] anim_saver (on by default; anim_every: testing)
+	mods::ApplyVertexPoolFromSettings();  // [camera] vertex_pool (4: a bigger pool; vb_trace: research, hidden)
 	mods::ApplyWheelFromSettings();  // its DirectInput filter goes first (order -10)
 	mods::ApplyEdgeSkyFromSettings();  // [camera] edge_sky: before the first map reads its light
 	mods::ApplyHostRulesFromSettings();  // [rules]: the host's rules, served as H55-Settings.lua

@@ -1,6 +1,6 @@
 # Map drawing performance (study, 2026-11-04)
 
-Status: **study**, with a first fix built (`[camera] anim_saver`, on by default: the owner's choice, as it acts only when the map is already slow). The owner's question: the adventure map is slow on big maps, more so zoomed out (their game of 2026-11-03: 2560x1440, `[camera] zoom_out=250`, a huge 6-player map, 16 to 60 frames a second for long stretches). The rest of the performance picture (clicks, MMH5.5's scripts, AI turns): [performance.md](performance.md).
+Status: **two fixes built**: lighter animations (`[camera] anim_saver`, on by default: the owner's choice, as it acts only when the map is already slow) and a bigger vertex pool (`[camera] vertex_pool=4`, on: an exact speed-up). Zoomed out on the owner's map: 33-36 -> 70 frames a second. The owner's question: the adventure map is slow on big maps, more so zoomed out (their game of 2026-11-03: 2560x1440, `[camera] zoom_out=250`, a huge 6-player map, 16 to 60 frames a second for long stretches). The rest of the performance picture (clicks, MMH5.5's scripts, AI turns): [performance.md](performance.md).
 
 ## How it was measured
 
@@ -46,9 +46,31 @@ One run, the same camera, N changed every 20 s (`anim_every=0`, `20261104-151859
 
 The setting picks N by itself, every half second: below 55 frames a second two half seconds in a row, one step slower (up to 1 in 4); above 80 two half seconds in a row, one step back; after a pause of over 1.5 s (loading, a save), every frame again. Only in frames that animate 300 skeletons or more (the adventure map has over 1,000, a battle a few dozen): battles and towns keep every frame. Robot `20261104-153211`: zoomed out it reaches 1 in 4 in about 2 s, **48 frames a second instead of 36**; at the normal zoom it stays at every frame. Display only (the world never reads the scene), each player chooses; on by default (the owner's choice; 0 = the game's own way), in the Options page's camera group ("Lighter animations" / "Animations allégées").
 
+## The second fix: a bigger vertex pool (`[camera] vertex_pool=4`)
+
+Why the models' vertices were built again every frame (the research trace `[camera] vb_trace=1`, `src/mods/vertex_pool.cpp`; robot runs `20261104-162420` to `-170705`):
+
+- A model's builder (`NGScene::CVBCombiner`, vtable `0x00e54e58`) is a node: slot 7 `0x00c68db0` "must I build again?", slot 8 `0x00c6a360` -> `0x00c6a130` builds (its parts' vertices, 20 bytes each, into one buffer at `+0x14`). Its inputs: edge A (`+0x54`/`+0x58`, an `NGScene::CLightStateNode`), B (`+0x40`/`+0x44`, an `NGScene::CPerMaterialCombiner`: the parts), C (`+0x4c`/`+0x50`, an `NGScene::CAnimationWatch`), and the flags `+0x5c`, `+0x5d` ("build the vertices").
+- The watch (vtable `0x00e8f48c`, all its work in slot 7 `0x00c69bf0`) watches the parts' `NGScene::CBind` nodes (vtable `0x00e66464`, slot 7 `0x009dc420`: its input `+0x20`/`+0x24`, which follows a skeleton). When one moved on, that part's cached vertices are freed (`+0x0c`..`+0x14`, `+0x74`/`+0x78`) and the watch reports a change; the builder's bounds (slot 9 `0x008f1da0` -> `0x00c696a0`) then set `+0x5d`.
+- **But most builds had nothing to do with that.** The scene walk (`0x009ba480`) asks each builder (the normal path, its call at `0x009ba5dd`), then builds it again at once if its buffer (`+0x14`) is missing or dying (`0x009ba654`). Zoomed out, that second path made 9,300 of the 14,700 builds a second.
+- The buffers die because **the shared dynamic vertex pool is too small**: the pools are made with the size `0C0000h` (`mov ecx` at `0x00c324a6`, then `0x00c3a180`, the pools of map `0x00f79ab4`). When an allocation (`0x00c3a660`) finds the next block still in use by the last `gfx_lag` frames (`0x009ae800`), the game moves its frame counter `0x00f79a50` on by 5 (`0x00c315d0`), locks the buffer with discard and calls `0x00c357a0`: everything in it dies. Zoomed out: **18.5 times a second**; at the normal zoom: 0.
+
+| Robot (the owner's map and settings, 2560x1440, zoomed out to 250%) | Discards | Builds | Frames per second |
+|---|---|---|---|
+| the game's pool, every frame (`-164815`) | 18.5/s | 14,700/s, 316 ms/s | 36-37 |
+| pool x8, every frame (`-165219`) | 0 | 7,100/s, 110 ms/s | 49 |
+| the game's pool, lighter animations (`-165548`) | 24/s | | 48 |
+| pool x2, lighter animations (`-165940`) | 0 | | 69 |
+| **pool x4, lighter animations** (`-170127`) | 0 | | **70-71** |
+| pool x8, lighter animations (`-165735`) | 0 | | 66-67 |
+
+Video memory (Direct3D's estimate of what is free): x2 about 27 MB more, x4 about 77 MB, x8 about 260 MB. The default is x4: room for zooming out further (up to 400%) and bigger maps. An exact speed-up (the same picture: the game only stops throwing away its own work), so it is on; `vertex_pool=1` is the game's own size. With computer turns and the default settings (`-170705`): 21 computer turns, zoomed out 44 to 74 frames a second, no crash.
+
+The model watch held per model (every skeleton of a model on the same frame, `vb_hold`, tried and dropped): the builds fell by 70% but the frame rate did not move, as the discards rebuilt everything anyway.
+
 ## Next
 
-1. **Vertex building** (~7 ms a frame left with the fix): `CVBCombiner` builds most models' vertices again each frame even when their skeleton did not change. Keeping each model's last result while its skeleton's version is the same would save most of it. Needs a closer look at the combiner's records (`0x00c6b4a0` and around).
+1. ~~Vertex building~~: done (the pool, above). What is left zoomed out: the scene walk, the skeletons that still move, the driver.
 2. **Models nobody sees**: skip the skeletons of models under the black fog of war (and off screen), which the game animates anyway.
 3. ~~DXVK on Windows~~: tried (below), a small gain only on this PC.
 4. **Hitches**: a frame of 1.4 to 1.7 s at each new day in single player (likely the autosave); in multiplayer, the owner's game had a frame of 100 to 400 ms every few seconds (MMH5.5's scripts: fixed by `[coop] script_rhythm` in 0.3.2-test2; to check in the owner's next logs).
