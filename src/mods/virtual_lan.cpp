@@ -99,11 +99,33 @@ struct Stats {
 	long to_peers, to_peers_bytes, to_self, fanned_out, from_peers, from_peers_bytes, probes, probe_answers;
 	long dropped_real, dropped_broadcasts, unknown_peer, send_failed, stale, host_answers;
 	volatile LONG dropped_received;  // counted outside the lock
+	// how long the game's sends and reads waited for the lock (our Steam thread holds it
+	// while it talks to Steam): since the last stats line
+	long lock_waits, lock_waits_long;
+	int64_t lock_wait_us, lock_wait_max_us;
 };
 Stats g_stats = {};
 uint32_t g_stats_at = 0;
 long g_stats_logged = -1;
 bool g_said_real = false, g_said_broadcast = false, g_said_unknown = false, g_said_received = false;
+
+// EnterCriticalSection(&g_lock) for the game's sends and reads, timed (Stats).
+void EnterTimed()
+{
+	static LARGE_INTEGER freq = {};
+	if (!freq.QuadPart)
+		QueryPerformanceFrequency(&freq);
+	LARGE_INTEGER a, b;
+	QueryPerformanceCounter(&a);
+	EnterCriticalSection(&g_lock);
+	QueryPerformanceCounter(&b);
+	const int64_t us = (b.QuadPart - a.QuadPart) * 1000000 / freq.QuadPart;
+	++g_stats.lock_waits;
+	g_stats.lock_wait_us += us;
+	g_stats.lock_wait_max_us = us > g_stats.lock_wait_max_us ? us : g_stats.lock_wait_max_us;
+	if (us > 5000)
+		++g_stats.lock_waits_long;
+}
 
 // The game's own address list (thread-local, as Winsock's own answer is).
 struct OwnHost {
@@ -254,6 +276,13 @@ void LogStats(uint32_t now, bool force)
 	               g_stats.to_self, g_stats.fanned_out, g_stats.probes, g_stats.probe_answers, g_stats.host_answers,
 	               g_stats.dropped_real, g_stats.dropped_broadcasts, g_stats.unknown_peer,
 	               static_cast<long>(g_stats.dropped_received), g_stats.stale, g_stats.send_failed, g_peers.Count() - 1);
+	if (g_stats.lock_waits)
+		hooklog::Write("vlan: the game's sends and reads since the last line: %ld, waited for our lock %lld us on average, "
+		               "%lld us at most, %ld times over 5 ms",
+		               g_stats.lock_waits, static_cast<long long>(g_stats.lock_wait_us / g_stats.lock_waits),
+		               static_cast<long long>(g_stats.lock_wait_max_us), g_stats.lock_waits_long);
+	g_stats.lock_waits = g_stats.lock_waits_long = 0;
+	g_stats.lock_wait_us = g_stats.lock_wait_max_us = 0;
 }
 
 // Everybody the transport knows (lobby members) gets an address now, before a first
@@ -293,7 +322,7 @@ int WINAPI VlanSendTo(SOCKET s, const char *buf, int len, int flags, const socka
 	const uint32_t destination = ntohl(in->sin_addr.s_addr);
 	const uint16_t port = ntohs(in->sin_port);
 	char ip[20];
-	EnterCriticalSection(&g_lock);
+	EnterTimed();
 	const uint32_t now = GetTickCount();  // (inside the lock: no message is newer than "now")
 	if (Ready()) {
 		g_transport->Poll(now);
@@ -386,7 +415,7 @@ int WINAPI VlanRecvFrom(SOCKET s, char *buf, int len, int flags, sockaddr *from,
 {
 	if (!g_on)
 		return g_recvfrom(s, buf, len, flags, from, from_len);
-	EnterCriticalSection(&g_lock);
+	EnterTimed();
 	const uint32_t now = GetTickCount();  // (inside the lock: no message is newer than "now")
 	if (Ready()) {
 		g_transport->Poll(now);

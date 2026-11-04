@@ -72,8 +72,8 @@ const Setting kSettings[] = {
 	// [net]
 	ROW("net", "tuning", "1", kBool, 0, 1, nullptr, 0, nullptr, kGroup, kRestart, kAdvanced, kCheck,
 	    "settings.net.tuning", "settings.net.tuning.help"),
-	FILE_ONLY("net", "keepalive_ms", "50", kInt, 1, 1000, kTester, kRestart),
-	FILE_ONLY("net", "send_interval_ms", "10", kInt, 0, 50, kTester, kRestart),
+	FILE_ONLY("net", "keepalive_ms", "10", kInt, 1, 1000, kTester, kRestart),
+	FILE_ONLY("net", "send_interval_ms", "2", kInt, 0, 50, kTester, kRestart),
 	FILE_ONLY("net", "batched_segments", "0", kInt, 0, 3, kTester, kRestart),
 	ROW("net", "lan_all_adapters", "1", kBool, 0, 1, nullptr, 0, nullptr, kPlayer, kLive, kAdvanced, kCheck,
 	    "settings.net.lan_all_adapters", "settings.net.lan_all_adapters.help"),
@@ -87,6 +87,7 @@ const Setting kSettings[] = {
 	FILE_ONLY("net", "trace_lockstep", "1", kBool, 0, 1, kTester, kRestart),
 	FILE_ONLY("net", "catch_up_ms", "600", kInt, 150, 5000, kTester, kRestart),
 	FILE_ONLY("net", "scale_pacing", "1", kBool, 0, 1, kTester, kRestart),
+	FILE_ONLY("net", "catch_up_behind", "1", kBool, 0, 1, kTester, kRestart),
 	FILE_ONLY("net", "net_sleep_ms", "2", kInt, 1, 10, kTester, kRestart),
 	// [coop]
 	ROW("coop", "guard", "1", kBool, 0, 1, nullptr, 0, nullptr, kGroup, kRestart, kAdvanced, kCheck,
