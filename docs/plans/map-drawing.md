@@ -1,6 +1,6 @@
 # Map drawing performance (study, 2026-11-04)
 
-Status: **study**, with a first fix built (`[camera] anim_saver`, off by default). The owner's question: the adventure map is slow on big maps, more so zoomed out (their game of 2026-11-03: 2560x1440, `[camera] zoom_out=250`, a huge 6-player map, 16 to 60 frames a second for long stretches). The rest of the performance picture (clicks, MMH5.5's scripts, AI turns): [performance.md](performance.md).
+Status: **study**, with a first fix built (`[camera] anim_saver`, on by default: the owner's choice, as it acts only when the map is already slow). The owner's question: the adventure map is slow on big maps, more so zoomed out (their game of 2026-11-03: 2560x1440, `[camera] zoom_out=250`, a huge 6-player map, 16 to 60 frames a second for long stretches). The rest of the performance picture (clicks, MMH5.5's scripts, AI turns): [performance.md](performance.md).
 
 ## How it was measured
 
@@ -44,7 +44,7 @@ One run, the same camera, N changed every 20 s (`anim_every=0`, `20261104-151859
 | 1 frame in 3 | 47.8 (+34%) | 1.7 ms | 6.2 ms |
 | 1 frame in 4 | 50.0 (+40%) | 1.4 ms | 5.9 ms |
 
-The setting picks N by itself, every half second: below 55 frames a second two half seconds in a row, one step slower (up to 1 in 4); above 80 two half seconds in a row, one step back; after a pause of over 1.5 s (loading, a save), every frame again. Only in frames that animate 300 skeletons or more (the adventure map has over 1,000, a battle a few dozen): battles and towns keep every frame. Robot `20261104-153211`: zoomed out it reaches 1 in 4 in about 2 s, **48 frames a second instead of 36**; at the normal zoom it stays at every frame. Display only (the world never reads the scene), each player chooses; off by default (the game's own way), in the Options page's camera group ("Lighter animations" / "Animations allégées").
+The setting picks N by itself, every half second: below 55 frames a second two half seconds in a row, one step slower (up to 1 in 4); above 80 two half seconds in a row, one step back; after a pause of over 1.5 s (loading, a save), every frame again. Only in frames that animate 300 skeletons or more (the adventure map has over 1,000, a battle a few dozen): battles and towns keep every frame. Robot `20261104-153211`: zoomed out it reaches 1 in 4 in about 2 s, **48 frames a second instead of 36**; at the normal zoom it stays at every frame. Display only (the world never reads the scene), each player chooses; on by default (the owner's choice; 0 = the game's own way), in the Options page's camera group ("Lighter animations" / "Animations allégées").
 
 ## Next
 

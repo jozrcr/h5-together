@@ -1,4 +1,5 @@
-// Mod: lighter animations when the map is slow ([camera] anim_saver=1, off by default;
+// Mod: lighter animations when the map is slow ([camera] anim_saver, on by default: the
+// owner's choice, 2026-11-04, as it acts only when the map is already slow;
 // docs/plans/map-drawing.md).
 //
 // In plain words: zoomed out on a big map, a large part of each frame goes into animating
@@ -170,7 +171,7 @@ void ApplyAnimThrottleFromSettings()
 		g_mode = kFixed;
 		g_every = every > 8 ? 8 : static_cast<DWORD>(every);
 	}
-	else if (GetPrivateProfileIntW(L"camera", L"anim_saver", 0, path) != 0)
+	else if (GetPrivateProfileIntW(L"camera", L"anim_saver", 1, path) != 0)
 		g_mode = kAuto;
 	if (g_mode == kOff)
 		return;
