@@ -289,6 +289,9 @@ picker.invited = Invité
 picker.refused = Refusé
 picker.close = Fermer
 
+[turn]
+undo_button = Reprendre mon tour
+
 [settings]
 category = H5 Together
 category.title = Options de H5 Together
@@ -428,6 +431,8 @@ coop.guard = Coopération rapide
 coop.guard.help = Des étapes de coopération plus courtes, seulement si chaque PC a le module avec les mêmes réglages.
 coop.segment_ms = Durée des étapes
 coop.segment_ms.help = Des étapes plus courtes accélèrent les mouvements de l'ordinateur.
+coop.undo_end_turn = Annuler la fin de tour
+coop.undo_end_turn.help = Avec les tours simultanés, un joueur qui a fini son tour peut le reprendre tant qu'un autre humain joue encore. Chaque PC doit avoir le module.
 net.view_delay_ms = Délai d'affichage
 net.view_delay_ms.help = Plus bas : les mouvements partent plus tôt après un clic ; trop bas pour votre connexion : un petit saut. Le journal suggère une valeur.
 net.tuning = Réseau rapide

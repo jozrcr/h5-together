@@ -69,6 +69,16 @@ python tools\robot\run_ai_test.py --load-save "Sauvegarde auto" --turns 2 --quic
 - The trace lines start with `autosave:` in both logs. Robot autosaves go to `<test copy>/robot_home-<host|client>/.../Profiles/Robot/Saves/` and stay there between runs (3 files, "Sauvegarde auto 1..3"). With `fast_save_list=0`, the time of each autosave grows with the multiplayer saves in that folder (docs/subsystems/save.md). Saves copied there whose name is an autosave's ("Sauvegarde auto 2") get overwritten: the game reuses the file of the save with the same name.
 - Multiplayer saves do not show in the single-player load list, so the load check uses a single-player autosave (`run_ai_test.py` makes one each day: the robot profile has `autosave = 1`).
 
+## Checking undo End Turn (`turn_undo.cpp`)
+
+```
+python tools\robot\run_lan_test.py --game C:\Games\H5_test_k --simultaneous --client-end-turn-every 45 --end-turn-every 10 --no-stuck-exit --seconds 150 --turns 3 --host-coop undo_end_turn=1 --host-step "58|shot|ended-with-button" --host-step "60|panel|turn request" --host-step "64|shot|after-request"
+```
+
+- `--simultaneous`: the humans play at the same time (the undo needs it). `--client-end-turn-every 45`: the client plays on while the host has ended its turn. `--no-stuck-exit`: else the host's robot closes its copy after a few End Turns with no computer move (it waits for the client).
+- `panel|turn request`: as a click on the button (only when the button would show); `panel|turn force_request`: a request even when it is not allowed (every PC must refuse it the same way); `panel|turn states`: every player's turn state in the log (`1h:1/1`: player 1, human, state 1, pressed End Turn).
+- Look for `turn undo: on for this game`, `request sent ... it counts at segment N` on the asking PC, `PC 0 asks ...` on the others, and `segment N: player 1 plays again` (or `refused: ...`) at the same N on both copies; world checksums equal.
+
 ## Checking the "your turn" notification (the notify mod)
 
 ```
