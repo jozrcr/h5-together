@@ -516,7 +516,8 @@ try {
 
     # The logs, under the add-on's name and its old one (open-homm5, until 0.2.7). The log is
     # kept to 5 MB: when it got bigger, the game kept the last full one as h5-together.old.log.
-    $logs = @("h5-together.log", "h5-together.old.log", "open-homm5.log", "open-homm5.old.log")
+    # (and h5-together-resume.txt: which save quick resume offers to a player who lacks it)
+    $logs = @("h5-together.log", "h5-together.old.log", "open-homm5.log", "open-homm5.old.log", "h5-together-resume.txt")
     if (-not (Test-Path -LiteralPath (Join-Path $bin "h5-together.log")) -and -not (Test-Path -LiteralPath (Join-Path $bin "open-homm5.log"))) {
         Write-Host "  - no h5-together.log here"
     }

@@ -323,6 +323,16 @@ bool PickGame(int index)
 	return picked;
 }
 
+// The waiting room: a new game's (NUI::CMPWaitScreen), or a loaded game's
+// (NUI::CMPUbiComLoadScreen, the same rows and logic at +0x1b4; robot run
+// 20261104-092313-lan), or nullptr.
+BYTE *WaitingRoom()
+{
+	if (BYTE *screen = static_cast<BYTE *>(FindScreen("NUI::CMPWaitScreen")))
+		return screen;
+	return static_cast<BYTE *>(FindScreen("NUI::CMPUbiComLoadScreen"));
+}
+
 // Research: why the host's "Start game" stays disabled. The waiting room
 // (NUI::CMPWaitScreen) asks its logic object (at +0x1b4, e.g.
 // CMPUbiComWaitHostLogic) slot 6 "can start?" (0x0071d590), which needs
@@ -335,7 +345,7 @@ bool PickGame(int index)
 // This logs all of that.
 void LogWaitSlots()
 {
-	BYTE *screen = static_cast<BYTE *>(FindScreen("NUI::CMPWaitScreen"));
+	BYTE *screen = WaitingRoom();
 	if (!screen)
 		return;
 	typedef bool(__fastcall *BoolFn)(void *self, void *edx);
@@ -399,7 +409,7 @@ bool PressSlotArrow(const char *spec)
 	const bool race = strstr(spec, "race") != nullptr;
 	const bool bonus = strstr(spec, "bonus") != nullptr;
 	const bool hero = strstr(spec, "hero") != nullptr;
-	BYTE *screen = static_cast<BYTE *>(FindScreen("NUI::CMPWaitScreen"));
+	BYTE *screen = WaitingRoom();
 	if (!screen) {
 		hooklog::Write("robot: waiting room: not open (arrow %s skipped)", spec);
 		return false;

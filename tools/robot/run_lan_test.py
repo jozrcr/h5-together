@@ -224,6 +224,8 @@ def main():
                    help="with --vlan: at that time the client gets an 'invite' to the host's game on the main menu, and "
                         "the online UI's auto-join opens the LAN screen and joins (instead of the robot's own clicks)")
     p.add_argument("--texts-dir", help="language files for bin/h5-together/texts (default src/mods/texts), as run_ai_test.py")
+    p.add_argument("--host-load", metavar="PART_OF_NAME",
+                   help="the host loads this saved multiplayer game (from its robot profile) instead of starting --map")
     args = p.parse_args()
 
     game = pathlib.Path(args.game)
@@ -232,9 +234,17 @@ def main():
     host_steps = [
         "8|menu|multi lan",
         "11|ui|NUI::CLobbyScreen create",
+    ] + ([
         "15|map|" + args.map,
         "16|shot|host-options",
         "17|msg|create",
+    ] if not args.host_load else [
+        # a saved multiplayer game: the setup screen's Load, the save, Load (robot_lobby.cpp PickSave)
+        "15|msg|load",
+        "18|save|" + args.host_load,
+        "19|shot|host-load-list",
+        "20|msg|load",
+    ]) + [
         "22|shot|host-waiting",
         # waiting room: rows 0 = host, 1 = client, 2 = the map's third player.
         # State arrows (src/hook/robot_lobby.cpp): the host gets ready; the empty
@@ -248,6 +258,8 @@ def main():
     ] + (["16|option|quick_combat %d" % args.quick_combat_state] if args.quick_combat_state >= 0 else []) \
       + (["16|option|realtime 0"] if args.autosave else []) \
       + (["16|option|simultaneus 0"] if args.simultaneous else []) + args.host_step
+    if args.host_load:  # a loaded game keeps its players: the third slot stays as saved
+        host_steps = [step for step in host_steps if step != "37|arrow|2 right"]
     client_steps = [
         "10|menu|multi lan",
         "24|shot|client-lobby",
@@ -257,6 +269,9 @@ def main():
         "%d|arrow|1 ready" % args.client_ready_at,
         "%d|shot|client-started" % (args.start_at + 12),
     ] + args.client_step
+    if args.host_load:  # the client joins later: its add-on may first fetch the host's save (quick resume)
+        client_steps = [{"26|game|0": "36|game|0", "27|ui|NUI::CLobbyScreen join": "37|ui|NUI::CLobbyScreen join"}.get(step, step)
+                        for step in client_steps]
     if args.client_autojoin:
         # the online UI's auto-join instead of the robot's own clicks: an "invite" to the host's
         # game while the client is on the main menu (src/mods/online_join.cpp; needs --vlan)

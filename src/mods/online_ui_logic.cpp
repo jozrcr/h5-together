@@ -128,6 +128,12 @@ std::vector<Line> StatusLines(const Status &s, GetText get, const char *ours)
 		out.push_back({Fill(get, "online.others", {{"n", std::to_string(others)}}), Tone::kDim});
 	if (s.hosts > 0)
 		out.push_back({get("online.list"), Tone::kDim});
+	if (s.resume == 1)
+		out.push_back({Fill(get, "online.resume_arriving", {{"n", std::to_string(s.resume_percent)}}), Tone::kBody});
+	else if (s.resume == 2)
+		out.push_back({get("online.resume_here"), Tone::kGood});
+	else if (s.resume == 3)
+		out.push_back({get("online.resume_failed"), Tone::kWarn});
 	for (int i = 0; i < s.invite_count && i < Status::kMaxInvites; ++i) {
 		const Invite &v = s.invites[i];
 		const char *key = v.cannot ? "online.invite_cannot" : v.visible ? "online.invite" : "online.invite_wait";
