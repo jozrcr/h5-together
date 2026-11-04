@@ -21,6 +21,7 @@ struct Look {
 
 struct PanelData {
 	int hero = -1;            // the hero the panel is for (catalog position)
+	bool from_hero_screen = false;  // it is the hero the hero screen shows (else the selected hero)
 	std::string internal;     // its InternalName
 	std::string name_file;
 	std::string portrait;
@@ -31,9 +32,12 @@ struct PanelData {
 	bool agreed = false;      // multiplayer: looks on in this game
 };
 
-// The hero the panel is for: this PC's player's selected hero (on the map, and
-// behind the hero screen it opens). False when there is none, or the looks are off.
-bool PanelHero(PanelData *out);
+// The hero the panel is for: the hero the hero screen shows when it is on top
+// (its arrows and the town screen open it for heroes that are not the selected
+// one), else this PC's player's selected hero (the adventure map, the town
+// screen). False when there is none, when the hero screen shows a hero whose
+// look this PC's player does not choose, or when the looks are off; *why says why.
+bool PanelHero(PanelData *out, const char **why);
 
 // Saves a choice to h5-together-skins.ini and makes it count: at once in single
 // player; in multiplayer it is sent and counts on every PC at the same segment
@@ -41,9 +45,10 @@ bool PanelHero(PanelData *out);
 enum Applied { kAppliedNow, kAppliedSoon, kSavedForNextGames, kNotApplied };
 Applied ApplyLook(int hero, int look, std::string *note);
 
-// The portrait (.dds) of the look chosen for the selected hero (its own if none),
-// for the hero screen's button; false when there is no selected hero.
-bool SelectedLookPortrait(std::string *dds);
+// The portrait (.dds) of the look chosen for the panel's hero (PanelHero's: on the
+// hero screen, the hero it shows), its own if none, for the hero screen's button;
+// false when there is no such hero.
+bool PanelLookPortrait(std::string *dds);
 
 // After these heroes' looks changed (catalog positions): at the next adventure
 // frame, a hero screen on top showing one of them closes and opens again (its
@@ -52,8 +57,12 @@ void RefreshHeroScreen(const std::vector<int> &heroes, const char *why);
 
 // Robot mode only (the panel's robot commands): "hero_screen" (the adventure
 // screen's "hero_attributes"), "town <n>" (its "input_select_town_<n+1>", then
-// "adv_show_town"), "town_hero_screen" (the town screen's "hero_attributes").
-// Done at the next adventure frame, by the game's own message handlers.
+// "adv_show_town"), "town_hero_screen" (the town screen's "hero_attributes"),
+// "hero_screen_next" / "hero_screen_prev" (the hero screen's own arrows),
+// "lua <code>" (a line of Lua in the adventure controller's script machine, as
+// the console's script commands: single player), "figures" (logs every map
+// figure with its hero's look). Done at the next adventure frame, by the game's
+// own message handlers.
 void RobotScreenCommand(const char *text);
 
 // The catalog's InternalName of a position, and the text file of its name ("" if none).

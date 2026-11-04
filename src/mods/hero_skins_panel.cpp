@@ -1,8 +1,9 @@
 // The hero looks' panel (plan step 2, docs/plans/hero-skins.md): a modal
 // overlay panel in the template builder's style. Its key (F7 by default,
 // h5-together.ini [skins] key; for now, until the hero screen gets a button)
-// opens it on the adventure map, the hero screen or the town screen, for this
-// PC's player's selected hero. It shows the looks of the hero's faction as
+// opens it on the adventure map, the hero screen or the town screen: on the hero
+// screen for the hero it shows, elsewhere for this PC's player's selected hero
+// (skins::PanelHero). It shows the looks of the hero's faction as
 // portraits (its own first), with the names of the heroes who wear each one.
 // Apply saves the choice to h5-together-skins.ini and makes it count
 // (hero_skins.cpp: at once in single player; in multiplayer for every PC at
@@ -155,8 +156,9 @@ void OpenPanel(const char *why)
 		return;
 	}
 	State fresh;
-	if (!skins::PanelHero(&fresh.data) || fresh.data.looks.empty()) {
-		hooklog::Write("hero skins: panel not opened (%s): no selected hero of this PC's player", why);
+	const char *no = "";
+	if (!skins::PanelHero(&fresh.data, &no) || fresh.data.looks.empty()) {
+		hooklog::Write("hero skins: panel not opened (%s): %s", why, fresh.data.hero >= 0 ? "no look for its faction" : no);
 		return;
 	}
 	g = fresh;
@@ -173,7 +175,8 @@ void OpenPanel(const char *why)
 	}
 	g.selected = LookIndexOfChosen(g.data);
 	if (overlay::OpenModal(kName))
-		hooklog::Write("hero skins: panel opened (%s) for %s: %d look(s) of its faction, now %s", why, g.data.internal.c_str(),
+		hooklog::Write("hero skins: panel opened (%s) for %s (%s): %d look(s) of its faction, now %s", why,
+		               g.data.internal.c_str(), g.data.from_hero_screen ? "the hero the hero screen shows" : "the selected hero",
 		               static_cast<int>(g.data.looks.size()),
 		               g.data.chosen >= 0 ? skins::InternalName(g.data.chosen).c_str() : "its own");
 }
@@ -208,7 +211,8 @@ void RobotCommand(const char *text)
 		return;
 	}
 	// Robot helpers: the game's own message handlers, at the next adventure frame (hero_skins.cpp, 8.)
-	if (strcmp(text, "hero_screen") == 0 || strncmp(text, "town", 4) == 0) {
+	if (strncmp(text, "hero_screen", 11) == 0 || strncmp(text, "town", 4) == 0 || strncmp(text, "lua ", 4) == 0 ||
+	    strcmp(text, "figures") == 0) {
 		skins::RobotScreenCommand(text);
 		return;
 	}
@@ -369,7 +373,7 @@ void Prepare(const overlay::Frame &frame)
 		if (!look.portrait.empty())
 			overlay::GameTexture(frame.device, look.portrait.c_str(), &loads);
 	if (g_on_hero_screen) {
-		skins::SelectedLookPortrait(&g_button_face);
+		skins::PanelLookPortrait(&g_button_face);
 		if (!g_button_face.empty())
 			overlay::GameTexture(frame.device, g_button_face.c_str(), &loads);
 	}
