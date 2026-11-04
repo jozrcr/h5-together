@@ -34,6 +34,9 @@ const Value kStartZoom[] = {{"", "settings.value.game_start_zoom"},
                             {"50", nullptr}, {"60", nullptr}, {"70", nullptr}, {"100", nullptr}, {"150", nullptr}};
 const Value kWheelFix[] = {{"auto", "settings.value.wheel_auto"}, {"1", "settings.value.wheel_always"}, {"0", "settings.value.off"}};
 const Value kEdgeSky[] = {{"game", nullptr}, {"none", nullptr}};
+const Value kFpsLimit[] = {{"0", "settings.value.off"}, {"30", nullptr},  {"60", nullptr},  {"90", nullptr}, {"120", nullptr},
+                           {"144", nullptr}, {"165", nullptr}, {"180", nullptr}, {"240", nullptr}};
+const Value kVsync[] = {{"game", "settings.value.vsync_game"}, {"1", "settings.value.vsync_on"}, {"0", "settings.value.off"}};
 const Value kMenuScene[] = {{"default", "settings.value.menu_default"}, {"toe", "settings.value.menu_toe"},
                             {"homm5", "settings.value.menu_homm5"}, {"random", "settings.value.menu_random"}};          // a check box: ticked = none (black)
 const Value kVolumeCurve[] = {{"game", nullptr}, {"wide", nullptr}};      // ticked = wide
@@ -196,6 +199,10 @@ const Setting kSettings[] = {
 	    "settings.camera.edge_sky", "settings.camera.edge_sky.help"),
 	ROW("camera", "anim_saver", "1", kBool, 0, 1, nullptr, 0, nullptr, kPlayer, kRestart, kCamera, kCheck,
 	    "settings.camera.anim_saver", "settings.camera.anim_saver.help"),
+	ROW("video", "fps_limit", "0", kInt, 0, 500, kFpsLimit, COUNT(kFpsLimit), "settings.unit.fps", kPlayer, kLive, kCamera, kList,
+	    "settings.video.fps_limit", "settings.video.fps_limit.help"),
+	ROW("video", "vsync", "game", kChoice, 0, 0, kVsync, COUNT(kVsync), nullptr, kPlayer, kRestart, kCamera, kList,
+	    "settings.video.vsync", "settings.video.vsync.help"),
 	HIDDEN("camera", "anim_every", "1", kInt, 0, 8),  // testing: 3D models animated on one frame in N (anim_throttle.cpp)
 	FILE_ONLY("camera", "vertex_pool", "4", kInt, 1, 16, kTester, kRestart),  // the dynamic vertex pool N times as large (vertex_pool.cpp)
 	HIDDEN("camera", "vb_trace", "0", kBool, 0, 1),  // research: why the models' vertices are built again (vertex_pool.cpp)

@@ -30,6 +30,8 @@
 // each, with the frames and updates per second in the log.
 #include "anim_throttle.h"
 
+#include "frame_limit.h"
+
 #include <windows.h>
 #include <string.h>
 
@@ -106,8 +108,13 @@ void NewFrame()
 		return;
 	const double fps = g_window_frames * 1000.0 / ms;
 	const DWORD before = g_every;
-	g_slow_windows = fps < kSlowerBelowFps ? g_slow_windows + 1 : 0;
-	g_fast_windows = fps > kFasterAboveFps ? g_fast_windows + 1 : 0;
+	// with a frame rate limit (frame_limit.cpp), "fast" is near the limit: at 60, slower
+	// below 51 and faster from 57 (else the limit would keep the animations light)
+	const int cap = FrameLimit();
+	const double slower = cap > 0 && cap * 0.85 < kSlowerBelowFps ? cap * 0.85 : kSlowerBelowFps;
+	const double faster = cap > 0 && cap * 0.95 < kFasterAboveFps ? cap * 0.95 : kFasterAboveFps;
+	g_slow_windows = fps < slower ? g_slow_windows + 1 : 0;
+	g_fast_windows = fps > faster ? g_fast_windows + 1 : 0;
 	if (ms > 3 * kCheckMs) {
 		g_every = 1;  // a long pause (a loading screen, a save): start again from the game's own way
 		g_slow_windows = g_fast_windows = 0;
