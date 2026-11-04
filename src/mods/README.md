@@ -137,6 +137,12 @@ turn undo: segment 166: player 1 plays again (PC 0 asked; before: 1h:1/1 2h:0/0 
 
 How turns end in the game, and the robot runs: [docs/plans/turn-features.md](../../docs/plans/turn-features.md), part 1.
 
+## Lighter animations when the map is slow (`anim_throttle.cpp`; off, each player's choice)
+
+**What it does:** zoomed far out on a big map, most of each frame goes into animating the 3D models on the CPU (about 1,270 skeletons a frame on a 6-player map). With this on, when the adventure map drops below about 55 frames a second, each model moves on only 1 frame in 2 to 4 (the frame rate decides, every half second); above 80 it is every frame again. Robot, 2560x1440 zoomed out to 250%: 36 -> 48 frames a second. Battles and towns are not affected (few models). Display only: each player can choose.
+
+**Setting:** `[camera] anim_saver=1` (Options, H5 Together, camera group; restart). `[camera] anim_every=N` (hidden, testing): a fixed 1 in N; 0 = 1, 2, 3, 4 in turn, 20 s each, with the numbers in the log. Study and addresses: [docs/plans/map-drawing.md](../../docs/plans/map-drawing.md).
+
 ## The co-op features' agreement (`coop_features*.cpp`)
 
 Some of our changes act on the game world, so every PC of a multiplayer game must use them, or none. At the start of each multiplayer game every PC's DLL sends one hello (next to the world checksums, as undo End Turn's): the features it knows and, from the host, the ones the host wants. At segment 20 every PC decides the same: a feature is on only if every PC knows it and the host wants it. These features act only inside the multiplayer segment runner, where every PC changes its world alike; never in single player. The log:

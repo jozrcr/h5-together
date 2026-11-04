@@ -194,6 +194,9 @@ const Setting kSettings[] = {
 	    "settings.camera.wheel_fix", "settings.camera.wheel_fix.help"),
 	ROW("camera", "edge_sky", "game", kChoice, 0, 0, kEdgeSky, COUNT(kEdgeSky), nullptr, kPlayer, kRestart, kCamera, kCheck,
 	    "settings.camera.edge_sky", "settings.camera.edge_sky.help"),
+	ROW("camera", "anim_saver", "0", kBool, 0, 1, nullptr, 0, nullptr, kPlayer, kRestart, kCamera, kCheck,
+	    "settings.camera.anim_saver", "settings.camera.anim_saver.help"),
+	HIDDEN("camera", "anim_every", "1", kInt, 0, 8),  // testing: 3D models animated on one frame in N (anim_throttle.cpp)
 	FILE_ONLY("camera", "edge_sky_test_light", "", kText, 0, 0, kTester, kRestart),
 	// [menu]
 	ROW("menu", "scene", "default", kChoice, 0, 0, kMenuScene, COUNT(kMenuScene), nullptr, kPlayer, kRestart, kCamera, kList,
