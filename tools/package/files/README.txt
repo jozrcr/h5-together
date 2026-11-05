@@ -51,6 +51,14 @@ WHAT IT DOES
 - Linux: the mouse wheel zooms out again (automatic).
 
 
+NEW IN 0.3.3
+
+- Follow a friend's view: while you wait, click an ally's name in the player list and your camera follows theirs on the adventure map (allies only, each through their own fog). A button just over the turn banner stops it; it also stops when your turn begins.
+- Watch their battle live: while you follow an ally who fights, "Watch the battle" opens their battle on your screen, even mid-battle. You only watch (the battle gets none of your clicks); "Stop watching" or Esc brings you back.
+- Options, H5 Together: "Allies may follow my view" and "Watch the followed ally's battles" (both on).
+- Following needs 0.3.3 on both PCs. Everything else mixes with 0.3.2.
+
+
 NEW IN 0.3.2
 
 - A smoother map: big maps zoomed far out run about twice as fast (the game gets more room for its 3D models; far-away animations get lighter when the map runs slow), and MMH5.5's scripts run at their own pace again with the faster co-op steps.
