@@ -33,7 +33,7 @@ struct Step {
 	char kind;  // 'c' console, 'm' menu, 'u' ui, 'g' game message, 'p' pick map, 'l' pick save,
 	            // 'o' setup option, 'r' setup slider, 'j' pick game, 'k' peek, 'w' waiting-room slots, 'a' slot arrow,
 	            // 'v' memory, 's' screenshot, 'y' a key of our overlay, 'b' a command for our panel,
-	            // 'd' a game key (DirectInput), 'z' the mouse wheel, 'x' the mouse's place
+	            // 'd' a game key (DirectInput), 'z' the mouse wheel, 'x' the mouse's place, 'q' a click
 	char text[512];
 };
 const int kMaxSteps = 32;
@@ -272,6 +272,30 @@ void PlaceMouse(const char *text)
 	hooklog::Write("robot: mouse at %ld, %ld (the game window's client pixels)", x, y);
 }
 
+// --- the robot's click ("click|<x> <y>"): the button's messages, down then up -------
+DWORD WINAPI ClickUpThread(void *param)
+{
+	Sleep(120);
+	const bool right = param != nullptr;
+	const LPARAM where = MAKELPARAM(g_mouse_x, g_mouse_y);
+	PostMessageA(g_game_hwnd, right ? WM_RBUTTONUP : WM_LBUTTONUP, 0, where);
+	return 0;
+}
+
+void PostClick(bool right)
+{
+	if (!g_game_hwnd) {
+		hooklog::Write("robot: click: the game's window is not known yet");
+		return;
+	}
+	const LPARAM where = MAKELPARAM(g_mouse_x, g_mouse_y);
+	PostMessageA(g_game_hwnd, WM_MOUSEMOVE, 0, where);
+	PostMessageA(g_game_hwnd, right ? WM_RBUTTONDOWN : WM_LBUTTONDOWN, right ? MK_RBUTTON : MK_LBUTTON, where);
+	HANDLE thread = CreateThread(nullptr, 0, &ClickUpThread, right ? reinterpret_cast<void *>(1) : nullptr, 0, nullptr);
+	if (thread)
+		CloseHandle(thread);
+}
+
 typedef ATOM(WINAPI *RegisterClassAFn)(const WNDCLASSA *);
 typedef ATOM(WINAPI *RegisterClassExAFn)(const WNDCLASSEXA *);
 RegisterClassAFn g_real_RegisterClassA = nullptr;
@@ -435,6 +459,13 @@ BOOL WINAPI RobotPeekMessageA(LPMSG msg, HWND hwnd, UINT min, UINT max, UINT rem
 			}
 			else if (s.kind == 'x') {  // "<x> <y>" (client pixels) or "off": where the game hears the mouse is
 				PlaceMouse(s.text);
+			}
+			else if (s.kind == 'q') {  // "<x> <y> [right]": the mouse there, then a click of its button
+				PlaceMouse(s.text);
+				const bool right = strstr(s.text, "right") != nullptr;
+				ClickMouse(right ? 1 : 0);  // through DirectInput
+				PostClick(right);           // and as the window's messages
+				hooklog::Write("robot: click (%s)", s.text);
 			}
 			else if (s.kind == 'b') {  // "<command>" for our open panel (e.g. the builder's "preset 4", "use")
 				lstrcpynA(g_panel_command, s.text, sizeof(g_panel_command));
@@ -778,11 +809,12 @@ bool ReadConfig(const wchar_t *path)
 				         : strcmp(kind, "rmg") == 0 ? 'n'
 				         : strcmp(kind, "panel") == 0 ? 'b'
 				         : strcmp(kind, "mouse") == 0 ? 'x'
+				         : strcmp(kind, "click") == 0 ? 'q'
 				                                     : 'c';
 				lstrcpynA(s.text, text, sizeof(s.text));
-				if (s.kind == 'd' || s.kind == 'z')
+				if (s.kind == 'd' || s.kind == 'z' || s.kind == 'q')
 					EnableGameInput();
-				if (s.kind == 'x')
+				if (s.kind == 'x' || s.kind == 'q')
 					g_mouse_steps = true;
 			}
 		}
@@ -943,6 +975,7 @@ void Init()
 		               : g_steps[i].kind == 'n' ? "rmg"
 		               : g_steps[i].kind == 'b' ? "panel"
 		               : g_steps[i].kind == 'x' ? "mouse"
+		               : g_steps[i].kind == 'q' ? "click"
 		               : g_steps[i].kind == 's' ? "shot"
 		                                        : "console",
 		               g_steps[i].text);

@@ -456,6 +456,18 @@ void Frame(DWORD now, float dt)
 
 void Probe(DWORD now)
 {
+	static char last_top[96] = "";
+	char top[96] = "";
+	overlay::TopScreen(top, sizeof(top));
+	if (strcmp(top, last_top) != 0) {
+		char names[12][96];
+		const int n = overlay::ScreenNames(names, 12);
+		std::string all;
+		for (int i = 0; i < n; ++i)
+			all += std::string(i ? ", " : "") + names[i];
+		hooklog::Write("spectate probe: the screen on top is now %s (all, bottom first: %s)", top[0] ? top : "none", all.c_str());
+		lstrcpynA(last_top, top, sizeof(last_top));
+	}
 	static DWORD last = 0;
 	if (now - last < 2000)
 		return;
@@ -471,12 +483,35 @@ void Probe(DWORD now)
 		               op ? static_cast<long>(Read(op, 0x190)) : -1L);
 }
 
+// Robot tests: the camera on a tile (to click what stands there at the screen's centre).
+void LookAt(int x, int y)
+{
+	BYTE *screen = Screen();
+	float *pos = screen ? CameraPos(screen) : nullptr;
+	void *op = screen ? Operator(screen) : nullptr;
+	if (!pos || !op) {
+		hooklog::Write("spectate: robot: look at %d, %d: not on the adventure map", x, y);
+		return;
+	}
+	if (Read(op, kOperatorObject))
+		reinterpret_cast<FollowFn>(kOperatorFollow)(op, nullptr, nullptr, 0);
+	float wanted[10];
+	memcpy(wanted, pos, sizeof(wanted));
+	wanted[7] = spectate::FromTile(x);
+	wanted[8] = spectate::FromTile(y);
+	reinterpret_cast<SetPosFn>(kOperatorSet)(op, nullptr, wanted, 1);
+	hooklog::Write("spectate: robot: the camera looks at tile %d, %d (%.1f, %.1f; distance %.1f)", x, y, pos[7], pos[8], pos[0]);
+}
+
 void RobotCommand(const char *text)
 {
-	// robot steps "panel|spectate follow 2", "panel|spectate stop" (the prefix is taken off)
-	int player = 0;
+	// robot steps "panel|spectate follow 2", "panel|spectate stop", "panel|spectate look 23 66"
+	// (the prefix is taken off)
+	int player = 0, x = 0, y = 0;
 	if (sscanf_s(text, "follow %d", &player) == 1)
 		Start(player, "robot");
+	else if (sscanf_s(text, "look %d %d", &x, &y) == 2)
+		LookAt(x, y);
 	else if (strcmp(text, "stop") == 0)
 		Stop("robot");
 	else

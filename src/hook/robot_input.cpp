@@ -8,7 +8,8 @@
 //   GetDeviceState   our key press is added to the keys that are down;
 //   GetDeviceData    our key press and release are added to the events.
 // The mouse passes untouched, except the wheel notches of a "wheel" step, added
-// to its events (order -20, before the wheel fix of mods/wheel.cpp).
+// to its events (order -20, before the wheel fix of mods/wheel.cpp), and the
+// button of a "click" step, added to its events and to its state.
 #define DIRECTINPUT_VERSION 0x0800
 #include <windows.h>
 #include <dinput.h>
@@ -39,6 +40,13 @@ volatile LONG g_wheel_pending = 0;
 volatile LONG g_wheel_steps = 0;  // 1 = as steps (Wine), 0 = as positions (Windows)
 LONG g_wheel_position = 0;
 
+// The robot's mouse click: phase 1 down to give, 2 down given (held kClickMs), 3 up to give.
+const DWORD kClickMs = 120;
+volatile LONG g_click_phase = 0;
+volatile LONG g_click_button = 0;
+DWORD g_click_at = 0;
+bool g_mouse_events = false;  // the game reads the mouse's events (else only its state)
+
 void Advance()
 {
 	if (g_phase == 2 && GetTickCount() - g_down_at >= g_hold_ms)
@@ -54,6 +62,33 @@ void Clear()
 
 HRESULT FilterState(dihook::DeviceKind kind, void *self, DWORD size, void *data, HRESULT hr)
 {
+	if (kind == dihook::kMouse) {  // a click step: its button is down while held
+		static bool told = false;
+		if (!told) {
+			told = true;
+			hooklog::Write("robot: game polls the mouse (GetDeviceState, %lu bytes, hr=%08lx)", size, static_cast<unsigned long>(hr));
+		}
+		LONG phase = g_click_phase;
+		if (phase == 0 || size < 16)
+			return hr;
+		if (FAILED(hr)) {
+			ZeroMemory(data, size);
+			hr = DI_OK;
+		}
+		if (phase == 1) {  // (a game that only polls: the down starts now)
+			g_click_at = GetTickCount();
+			InterlockedExchange(&g_click_phase, phase = 2);
+		}
+		if (phase == 2 && GetTickCount() - g_click_at >= kClickMs)
+			InterlockedExchange(&g_click_phase, phase = 3);
+		if (phase == 2)
+			static_cast<BYTE *>(data)[12 + g_click_button] = 0x80;
+		else if (phase == 3 && !g_mouse_events) {
+			InterlockedExchange(&g_click_phase, 0);
+			hooklog::Write("robot: mouse button %ld clicked (held, then let go, in the polled state)", static_cast<long>(g_click_button));
+		}
+		return hr;
+	}
 	if (kind != dihook::kKeyboard)
 		return hr;
 	static bool logged = false;
@@ -120,8 +155,40 @@ HRESULT FilterMouseData(dihook::DeviceKind kind, void *self, DWORD size, DIDEVIC
                         DWORD capacity, DWORD flags, HRESULT hr)
 {
 	(void)self;
-	if (kind != dihook::kMouse || !g_wheel_pending || !count || !data || size < sizeof(DIDEVICEOBJECTDATA_DX3) ||
-	    (flags & DIGDD_PEEK))
+	if (kind != dihook::kMouse || !count || !data || size < sizeof(DIDEVICEOBJECTDATA_DX3) || (flags & DIGDD_PEEK))
+		return hr;
+	if (!g_mouse_events) {
+		g_mouse_events = true;
+		hooklog::Write("robot: game reads mouse events (GetDeviceData, hr=%08lx)", static_cast<unsigned long>(hr));
+	}
+	// a click step: the button's down, then (kClickMs later) its up
+	LONG phase = g_click_phase;
+	if (phase == 2 && GetTickCount() - g_click_at >= kClickMs)
+		InterlockedExchange(&g_click_phase, phase = 3);
+	if (phase == 1 || phase == 3) {
+		if (FAILED(hr)) {
+			*count = 0;
+			hr = DI_OK;
+		}
+		if (*count < capacity) {
+			DIDEVICEOBJECTDATA *e = reinterpret_cast<DIDEVICEOBJECTDATA *>(reinterpret_cast<BYTE *>(data) + *count * size);
+			ZeroMemory(e, size);
+			e->dwOfs = static_cast<DWORD>(DIMOFS_BUTTON0 + g_click_button);
+			e->dwData = phase == 1 ? 0x80 : 0;
+			e->dwTimeStamp = GetTickCount();
+			e->dwSequence = ++g_sequence;
+			++*count;
+			if (phase == 1) {
+				g_click_at = GetTickCount();
+				InterlockedExchange(&g_click_phase, 2);
+			}
+			else {
+				InterlockedExchange(&g_click_phase, 0);
+				hooklog::Write("robot: mouse button %ld clicked (down and up given to the game)", static_cast<long>(g_click_button));
+			}
+		}
+	}
+	if (!g_wheel_pending)
 		return hr;
 	if (FAILED(hr)) {  // not acquired (window in background): "no events", plus ours
 		*count = 0;
@@ -215,6 +282,12 @@ bool PressKey(int dik_code, DWORD hold_ms)
 void EnableGameInput()
 {
 	g_game_input = true;
+}
+
+void ClickMouse(int button)
+{
+	InterlockedExchange(&g_click_button, button == 1 ? 1 : 0);
+	InterlockedExchange(&g_click_phase, 1);
 }
 
 void TurnWheel(int notches, bool steps)
