@@ -497,6 +497,46 @@ const void *BattleNoticeUnsafe(const void *player)
 	return found;
 }
 
+// For the log: how many notices the player's inbox holds here, and their types (the first 8 kinds).
+void InboxSummaryUnsafe(const void *player, char *out, int size)
+{
+	const void *inbox = reinterpret_cast<const void *>(Read(player, kInbox));
+	if (!inbox) {
+		lstrcpynA(out, "no inbox", size);
+		return;
+	}
+	const DWORD *head = reinterpret_cast<const DWORD *>(Read(inbox, 0xc));
+	int count = 0, kinds = 0, types[8];
+	for (const DWORD *node = reinterpret_cast<const DWORD *>(head[0]); node && node != head && count < 5000;
+	     node = reinterpret_cast<const DWORD *>(node[0]), ++count) {
+		const void *notice = reinterpret_cast<const void *>(node[3]);
+		const int type = notice ? NoticeType(notice) : -1;
+		bool seen = false;
+		for (int i = 0; i < kinds; ++i)
+			seen = seen || types[i] == type;
+		if (!seen && kinds < 8)
+			types[kinds++] = type;
+	}
+	int n = _snprintf_s(out, size, _TRUNCATE, "%d notice(s), types", count);
+	for (int i = 0; i < kinds && n > 0 && n < size; ++i)
+		n += _snprintf_s(out + n, size - n, _TRUNCATE, " 0x%x", types[i]);
+}
+
+void InboxSummary(const void *player, char *out, int size)
+{
+	out[0] = 0;
+	if (!player) {
+		lstrcpynA(out, "no player", size);
+		return;
+	}
+	__try {
+		InboxSummaryUnsafe(player, out, size);
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER) {
+		lstrcpynA(out, "reading it crashed (caught)", size);
+	}
+}
+
 const void *BattleNotice(const void *player)
 {
 	if (!player)
@@ -655,6 +695,32 @@ void WatchNow(const char *how)
 	StartWatching(screen, notice);
 }
 
+// The log, once each time the followed ally's battle starts (real games: 2026-11-05, the owner
+// saw no way to watch his friend's battle): whether this PC can watch it, and if not, why.
+bool g_told_battle = false;
+
+void TellWatchable()
+{
+	const bool in_battle = g_heard && g_their_screen == spectate::kInBattle;
+	if (!in_battle) {
+		g_told_battle = false;
+		return;
+	}
+	if (g_told_battle || g_watching_battle || !Screen())  // (told once this PC is on its map)
+		return;
+	g_told_battle = true;
+	const void *notice = BattleNotice(g_players[g_following].object);
+	char inbox[160];
+	InboxSummary(g_players[g_following].object, inbox, sizeof(inbox));
+	const char *why = !g_watch_battles                         ? "no: watch_battles=0 here"
+	                  : !g_send_next                           ? "no: the game's send of commands is not as expected"
+	                  : BattleNotice(g_players[g_me].object)   ? "no: this PC's own battle waits"
+	                  : !notice                                ? "no: their battle's notice is not in their inbox here"
+	                                                           : "yes: the button shows";
+	hooklog::Write("spectate: %s is in a battle; watch it from here? %s (their inbox here: %s; player %d, object %p)",
+	               NameOf(g_following).c_str(), why, inbox, g_following, g_players[g_following].object);
+}
+
 // The banner's clicks come during the drawing: they are handled in the next frame's step.
 bool g_request_watch = false, g_request_stop_watching = false;
 const char *g_request_how = "";
@@ -733,6 +799,7 @@ void Frame(DWORD now, float dt)
 		WatchFrame(now);
 		return;
 	}
+	TellWatchable();
 	BYTE *screen = Screen();
 	if (!screen) {
 		g_set = false;
