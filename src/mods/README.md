@@ -118,7 +118,7 @@ segment_ms=50     ; 50 or 100 (50 by default since 0.2.0)
 
 ## Undo End Turn (`turn_undo*.cpp`; off by default, the host's choice)
 
-**What it does:** with simultaneous turns, a player who pressed End Turn too early can take it back while another human still plays. A button **"Resume my turn"** ("Reprendre mon tour") shows under the game's own banner "Please wait for the other players..."; a click gives the turn back on every PC at the same moment. Once the last other human has ended the turn, the computer players start and the button goes.
+**What it does:** with simultaneous turns, a player who pressed End Turn too early can take it back while another human still plays. A round button **"Resume my turn"** ("Reprendre mon tour") shows over the game's hourglass (the End Turn button, at the centre of the wheel at the bottom right): an arrow turning back around a small hourglass, its name at the left of the wheel for a few seconds and whenever the mouse is over it. A click gives the turn back on every PC at the same moment. Once the last other human has ended the turn, the computer players start and the button goes.
 
 **Setting:** `[coop] undo_end_turn=1` (Options, H5 Together, the host's settings). Only the host's value counts, from the next game. Every PC needs a DLL that knows it (whatever its own setting); otherwise it stays off for that game.
 
@@ -179,19 +179,20 @@ co-op features: this game (2 PCs): on: script_rhythm parallel_ai
 
 ## Following a friend's view (`spectate*.cpp`; on, each player's choice)
 
-**What it does:** in a multiplayer game, a click on an ally's name in the player list makes your camera follow theirs on the adventure map, gliding, so you can watch what they do while you wait. Just over the game's turn banner, a button "Stop following Pierre", with a line over it, says what they are doing ("Pierre is in a battle", "in a town"...). It stops when you click the button or the name again, move the camera yourself, or your own turn begins. An eye after a name shows whom you follow; on their screen, an eye after your name shows that you follow them.
+**What it does:** in a multiplayer game, a click on an ally's name in the player list makes your camera follow theirs on the adventure map, gliding, so you can watch what they do while you wait. An eye after their name shows that you follow them, and a short line after the eye says where they are when it is not the map ("in a town", "looking at a hero"...). It stops when you click the name (or the eye) again, move the camera yourself, or your own turn begins. On their screen, an eye after your name shows that you follow them. Nothing is drawn in the middle of the map.
 
 **Only allies** (the same team), and each player sees the map through their own fog: nothing of the game itself changes, so it cannot desync a game. While an ally follows you, your PC sends where your camera looks (a tile, a few times a second) as a small message next to the game's own world checks.
 
-**Watching their battle.** While you follow an ally and they fight, a second button shows beside the first: **"Watch the battle"**. It opens the game's own battle screen on their battle, live (every PC runs every battle anyway: its actions are world commands), also when the battle has begun; leave with the small **"Stop watching"** button at the bottom right (or Esc) and come back as often as you like. The battle's own buttons at the top right (auto combat, options, the white flag) show greyed out, as the game greys the others when it is not your turn. At the end, their results box shows, and **"Back to the map"** closes it. You only watch: while the battle screen is open the game gets none of your clicks or keys, and your PC sends no command at all (that battle screen would act as your ally: its own settings, auto-combat moves; all dropped). If your own battle starts meanwhile, watching stops at once.
+**Watching their battle.** While you follow an ally and they fight, a small button shows right after their eye in the player list: **"Watch the battle"** (also when you start following them in the middle of their battle). It opens the game's own battle screen on their battle, live (every PC runs every battle anyway: its actions are world commands), also when the battle has begun; leave with the small **"Stop watching"** button at the bottom right (or Esc) and come back as often as you like. The battle's own buttons at the top right (auto combat, options, the white flag) show greyed out, as the game greys the others when it is not your turn. At the end, their results box shows, and **"Back to the map"** closes it. You only watch: while the battle screen is open the game gets none of your clicks or keys, and your PC sends no command at all (that battle screen would act as your ally: its own settings, auto-combat moves; all dropped). If your own battle starts meanwhile, watching stops at once.
 
-**Settings:** `[coop] share_view=1` (Options, H5 Together, interface): your allies may follow your view; 0 = your view stays yours (they then read "Pierre does not share their view"). `[coop] watch_battles=1`: the "Watch the battle" button; 0 = no button. Each player chooses; both apply at once. The player list must be on (`[ui] player_list=1`): its names are where you click.
+**Settings:** `[coop] share_view=1` (Options, H5 Together, interface): your allies may follow your view; 0 = your view stays yours (they then read "does not share their view" after your name). `[coop] watch_battles=1`: the "Watch the battle" button; 0 = no button. Each player chooses; both apply at once. The player list must be on (`[ui] player_list=1`): its names are where you click.
 
 `h5-together.log`:
 
 ```
 spectate: following Pierre's view (a click on the player list)
 spectate: Pierre's view arrives (0.1 s after the request)
+spectate: Pierre's screen: a battle
 spectate: stopped following Pierre (this PC's turn began)
 spectate: Joz follows this PC's view
 ```

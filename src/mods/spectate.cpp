@@ -22,8 +22,10 @@
 // 3. Every frame (after it is shown, in a Present callback, on the game's thread): as the
 //    followed, read the camera and queue what changed; as the follower, let go of the
 //    operator's object and glide toward the ally's point.
-// 4. The banner (an overlay client): "Stop following Pierre", a button at the top of the
-//    adventure map, and a line under it ("Pierre is in a battle", ...).
+// 4. On screen (an overlay client), beside the followed ally's row in the player list, after
+//    its eye: a short line when the ally is not on the map ("in a town"), or, while the ally
+//    fights, a small button "Watch the battle". Nothing in the middle of the map: a click on
+//    the name or the eye starts and stops following (the owner's choice, 2026-11-05).
 //
 // Research probe ([debug] spectate_probe=1, robot runs): the camera's position, the floor
 // and the operator's object, every 2 s.
@@ -36,6 +38,8 @@
 
 #include <string>
 
+#include "player_list.h"
+#include "player_list_internal.h"
 #include "rmg_builder_widgets.h"
 #include "spectate_logic.h"
 
@@ -164,6 +168,7 @@ int g_following = 0;  // the player this PC follows, 0 = none
 DWORD g_follow_since = 0;
 DWORD g_watch_sent_at = 0;
 bool g_have_view = false;
+bool g_heard = false;  // a view or a status came from the followed ally (they share)
 int g_view_x = 0, g_view_y = 0, g_view_floor = 0;
 int g_their_screen = spectate::kOnMap;
 bool g_set = false;  // we put the camera somewhere in the frame before
@@ -287,15 +292,25 @@ BYTE *Screen()
 	return static_cast<BYTE *>(overlay::TopScreenObject());
 }
 
+bool WatchingBattle();
+
 int ScreenCode()
 {
-	char top[96] = "";
-	if (!overlay::TopScreen(top, sizeof(top)))
+	char names[12][96];
+	const int n = overlay::ScreenNames(names, 12);
+	if (n <= 0)
 		return spectate::kElsewhere;
+	const char *top = names[n - 1];
 	if (strstr(top, "CAdventure"))
 		return spectate::kOnMap;
-	if (strstr(top, "CombatArena"))
-		return spectate::kInBattle;  // (the results box after it: elsewhere)
+	// In a battle: its screen anywhere under the top one (a spell book or the battle's options
+	// over it are still the battle), but not its results box, and not a battle this PC only
+	// watches (its own inbox's old battle is not that one).
+	if (strstr(top, "CombatResults") || WatchingBattle())
+		return spectate::kElsewhere;
+	for (int i = 0; i < n; ++i)
+		if (strstr(names[i], "CombatArena"))
+			return spectate::kInBattle;
 	if (strstr(top, "Town"))
 		return spectate::kInTown;
 	if (strstr(top, "Hero"))
@@ -321,11 +336,12 @@ void *Operator(BYTE *screen)
 // --- as the followed: tell the followers where this PC looks ---------------------------------
 void ShareView(DWORD now)
 {
-	bool any = false;
+	bool any = false, fresh = false;
 	for (int p = 1; p <= 8; ++p) {
 		const bool active = g_watchers.Active(p, now);
 		if (active != g_watchers_told[p]) {
 			g_watchers_told[p] = active;
+			fresh = fresh || active;  // a new follower: what this PC shows and where it looks, at once
 			hooklog::Write("spectate: %s %s this PC's view%s", NameOf(p).c_str(), active ? "follows" : "stopped following",
 			               active && !g_share       ? " (asked; not shared: share_view=0)"
 			               : active && !Followable(p) ? " (asked; not shared: not an ally)"
@@ -336,7 +352,7 @@ void ShareView(DWORD now)
 	if (!any || g_me == 0)
 		return;
 	const int screen_code = ScreenCode();
-	if (screen_code != g_sent_screen || now - g_sent_status_at >= 2000) {
+	if (fresh || screen_code != g_sent_screen || now - g_sent_status_at >= 2000) {
 		Queue(spectate::EncodeStatus(g_me, screen_code));
 		g_sent_screen = screen_code;
 		g_sent_status_at = now;
@@ -350,7 +366,7 @@ void ShareView(DWORD now)
 	const int x = spectate::ToTile(pos[7]), y = spectate::ToTile(pos[8]);
 	const int floor = Read(screen, kScreenFloor) ? 1 : 0;
 	const bool moved = x != g_sent_x || y != g_sent_y || floor != g_sent_floor;
-	if (moved ? now - g_sent_view_at >= 200 : now - g_sent_view_at >= 2000) {
+	if (fresh || (moved ? now - g_sent_view_at >= 200 : now - g_sent_view_at >= 2000)) {
 		Queue(spectate::EncodeView(g_me, floor, x, y));
 		g_sent_x = x;
 		g_sent_y = y;
@@ -372,6 +388,7 @@ void Stop(const char *why)
 		Queue(spectate::EncodeWatch(g_me, g_following, false));
 	g_following = 0;
 	g_have_view = false;
+	g_heard = false;
 	g_set = false;
 }
 
@@ -389,6 +406,7 @@ void Start(int player, const char *how)
 	g_follow_since = GetTickCount();
 	g_watch_sent_at = g_follow_since;
 	g_have_view = false;
+	g_heard = false;
 	g_their_screen = spectate::kOnMap;
 	g_set = false;
 	Queue(spectate::EncodeWatch(g_me, player, true));
@@ -397,6 +415,23 @@ void Start(int player, const char *how)
 
 int NoticeType(const void *notice);
 const char *RttiName(const void *object);
+
+// For the log.
+const char *ScreenWords(int screen)
+{
+	switch (screen) {
+	case spectate::kOnMap:
+		return "the map";
+	case spectate::kInTown:
+		return "a town";
+	case spectate::kInBattle:
+		return "a battle";
+	case spectate::kInHeroScreen:
+		return "the hero screen";
+	default:
+		return "something else (a menu, a box)";
+	}
+}
 
 // --- watching the followed ally's battle ([coop] watch_battles) ----------------------------------
 // At a battle's start every PC's world posts "open the battle screen" (NWorld::CCreateCombatScreen,
@@ -502,6 +537,11 @@ bool QueueClose()
 bool g_closing = false;  // the close of the battle screens is queued: watching ends once they are gone
 DWORD g_closing_since = 0;
 
+bool WatchingBattle()
+{
+	return g_watching_battle;
+}
+
 void StopWatching(const char *why)
 {
 	if (!g_watching_battle || g_closing)
@@ -591,11 +631,12 @@ void WatchFrame(DWORD now)
 // The ally's battle notice when this PC may watch it now: the ally's own screen is a battle
 // (their status message), this PC is on its map, its own battle does not wait, watch_battles
 // is on. (The ally's inbox keeps old notices: the newest is the battle going on only while the
-// ally's screen is that battle.)
+// ally's screen is that battle.) No view of the ally's map is needed: an ally followed while
+// already in a battle sends no view until it ends (the owner's game, 2026-11-05).
 const void *WatchableNotice()
 {
-	if (!g_watch_battles || !g_send_next || g_watching_battle || !g_following || g_their_screen != spectate::kInBattle ||
-	    !g_have_view)
+	if (!g_watch_battles || !g_send_next || g_watching_battle || !g_following || !g_heard ||
+	    g_their_screen != spectate::kInBattle)
 		return nullptr;
 	if (!Screen() || BattleNotice(g_players[g_me].object))
 		return nullptr;
@@ -954,32 +995,41 @@ void __fastcall CheckHook(void *self, void *edx, int pc, const BYTE *cmd)
 					hooklog::Write("spectate: %s's view arrives (%.1f s after the request)", NameOf(m.player).c_str(),
 					               (now - g_follow_since) / 1000.0);
 				g_have_view = true;
+				g_heard = true;
 				g_view_x = m.x;
 				g_view_y = m.y;
 				g_view_floor = m.floor;
 			}
-			else if (m.valid && m.kind == spectate::kStatus && g_following && m.player == g_following)
+			else if (m.valid && m.kind == spectate::kStatus && g_following && m.player == g_following) {
+				if (!g_heard || m.screen != g_their_screen)
+					hooklog::Write("spectate: %s's screen: %s", NameOf(m.player).c_str(), ScreenWords(m.screen));
+				g_heard = true;
 				g_their_screen = m.screen;
+			}
 			return;  // ours: the game never sees it
 		}
 	}
 	g_check_next(self, edx, pc, cmd);
 }
 
-// --- the banner ------------------------------------------------------------------------------------
-// On the map: a line ("Pierre is in a battle") and, under it, the buttons side by side, just
-// over the game's turn banner ("Tour de Pierre", its progress bar): "Stop following Pierre" and,
-// while the followed ally fights, "Watch the battle". In the battle: one small button at the
+// --- on screen -------------------------------------------------------------------------------------
+// On the map, beside the followed ally's row in the player list, just after its eye (nothing
+// in the middle of the map: the name or the eye starts and stops following; the owner's
+// choice, 2026-11-05): a short line when the ally is not on the map ("in a town"), or, while
+// the ally fights, a small button "Watch the battle" in the row's height. Without the list
+// (F9), that button alone over the game's turn banner. In the battle: one small button at the
 // bottom right ("Stop watching", then "Back to the map") with a caption over it ("Watching
 // Pierre"), the owner's choice: discreet.
-// Places in the game's 1024x768 layout, centred, scaled with the screen's height.
+// Places in the game's 1024x768 layout, scaled with the screen's height.
 const float kRefH = 768.0f, kScreenW = 1024.0f;
-const float kButtonH = 34.0f, kButtonFont = 15.0f, kLineFont = 14.0f;
-const float kMapButtonW = 240.0f, kMapGap = 16.0f, kMapRowY = 497.0f;  // (the turn banner's top: about 539)
-const float kBattleButtonW = 300.0f, kBattleButtonY = 46.0f;
+const float kRowGap = 8.0f, kRowPad = 14.0f, kRowButtonMinW = 110.0f;
+const float kFallbackW = 240.0f, kFallbackY = 497.0f, kFallbackH = 34.0f, kFallbackFont = 15.0f;  // (the turn banner: from about 539)
 float g_back_w = 1024.0f, g_back_h = 768.0f;
-bool g_shown = false;
-bool g_offer = false;  // the second button shows
+bool g_shown = false;  // something to draw this frame
+bool g_offer = false;  // "Watch the battle" shows
+bool g_row = false;    // the followed ally's row is in the player list: drawn beside it
+float g_row_right = 0, g_row_top = 0, g_row_bottom = 0;
+float g_offer_w = 0;   // the button's width on the last frame (from its words)
 struct Button {
 	bool down, hovered;
 };
@@ -992,36 +1042,36 @@ ImVec2 ScreenAt(float x, float y, float w, float h)
 	return ImVec2(x0 + x * k, y * k);
 }
 
-// A button's place (1024x768 units): which = 0 the main button, 1 "Watch the battle".
-struct Place {
-	float x, y, w;
-};
-Place ButtonPlace(int which)
-{
-	if (g_watching_battle)
-		return Place{(kScreenW - kBattleButtonW) / 2, kBattleButtonY, kBattleButtonW};
-	if (!g_offer)
-		return Place{(kScreenW - kMapButtonW) / 2, kMapRowY, kMapButtonW};
-	const float left = (kScreenW - 2 * kMapButtonW - kMapGap) / 2;
-	return Place{which == 0 ? left : left + kMapButtonW + kMapGap, kMapRowY, kMapButtonW};
-}
-
 // In a battle: one small button at the bottom right, just over the creatures' bar and beside the
 // game's own buttons there (anchored to the right and bottom edges, scaled with the height).
 const float kBattleRight = 80.0f, kBattleBottom = 92.0f, kBattleW = 172.0f, kBattleH = 28.0f, kBattleFont = 13.0f,
             kCaptionFont = 12.0f;
 
+// The row's words and button: the player list's name size.
+float RowFont(float h)
+{
+	float regular = 0, bold = 0;
+	plist::FontSizes(h, &regular, &bold);
+	return regular;
+}
+
+// A button's place: which = 0 the battle's button (while watching), 1 "Watch the battle".
 void ButtonRect(int which, float w, float h, ImVec2 *p0, ImVec2 *p1)
 {
-	if (g_watching_battle) {
-		const float k = h / kRefH;
+	const float k = h / kRefH;
+	if (which == 0) {
 		*p1 = ImVec2(floorf(w - kBattleRight * k), floorf(h - kBattleBottom * k));
 		*p0 = ImVec2(floorf(p1->x - kBattleW * k), floorf(p1->y - kBattleH * k));
 		return;
 	}
-	const Place pl = ButtonPlace(which);
-	*p0 = ScreenAt(pl.x, pl.y, w, h);
-	*p1 = ScreenAt(pl.x + pl.w, pl.y + kButtonH, w, h);
+	if (g_row) {
+		const float bw = g_offer_w > kRowButtonMinW * k ? g_offer_w : kRowButtonMinW * k;
+		*p0 = ImVec2(floorf(g_row_right + kRowGap * k), floorf(g_row_top));
+		*p1 = ImVec2(floorf(p0->x + bw), floorf(g_row_bottom));
+		return;
+	}
+	*p0 = ScreenAt((kScreenW - kFallbackW) / 2, kFallbackY, w, h);
+	*p1 = ScreenAt((kScreenW + kFallbackW) / 2, kFallbackY + kFallbackH, w, h);
 }
 
 // A click on a button: true once, when the mouse button is let go over it.
@@ -1041,24 +1091,42 @@ bool Clicked(Button *b, int which, bool front)
 	return false;
 }
 
+// The line beside the row: what the ally has on screen when it is not the map, or why
+// nothing comes ("" = nothing to say).
+std::string RowLine(DWORD now)
+{
+	if (!g_heard)
+		return now - g_follow_since > 3000 ? std::string(texts::Get("spectate.row_no_view")) : std::string();
+	switch (g_their_screen) {
+	case spectate::kInBattle:
+		return texts::Get("spectate.row_in_battle");
+	case spectate::kInTown:
+		return texts::Get("spectate.row_in_town");
+	case spectate::kInHeroScreen:
+		return texts::Get("spectate.row_in_hero_screen");
+	case spectate::kElsewhere:
+		return texts::Get("spectate.row_elsewhere");
+	default:
+		return std::string();
+	}
+}
+
 bool Wanted()
 {
-	g_shown = (g_following != 0 && Screen() != nullptr) || g_watching_battle;
-	g_offer = g_shown && !g_watching_battle && WatchableNotice() != nullptr;
-	if (!g_shown) {
-		g_main = Button();
-		g_watch = Button();
-		return false;
-	}
+	const bool on_map = g_following != 0 && !g_watching_battle && Screen() != nullptr;
+	g_row = on_map && PlayerListRowPlace(g_following, &g_row_right, &g_row_top, &g_row_bottom);
+	g_offer = on_map && WatchableNotice() != nullptr;
+	g_shown = g_watching_battle || g_offer || (g_row && !RowLine(GetTickCount()).empty());
 	HWND window = overlay::GameWindow();
 	const bool front = window && GetAncestor(GetForegroundWindow(), GA_ROOTOWNER) == GetAncestor(window, GA_ROOTOWNER);
-	if (Clicked(&g_main, 0, front)) {
-		g_request_how = "its button";
-		if (g_watching_battle)
+	if (g_watching_battle) {
+		if (Clicked(&g_main, 0, front)) {
+			g_request_how = "its button";
 			g_request_stop_watching = true;
-		else
-			Stop("its button");
+		}
 	}
+	else
+		g_main = Button();
 	if (g_offer) {
 		if (Clicked(&g_watch, 1, front)) {
 			g_request_how = "its button";
@@ -1073,8 +1141,8 @@ bool Wanted()
 void Prepare(const overlay::Frame &frame)
 {
 	ui::LoadPictures(frame.device);
-	overlay::WantFont(floorf(kButtonFont * frame.height / kRefH + 0.5f));
-	overlay::WantFont(floorf(kLineFont * frame.height / kRefH + 0.5f));
+	overlay::WantFont(RowFont(frame.height));
+	overlay::WantFont(floorf(kFallbackFont * frame.height / kRefH + 0.5f));
 	overlay::WantFont(floorf(kBattleFont * frame.height / kRefH + 0.5f));
 	overlay::WantFont(floorf(kCaptionFont * frame.height / kRefH + 0.5f));
 }
@@ -1087,35 +1155,23 @@ bool ResultsOnTop()
 	return strstr(top, "CombatResults") != nullptr;
 }
 
-// The main button's words.
+// The battle's button's words.
 std::string ButtonLabel()
 {
-	const std::string name = NameOf(g_following);
-	if (g_watching_battle)
-		return ResultsOnTop() ? std::string(texts::Get("spectate.back_to_map")) : std::string(texts::Get("spectate.stop_watching"));
-	return texts::Fill(texts::Get("spectate.stop_button"), {{"name", name}});
+	return ResultsOnTop() ? std::string(texts::Get("spectate.back_to_map")) : std::string(texts::Get("spectate.stop_watching"));
 }
 
-// The line under the button: what the ally does, or why nothing comes.
-std::string StatusLine(DWORD now)
+// The caption over it.
+std::string Caption()
 {
-	const std::string name = NameOf(g_following);
-	if (g_watching_battle)
-		return texts::Fill(texts::Get(ResultsOnTop() ? "spectate.battle_over" : "spectate.watching"), {{"name", name}});
-	if (!g_have_view && now - g_follow_since > 3000)
-		return texts::Fill(texts::Get("spectate.no_view"), {{"name", name}});
-	switch (g_their_screen) {
-	case spectate::kInBattle:
-		return texts::Fill(texts::Get("spectate.in_battle"), {{"name", name}});
-	case spectate::kInTown:
-		return texts::Fill(texts::Get("spectate.in_town"), {{"name", name}});
-	case spectate::kInHeroScreen:
-		return texts::Fill(texts::Get("spectate.in_hero_screen"), {{"name", name}});
-	case spectate::kElsewhere:
-		return texts::Fill(texts::Get("spectate.elsewhere"), {{"name", name}});
-	default:
-		return texts::Get("spectate.hint");
-	}
+	return texts::Fill(texts::Get(ResultsOnTop() ? "spectate.battle_over" : "spectate.watching"), {{"name", NameOf(g_following)}});
+}
+
+float ButtonFont(int which, float h)
+{
+	if (which == 0)
+		return floorf(kBattleFont * h / kRefH + 0.5f);
+	return g_row ? RowFont(h) : floorf(kFallbackFont * h / kRefH + 0.5f);
 }
 
 void DrawButton(ImDrawList *draw, const Button &b, int which, const std::string &label, float k)
@@ -1123,19 +1179,21 @@ void DrawButton(ImDrawList *draw, const Button &b, int which, const std::string 
 	ImVec2 p0, p1;
 	ButtonRect(which, g_back_w, g_back_h, &p0, &p1);
 	const bool pressed = b.down && b.hovered;
+	// the game's 122x34 button, its ends kept (in the row's height, they shrink with it)
+	const float border = (p1.y - p0.y) < 34.0f * k ? 12.0f * (p1.y - p0.y) / 34.0f : 12.0f * k;
 	if (ImTextureID picture = ui::Tex(pressed ? ui::kButtonClick : ui::kButtonNormal))
-		ui::NineSlice(draw, picture, p0, p1, ImVec2(122.0f, 34.0f), 12.0f, 12.0f * k);
+		ui::NineSlice(draw, picture, p0, p1, ImVec2(122.0f, 34.0f), 12.0f, border);
 	else
 		draw->AddRectFilled(p0, p1, pressed ? IM_COL32(70, 52, 30, 255) : IM_COL32(96, 72, 40, 255), 4.0f * k);
 	if (b.hovered && !pressed) {
 		if (ImTextureID highlight = ui::Tex(ui::kButtonHighlight))
-			ui::NineSlice(draw, highlight, p0, p1, ImVec2(122.0f, 34.0f), 12.0f, 12.0f * k);
+			ui::NineSlice(draw, highlight, p0, p1, ImVec2(122.0f, 34.0f), 12.0f, border);
 		else
 			draw->AddRect(p0, p1, ui::kGold, 4.0f * k, 0, 1.5f * k);
 	}
-	const float px = floorf((g_watching_battle ? kBattleFont : kButtonFont) * k + 0.5f);
+	const float px = ButtonFont(which, g_back_h);
 	ImFont *font = overlay::Font(px);
-	const std::string text = ui::Fit(font, px, label.c_str(), p1.x - p0.x - 16.0f * k);
+	const std::string text = ui::Fit(font, px, label.c_str(), p1.x - p0.x - 12.0f * k);
 	const ImVec2 size = font->CalcTextSizeA(px, 10000.0f, 0.0f, text.c_str());
 	ui::ShadowText(draw, font, px, ImVec2(floorf((p0.x + p1.x - size.x) / 2), floorf((p0.y + p1.y - size.y) / 2 + (pressed ? k : 0.0f))),
 	               IM_COL32(255, 236, 190, 255), text.c_str());
@@ -1166,38 +1224,41 @@ void Draw(const overlay::Frame &frame)
 	if (!g_shown)
 		return;
 	const float k = frame.height / kRefH;
-	ImVec2 p0, p1;
-	ButtonRect(0, frame.width, frame.height, &p0, &p1);
-	overlay::BlockClicksIn(kName, p0.x, p0.y, p1.x, p1.y, frame.width, frame.height);
 	ImDrawList *draw = ImGui::GetForegroundDrawList();
-	if (g_watching_battle && !ResultsOnTop())
-		GreyBattleButtons(draw, frame.width, k);
-	DrawButton(draw, g_main, 0, ButtonLabel(), k);
-	if (g_offer) {
-		ImVec2 w0, w1;
-		ButtonRect(1, frame.width, frame.height, &w0, &w1);
-		static const char kWatchOwner[] = "spectate watch";
-		overlay::BlockClicksIn(kWatchOwner, w0.x, w0.y, w1.x, w1.y, frame.width, frame.height);
-		DrawButton(draw, g_watch, 1, texts::Get("spectate.watch_button"), k);
-	}
-	if (g_watching_battle) {  // a small caption over the small button, centred on it
+	if (g_watching_battle) {
+		ImVec2 p0, p1;
+		ButtonRect(0, frame.width, frame.height, &p0, &p1);
+		overlay::BlockClicksIn(kName, p0.x, p0.y, p1.x, p1.y, frame.width, frame.height);
+		if (!ResultsOnTop())
+			GreyBattleButtons(draw, frame.width, k);
+		DrawButton(draw, g_main, 0, ButtonLabel(), k);
+		// a small caption over the small button, centred on it
 		const float cpx = floorf(kCaptionFont * k + 0.5f);
 		ImFont *cfont = overlay::Font(cpx);
-		const std::string caption = ui::Fit(cfont, cpx, StatusLine(GetTickCount()).c_str(), 260.0f * k);
+		const std::string caption = ui::Fit(cfont, cpx, Caption().c_str(), 260.0f * k);
 		const ImVec2 csize = cfont->CalcTextSizeA(cpx, 10000.0f, 0.0f, caption.c_str());
 		ui::ShadowText(draw, cfont, cpx, ImVec2(floorf((p0.x + p1.x - csize.x) / 2), floorf(p0.y - 4.0f * k - csize.y)), ui::kParchment,
 		               caption.c_str());
 		return;
 	}
-	// the line: over the buttons on the map, centred on the screen
-	const float lpx = floorf(kLineFont * k + 0.5f);
-	ImFont *lfont = overlay::Font(lpx);
-	const std::string line = StatusLine(GetTickCount());
-	const std::string fitted = ui::Fit(lfont, lpx, line.c_str(), 600.0f * k);
-	const ImVec2 lsize = lfont->CalcTextSizeA(lpx, 10000.0f, 0.0f, fitted.c_str());
-	const float centre = ScreenAt(kScreenW / 2, 0, frame.width, frame.height).x;
-	const float line_y = p0.y - 6.0f * k - lsize.y;
-	ui::ShadowText(draw, lfont, lpx, ImVec2(floorf(centre - lsize.x / 2), floorf(line_y)), ui::kParchment, fitted.c_str());
+	if (g_offer) {
+		const char *label = texts::Get("spectate.watch_button");
+		const float px = ButtonFont(1, frame.height);
+		g_offer_w = ceilf(overlay::Font(px)->CalcTextSizeA(px, 10000.0f, 0.0f, label).x + 2 * kRowPad * k);
+		ImVec2 w0, w1;
+		ButtonRect(1, frame.width, frame.height, &w0, &w1);
+		overlay::BlockClicksIn(kName, w0.x, w0.y, w1.x, w1.y, frame.width, frame.height);
+		DrawButton(draw, g_watch, 1, label, k);
+		return;
+	}
+	const std::string line = RowLine(GetTickCount());
+	if (!g_row || line.empty())
+		return;
+	const float px = RowFont(frame.height);
+	ImFont *font = overlay::Font(px);
+	const ImVec2 size = font->CalcTextSizeA(px, 10000.0f, 0.0f, line.c_str());
+	ui::ShadowText(draw, font, px, ImVec2(floorf(g_row_right + kRowGap * k), floorf((g_row_top + g_row_bottom - size.y) / 2)),
+	               ui::kParchment, line.c_str());
 }
 
 bool CodeAsExpected()
@@ -1294,7 +1355,7 @@ void ApplySpectateFromSettings()
 	d3dhook::AddPresentCallback(&OnPresent, 900);
 	const overlay::Client client = {kName, &Wanted, &Prepare, &Draw};
 	if (!overlay::AddClient(client))
-		hooklog::Write("spectate: no overlay in this game: no button to stop following (a click on the name still stops it)");
+		hooklog::Write("spectate: no overlay in this game: no button to watch a battle (a click on the name still follows)");
 	else
 		overlay::EnableModalInput();  // (its click zones: the game does not get the button's clicks)
 	hooklog::Write("spectate: ready (a click on an ally's name in the player list follows their view; allies may follow "
