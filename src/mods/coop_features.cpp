@@ -242,6 +242,28 @@ void __fastcall CheckHook(void *self, void *edx, int pc, const BYTE *cmd)
 
 void SetComputerBonus(unsigned bonus);
 
+// Testing (the robot; never for players): [debug] script_at=<segment> and script=<a line of
+// Lua>, the same on every PC of a robot game: that line runs at the start of that segment on
+// every PC (the same point of the game), e.g. to take a player's heroes and towns away so that
+// it loses (a defeated player watching: docs/plans/backlog.md).
+void DebugScriptAt(DWORD segment)
+{
+	static int at = -2;
+	static char line[512];
+	if (at == -2) {
+		wchar_t path[MAX_PATH];
+		hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
+		at = static_cast<int>(GetPrivateProfileIntW(L"debug", L"script_at", -1, path));
+		wchar_t wide[512] = L"";
+		GetPrivateProfileStringW(L"debug", L"script", L"", wide, 512, path);
+		WideCharToMultiByte(CP_UTF8, 0, wide, -1, line, sizeof(line), nullptr, nullptr);
+	}
+	if (at < 0 || !line[0] || segment != static_cast<DWORD>(at))
+		return;
+	const bool ok = RunGameScript(line);
+	hooklog::Write("co-op features: testing: segment %lu: the script line %s: %s", segment, ok ? "ran" : "FAILED", line);
+}
+
 // The start of each segment's commands (every PC runs the same segments in the same
 // order): the decision at kDecideAt.
 void __fastcall SegmentHook(void *transceiver8, void *edx, DWORD time)
@@ -251,6 +273,7 @@ void __fastcall SegmentHook(void *transceiver8, void *edx, DWORD time)
 		if (t != g_transceiver)
 			NewGame(t);
 		++g_segments;
+		DebugScriptAt(g_segments);
 		int me = 0, pcs = 0;
 		if (g_segments == features::kDecideAt && !g_decided && Pcs(t, &me, &pcs)) {
 			g_decided = true;
