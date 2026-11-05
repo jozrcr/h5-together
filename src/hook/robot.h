@@ -46,6 +46,9 @@ bool PressKey(int dik_code, DWORD hold_ms = 0);
 // that many notches (+ up, - down), one per buffered read, as positions (the
 // running sum, as Windows gives them) or as steps (+-120, as Wine gives them).
 void TurnWheel(int notches, bool steps);
+// A click of the game's mouse (button 0 left, 1 right): down now, up 120 ms later, given to
+// the game through DirectInput like the keys (needs EnableGameInput).
+void ClickMouse(int button);
 // The script has "dik" or "wheel" steps: the mouse's Acquire reports success
 // (the game reads no device until all are acquired). From the config reader.
 void EnableGameInput();

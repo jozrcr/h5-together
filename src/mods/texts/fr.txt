@@ -301,6 +301,11 @@ banner = Un joueur est parti. Sauvegarde « Reprise » : Multijoueur, Réseau lo
 
 [spectate]
 stop_button = Arrêter de suivre {name}
+watch_button = Regarder le combat
+stop_watching = Arrêter de regarder
+back_to_map = Retour à la carte
+watching = Vous regardez {name}
+battle_over = Combat terminé
 hint = Cliquez sur le bouton ou sur le nom, ou déplacez la caméra, pour arrêter.
 in_battle = {name} est en combat.
 in_town = {name} est dans une ville.
@@ -404,6 +409,8 @@ notify.sound.help = Un son bref avec le clignotement (le son de notification de 
 notify.popup = ... avec une notification
 notify.popup.help = Une notification Windows avec le clignotement (sous Linux, elle peut ne pas s'afficher).
 coop.share_view = Mes alliés peuvent suivre ma vue
+coop.watch_battles = Regarder les combats de l'allié suivi
+coop.watch_battles.help = Quand vous suivez la vue d'un allié et qu'il combat, un bouton « Regarder le combat » affiche son combat en direct sur votre écran, même déjà commencé. Vous regardez seulement : les boutons du combat sont inactifs pour vous, et « Arrêter de regarder » (ou Échap) vous ramène à la carte.
 coop.share_view.help = Un allié peut cliquer sur votre nom dans la liste des joueurs et regarder la carte d'aventure là où vous regardez (un œil montre qui). Seule la position de votre caméra est envoyée ; chacun voit la carte à travers son propre brouillard.
 rules.key = Touche des règles
 rules.key.help = Ouvre le panneau des règles : écran de création, salle d'attente, carte d'aventure.
