@@ -23,7 +23,7 @@ H5 Together was called **open-homm5** until version 0.2.7. If you have an old ve
 2. Close the game. **Extract the whole zip** (Windows: right-click it, **Extract All**).
 3. **Windows:** double-click `install.bat`. **Linux:** run `bash install.sh` in the folder.
 
-The installer finds your game, shows you what it found ("Your game": the folder, Steam or GOG, the language, which MMH5.5 you have), copies the files in and tells you what to do next. Start the game as you always do. In the main menu, a line **"H5 Together 0.3.2"** now sits above MMH5.5's version line: the add-on is running.
+The installer finds your game, shows you what it found ("Your game": the folder, Steam or GOG, the language, which MMH5.5 you have), copies the files in and tells you what to do next. Start the game as you always do. In the main menu, a line **"H5 Together 0.3.3"** now sits above MMH5.5's version line: the add-on is running.
 
 ![The main menu with the H5 Together version line](docs/images/main-menu.png)
 
@@ -132,6 +132,9 @@ The defaults keep the original game: the speed-ups, fixes and panels are on, and
 - **Player list** on the adventure map: who is still playing, who has ended the turn, and when the computer is moving. **F9** hides it.
 
   ![The player list during a computer turn](docs/images/player-list.png)
+
+- **Follow a friend's view** (new in 0.3.3, on). While you wait for your turn, click an ally's name in the player list: your camera follows theirs on the adventure map, and a line says what they are doing ("in a battle", "in a town"). An eye shows who follows whom. Allies only; each player still sees the map through their own fog.
+- **Watch their battle live** (new in 0.3.3, on). While you follow an ally who fights, a "Watch the battle" button opens their battle on your screen, also when it has begun. You only watch: the battle gets none of your clicks, and your PC sends nothing. Leave with "Stop watching" (or Esc) and come back whenever you like.
 
 - **"Your turn" notification** when the game is in the background: the taskbar button flashes, a short sound plays, and a pop-up appears.
 - **Hero looks.** Give a hero the 3D figure of another hero of the same faction (the small button on the hero screen, or **F7**). In multiplayer, friends see your looks when everyone has the add-on.
