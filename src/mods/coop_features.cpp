@@ -25,7 +25,8 @@
 //    segment kDecideAt, the same point of the game on every PC), with the game's own "run
 //    a line of script" (script_rhythm.cpp, RunGameScript). So it applies to a loaded game
 //    too (MMH5.5 reads its settings file only at a map's start; a save keeps the values):
-//    from the next week on. The host wants it when its [rules] ai_cheat is set.
+//    from the next week on. The value: what the host's F2 panel shows (its [rules] ai_cheat
+//    choice, else its own H55-Settings.lua's; host_rules.cpp, HostComputerBonus).
 #include "coop_features.h"
 
 #include <windows.h>
@@ -34,6 +35,7 @@
 #include <string>
 
 #include "coop_features_logic.h"
+#include "host_rules.h"
 #include "script_rhythm.h"
 
 #include "../hook/log.h"
@@ -156,8 +158,10 @@ unsigned Wants(unsigned *ai_bonus)
 	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
 	unsigned wants = 0;
 	*ai_bonus = 0;
-	const int ai = GetPrivateProfileIntW(L"rules", L"ai_cheat", -1, path);
-	if (GetPrivateProfileIntW(L"rules", L"enabled", 1, path) != 0 && ai >= 0 && ai <= 6) {
+	// the value the F2 panel shows: the host's choice, else its own MMH5.5 file's (0.3.4-test2
+	// read only a saved choice: a host whose file already said "Off" asked for nothing)
+	const int ai = HostComputerBonus();
+	if (ai >= 0 && ai <= 6) {
 		wants |= 1u << features::kAiBonus;
 		*ai_bonus = static_cast<unsigned>(ai);
 	}
