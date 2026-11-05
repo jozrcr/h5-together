@@ -483,24 +483,45 @@ void __fastcall SendHook(void *transceiver, void *edx, void *command)
 }
 
 // The newest "open the battle screen" notice in the player's inbox, or nullptr.
+// The inbox is a list sorted by time (0x00a7cd30 puts each new notice by its time, so the
+// newest are at the end): [0] next, [1] previous; the list's own node: [0] the first, [1] the
+// last. On this PC nobody takes the other humans' notices out (only each PC's own player's are
+// read), so an ally's inbox only grows during a game: walk it from the newest end. (0.3.3 walked
+// it from the oldest and gave up after 5000: in a long game the battle was never reached.)
+const int kNewestWalk = 20000;
+
 const void *BattleNoticeUnsafe(const void *player)
 {
 	const void *inbox = reinterpret_cast<const void *>(Read(player, kInbox));
 	if (!inbox)
 		return nullptr;
 	const DWORD *head = reinterpret_cast<const DWORD *>(Read(inbox, 0xc));
-	const void *found = nullptr;
 	int count = 0;
-	for (const DWORD *node = reinterpret_cast<const DWORD *>(head[0]); node && node != head && count < 5000;
-	     node = reinterpret_cast<const DWORD *>(node[0]), ++count) {
+	for (const DWORD *node = reinterpret_cast<const DWORD *>(head[1]); node && node != head && count < kNewestWalk;
+	     node = reinterpret_cast<const DWORD *>(node[1]), ++count) {
 		const void *notice = reinterpret_cast<const void *>(node[3]);
 		if (notice && NoticeType(notice) == kBattleNoticeType)
-			found = notice;
+			return notice;
 	}
-	return found;
+	return nullptr;
 }
 
-// For the log: how many notices the player's inbox holds here, and their types (the first 8 kinds).
+// How many notices the player's inbox holds here (up to a million).
+int InboxCountUnsafe(const void *player)
+{
+	const void *inbox = reinterpret_cast<const void *>(Read(player, kInbox));
+	if (!inbox)
+		return -1;
+	const DWORD *head = reinterpret_cast<const DWORD *>(Read(inbox, 0xc));
+	int count = 0;
+	for (const DWORD *node = reinterpret_cast<const DWORD *>(head[0]); node && node != head && count < 1000000;
+	     node = reinterpret_cast<const DWORD *>(node[0]))
+		++count;
+	return count;
+}
+
+// For the log: how many notices the player's inbox holds here, and the types of the newest 64
+// (8 kinds at most).
 void InboxSummaryUnsafe(const void *player, char *out, int size)
 {
 	const void *inbox = reinterpret_cast<const void *>(Read(player, kInbox));
@@ -510,8 +531,8 @@ void InboxSummaryUnsafe(const void *player, char *out, int size)
 	}
 	const DWORD *head = reinterpret_cast<const DWORD *>(Read(inbox, 0xc));
 	int count = 0, kinds = 0, types[8];
-	for (const DWORD *node = reinterpret_cast<const DWORD *>(head[0]); node && node != head && count < 5000;
-	     node = reinterpret_cast<const DWORD *>(node[0]), ++count) {
+	for (const DWORD *node = reinterpret_cast<const DWORD *>(head[1]); node && node != head && count < 64;
+	     node = reinterpret_cast<const DWORD *>(node[1]), ++count) {
 		const void *notice = reinterpret_cast<const void *>(node[3]);
 		const int type = notice ? NoticeType(notice) : -1;
 		bool seen = false;
@@ -520,7 +541,7 @@ void InboxSummaryUnsafe(const void *player, char *out, int size)
 		if (!seen && kinds < 8)
 			types[kinds++] = type;
 	}
-	int n = _snprintf_s(out, size, _TRUNCATE, "%d notice(s), types", count);
+	int n = _snprintf_s(out, size, _TRUNCATE, "%d notice(s), the newest of types", InboxCountUnsafe(player));
 	for (int i = 0; i < kinds && n > 0 && n < size; ++i)
 		n += _snprintf_s(out + n, size - n, _TRUNCATE, " 0x%x", types[i]);
 }
@@ -882,6 +903,18 @@ void Probe(DWORD now)
 			all += std::string(i ? ", " : "") + names[i];
 		hooklog::Write("spectate probe: the screen on top is now %s (all, bottom first: %s)", top[0] ? top : "none", all.c_str());
 		lstrcpynA(last_top, top, sizeof(last_top));
+	}
+	static DWORD counted = 0;
+	if (now - counted >= 10000) {
+		counted = now;
+		for (int pl = 1; pl <= 8; ++pl) {
+			const PlayerInfo &info = g_players[pl];
+			if (!info.known || !info.human || pl == g_me || !info.object)
+				continue;
+			char inbox[160];
+			InboxSummary(info.object, inbox, sizeof(inbox));
+			hooklog::Write("spectate probe: player %d's inbox here: %s", pl, inbox);
+		}
 	}
 	static DWORD last = 0;
 	if (now - last < 2000)
