@@ -1,6 +1,6 @@
 # Plan: follow a friend's view (spectating)
 
-Status (2026-11-05): **step 1 built and robot-tested** (following a friend's view of the adventure map: `src/mods/spectate*.cpp`); waiting for a hand test in a real game. Step 2 (watching a friend's battle): research done, the plan is below.
+Status (2026-11-05): **step 1 built and robot-tested** (following a friend's view of the adventure map: `src/mods/spectate*.cpp`); waiting for a hand test in a real game. **Step 2 built and robot-tested** (watching a followed ally's battle live, with a button: below).
 
 The wish (owner, 2026-11-05): "When you're waiting after passing your turn, a way to spectate your friends (using the player list maybe?): spectate their battle at worst, everything they do at best."
 
@@ -42,7 +42,7 @@ They go out after this PC's own segment report, as the other mods' messages do, 
 
 **Following.** Every frame on the adventure map: release the operator's object, then glide toward the friend's point (exponential, about 0.15 s; a jump when farther than 20 tiles), switching the floor when theirs differs. It stops when the player clicks the name again, moves the camera (the camera is more than 3 units from where we put it), or their own turn begins, or when the friend leaves the game.
 
-**On screen.** In the player list: a click on an ally's row starts or stops following (only those rows take clicks: `overlay::BlockClicksIn`); an eye next to the followed friend, and next to whoever follows you. A banner at the top: "Following Pierre's view", with "Pierre is in a battle" and the like.
+**On screen.** In the player list: a click on an ally's row starts or stops following (only those rows take clicks: `overlay::BlockClicksIn`); an eye next to the followed friend, and next to whoever follows you. On the map, just over the game's turn banner (the owner's choice, 2026-11-05): a line ("Pierre is in a battle" and the like) and the buttons side by side, "Stop following Pierre" and, while Pierre fights, "Watch the battle". In a battle: "Stop watching Pierre's battle" at the top, the line under it.
 
 ## Step 2: watching a friend's battle (research, 2026-11-05)
 
@@ -63,6 +63,21 @@ They go out after this PC's own segment report, as the other mods' messages do, 
 - Battle replays live in the world (`NWorld::CReplayBattleSaver`, `CReplayBattleContainer`); the results box has a "Revoir" (replay) button. A second road: watch a friend's battle as a replay once it ends.
 
 **The plan:** on the follower's PC, when the followed friend's battle starts, take the friend's `CCreateCombatScreen` notice from the friend's own list (the world posted it there on every PC) and hand it to the adventure screen's handler: the game's own battle screen opens on that battle. While it is open: no input reaches it (the overlay's modal input), and every command this PC tries to send is dropped (the battle screen would act as the friend). It closes when the friend's battle ends. To check first: that the friend's list holds the notice on the follower's PC, and what the battle screen sends by itself.
+
+### Built (2026-11-05): "Watch the battle"
+
+- **Opening.** While this PC follows an ally whose own screen is a battle (their status message; the ally's inbox keeps old notices, so only then is its newest `0x2a` notice the battle going on), the banner has a second button, "Watch the battle". A click hands that notice to this PC's adventure screen handler (`0x005a5d90`), with the **ally** as the player: built for this PC's own player (not in the battle), the battle screen crashes at once (robot, `20261105-115543-lan`).
+- **Watching.** Our modal panel over the battle screen (the game gets no input); every command this PC sends is dropped (`CMultiPlayerTransceiver` slot 0). The battle screen acts as the ally: it sends its start-up settings (`CSetVisualATBSizeCmd`, `CSetCombatTimeFactor`, `CSetArmyAutocombatOptions`, `CSetCombatCasterMana`) and, under the ally's auto-combat, moves for the ally's creatures (`CMoveAttackCreatureCmd`): all dropped. At the battle's end the results box opens on both PCs at once.
+- **Closing.** The game's own "close the top screen" UI command (`0x00ac3590`), queued for the next frame (`0x00838c10`; the queue runs at the frame's start, `0x00838ac0`), once per battle screen on top: what the results box's OK does (`0x0057ff30`). Taking the battle screen off the stack at once (`0x008389e0`) left its message handlers alive: a crash in the next frame's message dispatch (`20261105-114629-lan`). The lock and the filter stay until the battle screens are gone.
+
+| Run | What | Result |
+|---|---|---|
+| `20261105-111852-lan` | Watching from the start to the end (automatic, before the button) | The battle on both PCs, the same frames; the results box at the same moment on both. |
+| `20261105-121427-lan` | Leaving mid-battle | Back on the map, still following ("Robot-host est en combat."); no command sent after; 4877 world checks, all equal. |
+| `20261105-122038-lan` | Watching to the end, then "Back to the map" over the results | 2 screens closed, back on the map; 6475 world checks, all equal. |
+| `20261105-123026-lan` | The button: joining mid-battle, leaving, joining again, leaving | The battle as it stands when joined; every command of the client during watching dropped; 3473 world checks, all equal. |
+
+**Not tested yet:** Esc (the robot's keys do not reach the overlay's window messages), this PC's own battle starting while it watches, a real game between two PCs over Steam.
 
 ## Tests
 

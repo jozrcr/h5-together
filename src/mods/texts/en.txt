@@ -349,6 +349,11 @@ banner = A player left. Saved as "Resume": Multiplayer, LAN, Create, Load to pla
 # {name} is the friend's name; {n} a player's number.
 [spectate]
 stop_button = Stop following {name}
+watch_button = Watch the battle
+stop_watching = Stop watching {name}'s battle
+back_to_map = Back to the map
+watching = You are watching {name}'s battle: its buttons do nothing for you.
+battle_over = {name}'s battle is over.
 hint = Click the button, the name, or move the camera to stop.
 in_battle = {name} is in a battle.
 in_town = {name} is in a town.
@@ -452,6 +457,8 @@ notify.sound.help = A short sound with the flash (Windows' notification sound).
 notify.popup = ... with a pop-up
 notify.popup.help = A Windows notification with the flash (on Linux it may not show).
 coop.share_view = Allies may follow my view
+coop.watch_battles = Watch the followed ally's battles
+coop.watch_battles.help = While you follow an ally's view and they fight, a "Watch the battle" button shows their battle live on your screen, even when it has begun. You only watch: the battle's buttons do nothing for you, and "Stop watching" (or Esc) brings you back.
 coop.share_view.help = An ally can click your name in the player list and watch the adventure map where you look (an eye shows who). Only your camera's place is sent; each sees the map through their own fog.
 rules.key = Game rules key
 rules.key.help = Opens the game rules panel: setup screen, waiting room, adventure map.

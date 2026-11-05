@@ -252,6 +252,21 @@ python tools\robot\run_ai_test.py --game C:\Games\H5_test_k --no-map --seconds 3
 - Look for `settings: h5-together.ini: N line(s) changed; Windows reads ...` and each mod's `... from the settings menu: ...` line. The runner puts the player's `h5-together.ini` back afterwards.
 - Not possible with the robot: clicks, the mouse wheel on a page, and the tooltips (its window is in the background).
 
+## Checking a friend's view and battles (`src/mods/spectate*.cpp`)
+
+Two copies over LAN, both humans on one team (`--host-rmg teams=humans_vs_ai`), nobody ending a turn (`--end-turn-every 0`; turns are one after another on A1M4, so the host plays first), real battles (`--quick-combat-state 1`; the robot's default turns quick combat on). The host's hero attacks the level-1 monster at tile 23,66 of A1M4; the client follows and watches:
+
+```
+python tools\robot\run_lan_test.py --game C:\Games\H5_test_k --seconds 230 --turns 6 --end-turn-every 0 --no-stuck-exit --quick-combat-state 1 --host-rmg teams=humans_vs_ai --trace-mp --client-step "56|panel|spectate follow 1" --host-step "60|panel|spectate look 23 66" --host-step "64|click|504 460" --host-step "68|click|504 460" --host-step "82|dik|1c" --host-step "88|dik|1e" --client-step "100|shot|offer" --client-step "120|panel|spectate watch" --client-step "128|shot|watching" --client-step "160|panel|spectate stop_watching" --client-step "166|shot|left"
+```
+
+- `click|<x> <y> [right]`: the robot's mouse there (client pixels), then a click, given to the game as DirectInput events and state and as the window's button messages (the adventure map takes its clicks from the messages). Two clicks on a monster: the first shows the path, the second walks and attacks.
+- `panel|spectate look <x> <y>`: the camera on that map tile; at 1024x768 the tile shows about 100 pixels below the screen's centre (504,460), not at it.
+- `dik|1c` (Enter) ends the battle's placement, `dik|1e` (A) plays it by itself.
+- `panel|spectate follow <player>`, `stop` (following), `watch` (as the "Watch the battle" button), `stop_watching`.
+- `ui|NUI::CCombatResults Close` closes a results box, as its OK does.
+- Look for `spectate: following ...`, `... view arrives`, `watch ...'s battle`, `overlay: modal panel "spectate" open over .?AVCCombatArenaScreen@NUI@@`, `stopped watching ...`; with `--trace-mp`, every `mp-send` of the client while it watches is one the filter drops (the trace logs it first). Compare the world checks of both copies: all equal.
+
 ## Robot script
 
 Besides starting a map, the DLL runs a script of timed steps (`--step`, or `--host-step` / `--client-step`), `"<seconds>|<kind>|<text>"`, seconds counted from the first main-loop call:

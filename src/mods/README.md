@@ -179,11 +179,13 @@ co-op features: this game (2 PCs): on: script_rhythm parallel_ai
 
 ## Following a friend's view (`spectate*.cpp`; on, each player's choice)
 
-**What it does:** in a multiplayer game, a click on an ally's name in the player list makes your camera follow theirs on the adventure map, gliding, so you can watch what they do while you wait. A button at the top, "Stop following Pierre", and a line under it say what they are doing ("Pierre is in a battle", "in a town"...). It stops when you click the button or the name again, move the camera yourself, or your own turn begins. An eye after a name shows whom you follow; on their screen, an eye after your name shows that you follow them.
+**What it does:** in a multiplayer game, a click on an ally's name in the player list makes your camera follow theirs on the adventure map, gliding, so you can watch what they do while you wait. Just over the game's turn banner, a button "Stop following Pierre", with a line over it, says what they are doing ("Pierre is in a battle", "in a town"...). It stops when you click the button or the name again, move the camera yourself, or your own turn begins. An eye after a name shows whom you follow; on their screen, an eye after your name shows that you follow them.
 
 **Only allies** (the same team), and each player sees the map through their own fog: nothing of the game itself changes, so it cannot desync a game. While an ally follows you, your PC sends where your camera looks (a tile, a few times a second) as a small message next to the game's own world checks.
 
-**Setting:** `[coop] share_view=1` (Options, H5 Together, interface): your allies may follow your view; 0 = your view stays yours (they then read "Pierre does not share their view"). Each player chooses; it applies at once. The player list must be on (`[ui] player_list=1`): its names are where you click.
+**Watching their battle.** While you follow an ally and they fight, a second button shows beside the first: **"Watch the battle"**. It opens the game's own battle screen on their battle, live (every PC runs every battle anyway: its actions are world commands), also when the battle has begun; leave with **"Stop watching"** (or Esc) and come back as often as you like. At the end, their results box shows, and **"Back to the map"** closes it. You only watch: while the battle screen is open the game gets none of your clicks or keys, and your PC sends no command at all (that battle screen would act as your ally: its own settings, auto-combat moves; all dropped). If your own battle starts meanwhile, watching stops at once.
+
+**Settings:** `[coop] share_view=1` (Options, H5 Together, interface): your allies may follow your view; 0 = your view stays yours (they then read "Pierre does not share their view"). `[coop] watch_battles=1`: the "Watch the battle" button; 0 = no button. Each player chooses; both apply at once. The player list must be on (`[ui] player_list=1`): its names are where you click.
 
 `h5-together.log`:
 

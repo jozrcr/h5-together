@@ -139,6 +139,8 @@ const Setting kSettings[] = {
 	    "settings.notify.popup", "settings.notify.popup.help"),
 	ROW("coop", "share_view", "1", kBool, 0, 1, nullptr, 0, nullptr, kPlayer, kLive, kInterface, kCheck,
 	    "settings.coop.share_view", "settings.coop.share_view.help"),
+	ROW("coop", "watch_battles", "1", kBool, 0, 1, nullptr, 0, nullptr, kPlayer, kLive, kInterface, kCheck,
+	    "settings.coop.watch_battles", "settings.coop.watch_battles.help"),
 	FILE_ONLY("notify", "trace", "0", kBool, 0, 1, kTester, kRestart),
 	// [ui]
 	ROW("ui", "player_list", "1", kBool, 0, 1, nullptr, 0, nullptr, kPlayer, kRestart, kInterface, kCheck,
@@ -252,7 +254,7 @@ const Setting kSettings[] = {
 	    kAdvanced, kList,
 	    "settings.debug.hang_seconds", "settings.debug.hang_seconds.help"),
 	FILE_ONLY("debug", "hang_test", "0", kBool, 0, 1, kTester, kRestart),
-	HIDDEN("debug", "spectate_probe", "0", kBool, 0, 1),  // research: the camera's position every 2 s (spectate.cpp)
+	HIDDEN("debug", "spectate_probe", "0", kBool, 0, 1),  // research: 1 = the camera and the screens in the log, 2 = also watch the followed ally's battle (spectate.cpp)
 	ROW("debug", "crash_report", "1", kBool, 0, 1, nullptr, 0, nullptr, kPlayer, kRestart, kAdvanced, kCheck,
 	    "settings.debug.crash_report", "settings.debug.crash_report.help"),
 	FILE_ONLY("debug", "trace_wheel", "0", kBool, 0, 1, kTester, kRestart),

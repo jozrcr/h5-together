@@ -99,6 +99,11 @@ const Code kCode[] = {
 	{kOperatorSet, {0x53, 0x55, 0x8b, 0xd9, 0x8b, 0x03, 0x56, 0x8b, 0x74, 0x24}, 10},
 	{kOperatorFollow, {0x8b, 0x44, 0x24, 0x04, 0x83, 0xec, 0x0c, 0x85, 0xc0, 0x56}, 10},
 	{kSwitchFloor, {0x56, 0x8b, 0xf1, 0x8b, 0x8e, 0xf4, 0x05, 0x00, 0x00, 0xe8}, 10},
+	{0x005a5d90, {0x81, 0xec, 0xfc, 0x02, 0x00, 0x00, 0x53, 0x55, 0x56, 0x57}, 10},  // the adventure screen's notice handler
+	{0x00ac3590, {0x6a, 0x10, 0xe8, 0x39, 0x5a, 0xdb, 0xff, 0x33, 0xc9, 0x83}, 10},  // a new "close the top screen" command
+	{0x00838c10, {0x56, 0x8b, 0xf1, 0x85, 0xf6, 0x74, 0x04, 0x83, 0x46, 0x04}, 10},  // queue a UI command for the next frame
+	{0x007c9810, {0x55, 0x8b, 0x6c, 0x24, 0x08, 0x85, 0xed, 0x56, 0x8b, 0xf1}, 10},  // the transceiver's send
+	{0x004fbe80, {0x8b, 0x81, 0x08, 0x06, 0x00, 0x00, 0xc3}, 7},              // IPlayer slot 0x1bc: its inbox at +0x608
 };
 struct Slot {
 	DWORD vtable, offset, function;
@@ -109,6 +114,7 @@ const Slot kSlots[] = {
 	{kOperatorVftable, 0x5c, kOperatorFollow},
 	{kPlayerVftable, 0x2c, 0x00720e90},
 	{kPlayerVftable, 0x14, 0x00500bc0},
+	{kPlayerVftable, 0x1bc, 0x004fbe80},
 };
 
 typedef void(__fastcall *UpdateFn)(void *controller, void *edx, DWORD a, DWORD b, DWORD c, DWORD d, DWORD e);
@@ -133,6 +139,7 @@ const void *g_transceiver = nullptr;  // the multiplayer transceiver, while a mu
 DWORD g_transceiver_seen = 0;         // when its step last ran (GetTickCount): none for 3 s = no game
 
 struct PlayerInfo {
+	const void *object;  // its IPlayer
 	bool known, human, in_game;
 	int team;
 	DWORD turn;    // 0 = playing its turn
@@ -227,6 +234,7 @@ void ReadPlayersUnsafe()
 				if (number < 1 || number > 8)
 					continue;
 				PlayerInfo &info = fresh[number];
+				info.object = player;
 				info.known = true;
 				info.human = Read(player, kHuman) == 0;
 				info.in_game = Read(player, kInGame) == 1;
@@ -286,8 +294,8 @@ int ScreenCode()
 		return spectate::kElsewhere;
 	if (strstr(top, "CAdventure"))
 		return spectate::kOnMap;
-	if (strstr(top, "Combat"))
-		return spectate::kInBattle;
+	if (strstr(top, "CombatArena"))
+		return spectate::kInBattle;  // (the results box after it: elsewhere)
 	if (strstr(top, "Town"))
 		return spectate::kInTown;
 	if (strstr(top, "Hero"))
@@ -352,10 +360,13 @@ void ShareView(DWORD now)
 }
 
 // --- as the follower -------------------------------------------------------------------------------
+void StopWatching(const char *why);
+
 void Stop(const char *why)
 {
 	if (!g_following)
 		return;
+	StopWatching(why);
 	hooklog::Write("spectate: stopped following %s (%s)", NameOf(g_following).c_str(), why);
 	if (g_me)
 		Queue(spectate::EncodeWatch(g_me, g_following, false));
@@ -384,6 +395,229 @@ void Start(int player, const char *how)
 	hooklog::Write("spectate: following %s's view (%s)", NameOf(player).c_str(), how);
 }
 
+int NoticeType(const void *notice);
+const char *RttiName(const void *object);
+
+// --- watching the followed ally's battle ([coop] watch_battles) ----------------------------------
+// At a battle's start every PC's world posts "open the battle screen" (NWorld::CCreateCombatScreen,
+// notice type 0x2a) to each fighting human's inbox (IPlayer +0x608, slot 0x1bc; 0x008545b0 and
+// 0x00a7d0e0), but each PC's adventure screen reads only its own player's (0x0059d5f0). While
+// this PC follows an ally, the ally's notice goes to this PC's adventure screen too, through the
+// same handler (0x005a5d90) when the player clicks "Watch the battle" (a second button while the
+// followed ally fights; also mid-battle): the game's own battle screen opens on the ally's
+// battle, which every PC runs anyway (its actions are world commands). While it is open:
+//   - the game gets no mouse or keyboard input (our modal panel: the button to stop watching);
+//   - every command this PC tries to send is dropped: that battle screen acts as if it were the
+//     ally (its start-up settings, auto-combat moves...), and the world must stay the same on
+//     every PC (robot, 2026-11-05: 1373 world checks equal while about 40 were dropped).
+// It ends with the button, Esc, the ally's results box closed by the button, this PC's own
+// battle starting, or the end of following. Closing queues the game's own "close the top
+// screen" UI command once per battle screen on top (the results box, the battle): the game
+// runs them at the start of the next frame; the ally's battle goes on.
+const DWORD kScreenEvent = 0x005a5d90;     // __thiscall(screen, notice, player)
+const DWORD kSendCell = 0x00e43f1c;        // CMultiPlayerTransceiver slot 0: send a command from this PC
+const DWORD kSend = 0x007c9810;            // __thiscall(transceiver, command), ret 4
+const DWORD kNewCloseCommand = 0x00ac3590; // (): the game's "close the top screen" UI command (a new one)
+const DWORD kQueueUiCommand = 0x00838c10;  // __fastcall(command): run it at the start of the next frame
+const DWORD kInbox = 0x608;                // IPlayer: its notices (a list at +0xc: [0] next, [2] time, [3] notice)
+const int kBattleNoticeType = 0x2a;        // NWorld::CCreateCombatScreen
+typedef void(__fastcall *SendFn)(void *transceiver, void *edx, void *command);
+typedef DWORD(__fastcall *HandlerFn)(void *screen, void *edx, const void *notice, const void *player);
+typedef void *(__cdecl *NewCommandFn)();
+typedef void(__fastcall *QueueFn)(void *command, void *edx);
+SendFn g_send_next = nullptr;
+bool g_watch_battles = true;            // [coop] watch_battles
+const void *g_battle_notice = nullptr;  // the ally's last battle notice (not opened twice)
+bool g_watching_battle = false;
+DWORD g_watch_since = 0;
+char g_watch_top[96] = "";              // the battle screen our modal panel was opened over
+LONG g_dropped = 0;
+
+void __fastcall SendHook(void *transceiver, void *edx, void *command)
+{
+	if (g_watching_battle) {
+		if (InterlockedIncrement(&g_dropped) <= 3)
+			hooklog::Write("spectate: watching a battle: this PC's command %s dropped (and every other while it watches)",
+			               command ? RttiName(command) : "-");
+		return;
+	}
+	g_send_next(transceiver, edx, command);
+}
+
+// The newest "open the battle screen" notice in the player's inbox, or nullptr.
+const void *BattleNoticeUnsafe(const void *player)
+{
+	const void *inbox = reinterpret_cast<const void *>(Read(player, kInbox));
+	if (!inbox)
+		return nullptr;
+	const DWORD *head = reinterpret_cast<const DWORD *>(Read(inbox, 0xc));
+	const void *found = nullptr;
+	int count = 0;
+	for (const DWORD *node = reinterpret_cast<const DWORD *>(head[0]); node && node != head && count < 5000;
+	     node = reinterpret_cast<const DWORD *>(node[0]), ++count) {
+		const void *notice = reinterpret_cast<const void *>(node[3]);
+		if (notice && NoticeType(notice) == kBattleNoticeType)
+			found = notice;
+	}
+	return found;
+}
+
+const void *BattleNotice(const void *player)
+{
+	if (!player)
+		return nullptr;
+	__try {
+		return BattleNoticeUnsafe(player);
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER) {
+		return nullptr;
+	}
+}
+
+bool BattleOnTop(char *top, int size)
+{
+	top[0] = 0;
+	overlay::TopScreen(top, size);
+	return strstr(top, "Combat") != nullptr;
+}
+
+// Close the top screen the game's own way: its "close the top screen" UI command, run at the
+// start of the next frame (0x00838ac0), as the results box's OK does (0x0057ff30). (Taking it off
+// the stack at once, from here, left the battle screen's message handlers alive: a crash.)
+bool QueueClose()
+{
+	__try {
+		void *command = reinterpret_cast<NewCommandFn>(kNewCloseCommand)();
+		if (!command)
+			return false;
+		reinterpret_cast<QueueFn>(kQueueUiCommand)(command, nullptr);
+		return true;
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER) {
+		hooklog::Write("spectate: closing a battle screen crashed (caught)");
+		return false;
+	}
+}
+
+bool g_closing = false;  // the close of the battle screens is queued: watching ends once they are gone
+DWORD g_closing_since = 0;
+
+void StopWatching(const char *why)
+{
+	if (!g_watching_battle || g_closing)
+		return;
+	// the screens on top that belong to the battle (the results box over the battle screen)
+	char names[12][96];
+	const int n = overlay::ScreenNames(names, 12);
+	int battle_screens = 0;
+	for (int i = n - 1; i >= 0 && strstr(names[i], "Combat"); --i)
+		++battle_screens;
+	int queued = 0;
+	for (int i = 0; i < battle_screens; ++i)
+		queued += QueueClose() ? 1 : 0;
+	g_closing = true;
+	g_closing_since = GetTickCount();
+	// The lock and the filter stay until the battle screens are gone (WatchFrame).
+	hooklog::Write("spectate: stop watching %s's battle (%s): %d battle screen(s), %d close(s) queued", NameOf(g_following).c_str(),
+	               why, battle_screens, queued);
+}
+
+// The battle screens are gone: the end of watching.
+void EndWatching(const char *top)
+{
+	overlay::CloseModal(kName);
+	g_watching_battle = false;
+	g_closing = false;
+	g_watch_top[0] = 0;
+	hooklog::Write("spectate: stopped watching %s's battle (now %s; %ld command(s) of this PC dropped while watching)",
+	               NameOf(g_following).c_str(), top[0] ? top : "none", g_dropped);
+}
+
+void StartWatching(BYTE *screen, const void *notice)
+{
+	const PlayerInfo &ally = g_players[g_following];
+	g_battle_notice = notice;
+	g_watching_battle = true;  // (before: the battle screen sends its settings at once)
+	g_closing = false;
+	g_watch_since = GetTickCount();
+	g_watch_top[0] = 0;
+	g_dropped = 0;
+	DWORD result = 0;
+	__try {
+		// (built for the ally, as on the ally's PC: built for this PC's own player, who is not in
+		// the battle, the battle screen crashes at once; robot, 2026-11-05)
+		result = reinterpret_cast<HandlerFn>(kScreenEvent)(screen, nullptr, notice, ally.object);
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER) {
+		hooklog::Write("spectate: opening the ally's battle crashed (caught)");
+		g_watching_battle = false;
+		return;
+	}
+	hooklog::Write("spectate: the followed ally's battle starts: this PC watches it (the game's battle screen, no input, "
+	               "no command sent; %lu)",
+	               result);
+}
+
+// Every frame while watching: the input lock, and the ways it ends by itself.
+void WatchFrame(DWORD now)
+{
+	char top[96];
+	if (!BattleOnTop(top, sizeof(top))) {
+		if (g_closing || now - g_watch_since > 3000)  // (the battle screen comes a frame or two after the notice)
+			EndWatching(top);
+		return;
+	}
+	if (g_closing) {
+		if (now - g_closing_since > 5000) {
+			hooklog::Write("spectate: the battle screen %s did not close: this PC keeps watching", top);
+			g_closing = false;  // (the button can ask again)
+		}
+		return;
+	}
+	if (BattleNotice(g_players[g_me].object)) {
+		StopWatching("this PC's own battle starts");
+		return;
+	}
+	if (!overlay::ModalOpen(kName)) {
+		if (g_watch_top[0] && strcmp(top, g_watch_top) == 0) {  // closed on the same screen: Esc
+			StopWatching("Esc");
+			return;
+		}
+		if (overlay::OpenModal(kName))  // (again when the results box comes on top)
+			lstrcpynA(g_watch_top, top, sizeof(g_watch_top));
+	}
+}
+
+// The ally's battle notice when this PC may watch it now: the ally's own screen is a battle
+// (their status message), this PC is on its map, its own battle does not wait, watch_battles
+// is on. (The ally's inbox keeps old notices: the newest is the battle going on only while the
+// ally's screen is that battle.)
+const void *WatchableNotice()
+{
+	if (!g_watch_battles || !g_send_next || g_watching_battle || !g_following || g_their_screen != spectate::kInBattle ||
+	    !g_have_view)
+		return nullptr;
+	if (!Screen() || BattleNotice(g_players[g_me].object))
+		return nullptr;
+	return BattleNotice(g_players[g_following].object);
+}
+
+void WatchNow(const char *how)
+{
+	const void *notice = WatchableNotice();
+	BYTE *screen = Screen();
+	if (!notice || !screen) {
+		hooklog::Write("spectate: nothing to watch now (%s)", how);
+		return;
+	}
+	hooklog::Write("spectate: watch %s's battle (%s)", NameOf(g_following).c_str(), how);
+	StartWatching(screen, notice);
+}
+
+// The banner's clicks come during the drawing: they are handled in the next frame's step.
+bool g_request_watch = false, g_request_stop_watching = false;
+const char *g_request_how = "";
+
 // One frame of following: let go of the operator's object, glide toward the ally's point.
 void FollowFrame(BYTE *screen, float dt)
 {
@@ -391,7 +625,11 @@ void FollowFrame(BYTE *screen, float dt)
 	void *op = Operator(screen);
 	if (!pos || !op)
 		return;
-	if (g_set && spectate::TookOver(pos[7], pos[8], g_set_x, g_set_y)) {
+	// The player moved the camera (keys, the screen's edge, the minimap): it is away from where
+	// we put it, and the operator keeps no object in view. (When the game itself shows a hero
+	// walking, it gives the operator that hero: not the player's doing.)
+	const bool game_moved_it = Read(op, kOperatorObject) != 0;
+	if (g_set && !game_moved_it && spectate::TookOver(pos[7], pos[8], g_set_x, g_set_y)) {
 		Stop("the camera was moved");
 		return;
 	}
@@ -446,16 +684,82 @@ void Frame(DWORD now, float dt)
 		Queue(spectate::EncodeWatch(g_me, g_following, true));
 		g_watch_sent_at = now;
 	}
+	if (g_watching_battle) {
+		if (g_request_stop_watching) {
+			g_request_stop_watching = false;
+			StopWatching(g_request_how);
+		}
+		WatchFrame(now);
+		return;
+	}
 	BYTE *screen = Screen();
 	if (!screen) {
 		g_set = false;
 		return;
 	}
+	if (g_request_watch) {
+		g_request_watch = false;
+		WatchNow(g_request_how);
+		if (g_watching_battle)
+			return;
+	}
 	FollowFrame(screen, dt);
+}
+
+// Research: the notices waiting in other humans' inboxes (IPlayer +0x608: a list at +0xc,
+// each node: [0] next, [2] time, [3] the notice), each new one once.
+const void *g_seen_notices[512];
+int g_seen_next = 0;
+
+int NoticeType(const void *notice);
+const char *RttiName(const void *object);
+
+void ProbeInboxesUnsafe()
+{
+	for (int p = 1; p <= 8; ++p) {
+		const PlayerInfo &info = g_players[p];
+		if (!info.known || !info.human || p == g_me || !info.object)
+			continue;
+		const void *inbox = reinterpret_cast<const void *>(Read(info.object, 0x608));
+		if (!inbox)
+			continue;
+		const DWORD *head = reinterpret_cast<const DWORD *>(Read(inbox, 0xc));
+		int count = 0;
+		for (const DWORD *node = reinterpret_cast<const DWORD *>(head[0]); node && node != head && count < 200;
+		     node = reinterpret_cast<const DWORD *>(node[0]), ++count) {
+			const void *notice = reinterpret_cast<const void *>(node[3]);
+			bool seen = false;
+			for (int i = 0; i < 512 && !seen; ++i)
+				seen = g_seen_notices[i] == notice;
+			if (seen)
+				continue;
+			g_seen_notices[g_seen_next] = notice;
+			g_seen_next = (g_seen_next + 1) % 512;
+			if (NoticeType(notice) == 0x39)  // (the map changed: many)
+				continue;
+			hooklog::Write("spectate probe: player %d's inbox (not this PC's): notice type 0x%x %s at time %lu (%d waiting)", p,
+			               NoticeType(notice), RttiName(notice), node[2], count + 1);
+		}
+	}
+}
+
+void ProbeInboxes()
+{
+	__try {
+		ProbeInboxesUnsafe();
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER) {
+		static bool told = false;
+		if (!told) {
+			told = true;
+			hooklog::Write("spectate probe: reading an inbox crashed (caught)");
+		}
+	}
 }
 
 void Probe(DWORD now)
 {
+	ProbeInboxes();
 	static char last_top[96] = "";
 	char top[96] = "";
 	overlay::TopScreen(top, sizeof(top));
@@ -514,6 +818,10 @@ void RobotCommand(const char *text)
 		LookAt(x, y);
 	else if (strcmp(text, "stop") == 0)
 		Stop("robot");
+	else if (strcmp(text, "stop_watching") == 0)
+		StopWatching("robot");
+	else if (strcmp(text, "watch") == 0)
+		WatchNow("robot");
 	else
 		hooklog::Write("spectate: robot command \"%s\" not known", text);
 }
@@ -582,6 +890,11 @@ int EventType(const DWORD *event)
 	__except (EXCEPTION_EXECUTE_HANDLER) {
 		return -1;
 	}
+}
+
+int NoticeType(const void *notice)
+{
+	return notice ? EventType(static_cast<const DWORD *>(notice)) : -1;
 }
 
 DWORD __fastcall ScreenEventHook(void *screen, void *edx, const DWORD *event, void *third)
@@ -654,10 +967,22 @@ void __fastcall CheckHook(void *self, void *edx, int pc, const BYTE *cmd)
 }
 
 // --- the banner ------------------------------------------------------------------------------------
+// On the map: a line ("Pierre is in a battle") and, under it, the buttons side by side, just
+// over the game's turn banner ("Tour de Pierre", its progress bar): "Stop following Pierre" and,
+// while the followed ally fights, "Watch the battle". In the battle: one button at the top
+// ("Stop watching Pierre's battle", then "Back to the map") and the line under it.
+// Places in the game's 1024x768 layout, centred, scaled with the screen's height.
 const float kRefH = 768.0f, kScreenW = 1024.0f;
-const float kButtonX = 362.0f, kButtonY = 46.0f, kButtonW = 300.0f, kButtonH = 34.0f, kButtonFont = 15.0f, kLineFont = 14.0f;
+const float kButtonH = 34.0f, kButtonFont = 15.0f, kLineFont = 14.0f;
+const float kMapButtonW = 240.0f, kMapGap = 16.0f, kMapRowY = 497.0f;  // (the turn banner's top: about 539)
+const float kBattleButtonW = 300.0f, kBattleButtonY = 46.0f;
 float g_back_w = 1024.0f, g_back_h = 768.0f;
-bool g_shown = false, g_down = false, g_hovered = false;
+bool g_shown = false;
+bool g_offer = false;  // the second button shows
+struct Button {
+	bool down, hovered;
+};
+Button g_main = {}, g_watch = {};
 
 ImVec2 ScreenAt(float x, float y, float w, float h)
 {
@@ -666,34 +991,71 @@ ImVec2 ScreenAt(float x, float y, float w, float h)
 	return ImVec2(x0 + x * k, y * k);
 }
 
-void ButtonRect(float w, float h, ImVec2 *p0, ImVec2 *p1)
+// A button's place (1024x768 units): which = 0 the main button, 1 "Watch the battle".
+struct Place {
+	float x, y, w;
+};
+Place ButtonPlace(int which)
 {
-	*p0 = ScreenAt(kButtonX, kButtonY, w, h);
-	*p1 = ScreenAt(kButtonX + kButtonW, kButtonY + kButtonH, w, h);
+	if (g_watching_battle)
+		return Place{(kScreenW - kBattleButtonW) / 2, kBattleButtonY, kBattleButtonW};
+	if (!g_offer)
+		return Place{(kScreenW - kMapButtonW) / 2, kMapRowY, kMapButtonW};
+	const float left = (kScreenW - 2 * kMapButtonW - kMapGap) / 2;
+	return Place{which == 0 ? left : left + kMapButtonW + kMapGap, kMapRowY, kMapButtonW};
+}
+
+void ButtonRect(int which, float w, float h, ImVec2 *p0, ImVec2 *p1)
+{
+	const Place pl = ButtonPlace(which);
+	*p0 = ScreenAt(pl.x, pl.y, w, h);
+	*p1 = ScreenAt(pl.x + pl.w, pl.y + kButtonH, w, h);
+}
+
+// A click on a button: true once, when the mouse button is let go over it.
+bool Clicked(Button *b, int which, bool front)
+{
+	ImVec2 p0, p1;
+	ButtonRect(which, g_back_w, g_back_h, &p0, &p1);
+	float x = 0, cy = 0;
+	b->hovered = front && overlay::CursorInBackBuffer(g_back_w, g_back_h, &x, &cy) && x >= p0.x && x < p1.x && cy >= p0.y && cy < p1.y;
+	const bool down = front && (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
+	if (down && !b->down && b->hovered)
+		b->down = true;
+	else if (!down && b->down) {
+		b->down = false;
+		return b->hovered;
+	}
+	return false;
 }
 
 bool Wanted()
 {
-	g_shown = g_following != 0 && Screen() != nullptr;
+	g_shown = (g_following != 0 && Screen() != nullptr) || g_watching_battle;
+	g_offer = g_shown && !g_watching_battle && WatchableNotice() != nullptr;
 	if (!g_shown) {
-		g_down = g_hovered = false;
+		g_main = Button();
+		g_watch = Button();
 		return false;
 	}
-	ImVec2 p0, p1;
-	ButtonRect(g_back_w, g_back_h, &p0, &p1);
-	float x, y;
 	HWND window = overlay::GameWindow();
 	const bool front = window && GetAncestor(GetForegroundWindow(), GA_ROOTOWNER) == GetAncestor(window, GA_ROOTOWNER);
-	g_hovered = front && overlay::CursorInBackBuffer(g_back_w, g_back_h, &x, &y) && x >= p0.x && x < p1.x && y >= p0.y && y < p1.y;
-	const bool down = front && (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
-	if (down && !g_down && g_hovered)
-		g_down = true;
-	else if (!down && g_down) {
-		g_down = false;
-		if (g_hovered)
+	if (Clicked(&g_main, 0, front)) {
+		g_request_how = "its button";
+		if (g_watching_battle)
+			g_request_stop_watching = true;
+		else
 			Stop("its button");
 	}
-	return g_following != 0;
+	if (g_offer) {
+		if (Clicked(&g_watch, 1, front)) {
+			g_request_how = "its button";
+			g_request_watch = true;
+		}
+	}
+	else
+		g_watch = Button();
+	return g_shown;
 }
 
 void Prepare(const overlay::Frame &frame)
@@ -703,10 +1065,30 @@ void Prepare(const overlay::Frame &frame)
 	overlay::WantFont(floorf(kLineFont * frame.height / kRefH + 0.5f));
 }
 
+// While watching a battle: is it over (the results box on top)?
+bool ResultsOnTop()
+{
+	char top[96] = "";
+	overlay::TopScreen(top, sizeof(top));
+	return strstr(top, "CombatResults") != nullptr;
+}
+
+// The main button's words.
+std::string ButtonLabel()
+{
+	const std::string name = NameOf(g_following);
+	if (g_watching_battle)
+		return ResultsOnTop() ? std::string(texts::Get("spectate.back_to_map"))
+		                      : texts::Fill(texts::Get("spectate.stop_watching"), {{"name", name}});
+	return texts::Fill(texts::Get("spectate.stop_button"), {{"name", name}});
+}
+
 // The line under the button: what the ally does, or why nothing comes.
 std::string StatusLine(DWORD now)
 {
 	const std::string name = NameOf(g_following);
+	if (g_watching_battle)
+		return texts::Fill(texts::Get(ResultsOnTop() ? "spectate.battle_over" : "spectate.watching"), {{"name", name}});
 	if (!g_have_view && now - g_follow_since > 3000)
 		return texts::Fill(texts::Get("spectate.no_view"), {{"name", name}});
 	switch (g_their_screen) {
@@ -723,6 +1105,29 @@ std::string StatusLine(DWORD now)
 	}
 }
 
+void DrawButton(ImDrawList *draw, const Button &b, int which, const std::string &label, float k)
+{
+	ImVec2 p0, p1;
+	ButtonRect(which, g_back_w, g_back_h, &p0, &p1);
+	const bool pressed = b.down && b.hovered;
+	if (ImTextureID picture = ui::Tex(pressed ? ui::kButtonClick : ui::kButtonNormal))
+		ui::NineSlice(draw, picture, p0, p1, ImVec2(122.0f, 34.0f), 12.0f, 12.0f * k);
+	else
+		draw->AddRectFilled(p0, p1, pressed ? IM_COL32(70, 52, 30, 255) : IM_COL32(96, 72, 40, 255), 4.0f * k);
+	if (b.hovered && !pressed) {
+		if (ImTextureID highlight = ui::Tex(ui::kButtonHighlight))
+			ui::NineSlice(draw, highlight, p0, p1, ImVec2(122.0f, 34.0f), 12.0f, 12.0f * k);
+		else
+			draw->AddRect(p0, p1, ui::kGold, 4.0f * k, 0, 1.5f * k);
+	}
+	const float px = floorf(kButtonFont * k + 0.5f);
+	ImFont *font = overlay::Font(px);
+	const std::string text = ui::Fit(font, px, label.c_str(), p1.x - p0.x - 16.0f * k);
+	const ImVec2 size = font->CalcTextSizeA(px, 10000.0f, 0.0f, text.c_str());
+	ui::ShadowText(draw, font, px, ImVec2(floorf((p0.x + p1.x - size.x) / 2), floorf((p0.y + p1.y - size.y) / 2 + (pressed ? k : 0.0f))),
+	               IM_COL32(255, 236, 190, 255), text.c_str());
+}
+
 void Draw(const overlay::Frame &frame)
 {
 	g_back_w = frame.width;
@@ -731,33 +1136,26 @@ void Draw(const overlay::Frame &frame)
 		return;
 	const float k = frame.height / kRefH;
 	ImVec2 p0, p1;
-	ButtonRect(frame.width, frame.height, &p0, &p1);
+	ButtonRect(0, frame.width, frame.height, &p0, &p1);
 	overlay::BlockClicksIn(kName, p0.x, p0.y, p1.x, p1.y, frame.width, frame.height);
 	ImDrawList *draw = ImGui::GetForegroundDrawList();
-	const bool pressed = g_down && g_hovered;
-	if (ImTextureID picture = ui::Tex(pressed ? ui::kButtonClick : ui::kButtonNormal))
-		ui::NineSlice(draw, picture, p0, p1, ImVec2(122.0f, 34.0f), 12.0f, 12.0f * k);
-	else
-		draw->AddRectFilled(p0, p1, pressed ? IM_COL32(70, 52, 30, 255) : IM_COL32(96, 72, 40, 255), 4.0f * k);
-	if (g_hovered && !pressed) {
-		if (ImTextureID highlight = ui::Tex(ui::kButtonHighlight))
-			ui::NineSlice(draw, highlight, p0, p1, ImVec2(122.0f, 34.0f), 12.0f, 12.0f * k);
-		else
-			draw->AddRect(p0, p1, ui::kGold, 4.0f * k, 0, 1.5f * k);
+	DrawButton(draw, g_main, 0, ButtonLabel(), k);
+	if (g_offer) {
+		ImVec2 w0, w1;
+		ButtonRect(1, frame.width, frame.height, &w0, &w1);
+		static const char kWatchOwner[] = "spectate watch";
+		overlay::BlockClicksIn(kWatchOwner, w0.x, w0.y, w1.x, w1.y, frame.width, frame.height);
+		DrawButton(draw, g_watch, 1, texts::Get("spectate.watch_button"), k);
 	}
-	const float px = floorf(kButtonFont * k + 0.5f);
-	ImFont *font = overlay::Font(px);
-	const std::string label = texts::Fill(texts::Get("spectate.stop_button"), {{"name", NameOf(g_following)}});
-	const std::string text = ui::Fit(font, px, label.c_str(), p1.x - p0.x - 16.0f * k);
-	const ImVec2 size = font->CalcTextSizeA(px, 10000.0f, 0.0f, text.c_str());
-	ui::ShadowText(draw, font, px, ImVec2(floorf((p0.x + p1.x - size.x) / 2), floorf((p0.y + p1.y - size.y) / 2 + (pressed ? k : 0.0f))),
-	               IM_COL32(255, 236, 190, 255), text.c_str());
+	// the line: over the buttons on the map, under the button in a battle; centred on the screen
 	const float lpx = floorf(kLineFont * k + 0.5f);
 	ImFont *lfont = overlay::Font(lpx);
 	const std::string line = StatusLine(GetTickCount());
 	const std::string fitted = ui::Fit(lfont, lpx, line.c_str(), 600.0f * k);
 	const ImVec2 lsize = lfont->CalcTextSizeA(lpx, 10000.0f, 0.0f, fitted.c_str());
-	ui::ShadowText(draw, lfont, lpx, ImVec2(floorf((p0.x + p1.x - lsize.x) / 2), floorf(p1.y + 6.0f * k)), ui::kParchment, fitted.c_str());
+	const float centre = ScreenAt(kScreenW / 2, 0, frame.width, frame.height).x;
+	const float line_y = g_watching_battle ? p1.y + 6.0f * k : p0.y - 6.0f * k - lsize.y;
+	ui::ShadowText(draw, lfont, lpx, ImVec2(floorf(centre - lsize.x / 2), floorf(line_y)), ui::kParchment, fitted.c_str());
 }
 
 bool CodeAsExpected()
@@ -780,6 +1178,7 @@ void ReadSettings()
 	wchar_t path[MAX_PATH];
 	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
 	g_share = GetPrivateProfileIntW(L"coop", L"share_view", 1, path) != 0;
+	g_watch_battles = GetPrivateProfileIntW(L"coop", L"watch_battles", 1, path) != 0;
 	g_probe = static_cast<int>(GetPrivateProfileIntW(L"debug", L"spectate_probe", 0, path));
 }
 
@@ -846,6 +1245,10 @@ void ApplySpectateFromSettings()
 		               g_screen_event_next ? "are logged" : "cannot be logged (code not as expected)", c[0], c[1], c[2], c[3], c[4],
 		               c[5], c[6], c[7], c[8]);
 	}
+	g_send_next = reinterpret_cast<SendFn>(hookpatch::PatchPointer(kSendCell, kSend, &SendHook));
+	if (!g_send_next)
+		hooklog::Write("spectate: the game's send of commands is not as expected: no watching of battles (following the "
+		               "map still works)");
 	d3dhook::AddPresentCallback(&OnPresent, 900);
 	const overlay::Client client = {kName, &Wanted, &Prepare, &Draw};
 	if (!overlay::AddClient(client))

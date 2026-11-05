@@ -24,7 +24,7 @@ namespace settings {
 void Reload(const char *section, const char *key)
 {
 	const auto is = [&](const char *s, const char *k) { return strcmp(section, s) == 0 && strcmp(key, k) == 0; };
-	if (is("coop", "share_view"))
+	if (is("coop", "share_view") || is("coop", "watch_battles"))
 		ReloadSpectateSettings();
 	if (is("notify", "sound") || is("notify", "popup"))
 		ReloadNotifySettings();
