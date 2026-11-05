@@ -98,6 +98,9 @@ void *TopScreenObject();
 // The RTTI class names of every screen in the game's list, bottom first (the
 // last one is TopScreen's); their count (at most `max`).
 int ScreenNames(char (*names)[96], int max);
+// The topmost screen object of that RTTI class in the game's list (on top or under
+// others: the adventure map under a town or a battle), or nullptr.
+void *ScreenObject(const char *class_name);
 // The panels' language as English or French: kFrench when the texts in use
 // are French (texts.h chooses the language, any language with a texts file;
 // the panels take their words from there).

@@ -357,7 +357,10 @@ void ShareView(DWORD now)
 		g_sent_screen = screen_code;
 		g_sent_status_at = now;
 	}
-	BYTE *screen = Screen();
+	// The map's camera, also under a town, a battle or the hero screen: where it was when this
+	// player went in (the town, the battle's place). A follower then comes to this player's
+	// hero at once, wherever this player is (the owner's wish, 2026-11-05).
+	BYTE *screen = static_cast<BYTE *>(overlay::ScreenObject(kAdventureScreen));
 	if (!screen)
 		return;
 	const float *pos = CameraPos(screen);

@@ -179,7 +179,7 @@ co-op features: this game (2 PCs): on: script_rhythm parallel_ai
 
 ## Following a friend's view (`spectate*.cpp`; on, each player's choice)
 
-**What it does:** in a multiplayer game, a click on an ally's name in the player list makes your camera follow theirs on the adventure map, gliding, so you can watch what they do while you wait. An eye after their name shows that you follow them, and a short line after the eye says where they are when it is not the map ("in a town", "looking at a hero"...). It stops when you click the name (or the eye) again, move the camera yourself, or your own turn begins. On their screen, an eye after your name shows that you follow them. Nothing is drawn in the middle of the map.
+**What it does:** in a multiplayer game, a click on an ally's name in the player list makes your camera follow theirs on the adventure map, gliding, so you can watch what they do while you wait. An eye after their name shows that you follow them, and a short line after the eye says where they are when it is not the map ("in a town", "looking at a hero"...). Your camera goes to them at once, also when they are in a town or a battle (to the place where they went in). It stops when you click the name (or the eye) again, move the camera yourself, or your own turn begins. On their screen, an eye after your name shows that you follow them. Nothing is drawn in the middle of the map.
 
 **Only allies** (the same team), and each player sees the map through their own fog: nothing of the game itself changes, so it cannot desync a game. While an ally follows you, your PC sends where your camera looks (a tile, a few times a second) as a small message next to the game's own world checks.
 
