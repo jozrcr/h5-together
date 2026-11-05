@@ -1,6 +1,6 @@
 # Plan: follow a friend's view (spectating)
 
-Status (2026-11-05): **step 1 built and robot-tested** (following a friend's view of the adventure map: `src/mods/spectate*.cpp`); waiting for a hand test in a real game. Step 2 (watching a friend's battle) is research: what we know is below.
+Status (2026-11-05): **step 1 built and robot-tested** (following a friend's view of the adventure map: `src/mods/spectate*.cpp`); waiting for a hand test in a real game. Step 2 (watching a friend's battle): research done, the plan is below.
 
 The wish (owner, 2026-11-05): "When you're waiting after passing your turn, a way to spectate your friends (using the player list maybe?): spectate their battle at worst, everything they do at best."
 
@@ -46,11 +46,23 @@ They go out after this PC's own segment report, as the other mods' messages do, 
 
 ## Step 2: watching a friend's battle (research, 2026-11-05)
 
-- **Every PC already runs every battle.** The battle classes are in `NWorld`, the world every PC runs in lockstep (`NWorld::CArena*`), and every battle action is a world command sent to every PC: `CMoveAttackCreatureCmd`, `CDefendCreatureCmd`, `CCastCombatSpellCmd`, `CHeroAttackCmd`, `CStepQuickCombatCmd`... So the battle's data is on the follower's PC too.
-- **What is missing is the screen.** The fighting PC opens the battle screen (`NUI::CCombatArenaScreen`, made by `NMP::CCreateCombatScreen`); the others do not. Watching = opening it on another PC with no input, and closing it when the battle ends.
-- **`mp_observer_mode_for_player2` is not a battle viewer.** It is read once, in `CMultiPlayerTransceiver` slot 11 (`0x007c9050`, "is this player one of this PC's?"): with it, a PC also counts player 2 as its own. A developer's tool to watch a game as player 2.
-- **Other leads:** the game's battle replays (`NUI::CCreateReplayBattleScreen`, `CombatReplay_ShowStacksInfo`): a friend's battle could be watched just after it ends; the "ghost" combat results box (`NUI::CGhostCombatResultsBox`).
-- **Next:** a battle in a two-copy robot game. The robot cannot click yet, so either teach it to click (a monster next to a start hero), or a short hand test (one PC attacks a monster, the other's log with `--trace-mp`-style tracing shows the battle's commands running there).
+**What the robot showed** (two copies over LAN; the robot can now click: `click|<x> <y>`, and centre the camera on a tile: `panel|spectate look <x> <y>`; on A1M4 the host's hero attacks the level-1 monster at tile 23,66: look, then two clicks at 504,460; `--quick-combat-state 1` for real battles, `--end-turn-every 0` so that nobody ends a turn; Enter ends the placement, A plays the battle by itself):
+
+| Run | What | Result |
+|---|---|---|
+| `20261105-102409-lan` | The client fights, Enter, then A | Every action went out as a world command to every PC: `CMoveCreaturesOnBattlefield`, `CEndTactic`, `CHeroAttackCmd`, `CMoveAttackCreatureCmd`, `CShootCreatureCmd`, `CCastCombatSpellCmd`. 1864 world checks, all equal: the host ran the same battle, step by step, while it showed its map. |
+| `20261105-104702-lan` | The host fights; both log the adventure screen's events | Only the fighting PC gets event `0x2a`, an `NWorld::CCreateCombatScreen` notice (its player in `[5]`, the local player as the handler's third argument); then its `NUI::CCombatArenaScreen` opens. The other PC gets no such event. |
+
+**How the game opens the battle screen:**
+
+- At a battle's start, every PC's world runs `0x008545b0`: for each side's player, an `NWorld::CCreateCombatScreen` notice (ctor `0x00856830`; a quick combat's is `NWorld::CCreateQuickCombatScreen`, `0x00856930`) is posted to that player (`0x00a7d0e0`).
+- The adventure screen's frame (`0x0059d5f0`) reads only **its own player's** notices (the controller's `+0x3c`, player slot `0x1bc`: its list of notices) and hands each to its event handler `0x005a5d90` (called at `0x0059db0d`: `__thiscall(screen, notice, player)`; it switches on the notice's slot `0xc`).
+- Event `0x2a` (case `0x28` of that switch) builds `NUI::CCreateCombatArenaScreen` (`0x005472b0`), whose slot 7 (`0x005529c0`) makes the `NUI::CCombatArenaScreen` (`0x0054c2f0`, 0x594 bytes) and pushes it.
+- `mp_observer_mode_for_player2` is a developer's switch in the transceiver's "is this player one of this PC's?" (slot 11, `0x007c9050`), not a battle viewer.
+- `NMP::CCreateCombatScreen` belongs to the multiplayer **duel** mode, not to map battles.
+- Battle replays live in the world (`NWorld::CReplayBattleSaver`, `CReplayBattleContainer`); the results box has a "Revoir" (replay) button. A second road: watch a friend's battle as a replay once it ends.
+
+**The plan:** on the follower's PC, when the followed friend's battle starts, take the friend's `CCreateCombatScreen` notice from the friend's own list (the world posted it there on every PC) and hand it to the adventure screen's handler: the game's own battle screen opens on that battle. While it is open: no input reaches it (the overlay's modal input), and every command this PC tries to send is dropped (the battle screen would act as the friend). It closes when the friend's battle ends. To check first: that the friend's list holds the notice on the follower's PC, and what the battle screen sends by itself.
 
 ## Tests
 

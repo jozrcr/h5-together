@@ -549,6 +549,55 @@ void OnPresent(IDirect3DDevice9 *)
 	}
 }
 
+// --- research (spectate_probe): the events the adventure screen gets (0x005a5d90 via 0x0059db0d) ---
+typedef DWORD(__fastcall *ScreenEventFn)(void *screen, void *edx, const DWORD *event, void *third);
+ScreenEventFn g_screen_event_next = nullptr;
+LONG g_events_logged = 0;
+
+const char *RttiName(const void *object)
+{
+	__try {
+		const DWORD vtable = Read(object, 0);
+		if (vtable < 0x00401000 || vtable > 0x01200000)
+			return "?";
+		const DWORD locator = Read(reinterpret_cast<const void *>(vtable), static_cast<DWORD>(-4));
+		if (locator < 0x00401000 || locator > 0x01200000)
+			return "?";
+		const DWORD type = Read(reinterpret_cast<const void *>(locator), 12);
+		if (type < 0x00401000 || type > 0x01200000)
+			return "?";
+		return reinterpret_cast<const char *>(type + 8);
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER) {
+		return "!";
+	}
+}
+
+int EventType(const DWORD *event)
+{
+	__try {
+		typedef int(__fastcall * TypeFn)(const DWORD *event, void *edx);
+		return reinterpret_cast<TypeFn>(Read(reinterpret_cast<const void *>(event[0]), 0xc))(event, nullptr);
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER) {
+		return -1;
+	}
+}
+
+DWORD __fastcall ScreenEventHook(void *screen, void *edx, const DWORD *event, void *third)
+{
+	const int type = event ? EventType(event) : -1;
+	const DWORD result = g_screen_event_next(screen, edx, event, third);
+	if (type != 0x10 && type != 0x11 && InterlockedIncrement(&g_events_logged) <= 400) {
+		const void *a = event ? reinterpret_cast<const void *>(event[5]) : nullptr;
+		const void *b = event ? reinterpret_cast<const void *>(event[6]) : nullptr;
+		hooklog::Write("spectate probe: event 0x%x (%s) [5]=%p %s [6]=%p %s third=%p %s -> %lu", type,
+		               event ? RttiName(event) : "-", a, a ? RttiName(a) : "", b, b ? RttiName(b) : "", third,
+		               third ? RttiName(third) : "", result);
+	}
+	return result;
+}
+
 // --- the game's hooks ------------------------------------------------------------------------------
 void __fastcall UpdateHook(void *controller, void *edx, DWORD a, DWORD b, DWORD c, DWORD d, DWORD e)
 {
@@ -787,6 +836,16 @@ void ApplySpectateFromSettings()
 		return;
 	}
 	g_ready = true;
+	static const BYTE kEventCall[] = {0x57, 0x53, 0x8d, 0x8e, 0xbc, 0xf7, 0xff, 0xff, 0xe8};  // push edi; push ebx; lea ecx,[esi-844h]; call
+	if (g_probe && memcmp(reinterpret_cast<const void *>(0x0059db05), kEventCall, sizeof(kEventCall)) == 0)
+		g_screen_event_next = reinterpret_cast<ScreenEventFn>(hookpatch::RedirectCall(0x0059db0d, 0x005a5d90, &ScreenEventHook));
+	if (g_probe)
+	{
+		const BYTE *c = reinterpret_cast<const BYTE *>(0x0059db05);
+		hooklog::Write("spectate probe: the adventure screen's events %s (bytes %02x %02x %02x %02x %02x %02x %02x %02x %02x)",
+		               g_screen_event_next ? "are logged" : "cannot be logged (code not as expected)", c[0], c[1], c[2], c[3], c[4],
+		               c[5], c[6], c[7], c[8]);
+	}
 	d3dhook::AddPresentCallback(&OnPresent, 900);
 	const overlay::Client client = {kName, &Wanted, &Prepare, &Draw};
 	if (!overlay::AddClient(client))
