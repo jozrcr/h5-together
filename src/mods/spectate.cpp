@@ -468,6 +468,11 @@ bool g_watch_battles = true;            // [coop] watch_battles
 const void *g_battle_notice = nullptr;  // the ally's last battle notice (not opened twice)
 bool g_watching_battle = false;
 DWORD g_watch_since = 0;
+// The followed ally's own news while watching (CheckHook): when a status last came, and since
+// when it says the ally is no longer in a battle (0 = it says they are).
+DWORD g_status_at = 0, g_out_of_battle_since = 0;
+const DWORD kOverAfterMs = 4000;   // the ally out of the battle this long, and no results here: watching ends
+const DWORD kSilentAfterMs = 8000; // no status from the ally this long: watching ends
 char g_watch_top[96] = "";              // the battle screen our modal panel was opened over
 LONG g_dropped = 0;
 
@@ -664,6 +669,8 @@ void StartWatching(BYTE *screen, const void *notice)
 	g_watching_battle = true;  // (before: the battle screen sends its settings at once)
 	g_closing = false;
 	g_watch_since = GetTickCount();
+	g_status_at = g_watch_since;
+	g_out_of_battle_since = 0;
 	g_watch_top[0] = 0;
 	g_dropped = 0;
 	DWORD result = 0;
@@ -683,6 +690,8 @@ void StartWatching(BYTE *screen, const void *notice)
 }
 
 // Every frame while watching: the input lock, and the ways it ends by itself.
+bool ResultsOnTopNow();
+
 void WatchFrame(DWORD now)
 {
 	char top[96];
@@ -702,6 +711,21 @@ void WatchFrame(DWORD now)
 		StopWatching("this PC's own battle starts");
 		return;
 	}
+	// Safety nets (the owner's game, 2026-11-05: watching a friend who lost his battle, the
+	// results never came here and the watcher sat in the finished battle for 7 minutes): the
+	// ally's own PC says they left that battle (results closed, the map, a defeat), or says
+	// nothing any more (gone, crashed). Not while this PC shows the results box: the player
+	// closes it, as after any battle.
+	if (!ResultsOnTopNow()) {
+		if (g_out_of_battle_since && now - g_out_of_battle_since >= kOverAfterMs) {
+			StopWatching("the ally's battle is over on their screen");
+			return;
+		}
+		if (now - g_status_at >= kSilentAfterMs) {
+			StopWatching("no news from the ally for 8 s");
+			return;
+		}
+	}
 	if (!overlay::ModalOpen(kName)) {
 		if (g_watch_top[0] && strcmp(top, g_watch_top) == 0) {  // closed on the same screen: Esc
 			StopWatching("Esc");
@@ -716,6 +740,14 @@ void WatchFrame(DWORD now)
 			overlay::SetModalPass(kName, overlay::kPassRightButton | overlay::kPassMouseMove | overlay::kPassWheel);
 		}
 	}
+}
+
+// (the results box on top: see ResultsOnTop below)
+bool ResultsOnTopNow()
+{
+	char top[96] = "";
+	overlay::TopScreen(top, sizeof(top));
+	return strstr(top, "CombatResults") != nullptr;
 }
 
 // The ally's battle notice when this PC may watch it now: the ally's own screen is a battle
@@ -1134,6 +1166,11 @@ void __fastcall CheckHook(void *self, void *edx, int pc, const BYTE *cmd)
 					hooklog::Write("spectate: %s's screen: %s", NameOf(m.player).c_str(), ScreenWords(m.screen));
 				g_heard = true;
 				g_their_screen = m.screen;
+				g_status_at = now;
+				if (m.screen == spectate::kInBattle)
+					g_out_of_battle_since = 0;
+				else if (!g_out_of_battle_since)
+					g_out_of_battle_since = now;
 			}
 			return;  // ours: the game never sees it
 		}
