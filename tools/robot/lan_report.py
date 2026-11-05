@@ -66,6 +66,9 @@ def report(run):
         print("   network:", e)
     if not gaps:
         print("   no AI steps")
+        crc = crc_check(run)
+        if crc:
+            print("   world checksums: %s" % crc)
         return
     q = sorted(gaps)
     print("   AI steps %d, wait before a step: median %.0f ms (p10 %.0f, p90 %.0f)" %
