@@ -11,6 +11,7 @@ An unofficial add-on for **Heroes of Might and Magic V: Tribes of the East** wit
 - **Faster co-op games.** The computer's turns are much quicker, and so are clicks. A rare freeze of the host during computer turns is fixed.
 - **Online play with your Steam friends** (new in 0.3.0, a test). Your friends' games show in the game's own LAN list, through Steam: no GameRanger, no VPN. The host invites friends from the waiting room. [How it works](#online-play-over-steam-new-a-test).
 - **Settings inside the game.** Main menu, **Options**, **H5 Together** (or press **F3**). No file to edit.
+- **Watch your friends while you wait** (new in 0.3.3). Click an ally's name in the player list: your camera follows theirs, and you can watch their battles live.
 - **A few extras on top:** a player list on the map, a "your turn" notification, a random map template builder, other looks for your heroes, and a game rules menu for the host.
 - **Safe to try.** It never changes the game's own files, and it is easy to remove.
 - **Made for** the Steam game with MMH5.5 RC19d or RC19k, on Windows, or on Linux with Proton.
