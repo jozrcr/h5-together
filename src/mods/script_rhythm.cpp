@@ -49,6 +49,10 @@ const DWORD kSetTimeUpdateCall = 0x009990bd;  // in NWorld::CSetWorldTime's Exec
 const DWORD kTickCell = 0x00e93768;      // the scripts' object's vtable 0x00e93760, slot 2
 const DWORD kTick = 0x00cab4f0;          // mov ecx, [ecx+0x1c]; jmp 0x004c0720
 const DWORD kStepMs = 200;               // the game's segment: MMH5.5's tick
+const DWORD kWorldScripts = 0x1d0;       // world +0x1d0: its scripts' holder; +0x0c of it: the scripts' object
+const DWORD kScriptsVftable = 0x00e93760;
+const DWORD kDoString = 0x00cab4a0;      // slot 0: __thiscall(scripts, const char *code), ret 4: false when the line
+                                         // ran without an error (robot 2026-11-05: its print came, it answered 0)
 
 struct Code {
 	DWORD address;
@@ -67,6 +71,7 @@ UpdateFn g_update_next = nullptr;
 TickFn g_tick_next = nullptr;
 
 // All on the game's main thread (the world's update), except the counters.
+void *g_world = nullptr;  // the world of the last multiplayer update (RunGameScript)
 int g_in_update = 0;      // inside a multiplayer world update (CSetWorldTime, in the segment runner)
 DWORD g_update_time = 0;  // its game time
 unsigned g_game = 0;      // the co-op features' game these belong to
@@ -81,6 +86,7 @@ void __fastcall SetTimeUpdateHook(void *world, void *edx, DWORD time)
 		g_update_next(world, edx, time);
 		return;
 	}
+	g_world = world;
 	const DWORD outer = g_update_time;
 	g_update_time = time;
 	++g_in_update;
@@ -130,7 +136,35 @@ bool CodeAsExpected()
 	return true;
 }
 
+bool RunGameScriptUnsafe(const char *code)
+{
+	const BYTE *holder = *reinterpret_cast<const BYTE *const *>(static_cast<const BYTE *>(g_world) + kWorldScripts);
+	if (!holder)
+		return false;
+	void *scripts = *reinterpret_cast<void *const *>(holder + 0x0c);
+	if (!scripts || *static_cast<const DWORD *>(scripts) != kScriptsVftable)
+		return false;
+	typedef bool(__fastcall * DoStringFn)(void *scripts, void *edx, const char *code);
+	const bool error = reinterpret_cast<DoStringFn>(kDoString)(scripts, nullptr, code);
+	if (error)
+		hooklog::Write("script rhythm: the game's scripts answered an error for: %s", code);
+	return !error;
+}
+
 }  // namespace
+
+bool RunGameScript(const char *code)
+{
+	if (!g_world || !code)
+		return false;
+	__try {
+		return RunGameScriptUnsafe(code);
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER) {
+		hooklog::Write("script rhythm: running a line of script crashed (caught)");
+		return false;
+	}
+}
 
 void ApplyScriptRhythmFromSettings()
 {

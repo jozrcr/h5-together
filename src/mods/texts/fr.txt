@@ -60,7 +60,7 @@ help.extra_conversions = Combien de conversions en plus (1 = l'équilibre de MMH
 help.town_gate = Les héros peuvent voyager entre leurs villes.
 help.mine_control = Des armées qui s'entretiennent seules peuvent garder les mines.
 help.dimension_doors = Sur les cartes aléatoires, une porte peut visiter une ville à distance.
-help.ai_cheat = Or et créatures en plus chaque semaine pour les joueurs ordinateur.
+help.ai_cheat = Or et créatures en plus chaque semaine pour les joueurs ordinateur. Compte aussi dans une partie chargée, dès la semaine suivante.
 help.mixed_stacks = Les armées neutres mêlent plusieurs sortes de créatures (cartes multijoueur).
 help.neutral_stack_size = Multiplie les armées neutres (le début peut ramer un moment).
 help.bank_difficulty = Multiplie les gardes des banques et des sites de combat.

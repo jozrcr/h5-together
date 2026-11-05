@@ -86,7 +86,7 @@ help.extra_conversions = How many more towns and dwellings may convert (1 = MMH5
 help.town_gate = Heroes can travel between their own towns.
 help.mine_control = Mines can be guarded by armies that keep themselves.
 help.dimension_doors = On random maps, a dimension door can visit a town from afar.
-help.ai_cheat = Extra gold and creatures each week for the computer players.
+help.ai_cheat = Extra gold and creatures each week for the computer players. Also in a loaded game, from the next week.
 help.mixed_stacks = Neutral armies mix several kinds of creatures (multiplayer maps).
 help.neutral_stack_size = Multiplier for the neutral armies (the start may lag a while).
 help.bank_difficulty = Multiplier for the guards of banks and battle sites.

@@ -17,7 +17,7 @@ void Check(bool ok, const char *what)
 		++g_failures;
 }
 
-const unsigned kRhythm = 1u << kScriptRhythm, kParallel = 1u << kParallelAi;
+const unsigned kRhythm = 1u << kScriptRhythm, kParallel = 1u << kParallelAi, kBonus = 1u << kAiBonus;
 
 }  // namespace
 
@@ -33,7 +33,17 @@ int main()
 	Check(!DecodeHello(0x55110001).valid, "Undo End Turn's hello ('U') is not ours");
 	Check(!DecodeHello(0x46000301).valid, "version 0: not a hello");
 	Check(!DecodeHello(0).valid, "nothing: not a hello");
-	Check(kKnown == (kRhythm | kParallel), "this version knows script_rhythm and parallel_ai");
+	Check(kKnown == (kRhythm | kParallel | kBonus), "this version knows script_rhythm, parallel_ai and ai_bonus");
+	h = DecodeHello(EncodeHello(kKnown, kBonus | kRhythm, 0));
+	Check(h.valid && h.wants == (kBonus | kRhythm) && h.ai_bonus == 0, "hello: the computer bonus 0 (off) travels");
+	h = DecodeHello(EncodeHello(kKnown, kBonus, 6));
+	Check(h.valid && h.wants == kBonus && h.ai_bonus == 6, "hello: the computer bonus 6 (140%) travels");
+	Check((EncodeHello(kKnown, kRhythm | kParallel, 6) & 0x03) == (kRhythm | kParallel),
+	      "hello: an older version (bits 0-1) still reads script_rhythm and parallel_ai alone");
+	Hello mixed[2];
+	mixed[0] = DecodeHello(EncodeHello(kKnown, kBonus | kRhythm, 0));
+	mixed[1] = DecodeHello(EncodeHello(kRhythm | kParallel, 0));  // a 0.3.3 PC
+	Check(Decide(mixed, 2) == kRhythm, "a PC that does not know ai_bonus: the computer bonus is not set, the rest as before");
 
 	// --- the decision ---
 	Hello two[2];
@@ -66,7 +76,7 @@ int main()
 	four[3] = Hello();
 	Check(Decide(four, 4) == 0, "four PCs, the last sent none: off");
 
-	Check(Name(kScriptRhythm)[0] == 's' && Name(kParallelAi)[0] == 'p', "names");
+	Check(Name(kScriptRhythm)[0] == 's' && Name(kParallelAi)[0] == 'p' && Name(kAiBonus)[0] == 'a', "names");
 
 	if (g_failures)
 		printf("%d FAILED\n", g_failures);
