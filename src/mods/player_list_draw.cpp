@@ -285,6 +285,43 @@ void Pill(ImDrawList *draw, const Row &r, const Look &look, ImVec2 p, float w, f
 	StatusMark(draw, r.status, ImVec2(mark_x, p.y + h / 2), k, a);
 }
 
+// An eye after a pill (following a friend's view): almond lids and an iris, in the
+// game's gold; bright when this PC follows that player, softer when that player
+// follows this PC, an outline when the cursor is over an ally (a click follows).
+const float kEyeGap = 5.0f, kEyeHalfW = 9.0f, kEyeHalfH = 5.0f;
+
+void EyeLids(ImDrawList *draw, ImVec2 c, float w, float h)
+{
+	const float r = (w * w + h * h) / (2 * h);  // the circle through the corners and the lid's top
+	const float d = r - h;
+	draw->PathArcTo(ImVec2(c.x, c.y + d), r, atan2f(-d, -w), atan2f(-d, w), 12);
+	draw->PathArcTo(ImVec2(c.x, c.y - d), r, atan2f(d, w), atan2f(d, -w), 12);
+}
+
+void EyeMark(ImDrawList *draw, int eye, ImVec2 c, float k, float a)
+{
+	if (eye == kEyeNone)
+		return;
+	const float w = kEyeHalfW * k, h = kEyeHalfH * k;
+	const ImU32 ink = eye == kEyeFollowed    ? Rgba(255, 214, 120, 1.0f, a)
+	                  : eye == kEyeFollowsMe ? Rgba(226, 204, 158, 1.0f, a)
+	                                         : Rgba(214, 190, 140, 0.85f, a);
+	EyeLids(draw, ImVec2(c.x + 1.0f, c.y + 1.0f), w, h);
+	draw->PathStroke(Rgba(0, 0, 0, 0.6f, a), ImDrawFlags_Closed, 1.8f * k);
+	if (eye != kEyeHover) {
+		EyeLids(draw, c, w, h);
+		draw->PathFillConvex(Rgba(20, 16, 10, 0.55f, a));
+	}
+	EyeLids(draw, c, w, h);
+	draw->PathStroke(ink, ImDrawFlags_Closed, 1.4f * k);
+	if (eye == kEyeHover)
+		draw->AddCircle(c, h * 0.7f, ink, 0, 1.2f * k);
+	else {
+		draw->AddCircleFilled(c, h * 0.75f, ink);
+		draw->AddCircleFilled(c, h * 0.32f, Rgba(30, 22, 12, 1.0f, a));
+	}
+}
+
 }  // namespace
 
 void FontSizes(float screen_height, float *regular, float *bold)
@@ -296,8 +333,10 @@ void FontSizes(float screen_height, float *regular, float *bold)
 	*bold = floorf(kHeaderFont * k + 0.5f);
 }
 
-void DrawPanel(const Snapshot &s, const Look &look, float rect[4])
+void DrawPanel(const Snapshot &s, const Look &look, float rect[4], Hits *hits)
 {
+	if (hits)
+		hits->count = 0;
 	ImDrawList *draw = ImGui::GetForegroundDrawList();
 	ImFont *font = static_cast<ImFont *>(look.font), *bold = static_cast<ImFont *>(look.font_bold);
 	const ImVec2 screen = ImGui::GetIO().DisplaySize;
@@ -413,6 +452,19 @@ void DrawPanel(const Snapshot &s, const Look &look, float rect[4])
 		Pill(draw, r, look, ImVec2(px, y), pw, k);
 		if (px + pw > right)
 			right = px + pw;
+		const float eye_x = px + pw + (kEyeGap + kEyeHalfW) * k;
+		EyeMark(draw, r.eye, ImVec2(floorf(eye_x) + 0.5f, floorf(y + ph / 2) + 0.5f), k, a);
+		if (r.eye != kEyeNone && eye_x + kEyeHalfW * k > right)
+			right = eye_x + kEyeHalfW * k;
+		if (hits && hits->count < kMaxPlayers) {
+			const int n = hits->count++;
+			const float reach = (kFace - kPillHeight) / 2 * k;
+			hits->id[n] = r.id;
+			hits->rect[n][0] = px - overhang;
+			hits->rect[n][1] = y - reach;
+			hits->rect[n][2] = eye_x + kEyeHalfW * k;
+			hits->rect[n][3] = y + ph + reach;
+		}
 		y += ph;
 		if (teams && last) {  // the team's line, a thin pewter one, down to its last pill
 			const float lx = floorf(circle_x) + 0.5f;
