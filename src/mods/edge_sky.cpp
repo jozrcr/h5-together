@@ -16,6 +16,16 @@
 // game's copy has none. In the game data only the generator's list names this
 // light: no battlefield uses it, so battle skies do not change.
 //
+// The underground (the owner's game, 2026-11-05: "map borders aren't black when in
+// underground"): the generator gives every random map's underground one light,
+// Lights/_(AmbientLight)/Tests/underground.xdb (RMG/Params/Default.xdb,
+// UndergroundTerrainLight), which has a sky dome of its own
+// (/_(Model)/SkyDomes/Virtual/SkyDome_Dung_Virt.xdb) and a black BackColor. Only
+// adventure maps' undergrounds name it (random maps, six multiplayer and single
+// maps), and Maps/CombatArenas/AbandonedMine/AbandonedMine.xdb, an old map file
+// whose only use of it is an "underground lights" list (a battlefield has no
+// underground): served without its dome too.
+//
 // With [camera] edge_sky=none we wrap the game's "open file" function (the
 // file system's table, NVFS::CWinVFS vftable 0x00e66500, slot 7 = 0x009e0020,
 // stacked with the other mods that wrap it) and serve that light with an empty
@@ -50,6 +60,7 @@ const DWORD kStreamSetSize = 0x008c7610;        // __thiscall(this, int size), r
 const DWORD kGameNew = 0x00878fd0;              // cdecl void *(size): the game's operator new
 
 const char kDuskLight[] = "lights/_(ambientlight)/arena/dusk_light_boatarena01(victest).xdb";
+const char kUndergroundLight[] = "lights/_(ambientlight)/tests/underground.xdb";
 
 struct GameString {  // nstl::string: first char, one past the last, end of the allocation
 	const char *begin;
@@ -116,7 +127,7 @@ GameStream *__fastcall OpenFileHook(void *vfs, void *edx, const GameString *path
 	if (length < 8 || length > 300 || _strnicmp(path->end - 4, ".xdb", 4) != 0)
 		return s;  // (cheap test first: the game opens thousands of files)
 	const std::string key = edgesky::NormalizePath(std::string(path->begin, path->end));
-	if (key != kDuskLight && (g_test_light.empty() || key != g_test_light))
+	if (key != kDuskLight && key != kUndergroundLight && (g_test_light.empty() || key != g_test_light))
 		return s;
 	if (!s->begin || s->end < s->begin || s->pos != s->begin)
 		return s;  // not freshly opened: left alone
@@ -155,8 +166,8 @@ void ApplyEdgeSkyFromSettings()
 		hooklog::Write("edge sky: the game's file system is not as expected (%08lx): the game's sky", kWinVfsOpenSlot);
 		return;
 	}
-	hooklog::Write("edge sky: edge_sky=none: random maps' dusk light without its sky dome, black past the map's "
-	               "edge%s%s",
+	hooklog::Write("edge sky: edge_sky=none: random maps' dusk light and the undergrounds' light without their sky "
+	               "dome, black past the map's edge%s%s",
 	               g_test_light.empty() ? "" : "; also (test) ", g_test_light.c_str());
 }
 

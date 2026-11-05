@@ -573,11 +573,33 @@ const void *BattleNotice(const void *player)
 	}
 }
 
-bool BattleOnTop(char *top, int size)
+// The screens over the map that belong to the watched battle: how many from the top, down to
+// the map (the battle screen, its results box, and whatever the game opens over them: a
+// creature's information on a right click...); 0 when no battle screen is over the map. `top`
+// gets the screen on top.
+int BattleScreens(char *top, int size)
 {
 	top[0] = 0;
 	overlay::TopScreen(top, size);
-	return strstr(top, "Combat") != nullptr;
+	char names[16][96];
+	const int n = overlay::ScreenNames(names, 16);
+	int above = 0;
+	bool battle = false, map = false;
+	for (int i = n - 1; i >= 0; --i) {
+		if (strcmp(names[i], kAdventureScreen) == 0) {
+			map = true;
+			break;
+		}
+		battle = battle || strstr(names[i], "Combat") != nullptr;
+		++above;
+	}
+	if (map)
+		return battle ? above : 0;
+	// (no map under it: only the battle's own screens on top, as 0.3.3 counted)
+	int own = 0;
+	for (int i = n - 1; i >= 0 && strstr(names[i], "Combat"); --i)
+		++own;
+	return own;
 }
 
 // Close the top screen the game's own way: its "close the top screen" UI command, run at the
@@ -610,12 +632,10 @@ void StopWatching(const char *why)
 {
 	if (!g_watching_battle || g_closing)
 		return;
-	// the screens on top that belong to the battle (the results box over the battle screen)
-	char names[12][96];
-	const int n = overlay::ScreenNames(names, 12);
-	int battle_screens = 0;
-	for (int i = n - 1; i >= 0 && strstr(names[i], "Combat"); --i)
-		++battle_screens;
+	// the screens over the map that belong to the battle (the results box over the battle screen,
+	// a creature's information over it...)
+	char top[96];
+	const int battle_screens = BattleScreens(top, sizeof(top));
 	int queued = 0;
 	for (int i = 0; i < battle_screens; ++i)
 		queued += QueueClose() ? 1 : 0;
@@ -666,7 +686,7 @@ void StartWatching(BYTE *screen, const void *notice)
 void WatchFrame(DWORD now)
 {
 	char top[96];
-	if (!BattleOnTop(top, sizeof(top))) {
+	if (!BattleScreens(top, sizeof(top))) {
 		if (g_closing || now - g_watch_since > 3000)  // (the battle screen comes a frame or two after the notice)
 			EndWatching(top);
 		return;
@@ -687,8 +707,14 @@ void WatchFrame(DWORD now)
 			StopWatching("Esc");
 			return;
 		}
-		if (overlay::OpenModal(kName))  // (again when the results box comes on top)
+		if (overlay::OpenModal(kName)) {  // (again when the results box, or a creature's information, comes on top)
 			lstrcpynA(g_watch_top, top, sizeof(g_watch_top));
+			// A watcher may look: the right button (a creature's information), the mouse's motion
+			// (what lies under the cursor, a creature's reach) and the wheel reach the game; the
+			// left button and the keys do not (the owner's wish, 2026-11-05). Whatever command the
+			// battle screen would send is dropped anyway (SendHook).
+			overlay::SetModalPass(kName, overlay::kPassRightButton | overlay::kPassMouseMove | overlay::kPassWheel);
+		}
 	}
 }
 

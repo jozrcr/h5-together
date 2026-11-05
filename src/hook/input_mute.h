@@ -17,6 +17,18 @@
 
 namespace inputmute {
 
+// What a modal panel may let through to the game while it is open (`pass`, a mask of
+// these; 0 = nothing): one bit per mouse button (1 << the button: 0 left, 1 right...),
+// the mouse's motion messages, the wheel. Keys never pass. (Watching a friend's battle,
+// spectate.cpp: the right button shows a creature's information, the motion what lies
+// under the cursor; the left button and the keys stay held back.)
+enum Pass : unsigned {
+	kPassNothing = 0,
+	kPassRightButton = 1u << 1,
+	kPassMouseMove = 1u << 8,
+	kPassWheel = 1u << 9,
+};
+
 // What the game's window procedure gets of one message.
 enum Action {
 	kPass,     // the game gets it
@@ -28,7 +40,7 @@ enum Action {
 class Messages {
 public:
 	Messages();
-	Action Filter(UINT msg, WPARAM wp, LPARAM lp, bool muted);
+	Action Filter(UINT msg, WPARAM wp, LPARAM lp, bool muted, unsigned pass = kPassNothing);
 	void Forget();  // focus lost: releases will not come to this window
 
 private:
@@ -50,11 +62,11 @@ public:
 	void KeyboardState(BYTE *keys, bool muted);
 	// DIMOUSESTATE (16 bytes) or DIMOUSESTATE2 (20): the wheel and the buttons
 	// are held back, the motion is not.
-	void MouseState(void *state, DWORD size, bool muted);
+	void MouseState(void *state, DWORD size, bool muted, unsigned pass = kPassNothing);
 	// Buffered events (DIDEVICEOBJECTDATA, `size` bytes each, dwOfs then dwData
 	// first): while muted, presses and the mouse wheel are removed, releases and
 	// mouse motion kept. Returns how many events are left (moved to the front).
-	DWORD Events(bool keyboard, void *data, DWORD size, DWORD count, bool muted);
+	DWORD Events(bool keyboard, void *data, DWORD size, DWORD count, bool muted, unsigned pass = kPassNothing);
 
 private:
 	bool key_held_[256];   // went down while muted and is still down: the game sees it up

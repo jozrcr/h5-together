@@ -51,11 +51,13 @@ void Messages::Forget()
 	memset(game_button_, 0, sizeof(game_button_));
 }
 
-Action Messages::Filter(UINT msg, WPARAM wp, LPARAM lp, bool muted)
+Action Messages::Filter(UINT msg, WPARAM wp, LPARAM lp, bool muted, unsigned pass)
 {
 	bool down = false;
 	const int b = MessageButton(msg, wp, &down);
 	if (b >= 0) {
+		if (pass & (1u << b))
+			muted = false;  // a button the panel lets through: as if no panel were open
 		if (down) {
 			if (muted) {
 				if (!game_button_[b])
@@ -78,9 +80,10 @@ Action Messages::Filter(UINT msg, WPARAM wp, LPARAM lp, bool muted)
 	}
 	switch (msg) {
 	case WM_MOUSEMOVE:
+		return muted && !(pass & kPassMouseMove) ? kSwallow : kPass;
 	case WM_MOUSEWHEEL:
 	case WM_MOUSEHWHEEL:
-		return muted ? kSwallow : kPass;
+		return muted && !(pass & kPassWheel) ? kSwallow : kPass;
 	case WM_KEYDOWN:
 	case WM_SYSKEYDOWN: {
 		const int vk = static_cast<int>(wp & 0xff);
@@ -152,18 +155,18 @@ void DirectInput::KeyboardState(BYTE *keys, bool muted)
 	}
 }
 
-void DirectInput::MouseState(void *state, DWORD size, bool muted)
+void DirectInput::MouseState(void *state, DWORD size, bool muted, unsigned pass)
 {
 	if (size < 16)
 		return;
 	LONG *axes = static_cast<LONG *>(state);  // lX, lY, lZ (the wheel)
 	BYTE *buttons = static_cast<BYTE *>(state) + 12;
 	const int n = size >= 20 ? 8 : 4;
-	if (muted)
+	if (muted && !(pass & kPassWheel))
 		axes[2] = 0;
 	for (int i = 0; i < n; ++i) {
 		const bool down = (buttons[i] & 0x80) != 0;
-		if (muted) {
+		if (muted && !(pass & (1u << i))) {
 			button_held_[i] = down;
 			buttons[i] = 0;
 		}
@@ -176,7 +179,7 @@ void DirectInput::MouseState(void *state, DWORD size, bool muted)
 	}
 }
 
-DWORD DirectInput::Events(bool keyboard, void *data, DWORD size, DWORD count, bool muted)
+DWORD DirectInput::Events(bool keyboard, void *data, DWORD size, DWORD count, bool muted, unsigned pass)
 {
 	if (!muted || !data || size < 8)
 		return count;
@@ -194,9 +197,9 @@ DWORD DirectInput::Events(bool keyboard, void *data, DWORD size, DWORD count, bo
 		else if (ofs == 0 || ofs == 4)
 			keep = true;  // DIMOFS_X, DIMOFS_Y: the game's cursor keeps moving
 		else if (ofs >= 12 && ofs < 20)
-			keep = release;  // DIMOFS_BUTTON0..7
+			keep = release || (pass & (1u << (ofs - 12))) != 0;  // DIMOFS_BUTTON0..7
 		else
-			keep = false;  // DIMOFS_Z: the wheel
+			keep = ofs == 8 && (pass & kPassWheel) != 0;  // DIMOFS_Z: the wheel
 		if (!keep)
 			continue;
 		if (kept != i)

@@ -54,6 +54,10 @@ volatile LONG g_open = 0;
 volatile LONG g_active = 0;      // open and its screen on top, at the last frame
 volatile DWORD g_drawn_at = 0;   // GetTickCount() of the last frame drawn with it open
 volatile LONG g_escape = 0;      // Esc was pressed while muted: closes on the next frame
+volatile LONG g_pass = 0;        // what the open panel lets through (inputmute::Pass)
+static_assert(kPassRightButton == inputmute::kPassRightButton && kPassMouseMove == inputmute::kPassMouseMove &&
+                  kPassWheel == inputmute::kPassWheel,
+              "overlay.h's pass values are input_mute.h's");
 volatile DWORD g_mouse_message_at = 0;  // the last mouse message to the game's window
 
 bool Muted()
@@ -106,6 +110,7 @@ void Close(const char *why)
 	InterlockedExchange(&g_active, 0);
 	InterlockedExchange(&g_open, 0);
 	InterlockedExchange(&g_escape, 0);
+	InterlockedExchange(&g_pass, 0);
 	hooklog::Write("overlay: modal panel \"%s\" closed (%s): the game gets its input again", g_owner, why);
 	g_owner[0] = 0;
 }
@@ -292,7 +297,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 		const bool zone = !muted && clicks && CursorInZone();
 		if (zone)
 			HeldBack("window message in a click zone", msg);
-		switch (g_messages.Filter(msg, wp, lp, muted || zone)) {
+		switch (g_messages.Filter(msg, wp, lp, muted || zone, muted ? static_cast<unsigned>(g_pass) : 0u)) {
 		case inputmute::kSwallow:
 			HeldBack("window message", msg);
 			return 0;
@@ -414,7 +419,7 @@ HRESULT MuteState(dihook::DeviceKind kind, void *device, DWORD size, void *data,
 			if (s->lZ)
 				Push(kWheel, kFromDirectInput, 0, s->lZ);
 		}
-		g_di.MouseState(data, size, muted || CursorInZone());
+		g_di.MouseState(data, size, muted || CursorInZone(), muted ? static_cast<unsigned>(g_pass) : 0u);
 	}
 	return hr;
 }
@@ -442,7 +447,8 @@ HRESULT MuteData(dihook::DeviceKind kind, void *device, DWORD size, DIDEVICEOBJE
 				Push(kWheel, kFromDirectInput, 0, static_cast<LONG>(e->dwData));
 		}
 	}
-	*count = g_di.Events(kind == dihook::kKeyboard, data, size, *count, muted || (kind == dihook::kMouse && CursorInZone()));
+	*count = g_di.Events(kind == dihook::kKeyboard, data, size, *count, muted || (kind == dihook::kMouse && CursorInZone()),
+	                     muted ? static_cast<unsigned>(g_pass) : 0u);
 	return hr;
 }
 
@@ -597,12 +603,22 @@ bool OpenModal(const char *owner)
 	lstrcpynA(g_owner, owner, sizeof(g_owner));
 	InterlockedExchange(&g_escape, 0);
 	InterlockedExchange(&g_held_logged, 0);
+	InterlockedExchange(&g_pass, 0);
 	g_drawn_at = GetTickCount();
 	InterlockedExchange(&g_open, 1);
 	InterlockedExchange(&g_active, 1);
 	hooklog::Write("overlay: modal panel \"%s\" open over %s: the game gets no mouse or keyboard input", owner,
 	               g_screen[0] ? g_screen : "(an unknown screen)");
 	return true;
+}
+
+void SetModalPass(const char *owner, unsigned pass)
+{
+	if (!g_open || strcmp(g_owner, owner) != 0 || static_cast<unsigned>(g_pass) == pass)
+		return;
+	InterlockedExchange(&g_pass, static_cast<LONG>(pass));
+	hooklog::Write("overlay: modal panel \"%s\" lets through to the game:%s%s%s%s", owner, pass & kPassRightButton ? " the right button" : "",
+	               pass & kPassMouseMove ? " the mouse's motion" : "", pass & kPassWheel ? " the wheel" : "", pass ? "" : " nothing");
 }
 
 void CloseModal(const char *owner)
