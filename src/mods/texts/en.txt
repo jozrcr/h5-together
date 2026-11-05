@@ -350,10 +350,10 @@ banner = A player left. Saved as "Resume": Multiplayer, LAN, Create, Load to pla
 [spectate]
 stop_button = Stop following {name}
 watch_button = Watch the battle
-stop_watching = Stop watching {name}'s battle
+stop_watching = Stop watching
 back_to_map = Back to the map
-watching = You are watching {name}'s battle: its buttons do nothing for you.
-battle_over = {name}'s battle is over.
+watching = Watching {name}
+battle_over = Battle over
 hint = Click the button, the name, or move the camera to stop.
 in_battle = {name} is in a battle.
 in_town = {name} is in a town.

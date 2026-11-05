@@ -969,8 +969,9 @@ void __fastcall CheckHook(void *self, void *edx, int pc, const BYTE *cmd)
 // --- the banner ------------------------------------------------------------------------------------
 // On the map: a line ("Pierre is in a battle") and, under it, the buttons side by side, just
 // over the game's turn banner ("Tour de Pierre", its progress bar): "Stop following Pierre" and,
-// while the followed ally fights, "Watch the battle". In the battle: one button at the top
-// ("Stop watching Pierre's battle", then "Back to the map") and the line under it.
+// while the followed ally fights, "Watch the battle". In the battle: one small button at the
+// bottom right ("Stop watching", then "Back to the map") with a caption over it ("Watching
+// Pierre"), the owner's choice: discreet.
 // Places in the game's 1024x768 layout, centred, scaled with the screen's height.
 const float kRefH = 768.0f, kScreenW = 1024.0f;
 const float kButtonH = 34.0f, kButtonFont = 15.0f, kLineFont = 14.0f;
@@ -1005,8 +1006,19 @@ Place ButtonPlace(int which)
 	return Place{which == 0 ? left : left + kMapButtonW + kMapGap, kMapRowY, kMapButtonW};
 }
 
+// In a battle: one small button at the bottom right, just over the creatures' bar and beside the
+// game's own buttons there (anchored to the right and bottom edges, scaled with the height).
+const float kBattleRight = 80.0f, kBattleBottom = 92.0f, kBattleW = 172.0f, kBattleH = 28.0f, kBattleFont = 13.0f,
+            kCaptionFont = 12.0f;
+
 void ButtonRect(int which, float w, float h, ImVec2 *p0, ImVec2 *p1)
 {
+	if (g_watching_battle) {
+		const float k = h / kRefH;
+		*p1 = ImVec2(floorf(w - kBattleRight * k), floorf(h - kBattleBottom * k));
+		*p0 = ImVec2(floorf(p1->x - kBattleW * k), floorf(p1->y - kBattleH * k));
+		return;
+	}
 	const Place pl = ButtonPlace(which);
 	*p0 = ScreenAt(pl.x, pl.y, w, h);
 	*p1 = ScreenAt(pl.x + pl.w, pl.y + kButtonH, w, h);
@@ -1063,6 +1075,8 @@ void Prepare(const overlay::Frame &frame)
 	ui::LoadPictures(frame.device);
 	overlay::WantFont(floorf(kButtonFont * frame.height / kRefH + 0.5f));
 	overlay::WantFont(floorf(kLineFont * frame.height / kRefH + 0.5f));
+	overlay::WantFont(floorf(kBattleFont * frame.height / kRefH + 0.5f));
+	overlay::WantFont(floorf(kCaptionFont * frame.height / kRefH + 0.5f));
 }
 
 // While watching a battle: is it over (the results box on top)?
@@ -1078,8 +1092,7 @@ std::string ButtonLabel()
 {
 	const std::string name = NameOf(g_following);
 	if (g_watching_battle)
-		return ResultsOnTop() ? std::string(texts::Get("spectate.back_to_map"))
-		                      : texts::Fill(texts::Get("spectate.stop_watching"), {{"name", name}});
+		return ResultsOnTop() ? std::string(texts::Get("spectate.back_to_map")) : std::string(texts::Get("spectate.stop_watching"));
 	return texts::Fill(texts::Get("spectate.stop_button"), {{"name", name}});
 }
 
@@ -1120,12 +1133,30 @@ void DrawButton(ImDrawList *draw, const Button &b, int which, const std::string 
 		else
 			draw->AddRect(p0, p1, ui::kGold, 4.0f * k, 0, 1.5f * k);
 	}
-	const float px = floorf(kButtonFont * k + 0.5f);
+	const float px = floorf((g_watching_battle ? kBattleFont : kButtonFont) * k + 0.5f);
 	ImFont *font = overlay::Font(px);
 	const std::string text = ui::Fit(font, px, label.c_str(), p1.x - p0.x - 16.0f * k);
 	const ImVec2 size = font->CalcTextSizeA(px, 10000.0f, 0.0f, text.c_str());
 	ui::ShadowText(draw, font, px, ImVec2(floorf((p0.x + p1.x - size.x) / 2), floorf((p0.y + p1.y - size.y) / 2 + (pressed ? k : 0.0f))),
 	               IM_COL32(255, 236, 190, 255), text.c_str());
+}
+
+// While watching, the battle screen's buttons at the top right (auto combat, the battle's options,
+// the white flag: retreat or surrender) look greyed out, as the game greys the ones below when it
+// is not the player's turn: they do nothing for a watcher (the game gets no input then). Their
+// places in the game's layout: anchored to the right edge, scaled with the screen's height
+// (measured on the robot's 1008x729 screenshots, 2026-11-05).
+void GreyBattleButtons(ImDrawList *draw, float width, float k)
+{
+	struct Disc {
+		float from_right, y, r;
+	};
+	static const Disc kDiscs[] = {{22.1f, 61.1f, 20.0f}, {35.8f, 109.0f, 31.5f}, {22.1f, 171.7f, 20.0f}};
+	for (const Disc &d : kDiscs) {
+		const ImVec2 c(width - d.from_right * k, d.y * k);
+		draw->AddCircleFilled(c, d.r * k, IM_COL32(0, 0, 0, 115), 40);
+		draw->AddCircleFilled(c, d.r * k, IM_COL32(105, 105, 105, 115), 40);
+	}
 }
 
 void Draw(const overlay::Frame &frame)
@@ -1139,6 +1170,8 @@ void Draw(const overlay::Frame &frame)
 	ButtonRect(0, frame.width, frame.height, &p0, &p1);
 	overlay::BlockClicksIn(kName, p0.x, p0.y, p1.x, p1.y, frame.width, frame.height);
 	ImDrawList *draw = ImGui::GetForegroundDrawList();
+	if (g_watching_battle && !ResultsOnTop())
+		GreyBattleButtons(draw, frame.width, k);
 	DrawButton(draw, g_main, 0, ButtonLabel(), k);
 	if (g_offer) {
 		ImVec2 w0, w1;
@@ -1147,14 +1180,23 @@ void Draw(const overlay::Frame &frame)
 		overlay::BlockClicksIn(kWatchOwner, w0.x, w0.y, w1.x, w1.y, frame.width, frame.height);
 		DrawButton(draw, g_watch, 1, texts::Get("spectate.watch_button"), k);
 	}
-	// the line: over the buttons on the map, under the button in a battle; centred on the screen
+	if (g_watching_battle) {  // a small caption over the small button, centred on it
+		const float cpx = floorf(kCaptionFont * k + 0.5f);
+		ImFont *cfont = overlay::Font(cpx);
+		const std::string caption = ui::Fit(cfont, cpx, StatusLine(GetTickCount()).c_str(), 260.0f * k);
+		const ImVec2 csize = cfont->CalcTextSizeA(cpx, 10000.0f, 0.0f, caption.c_str());
+		ui::ShadowText(draw, cfont, cpx, ImVec2(floorf((p0.x + p1.x - csize.x) / 2), floorf(p0.y - 4.0f * k - csize.y)), ui::kParchment,
+		               caption.c_str());
+		return;
+	}
+	// the line: over the buttons on the map, centred on the screen
 	const float lpx = floorf(kLineFont * k + 0.5f);
 	ImFont *lfont = overlay::Font(lpx);
 	const std::string line = StatusLine(GetTickCount());
 	const std::string fitted = ui::Fit(lfont, lpx, line.c_str(), 600.0f * k);
 	const ImVec2 lsize = lfont->CalcTextSizeA(lpx, 10000.0f, 0.0f, fitted.c_str());
 	const float centre = ScreenAt(kScreenW / 2, 0, frame.width, frame.height).x;
-	const float line_y = g_watching_battle ? p1.y + 6.0f * k : p0.y - 6.0f * k - lsize.y;
+	const float line_y = p0.y - 6.0f * k - lsize.y;
 	ui::ShadowText(draw, lfont, lpx, ImVec2(floorf(centre - lsize.x / 2), floorf(line_y)), ui::kParchment, fitted.c_str());
 }
 

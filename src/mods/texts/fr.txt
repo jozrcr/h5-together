@@ -302,10 +302,10 @@ banner = Un joueur est parti. Sauvegarde « Reprise » : Multijoueur, Réseau lo
 [spectate]
 stop_button = Arrêter de suivre {name}
 watch_button = Regarder le combat
-stop_watching = Arrêter de regarder le combat de {name}
+stop_watching = Arrêter de regarder
 back_to_map = Retour à la carte
-watching = Vous regardez le combat de {name} : ses boutons sont inactifs pour vous.
-battle_over = Le combat de {name} est terminé.
+watching = Vous regardez {name}
+battle_over = Combat terminé
 hint = Cliquez sur le bouton ou sur le nom, ou déplacez la caméra, pour arrêter.
 in_battle = {name} est en combat.
 in_town = {name} est dans une ville.
