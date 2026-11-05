@@ -34,6 +34,22 @@ struct Row {
 	char hero[64];  // UTF-8: the name of the player's selected (or first) hero, "" without heroes
 	char face[160];  // that hero's portrait: a .dds file of the game's data, or ""
 	void *face_texture;  // the portrait as a texture (IDirect3DTexture9 *), or nullptr (overlay::GameTexture)
+	int eye;             // following views (spectate.cpp): kEyeNone, kEyeFollowsMe, kEyeFollowed, kEyeHover
+};
+
+// The eye after a pill (following a friend's view, spectate.cpp).
+enum Eye {
+	kEyeNone,
+	kEyeFollowsMe,  // this player follows this PC's view
+	kEyeFollowed,   // this PC follows this player's view
+	kEyeHover,      // an ally the cursor is over: a click follows their view
+};
+
+// Where each drawn row is on screen (for clicks), by row in turn order.
+struct Hits {
+	int count;
+	int id[kMaxPlayers];         // the player number
+	float rect[kMaxPlayers][4];  // x0, y0, x1, y1 in pixels: the portrait, the pill and the eye
 };
 
 struct Snapshot {
@@ -65,8 +81,9 @@ struct Look {
 extern const char kFramePicture[];
 // The font sizes the panel wants at this screen height (pixels).
 void FontSizes(float screen_height, float *regular, float *bold);
-// Draws the panel; writes the rectangle it covers (x0, y0, x1, y1, in pixels).
-void DrawPanel(const Snapshot &s, const Look &look, float rect[4]);
+// Draws the panel; writes the rectangle it covers (x0, y0, x1, y1, in pixels) and,
+// when `hits` is given, each row's.
+void DrawPanel(const Snapshot &s, const Look &look, float rect[4], Hits *hits);
 
 }  // namespace plist
 }  // namespace mods

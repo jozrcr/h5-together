@@ -137,6 +137,8 @@ const Setting kSettings[] = {
 	    "settings.notify.sound", "settings.notify.sound.help"),
 	ROW("notify", "popup", "1", kBool, 0, 1, nullptr, 0, nullptr, kPlayer, kLive, kInterface, kCheck,
 	    "settings.notify.popup", "settings.notify.popup.help"),
+	ROW("coop", "share_view", "1", kBool, 0, 1, nullptr, 0, nullptr, kPlayer, kLive, kInterface, kCheck,
+	    "settings.coop.share_view", "settings.coop.share_view.help"),
 	FILE_ONLY("notify", "trace", "0", kBool, 0, 1, kTester, kRestart),
 	// [ui]
 	ROW("ui", "player_list", "1", kBool, 0, 1, nullptr, 0, nullptr, kPlayer, kRestart, kInterface, kCheck,
@@ -250,6 +252,7 @@ const Setting kSettings[] = {
 	    kAdvanced, kList,
 	    "settings.debug.hang_seconds", "settings.debug.hang_seconds.help"),
 	FILE_ONLY("debug", "hang_test", "0", kBool, 0, 1, kTester, kRestart),
+	HIDDEN("debug", "spectate_probe", "0", kBool, 0, 1),  // research: the camera's position every 2 s (spectate.cpp)
 	ROW("debug", "crash_report", "1", kBool, 0, 1, nullptr, 0, nullptr, kPlayer, kRestart, kAdvanced, kCheck,
 	    "settings.debug.crash_report", "settings.debug.crash_report.help"),
 	FILE_ONLY("debug", "trace_wheel", "0", kBool, 0, 1, kTester, kRestart),

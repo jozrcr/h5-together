@@ -177,6 +177,25 @@ co-op features: this game (2 PCs): on: script_rhythm parallel_ai
 
 **Setting:** `[ai] parallel_turns=1` (Options, H5 Together, the host's settings). Only the host's value counts, from the next game; every PC needs a DLL that knows it. How: [docs/plans/turn-features.md](../../docs/plans/turn-features.md), part 3.
 
+## Following a friend's view (`spectate*.cpp`; on, each player's choice)
+
+**What it does:** in a multiplayer game, a click on an ally's name in the player list makes your camera follow theirs on the adventure map, gliding, so you can watch what they do while you wait. A button at the top, "Stop following Pierre", and a line under it say what they are doing ("Pierre is in a battle", "in a town"...). It stops when you click the button or the name again, move the camera yourself, or your own turn begins. An eye after a name shows whom you follow; on their screen, an eye after your name shows that you follow them.
+
+**Only allies** (the same team), and each player sees the map through their own fog: nothing of the game itself changes, so it cannot desync a game. While an ally follows you, your PC sends where your camera looks (a tile, a few times a second) as a small message next to the game's own world checks.
+
+**Setting:** `[coop] share_view=1` (Options, H5 Together, interface): your allies may follow your view; 0 = your view stays yours (they then read "Pierre does not share their view"). Each player chooses; it applies at once. The player list must be on (`[ui] player_list=1`): its names are where you click.
+
+`h5-together.log`:
+
+```
+spectate: following Pierre's view (a click on the player list)
+spectate: Pierre's view arrives (0.1 s after the request)
+spectate: stopped following Pierre (this PC's turn began)
+spectate: Joz follows this PC's view
+```
+
+How the camera is found and moved, the messages, and the robot runs: [docs/plans/spectate.md](../../docs/plans/spectate.md).
+
 ## Quick resume after a crash (`quick_resume.cpp`, `resume_transfer*.cpp`; on, the host's choice)
 
 **What it does:** when a player's game crashes (or loses its connection), the host's game drops that player after about 20 s and plays on without them: they count as defeated, and a save made after that cannot bring them back. With this, just before that defeat, the host has every PC save the game as **"Reprise"** ("Resume"), with the player still in it; a banner on the map says so. To play on together, everyone goes to Multiplayer, LAN, Create, Load, "Reprise".

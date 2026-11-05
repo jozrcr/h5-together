@@ -299,6 +299,16 @@ undo_button = Reprendre mon tour
 save_name = Reprise
 banner = Un joueur est parti. Sauvegarde « Reprise » : Multijoueur, Réseau local, Créer, Charger pour continuer ensemble.
 
+[spectate]
+stop_button = Arrêter de suivre {name}
+hint = Cliquez sur le bouton ou sur le nom, ou déplacez la caméra, pour arrêter.
+in_battle = {name} est en combat.
+in_town = {name} est dans une ville.
+in_hero_screen = {name} regarde un héros.
+elsewhere = {name} est dans un menu.
+no_view = {name} ne partage pas sa vue (son réglage, ou une ancienne version de H5 Together).
+player = Joueur {n}
+
 [settings]
 category = H5 Together
 category.title = Options de H5 Together
@@ -380,7 +390,7 @@ value.menu_homm5 = Heroes V
 value.menu_random = Au hasard
 value.no_peers = aucune
 ui.player_list = Liste des joueurs
-ui.player_list.help = Le jour, et le héros et le tour de chaque joueur, à gauche de la carte d'aventure.
+ui.player_list.help = Le jour, et le héros et le tour de chaque joueur, à gauche de la carte d'aventure. En multijoueur, cliquez sur le nom d'un allié pour suivre sa vue.
 ui.player_list_key = Touche de la liste
 ui.player_list_key.help = Masque ou affiche la liste des joueurs sur la carte d'aventure.
 ui.player_list_top = Liste : depuis le haut
@@ -393,6 +403,8 @@ notify.sound = ... avec un son
 notify.sound.help = Un son bref avec le clignotement (le son de notification de Windows).
 notify.popup = ... avec une notification
 notify.popup.help = Une notification Windows avec le clignotement (sous Linux, elle peut ne pas s'afficher).
+coop.share_view = Mes alliés peuvent suivre ma vue
+coop.share_view.help = Un allié peut cliquer sur votre nom dans la liste des joueurs et regarder la carte d'aventure là où vous regardez (un œil montre qui). Seule la position de votre caméra est envoyée ; chacun voit la carte à travers son propre brouillard.
 rules.key = Touche des règles
 rules.key.help = Ouvre le panneau des règles : écran de création, salle d'attente, carte d'aventure.
 rules.button = Bouton « Règles... »

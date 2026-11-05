@@ -14,11 +14,12 @@
 // from the game's data (the portraits, the resource bar's frame) and the
 // screen on top. It draws only while the adventure map is the screen on top.
 //
-// Input: none is taken from the game (it is not a modal panel). The panel
-// ignores the mouse (it only fades while the mouse is over it, read with
-// GetCursorPos) and the only key is the toggle (F9 by default), read with
-// GetAsyncKeyState while the game's window is in front, so the game still gets
-// every key and click.
+// Input: it is not a modal panel. It fades while the mouse is over it (read with
+// GetCursorPos), and the only key is the toggle (F9 by default), read with
+// GetAsyncKeyState while the game's window is in front. Only the rows of allies
+// whose view this PC may follow (spectate.cpp) take clicks: a click there starts or
+// stops following that ally's view, and the game does not get it
+// (overlay::BlockClicksIn). Everything else passes to the game.
 //
 // Settings (h5-together.ini):
 //   [ui]
@@ -41,6 +42,7 @@
 
 
 #include "player_list_internal.h"
+#include "spectate.h"
 
 #include "../hook/log.h"
 #include "../hook/overlay.h"
@@ -150,11 +152,60 @@ plist::Snapshot g_snapshot;      // this frame's
 float g_font_px = 0, g_bold_px = 0;
 float g_rect[4] = {0, 0, 0, 0};  // the panel on the last frame
 
+// Following a friend's view (spectate.cpp): the rows' eyes, and clicks on allies' rows.
+plist::Hits g_hits = {};
+float g_back_w = 0, g_back_h = 0;
+int g_hover = 0;    // the followable player under the cursor, 0 = none
+int g_pressed = 0;  // the row the button went down on
+bool g_button = false;
+const char *const kRowOwners[plist::kMaxPlayers] = {"player list row 1", "player list row 2", "player list row 3",
+                                                    "player list row 4", "player list row 5", "player list row 6",
+                                                    "player list row 7", "player list row 8"};
+
+void Spectate(plist::Snapshot *s)
+{
+	g_hover = 0;
+	float x = 0, y = 0;
+	HWND window = overlay::GameWindow();
+	const bool front = window && GetAncestor(GetForegroundWindow(), GA_ROOTOWNER) == GetAncestor(window, GA_ROOTOWNER);
+	const bool cursor = front && g_back_w > 0 && overlay::CursorInBackBuffer(g_back_w, g_back_h, &x, &y);
+	for (int i = 0; i < g_hits.count; ++i) {
+		const float *r = g_hits.rect[i];
+		if (cursor && x >= r[0] && x < r[2] && y >= r[1] && y < r[3] && SpectateCanFollow(g_hits.id[i]))
+			g_hover = g_hits.id[i];
+	}
+	const bool down = front && (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
+	if (down && !g_button)
+		g_pressed = g_hover;
+	else if (!down && g_button) {
+		if (g_pressed && g_pressed == g_hover)
+			SpectateToggle(g_pressed, "a click on the player list");
+		g_pressed = 0;
+	}
+	g_button = down;
+	const int followed = SpectateFollowing();
+	for (int i = 0; i < s->count; ++i) {
+		plist::Row &row = s->rows[i];
+		if (row.human)
+			SpectateNoteName(row.id, row.name);
+		row.eye = row.id == followed            ? plist::kEyeFollowed
+		          : SpectateFollowsMe(row.id)   ? plist::kEyeFollowsMe
+		          : row.id == g_hover           ? plist::kEyeHover
+		                                        : plist::kEyeNone;
+	}
+}
+
 // Every frame: drawn while the adventure map is on top (and F9 did not hide it).
 bool Wanted()
 {
 	PollKey();
-	return g_visible && plist::ReadSnapshot(&g_snapshot);
+	if (!g_visible || !plist::ReadSnapshot(&g_snapshot)) {
+		g_hits.count = 0;
+		g_hover = g_pressed = 0;
+		return false;
+	}
+	Spectate(&g_snapshot);
+	return true;
 }
 
 void Prepare(const overlay::Frame &frame)
@@ -181,7 +232,7 @@ void Prepare(const overlay::Frame &frame)
 	float mx, my;
 	const bool over = overlay::MouseInBackBuffer(frame.width, frame.height, &mx, &my) && g_rect[2] > g_rect[0] &&
 	                  mx >= g_rect[0] - 4 && mx <= g_rect[2] + 4 && my >= g_rect[1] - 4 && my <= g_rect[3] + 4;
-	const float target = over ? 0.12f : 1.0f;
+	const float target = over && !g_hover ? 0.12f : 1.0f;  // (an ally's row under the cursor: a click follows)
 	const float step = frame.delta * 8.0f;
 	g_look.alpha += (target - g_look.alpha) * (step < 1.0f ? step : 1.0f);
 }
@@ -190,7 +241,13 @@ void Draw(const overlay::Frame &frame)
 {
 	g_look.font = overlay::Font(g_font_px);
 	g_look.font_bold = overlay::Font(g_bold_px);
-	plist::DrawPanel(g_snapshot, g_look, g_rect);
+	g_back_w = frame.width;
+	g_back_h = frame.height;
+	plist::DrawPanel(g_snapshot, g_look, g_rect, &g_hits);
+	for (int i = 0; i < g_hits.count; ++i)
+		if (SpectateCanFollow(g_hits.id[i]))
+			overlay::BlockClicksIn(kRowOwners[i], g_hits.rect[i][0], g_hits.rect[i][1], g_hits.rect[i][2], g_hits.rect[i][3],
+			                       frame.width, frame.height);
 	static bool first = true;
 	if (first) {
 		first = false;

@@ -17,6 +17,7 @@
 #include "../mods/coop_guard.h"
 #include "../mods/edge_sky.h"
 #include "../mods/frame_limit.h"
+#include "../mods/spectate.h"
 #include "../mods/fast_paths.h"
 #include "../mods/hero_skins.h"
 #include "../mods/turn_undo.h"
@@ -136,6 +137,7 @@ void InstallAll()
 	mods::ApplyCameraFromSettings();
 	mods::ApplyAnimThrottleFromSettings();  // [camera] anim_saver (on by default; anim_every: testing)
 	mods::ApplyFrameLimitFromSettings();  // [video] fps_limit, vsync (off, the game's own by default)
+	mods::ApplySpectateFromSettings();  // following a friend's view ([coop] share_view; a click in the player list)
 	mods::ApplyVertexPoolFromSettings();  // [camera] vertex_pool (4: a bigger pool; vb_trace: research, hidden)
 	mods::ApplyWheelFromSettings();  // its DirectInput filter goes first (order -10)
 	mods::ApplyEdgeSkyFromSettings();  // [camera] edge_sky: before the first map reads its light

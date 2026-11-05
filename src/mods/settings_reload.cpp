@@ -5,6 +5,7 @@
 
 #include "autosave.h"
 #include "camera.h"
+#include "spectate.h"
 #include "frame_limit.h"
 #include "hero_skins_internal.h"
 #include "host_rules_internal.h"
@@ -23,6 +24,8 @@ namespace settings {
 void Reload(const char *section, const char *key)
 {
 	const auto is = [&](const char *s, const char *k) { return strcmp(section, s) == 0 && strcmp(key, k) == 0; };
+	if (is("coop", "share_view"))
+		ReloadSpectateSettings();
 	if (is("notify", "sound") || is("notify", "popup"))
 		ReloadNotifySettings();
 	else if (is("ui", "player_list_key") || is("ui", "player_list_top") || is("ui", "player_list_left"))
