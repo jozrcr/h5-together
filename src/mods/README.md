@@ -163,6 +163,18 @@ Some of our changes act on the game world, so every PC of a multiplayer game mus
 co-op features: this game (2 PCs): on: script_rhythm parallel_ai
 ```
 
+## The computer bonus, also in a loaded game (`coop_features.cpp`, `ai_bonus`; since 0.3.4)
+
+**What it does:** MMH5.5 gives the computer players extra gold and creatures every week (`H55_AICheatMode`, the F2 panel's "Computer bonus": Off, 40% ... 140%). Its scripts read their settings file only when a map starts, and a save keeps the values, so a loaded game used to keep the bonus it started with (the owner's 3-player game, 2026-11-05: "the AI army multiplies x2 overnight"). MMH5.5 reads the variable again at each new week. So at the co-op features' decision (segment 20, the same point of the game on every PC) every PC sets it to the host's value with the game's own "run a line of script" (`DoString`, the scripts' object slot 0 `0x00cab4a0`, at world `+0x1d0` `+0x0c`; it answers 0 when the line ran). The value is what the host's F2 panel shows: its choice, else its own MMH5.5 file's. It counts from the next week; what the computers already got stays.
+
+**Travels** in the co-op features' hello (the wants byte's bits 4-6; a 0.3.3 PC reads only bits 0-1, does not know `ai_bonus`, so it stays off for everyone). The log, on every PC:
+
+```
+co-op features: the host's computer bonus: H55_AICheatMode = 0 (off) set in the game on every PC
+```
+
+and MMH5.5's console: `H5 Together: H55_AICheatMode = 0`. Robot (LAN A1M4, 2026-11-05/06): with the host's `ai_cheat=0` and with no choice (its file's 4), both consoles print the value, 449 world checks all equal.
+
 ## MMH5.5's scripts at their own pace (`script_rhythm.cpp`; on, the host's choice)
 
 **What it does:** map scripts (MMH5.5's above all) count their waits in "ticks" of the game's script clock, one per segment. MMH5.5 was made for the game's 200 ms segments; with our 50 ms co-op segments its main loop checked every hero four times as often (more work on every PC, a choppier map). With this, the script clock ticks once per 200 ms of game time, as in the original game: every script keeps its original pace.
