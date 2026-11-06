@@ -21,6 +21,7 @@
 #include "../mods/spectate.h"
 #include "../mods/fast_paths.h"
 #include "../mods/hero_skins.h"
+#include "../mods/join_time.h"
 #include "../mods/turn_undo.h"
 #include "../mods/vertex_pool.h"
 #include "../mods/parallel_ai.h"
@@ -173,6 +174,7 @@ void InstallAll()
 	mods::ApplySteamSpikeFromSettings();  // [online] spike (test only, off by default; not with mode=steam): early too
 	InstallAiTrace();
 	mods::ApplyNetTuningFromSettings();
+	mods::ApplyJoinTimeFromSettings();  // [net] join_timeout_s: more time for a PC that joins (its map build)
 	mods::ApplyFastPathsFromSettings();
 	mods::ApplyLanDiscoveryFromSettings();  // (after InstallVirtualLan: its hooks stack on the virtual LAN's)
 	mods::ApplyCoopGuardFromSettings();

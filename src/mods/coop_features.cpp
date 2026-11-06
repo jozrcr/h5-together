@@ -41,6 +41,7 @@
 #include "coop_features_logic.h"
 #include "endless_turns.h"
 #include "host_rules.h"
+#include "join_time.h"
 #include "script_rhythm.h"
 
 #include "../hook/log.h"
@@ -289,6 +290,8 @@ void __fastcall SegmentHook(void *transceiver8, void *edx, DWORD time)
 		if (t != g_transceiver)
 			NewGame(t);
 		++g_segments;
+		if (g_segments == 1)
+			JoinTimeGameStarted();  // (the game's own time limit again, on every PC)
 		DebugScriptAt(g_segments);
 		int me = 0, pcs = 0;
 		if (g_segments == features::kDecideAt && !g_decided && Pcs(t, &me, &pcs)) {
