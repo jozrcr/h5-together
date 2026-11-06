@@ -266,6 +266,7 @@ st::MenuOptions OptionsNow()
 	wchar_t steam_dll[MAX_PATH];
 	oldnames::PathInOurFolder(L"steam_api.dll", steam_dll, MAX_PATH);
 	o.steam_dll = GetFileAttributesW(steam_dll) != INVALID_FILE_ATTRIBUTES;
+	o.mmh55 = GameHasMmh55();
 	return o;
 }
 
