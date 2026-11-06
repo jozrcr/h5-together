@@ -8,6 +8,8 @@
 # Options, for tests and odd setups:
 #   --game-dir <folder>   use this game folder (or its bin folder), skip the search
 #   --steam-dir <folder>  look in this Steam folder only
+#   --mmh55-installer <file>  MMH5.5's installer file, to make the original game's 4 GB exe
+#                         from (else looked for here, in Downloads and on the Desktop)
 #   --test-known-55u "<sha256>=<name>;..."   count these 55u.dll files as known versions (tests)
 #
 # It looks for Steam in ~/.steam/steam, ~/.local/share/Steam, the Flatpak and the Snap
@@ -40,11 +42,13 @@ GAME_FOLDER='Heroes of Might and Magic 5 Tribes of the East'
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 game_dir_arg=""
 steam_dir_arg=""
+mmh55_installer_arg=""
 test_known_55u_arg=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --game-dir)  game_dir_arg="${2:-}"; shift ;;
         --steam-dir) steam_dir_arg="${2:-}"; shift ;;
+        --mmh55-installer) mmh55_installer_arg="${2:-}"; shift ;;
         --test-known-55u) test_known_55u_arg="${2:-}"; shift ;;
         -h|--help)   awk 'NR > 1 { if (/^#/) { sub(/^# ?/, ""); print } else exit }' "${BASH_SOURCE[0]}"; exit 0 ;;
         *) echo "Unknown option: $1 (try --help)"; exit 2 ;;
@@ -238,7 +242,7 @@ game_info() {
         f="$(find_ci "$b" "$name")"
         if [ -n "$f" ] && [ -f "$f" ]; then coop+=("$f"); gi_exes+=("$name|coop"); fi
     done
-    for name in H5_Game.exe H5_GameOLD.exe; do
+    for name in H5_Game.exe H5_GameOLD.exe H5_Original_4GB.exe; do
         f="$(find_ci "$b" "$name")"
         if [ -z "$f" ] || [ ! -f "$f" ]; then continue; fi
         role="own"
@@ -815,6 +819,103 @@ if [ -f "$src_steam" ]; then
     steam_installed=1
 fi
 
+# ---- the original 2008 game with 4 GB of memory: bin/H5_Original_4GB.exe ----
+# As install.ps1 (Install-Original4Gb): the original game's exe can use only 2 GB of memory,
+# too little for big maps; Steam's copy refuses any change. MMH5.5's installer carries the 2008
+# exe without Steam's protection, stored as it is: it is copied out of that file (nothing is run
+# or installed) and its header gets the 4 GB mark. (Proton may give the game 4 GB by itself;
+# the copy does no harm then.)
+u16() { od -An -tu2 -j "$2" -N 2 "$1" 2>/dev/null | tr -d ' '; }
+u32() { od -An -tu4 -j "$2" -N 4 "$1" 2>/dev/null | tr -d ' '; }
+
+# exe_2008_length <file> <offset>: the length of the 2008 game's exe without Steam's protection
+# whose header starts at that offset of the file, else 0.
+exe_2008_length() {
+    local f="$1" o="$2" pe secs opt table i at e end=0
+    [ "$(od -An -c -j "$o" -N 2 "$f" 2>/dev/null | tr -d ' ')" = "MZ" ] || { echo 0; return; }
+    pe="$(u32 "$f" $((o + 60)))"
+    if [ -z "$pe" ] || [ "$pe" -lt 64 ] || [ "$pe" -gt 768 ]; then echo 0; return; fi
+    [ "$(u32 "$f" $((o + pe)))" = "17744" ] || { echo 0; return; }            # "PE\0\0"
+    [ "$(u16 "$f" $((o + pe + 4)))" = "332" ] || { echo 0; return; }           # 32-bit
+    [ "$(u32 "$f" $((o + pe + 8)))" = "$PE_DATE_2008" ] || { echo 0; return; } # 2008-06-04
+    [ "$(u32 "$f" $((o + pe + 80)))" = "14520320" ] || { echo 0; return; }      # 0x00DD9000: unprotected
+    secs="$(u16 "$f" $((o + pe + 6)))"
+    opt="$(u16 "$f" $((o + pe + 20)))"
+    table=$((o + pe + 24 + opt))
+    for ((i = 0; i < secs; i++)); do
+        at=$((table + 40 * i))
+        e=$(( $(u32 "$f" $((at + 20))) + $(u32 "$f" $((at + 16))) ))
+        [ "$e" -gt "$end" ] && end=$e
+    done
+    if [ "$end" -lt 1024 ] || [ "$end" -gt 67108864 ]; then echo 0; return; fi
+    echo "$end"
+}
+
+# The 2008 game's own exe (it loads um.dll, not MMH5.5's 55u.dll).
+exe_2008_bytes() {
+    LC_ALL=C grep -q -a -F um.dll "$1" && ! LC_ALL=C grep -q -a -F 55u.dll "$1"
+}
+
+# copy_exe_2008 <file> <out>: copies the 2008 exe found in <file> (MMH5.5's installer) to <out>.
+copy_exe_2008() {
+    local f="$1" out="$2" off len
+    while IFS=: read -r off _; do
+        len="$(exe_2008_length "$f" "$off")"
+        [ "$len" -gt 0 ] || continue
+        dd if="$f" of="$out" bs=1M iflag=skip_bytes,count_bytes skip="$off" count="$len" status=none 2>/dev/null || continue
+        [ "$(wc -c < "$out" | tr -d ' ')" = "$len" ] && exe_2008_bytes "$out" && return 0
+    done < <(LC_ALL=C grep -obUa $'MZ\x90' "$f" 2>/dev/null)   # (each exe header's first bytes; no -P: Git Bash refuses it)
+    rm -f "$out"
+    return 1
+}
+
+# The 4 GB mark (IMAGE_FILE_LARGE_ADDRESS_AWARE) in the exe $1's header.
+set_4gb() {
+    local pe at b
+    pe="$(u32 "$1" 60)"
+    at=$((pe + 22))
+    b="$(od -An -tu1 -j "$at" -N 1 "$1" | tr -d ' ')"
+    printf "$(printf '\\%03o' $((b | 32)))" | dd of="$1" bs=1 seek="$at" conv=notrunc status=none
+}
+
+original_state="none"
+original_from=""
+dst4="$bin/H5_Original_4GB.exe"
+if [ -n "$(find_ci "$bin" H5_Original_4GB.exe)" ]; then
+    original_state="kept"
+else
+    # a copy of the game's own 2008 exe without Steam's protection, already in the game folder
+    for name in H5_Game.exe H5_GameOLD.exe; do
+        f="$(find_ci "$bin" "$name")"
+        if [ -n "$f" ] && [ -f "$f" ] && [ "$(exe_2008_length "$f" 0)" = "$(wc -c < "$f" | tr -d ' ')" ] && exe_2008_bytes "$f"; then
+            cp -f "$f" "$dst4" && original_from="$name" && break
+        fi
+    done
+    sources=()
+    if [ -z "$original_from" ]; then
+        if [ -n "$mmh55_installer_arg" ]; then
+            sources=("$mmh55_installer_arg")
+        else
+            for place in "$here" "$(dirname "$here")" "$HOME/Downloads" "$HOME/Desktop" "${XDG_DOWNLOAD_DIR:-}"; do
+                [ -n "$place" ] && [ -d "$place" ] || continue
+                while IFS= read -r f; do sources+=("$f"); done < <(find "$place" -maxdepth 1 -type f -iname 'MMH55*.exe' -size +100M 2>/dev/null)
+            done
+        fi
+        for src in "${sources[@]}"; do
+            if [ ! -f "$src" ]; then original_state="failed"; original_from="$src (the file was not found)"; break; fi
+            echo "Looking for the original game's exe in $(basename "$src") ..."
+            if copy_exe_2008 "$src" "$dst4"; then original_from="$(basename "$src")"; break; fi
+        done
+    fi
+    if [ -n "$original_from" ] && [ -f "$dst4" ] && [ "$original_state" != "failed" ]; then
+        set_4gb "$dst4"
+        original_state="made"
+    elif [ "$original_state" != "failed" ] && [ "${#sources[@]}" -gt 0 ]; then
+        original_state="failed"
+        original_from="${sources[*]} (the original game's exe is not in it)"
+    fi
+fi
+
 echo
 echo "Done. What I did:"
 if [ "$old_moved" != " " ]; then
@@ -862,7 +963,26 @@ echo "  - installed ${#txt_files[@]} language files in h5-together/texts (${txt_
 [ "$txt_replaced" -gt 0 ] && echo "    ($txt_replaced of them replaced our files from an earlier install)"
 [ "$txt_others" -gt 0 ] && echo "    (left the $txt_others other file(s) in that folder alone)"
 [ "$steam_installed" -eq 1 ] && echo "  - installed Valve's steam_api.dll in h5-together (online play over Steam, off until you turn it on in Options)"
+case "$original_state" in
+    made)
+        echo "  - made H5_Original_4GB.exe: the original 2008 game, with 4 GB of memory (its exe, from $original_from)"
+        echo "    To play the original game without MMH5.5, use the launch option for it below."
+        ;;
+    kept) echo "  - H5_Original_4GB.exe (the original game with 4 GB of memory) is already there" ;;
+esac
 echo "  - did not change or replace any file of the game itself"
+case "$original_state" in
+    none)
+        echo
+        echo "Tip: to play the original game (without MMH5.5) with 4 GB of memory, H5 Together can make"
+        echo "bin/H5_Original_4GB.exe from MMH5.5's installer file (MMH55_RC19k.exe, from MMH5.5's ModDB page:"
+        echo "download it, you do not need to install it). Put it in ~/Downloads and run install.sh again."
+        ;;
+    failed)
+        echo
+        echo "Could not make H5_Original_4GB.exe (the original game with 4 GB) from $original_from."
+        ;;
+esac
 
 if [ "$gi_mmh55" = "missing" ] && [ "$gi_has2008" != "1" ]; then
     echo
@@ -893,6 +1013,11 @@ cat <<'EOF'
 
      If it does not work, docs/linux.md (step 3) has another way: swap the two exe
      files. https://github.com/jozrcr/h5-together/blob/main/docs/linux.md
+
+     For the original game without MMH5.5 (H5_Original_4GB.exe, when the installer made it),
+     the same line with that exe's name:
+
+         WINEDLLOVERRIDES="dinput8=n,b" bash -c 'exec "${@/H5_Game.exe/H5_Original_4GB.exe}"' -- %command%
 
   3. Start the game from Steam. Then look in the game's bin folder for the file
      h5-together.log:

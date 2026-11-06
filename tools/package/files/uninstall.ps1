@@ -295,7 +295,7 @@ function Get-GameInfo([string]$Bin) {
         $p = Join-Path $Bin $name
         if (Test-Path -LiteralPath $p -PathType Leaf) { $coop += $p; [void]$exes.Add(@{ Name = $name; Role = "coop" }) }
     }
-    foreach ($name in @("H5_Game.exe", "H5_GameOLD.exe")) {
+    foreach ($name in @("H5_Game.exe", "H5_GameOLD.exe", "H5_Original_4GB.exe")) {
         $p = Join-Path $Bin $name
         if (-not (Test-Path -LiteralPath $p -PathType Leaf)) { continue }
         $role = "own"
@@ -600,6 +600,19 @@ try {
             }
         } else {
             Write-Host "  - kept $what"
+        }
+    }
+
+    # The original game's 4 GB exe that the installer made (install.ps1, Install-Original4Gb):
+    # only that name, and only when it is the 2008 game's exe.
+    $orig4 = Join-Path $bin "H5_Original_4GB.exe"
+    if ((Test-Path -LiteralPath $orig4 -PathType Leaf) -and (Test-Exe2008 $orig4)) {
+        try {
+            Remove-Item -LiteralPath $orig4 -Force
+            Write-Host "  - removed H5_Original_4GB.exe (the original game's 4 GB exe that the installer made)"
+        } catch {
+            Write-Host ("  - could not remove H5_Original_4GB.exe: " + $_.Exception.Message) -ForegroundColor Red
+            $failed = $true
         }
     }
 

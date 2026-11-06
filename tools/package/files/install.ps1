@@ -36,6 +36,9 @@ param(
     [string]$GameDir = "",
     [string]$SteamDir = "",
     [switch]$NoPause,
+    # MMH5.5's installer file (MMH55_RC19k.exe...), to make the original game's 4 GB exe from
+    # (else it is looked for in this folder, Downloads and the Desktop).
+    [string]$Mmh55Installer = "",
     # Tests only (see above).
     [string]$TestRegistry = "",
     [string]$TestPicker = "",
@@ -304,7 +307,7 @@ function Get-GameInfo([string]$Bin) {
         $p = Join-Path $Bin $name
         if (Test-Path -LiteralPath $p -PathType Leaf) { $coop += $p; [void]$exes.Add(@{ Name = $name; Role = "coop" }) }
     }
-    foreach ($name in @("H5_Game.exe", "H5_GameOLD.exe")) {
+    foreach ($name in @("H5_Game.exe", "H5_GameOLD.exe", "H5_Original_4GB.exe")) {
         $p = Join-Path $Bin $name
         if (-not (Test-Path -LiteralPath $p -PathType Leaf)) { continue }
         $role = "own"
@@ -537,6 +540,130 @@ function Get-PublicZeroTier {
         }
     } catch { }
     return $names
+}
+
+# ---- the original 2008 game with 4 GB of memory: bin\H5_Original_4GB.exe ----
+# The original game's exe can use only 2 GB of memory, too little for big maps at a high
+# resolution (the game crashes when it runs out); MMH5.5's exes are marked to use 4 GB. Steam's
+# copy of the 2008 exe (H5_GameOLD.exe after the GameRanger guide) is protected by Steam and
+# refuses any change. MMH5.5's installer carries the 2008 exe without Steam's protection, stored
+# as it is: it is copied out of that file (nothing is run or installed), its header gets the
+# 4 GB mark, and it is written as bin\H5_Original_4GB.exe. A copy of the game's own exe without
+# Steam's protection (GOG, or the H5_Game.exe that MMH5.5 RC19k leaves) is used the same way.
+$Original4GbName = "H5_Original_4GB.exe"
+
+# The file length of the 2008 game's exe without Steam's protection whose header starts this
+# byte array (at least 1 KB), else 0. (The 2008 date, 32-bit, the unprotected image size: Steam's
+# protected one is 0x00E2D000.)
+function Get-Exe2008Length([byte[]]$Head) {
+    if ($Head.Length -lt 0x400 -or $Head[0] -ne 0x4D -or $Head[1] -ne 0x5A) { return 0 }
+    $pe = [BitConverter]::ToInt32($Head, 0x3C)
+    if ($pe -lt 0x40 -or $pe -gt 0x300) { return 0 }
+    if ([BitConverter]::ToUInt32($Head, $pe) -ne 0x4550 -or [BitConverter]::ToUInt16($Head, $pe + 4) -ne 0x14C) { return 0 }
+    if ([BitConverter]::ToUInt32($Head, $pe + 8) -ne $PeDate2008) { return 0 }
+    if ([BitConverter]::ToUInt32($Head, $pe + 24 + 56) -ne 0x00DD9000) { return 0 }
+    $sections = [BitConverter]::ToUInt16($Head, $pe + 6)
+    $table = $pe + 24 + [BitConverter]::ToUInt16($Head, $pe + 20)
+    if ($sections -lt 1 -or $table + 40 * $sections -gt $Head.Length) { return 0 }
+    $end = [long]0
+    for ($i = 0; $i -lt $sections; $i++) {
+        $at = $table + 40 * $i
+        $e = [long][BitConverter]::ToUInt32($Head, $at + 20) + [long][BitConverter]::ToUInt32($Head, $at + 16)
+        if ($e -gt $end) { $end = $e }
+    }
+    if ($end -lt 0x400 -or $end -gt 64MB) { return 0 }
+    return [int]$end
+}
+
+# These bytes are the 2008 game's own exe (it loads um.dll, not MMH5.5's 55u.dll).
+function Test-Exe2008Bytes([byte[]]$Exe) {
+    $head = New-Object byte[] ([Math]::Min(0x400, $Exe.Length))
+    [Array]::Copy($Exe, $head, $head.Length)
+    if ((Get-Exe2008Length $head) -ne $Exe.Length) { return $false }
+    $text = $Latin1.GetString($Exe)
+    return ($text.Contains("um.dll") -and -not $text.Contains("55u.dll"))
+}
+
+# The 2008 exe inside a bigger file (MMH5.5's installer, whose files are stored as they are):
+# its bytes, else $null. Looks at every "MZ" in the file, 64 MB at a time.
+function Find-Exe2008In([string]$Path) {
+    $chunk = 64MB
+    $fs = [System.IO.File]::OpenRead($Path)
+    try {
+        $buf = New-Object byte[] ($chunk + 0x400)
+        $pos = [long]0
+        while ($pos -lt $fs.Length) {
+            $fs.Position = $pos
+            $n = 0
+            while ($n -lt $buf.Length) { $r = $fs.Read($buf, $n, $buf.Length - $n); if ($r -le 0) { break }; $n += $r }
+            if ($n -le 0) { break }
+            $text = $Latin1.GetString($buf, 0, $n)
+            $i = $text.IndexOf("MZ", [StringComparison]::Ordinal)
+            while ($i -ge 0 -and $i -lt $chunk -and $i + 0x400 -le $n) {
+                $head = New-Object byte[] 0x400
+                [Array]::Copy($buf, $i, $head, 0, 0x400)
+                $len = Get-Exe2008Length $head
+                if ($len -gt 0 -and $pos + $i + $len -le $fs.Length) {
+                    $exe = New-Object byte[] $len
+                    $fs.Position = $pos + $i
+                    $got = 0
+                    while ($got -lt $len) { $r = $fs.Read($exe, $got, $len - $got); if ($r -le 0) { break }; $got += $r }
+                    if ($got -eq $len -and (Test-Exe2008Bytes $exe)) { return ,$exe }
+                }
+                $i = $text.IndexOf("MZ", $i + 2, [StringComparison]::Ordinal)
+            }
+            $pos += $chunk
+        }
+    } finally { $fs.Close() }
+    return $null
+}
+
+# MMH5.5's installer files (MMH55*.exe, over 100 MB) in this package's folder, Downloads, the Desktop.
+function Find-Mmh55Installers {
+    $places = @($PSScriptRoot, (Split-Path -Parent $PSScriptRoot))
+    if ($env:USERPROFILE) { $places += @((Join-Path $env:USERPROFILE "Downloads"), (Join-Path $env:USERPROFILE "Desktop")) }
+    try { $places += [Environment]::GetFolderPath("Desktop") } catch { }
+    $found = @()
+    foreach ($place in ($places | Select-Object -Unique)) {
+        if (-not $place -or -not (Test-Path -LiteralPath $place -PathType Container)) { continue }
+        $found += @(Get-ChildItem -LiteralPath $place -Filter "MMH55*.exe" -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Length -gt 100MB })
+    }
+    return @($found | Sort-Object LastWriteTime -Descending | ForEach-Object { $_.FullName } | Select-Object -Unique)
+}
+
+# Makes bin\H5_Original_4GB.exe if it can. A hashtable: State (kept, made, none, failed), From, Why.
+function Install-Original4Gb([string]$Bin, [string]$Given) {
+    $dst = Join-Path $Bin $Original4GbName
+    if (Test-Path -LiteralPath $dst -PathType Leaf) { return @{ State = "kept"; From = ""; Why = "" } }
+    $exe = $null
+    $from = ""
+    # a copy of the game's own 2008 exe without Steam's protection, already in the game folder
+    foreach ($name in @("H5_Game.exe", "H5_GameOLD.exe")) {
+        $p = Join-Path $Bin $name
+        if ($null -eq $exe -and (Test-Path -LiteralPath $p -PathType Leaf) -and (Get-Item -LiteralPath $p).Length -le 64MB) {
+            $bytes = [System.IO.File]::ReadAllBytes($p)
+            if (Test-Exe2008Bytes $bytes) { $exe = $bytes; $from = $name }
+        }
+    }
+    # else MMH5.5's installer file
+    $sources = @()
+    if ($Given) { $sources += $Given } else { $sources += @(Find-Mmh55Installers) }
+    foreach ($src in $sources) {
+        if ($null -ne $exe) { break }
+        if (-not (Test-Path -LiteralPath $src -PathType Leaf)) { return @{ State = "failed"; From = $src; Why = "the file was not found" } }
+        Write-Host ("Looking for the original game's exe in {0} ..." -f (Split-Path -Leaf $src))
+        try { $exe = Find-Exe2008In $src } catch { return @{ State = "failed"; From = $src; Why = $_.Exception.Message } }
+        if ($null -ne $exe) { $from = Split-Path -Leaf $src }
+    }
+    if ($null -eq $exe) {
+        if ($sources.Count -gt 0) { return @{ State = "failed"; From = ($sources -join ", "); Why = "the original game's exe is not in it" } }
+        return @{ State = "none"; From = ""; Why = "" }
+    }
+    $pe = [BitConverter]::ToInt32($exe, 0x3C)
+    $exe[$pe + 22] = $exe[$pe + 22] -bor 0x20  # IMAGE_FILE_LARGE_ADDRESS_AWARE: up to 4 GB
+    try { [System.IO.File]::WriteAllBytes($dst, $exe) } catch { return @{ State = "failed"; From = $from; Why = $_.Exception.Message } }
+    return @{ State = "made"; From = $from; Why = "" }
 }
 
 # ---- the settings file: refresh it from this package's h5-together.ini ----
@@ -984,6 +1111,10 @@ try {
         }
     }
 
+    # The original 2008 game with 4 GB of memory (bin\H5_Original_4GB.exe), if it can be made.
+    $original = @{ State = "failed"; From = ""; Why = "" }
+    try { $original = Install-Original4Gb $bin $Mmh55Installer } catch { $original.Why = $_.Exception.Message }
+
     Write-Host ""
     Write-Host "Done. What I did:" -ForegroundColor Green
     if ($renamed.Moved.Count -gt 0) {
@@ -1035,7 +1166,22 @@ try {
     if ($hasSteam) {
         Write-Host "  - installed Valve's steam_api.dll in h5-together (online play over Steam, off until you turn it on in Options)"
     }
+    if ($original.State -eq "made") {
+        Write-Host ("  - made {0}: the original 2008 game, with 4 GB of memory (its exe, from {1})" -f $Original4GbName, $original.From)
+        Write-Host "    To play the original game without MMH5.5, double-click it (Steam running for online play)."
+    } elseif ($original.State -eq "kept") {
+        Write-Host ("  - {0} (the original game with 4 GB of memory) is already there" -f $Original4GbName)
+    }
     Write-Host "  - did not change or replace any file of the game itself"
+    if ($original.State -eq "none") {
+        Write-Host ""
+        Write-Host "Tip: to play the original game (without MMH5.5) with 4 GB of memory, H5 Together can make"
+        Write-Host ("bin\{0} from MMH5.5's installer file (MMH55_RC19k.exe, from MMH5.5's ModDB page: download it," -f $Original4GbName)
+        Write-Host "you do not need to install it). Put it in your Downloads folder and run install.bat again."
+    } elseif ($original.State -eq "failed") {
+        Write-Host ""
+        Write-Host ("Could not make {0} (the original game with 4 GB) from {1}: {2}" -f $Original4GbName, $original.From, $original.Why) -ForegroundColor Yellow
+    }
     if ($game.Mmh55 -eq "missing" -and -not $game.Has2008) {
         Write-Host ""
         Write-Host "Reminder: neither MMH5.5 nor the original 2008 game's exe was found in this game folder." -ForegroundColor Yellow

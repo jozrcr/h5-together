@@ -245,7 +245,7 @@ game_info() {
         f="$(find_ci "$b" "$name")"
         if [ -n "$f" ] && [ -f "$f" ]; then coop+=("$f"); gi_exes+=("$name|coop"); fi
     done
-    for name in H5_Game.exe H5_GameOLD.exe; do
+    for name in H5_Game.exe H5_GameOLD.exe H5_Original_4GB.exe; do
         f="$(find_ci "$b" "$name")"
         if [ -z "$f" ] || [ ! -f "$f" ]; then continue; fi
         role="own"

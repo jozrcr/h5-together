@@ -303,7 +303,7 @@ function Get-GameInfo([string]$Bin) {
         $p = Join-Path $Bin $name
         if (Test-Path -LiteralPath $p -PathType Leaf) { $coop += $p; [void]$exes.Add(@{ Name = $name; Role = "coop" }) }
     }
-    foreach ($name in @("H5_Game.exe", "H5_GameOLD.exe")) {
+    foreach ($name in @("H5_Game.exe", "H5_GameOLD.exe", "H5_Original_4GB.exe")) {
         $p = Join-Path $Bin $name
         if (-not (Test-Path -LiteralPath $p -PathType Leaf)) { continue }
         $role = "own"

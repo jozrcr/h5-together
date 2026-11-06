@@ -229,7 +229,7 @@ game_info() {
         f="$(find_ci "$b" "$name")"
         if [ -n "$f" ] && [ -f "$f" ]; then coop+=("$f"); gi_exes+=("$name|coop"); fi
     done
-    for name in H5_Game.exe H5_GameOLD.exe; do
+    for name in H5_Game.exe H5_GameOLD.exe H5_Original_4GB.exe; do
         f="$(find_ci "$b" "$name")"
         if [ -z "$f" ] || [ ! -f "$f" ]; then continue; fi
         role="own"
@@ -497,6 +497,18 @@ else
 fi
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# The original game's 4 GB exe that the installer made (install.sh): only that name, and only
+# when it is the 2008 game's exe.
+p="$(find_ci "$bin" H5_Original_4GB.exe)"
+if [ -n "$p" ] && [ -f "$p" ] && exe_2008 "$p"; then
+    if rm -f "$p"; then
+        echo "  - removed H5_Original_4GB.exe (the original game's 4 GB exe that the installer made)"
+    else
+        echo "  - could not remove H5_Original_4GB.exe"
+        failed=1
+    fi
+fi
 
 # Valve's steam_api.dll (online play over Steam): only if this package has it, and only if
 # the file in the game is byte for byte that one (the same SHA-256). Another copy (another

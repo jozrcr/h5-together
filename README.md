@@ -172,15 +172,19 @@ The defaults keep the original game: the speed-ups, fixes and panels are on, and
 
 ### The original game, without MMH5.5 (new in 0.3.5)
 
-H5 Together also works with the original Tribes of the East 3.1, the 2008 program. In the owner's group, everyone has it already: the GameRanger guide for MMH5.5 renamed it `bin\H5_GameOLD.exe`.
+H5 Together also works with the original Tribes of the East 3.1, the 2008 program.
 
-- **Start `H5_GameOLD.exe`** (with Steam running) instead of MMH5.5's exe. The main menu shows "H5 Together" over "Version : 3.1", without MMH5.5's line.
+- **The installer makes `bin\H5_Original_4GB.exe`**, the original game that may use **4 GB** of memory, as MMH5.5's own exes do. The original exe can use only 2 GB, and a big map at a high resolution runs out of it (the game then crashes; measured: 1.86 GB of 2 in single player). It takes the 2008 exe out of **MMH5.5's installer file** (`MMH55_RC19k.exe`, from [MMH5.5's ModDB page](https://www.moddb.com/mods/might-magic-heroes-55): download it, you do not need to install it), which carries it without Steam's protection. Put that file in your Downloads folder (or next to `install.bat`, or give it with `install.bat -Mmh55Installer <file>`), then run the installer. Nothing of the game's own files changes; uninstalling removes it.
+- **Start it with a double-click** (Steam running, for online play): the main menu shows "H5 Together" over "Version : 3.1", without MMH5.5's line. On Linux, the installer prints the Steam launch option for it.
+- Without MMH5.5's installer file: Steam's protected copy of the 2008 exe (`bin\H5_GameOLD.exe` in groups that followed the GameRanger guide) works too, with 2 GB only, and only when Steam starts it: put it in the game's Steam launch options (`"<game>\bin\H5_GameOLD.exe" %command%`). A changed copy of it does not start (Steam's protection refuses it). Steam's current `H5_Game.exe` is a 2025 rebuild that H5 Together does not know.
 - **From the same folder as MMH5.5.** The 2008 program would read MMH5.5's data files without MMH5.5's program changes, a broken mix. So H5 Together hides MMH5.5's files from it (`data\MMH55-*.pak`, `UserMODs\MMH55-*.h5u`): you get the original game. MMH5.5 still starts as before from its own exe. No file is changed or moved.
 - **Its own profile and saves:** a save of one game crashes the other, so the original game keeps its profile and saves in `Documents\H5 Together\Original game`. At its first start it copies your profile's settings there (name, options, keys), never the saves.
 - **MMH5.5's HD textures, if you like them:** Options, H5 Together, **MMH5.5's HD textures** (`[video] hd_textures=1`). Only the pictures: terrain, towns, sky. Each player chooses; it does not matter for the others.
 - **Endless simultaneous turns** (the host's choice, off by default): the original game ends simultaneous turns when heroes get close; with **Endless simultaneous turns** (`[coop] endless_turns=1`) they last the whole game, as MMH5.5's PEST does. Every PC needs H5 Together 0.3.5.
 - Everything else of H5 Together works the same: faster computer turns, online play over Steam, following and watching your friends, the player list, quick resume, Undo End Turn. The game rules menu (F2) is not there: its rules are all MMH5.5's.
 - **In one game, everybody starts the same:** all the original game, or all MMH5.5. Over Steam you only see games of your own kind.
+- **Maps:** the original game cannot load maps made for MMH5.5 (with its editor or its random map generator): it crashes on their MMH5.5 objects. Use the game's own maps, or random maps made in the original game.
+- **Joining a big random map** takes a while (every PC builds the map itself): H5 Together gives a joining PC up to 90 s (`[net] join_timeout_s`) instead of the game's 20, and the game's 20 s again once the game runs.
 - Measured with the robot (same map, same settings): the computer's turns are as fast as with MMH5.5, and faster on a big map (15 turns in 92 s, against 119 s with MMH5.5's scripts).
 
 ### Camera, sound and visuals (off by default)
