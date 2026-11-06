@@ -106,7 +106,15 @@ std::string g_banner;
 // "...\Saves\*"), and the file of the last resume save this PC wrote (its CreateFileA
 // while our save command runs).
 char g_saves_folder[MAX_PATH] = "";
+// The finished resume save's file (offered to the others: resume_transfer.cpp, on the virtual
+// LAN's thread), and the one the game is writing now. The owner's game, 2026-11-05: the file
+// was offered while the game still wrote it (311073 of 6806510 bytes, 160 ms before the save
+// was done); the friend fetched that cut-off file and could not take his seat in the loaded
+// game. So a file is offered only once the save command has returned, never while one runs.
 char g_resume_file[MAX_PATH] = "";
+char g_writing_file[MAX_PATH] = "";
+SRWLOCK g_file_lock = SRWLOCK_INIT;
+volatile LONG g_writing = 0;
 volatile bool g_in_resume_save = false;
 typedef HANDLE(WINAPI *FindFirstFileAFn)(LPCSTR, LPWIN32_FIND_DATAA);
 typedef HANDLE(WINAPI *CreateFileAFn)(LPCSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES, DWORD, DWORD, HANDLE);
@@ -163,9 +171,9 @@ HANDLE WINAPI CreateFileAHook(LPCSTR path, DWORD access, DWORD share, LPSECURITY
 	if (g_in_resume_save && path && (access & GENERIC_WRITE)) {
 		const size_t n = strlen(path);
 		if (n > 4 && _stricmp(path + n - 4, ".sav") == 0) {
-			lstrcpynA(g_resume_file, path, sizeof(g_resume_file));
+			lstrcpynA(g_writing_file, path, sizeof(g_writing_file));
 			const char *name = strrchr(path, '\\');
-			hooklog::Write("quick resume: the resume save's file: %s", name ? name + 1 : path);
+			hooklog::Write("quick resume: the resume save's file: %s (offered once the save is done)", name ? name + 1 : path);
 		}
 	}
 	return g_create_file_next(path, access, share, sa, how, flags, templ);
@@ -264,19 +272,28 @@ bool Ours(const void *command)
 bool __fastcall ExecuteHook(void *command, void *edx)
 {
 	const bool ours = !g_save_name.empty() && Ours(command);
+	if (ours) {
+		g_writing_file[0] = 0;
+		InterlockedExchange(&g_writing, 1);  // (no offer while the game writes: it may rewrite the same file)
+	}
 	g_in_resume_save = ours;
 	const bool ok = g_execute_next(command, edx);
 	g_in_resume_save = false;
-	if (ours && g_resume_file[0]) {  // the file the others may need: kept for later (and a restart)
+	if (ours && g_writing_file[0]) {  // the save is done: the file the others may need, kept for later (and a restart)
+		AcquireSRWLockExclusive(&g_file_lock);
+		lstrcpynA(g_resume_file, g_writing_file, sizeof(g_resume_file));
+		ReleaseSRWLockExclusive(&g_file_lock);
 		wchar_t state[MAX_PATH];
 		hooklog::PathNextToExe(L"h5-together-resume", L".txt", state, MAX_PATH);
 		HANDLE f = CreateFileW(state, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
 		if (f != INVALID_HANDLE_VALUE) {
 			DWORD written = 0;
-			WriteFile(f, g_resume_file, static_cast<DWORD>(strlen(g_resume_file)), &written, nullptr);
+			WriteFile(f, g_writing_file, static_cast<DWORD>(strlen(g_writing_file)), &written, nullptr);
 			CloseHandle(f);
 		}
 	}
+	if (ours)
+		InterlockedExchange(&g_writing, 0);
 	if (ours) {
 		g_banner = texts::Get("resume.banner");
 		g_banner_until = GetTickCount() + kBannerMs;
@@ -333,10 +350,17 @@ bool CodeAsExpected()
 
 bool ResumeOfferFile(char *out, size_t size)
 {
+	if (g_writing)
+		return false;  // a resume save is being written: nothing to offer until it is done
+	bool known = false;
+	AcquireSRWLockShared(&g_file_lock);
 	if (g_resume_file[0]) {
 		lstrcpynA(out, g_resume_file, static_cast<int>(size));
-		return true;
+		known = true;
 	}
+	ReleaseSRWLockShared(&g_file_lock);
+	if (known)
+		return true;
 	wchar_t state[MAX_PATH];
 	hooklog::PathNextToExe(L"h5-together-resume", L".txt", state, MAX_PATH);
 	HANDLE f = CreateFileW(state, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
@@ -349,7 +373,10 @@ bool ResumeOfferFile(char *out, size_t size)
 	if (!ok)
 		return false;
 	path[got] = 0;
-	lstrcpynA(g_resume_file, path, sizeof(g_resume_file));
+	AcquireSRWLockExclusive(&g_file_lock);
+	if (!g_resume_file[0])
+		lstrcpynA(g_resume_file, path, sizeof(g_resume_file));
+	ReleaseSRWLockExclusive(&g_file_lock);
 	lstrcpynA(out, path, static_cast<int>(size));
 	return true;
 }
