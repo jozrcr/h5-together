@@ -872,9 +872,32 @@ void FollowFrame(BYTE *screen, float dt)
 	g_set_y = pos[8];
 }
 
+// Watching while nobody is followed any more (Stop: the ally left the game, or this PC's game
+// ended): only the end of the close. The battle screen's close is queued (StopWatching) and,
+// until it is gone, this PC's commands are dropped (SendHook). 0.3.4 stopped looking once nobody
+// was followed, so watching never ended and the watcher's commands stayed dropped for good: no
+// click did anything, no way out of the game (the owner's game, 2026-11-06: the watched Natoune
+// left the game in his battle).
+void FinishWatching(DWORD now)
+{
+	char top[96];
+	if (!BattleScreens(top, sizeof(top))) {
+		EndWatching(top);
+		return;
+	}
+	if (!g_closing || now - g_closing_since > 5000) {  // (asked again every 5 s until the screens are gone)
+		g_closing = false;
+		StopWatching("nobody is followed any more");
+	}
+}
+
 void Frame(DWORD now, float dt)
 {
 	ReadPlayers();
+	if (g_watching_battle && !g_following) {
+		FinishWatching(now);
+		return;
+	}
 	if (!InMultiplayer() || g_me == 0) {
 		if (g_following)
 			Stop("not in a multiplayer game");
