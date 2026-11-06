@@ -58,7 +58,9 @@ bool LoadOffer()
 	if (!GetFileAttributesExA(path, GetFileExInfoStandard, &info) || info.nFileSizeHigh || !info.nFileSizeLow ||
 	    info.nFileSizeLow > transfer::kMaxFile)
 		return false;
-	if (g_offer.ok && g_offer.path == path && CompareFileTime(&g_offer.written, &info.ftLastWriteTime) == 0)
+	// (read again when the file changed: its time or its size)
+	if (g_offer.ok && g_offer.path == path && CompareFileTime(&g_offer.written, &info.ftLastWriteTime) == 0 &&
+	    g_offer.file.size() == info.nFileSizeLow)
 		return true;
 	g_offer = Offer();
 	HANDLE f = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
