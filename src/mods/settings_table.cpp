@@ -162,6 +162,10 @@ const Setting kSettings[] = {
 	    "settings.ui.language", "settings.ui.language.help"),
 	ROW("ui", "hero_tips", "1", kBool, 0, 1, nullptr, 0, nullptr, kPlayer, kRestart, kInterface, kCheck,
 	    "settings.ui.hero_tips", "settings.ui.hero_tips.help"),
+	ROW("ui", "skill_wheel", "1", kBool, 0, 1, nullptr, 0, nullptr, kPlayer, kLive, kInterface, kCheck,
+	    "settings.ui.skill_wheel", "settings.ui.skill_wheel.help"),  // the button: the 2008 game only (skill_wheel.cpp)
+	ROW("ui", "skill_wheel_key", "none", kKey, 0, 0, nullptr, 0, nullptr, kPlayer, kLive, kInterface, kList,
+	    "settings.ui.skill_wheel_key", "settings.ui.skill_wheel_key.help"),
 	FILE_ONLY("ui", "trace_players", "0", kInt, 0, 2, kTester, kRestart),
 	FILE_ONLY("ui", "player_list_test_rows", "0", kInt, 0, 16, kTester, kRestart),
 	FILE_ONLY("ui", "overlay_test_panel", "0", kBool, 0, 1, kTester, kRestart),

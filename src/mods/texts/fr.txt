@@ -451,6 +451,10 @@ audio.volume_curve.help = Le cran le plus bas des curseurs de volume est 10 fois
 ui.language = Langue du module
 ui.language.help = Les mots des panneaux de H5 Together et de cette page.
 ui.hero_tips = Détails des héros dans la salle d'attente
+ui.skill_wheel = Bouton roue des compétences sur l'écran du héros
+ui.skill_wheel.help = Une petite roue près du nom du héros sur son écran : ce que sa classe peut apprendre, ce que chaque capacité nécessite d'abord, et ce que le héros a déjà. Jeu d'origine seulement (MMH5.5 a la sienne).
+ui.skill_wheel_key = Touche de la roue des compétences
+ui.skill_wheel_key.help = Ouvre la roue des compétences du héros sélectionné sur la carte d'aventure (ou du héros de l'écran du héros).
 ui.hero_tips.help = L'info-bulle d'un héros de départ (dans la salle d'attente multijoueur) donne aussi sa classe, ses compétences de départ et ce que fait sa spécialité.
 lang.texts = Textes du jeu
 lang.texts.help = Packs français : aussi les textes que MMH5.5 laisse en anglais (depuis h5-together\lang\fr).
@@ -527,6 +531,17 @@ after.failed = Les réglages n'ont pas pu être enregistrés : {why}.
 [lobby]
 hero_class = Classe : {class}
 hero_skills = Compétences de départ : {skills}
+
+[wheel]
+title = {class}
+title_hero = {class} : {hero}
+chance = {n} %
+needs = Nécessite d'abord : {list}
+legend = Cadre doré : le héros l'a. Cadre clair : il peut la prendre à un passage de niveau maintenant. Gris : pas encore. Les points : sa maîtrise. Le % est la chance de la compétence à un passage de niveau. Les flèches montrent les autres classes.
+legend_other = La roue d'une autre classe : les compétences qui peuvent lui être proposées (leur chance à un passage de niveau) et les capacités qu'elle peut prendre. Les flèches montrent les autres classes.
+close = Fermer
+button_tip = Roue des compétences
+no_data = Les tables de compétences du jeu n'ont pas pu être lues.
 
 [welcome]
 title = H5 Together

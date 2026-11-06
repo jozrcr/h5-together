@@ -23,6 +23,7 @@
 #include "../mods/hero_skins.h"
 #include "../mods/join_time.h"
 #include "../mods/lobby_hero_tips.h"
+#include "../mods/skill_wheel.h"
 #include "../mods/turn_undo.h"
 #include "../mods/vertex_pool.h"
 #include "../mods/parallel_ai.h"
@@ -204,6 +205,7 @@ void InstallAll()
 	mods::ApplyOnlineUiFromSettings();  // [online] mode=steam: Steam's lines on the LAN screen, Invite friends... (after the rules' button)
 	mods::ApplyAudioVolumeFromSettings();
 	mods::ApplyLobbyHeroTipsFromSettings();  // [ui] hero_tips: the waiting room's hero tooltip tells class, skills, specialty
+	mods::ApplySkillWheelFromSettings();  // [ui] skill_wheel: the hero screen's button (the original game), a key
 	mods::ApplyHeroSkinsFromSettings();  // after notify and the co-op guard: it stacks on their hooks
 	mods::ApplyTurnUndoFromSettings();  // [coop] undo_end_turn (host's); after hero looks: it stacks on their hooks
 	mods::InstallEndlessTurns();  // the 2008 game: endless simultaneous turns, one of the co-op features

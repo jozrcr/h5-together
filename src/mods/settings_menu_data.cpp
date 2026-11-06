@@ -77,6 +77,9 @@ bool Shown(const Setting &s, const MenuOptions &o)
 	// textures kept in the 2008 game (with MMH5.5 they are always there)
 	if (Is(s, "coop", "endless_turns") || Is(s, "video", "hd_textures"))
 		return !o.mmh55;
+	// the skill wheel's button on the hero screen: MMH5.5 has its own wheel there
+	if (Is(s, "ui", "skill_wheel"))
+		return !o.mmh55;
 	return true;
 }
 
@@ -213,7 +216,8 @@ struct Name {
 const Name kOrder[] = {
 	{"ui", "player_list"}, {"ui", "player_list_key"}, {"ui", "player_list_top"}, {"ui", "player_list_left"},
 	{"notify", "turn"}, {"notify", "sound"}, {"notify", "popup"}, {"coop", "share_view"}, {"coop", "watch_battles"}, {"coop", "stay_after_defeat"}, {"rules", "key"}, {"rules", "button"},
-	{"skins", "skins"}, {"skins", "key"}, {"skins", "hero_screen_button"}, {"skins", "show_others"},
+	{"ui", "hero_tips"},
+	{"skins", "skins"}, {"skins", "key"}, {"skins", "hero_screen_button"}, {"ui", "skill_wheel"}, {"ui", "skill_wheel_key"}, {"skins", "show_others"},
 	{"camera", "zoom_out"}, {"camera", "combat_zoom_out"}, {"camera", "start_zoom"}, {"camera", "edge_sky"}, {"camera", "anim_saver"}, {"video", "fps_limit"}, {"video", "vsync"}, {"menu", "scene"},
 	{"camera", "wheel_fix"}, {"audio", "original_music"}, {"audio", "volume_curve"}, {"ui", "language"},
 	{"lang", "texts"}, {"rmg", "builder"}, {"rmg", "builder_key"}, {"rmg", "teams"}, {"rmg", "lobby_teams"},
