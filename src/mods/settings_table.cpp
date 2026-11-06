@@ -160,6 +160,8 @@ const Setting kSettings[] = {
 	    "settings.ui.player_list_left", "settings.ui.player_list_left.help"),
 	ROW("ui", "language", "auto", kChoice, 0, 0, kLanguages, COUNT(kLanguages), nullptr, kPlayer, kRestart, kLanguage, kList,
 	    "settings.ui.language", "settings.ui.language.help"),
+	ROW("ui", "hero_tips", "1", kBool, 0, 1, nullptr, 0, nullptr, kPlayer, kRestart, kInterface, kCheck,
+	    "settings.ui.hero_tips", "settings.ui.hero_tips.help"),
 	FILE_ONLY("ui", "trace_players", "0", kInt, 0, 2, kTester, kRestart),
 	FILE_ONLY("ui", "player_list_test_rows", "0", kInt, 0, 16, kTester, kRestart),
 	FILE_ONLY("ui", "overlay_test_panel", "0", kBool, 0, 1, kTester, kRestart),

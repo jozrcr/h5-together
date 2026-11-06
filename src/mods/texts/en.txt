@@ -498,6 +498,8 @@ audio.volume_curve = Wider volume range
 audio.volume_curve.help = The volume sliders' lowest step is 10 times quieter; the highest is unchanged.
 ui.language = Add-on's language
 ui.language.help = The words of H5 Together's panels and of this page.
+ui.hero_tips = Hero details in the waiting room
+ui.hero_tips.help = The tooltip of a starting hero (in the multiplayer waiting room) also tells its class, its starting skills and what its specialty does.
 lang.texts = The game's texts
 lang.texts.help = French packs: also the texts MMH5.5 leaves in English (from h5-together\lang\fr).
 rmg.builder = Template builder
@@ -572,6 +574,13 @@ after.failed = The settings could not be saved: {why}.
 
 # The question the first time the main menu shows (once; the answer goes to
 # h5-together.ini [update] check).
+# The waiting room's hero tooltip: lines added under the game's own "Starting hero: <name>,
+# <specialty>". {class}: the hero's class (the game's word); {skills}: its starting skills
+# and abilities, with their mastery (the game's words).
+[lobby]
+hero_class = Class: {class}
+hero_skills = Starting skills: {skills}
+
 [welcome]
 title = H5 Together
 question = Check for new versions of H5 Together once a day?

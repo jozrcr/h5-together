@@ -138,6 +138,7 @@ The defaults keep the original game: the speed-ups, fixes and panels are on, and
 - **Watch their battle live** (new in 0.3.3, on). While you follow an ally who fights, a small "Watch the battle" button after their eye opens their battle on your screen, also when it has begun. You only watch: a right click shows a creature's card, but the battle gets none of your other clicks, and your PC sends nothing. Leave with "Stop watching" (or Esc) and come back whenever you like.
 - **Stay and watch after a defeat** (new in 0.3.4, on). When you lose the game while your friends play on, closing the results keeps you on the map: follow your team and watch their battles instead of going back to the lobby.
 
+- **Hero details in the waiting room** (new in 0.3.5, on). Hover a starting hero's picture (or hold the right button on it): besides its name and specialty, the tooltip gives its class, its starting skills and what its specialty does.
 - **"Your turn" notification** when the game is in the background: the taskbar button flashes, a short sound plays, and a pop-up appears.
 - **Hero looks.** Give a hero the 3D figure of another hero of the same faction (the small button on the hero screen, or **F7**). In multiplayer, friends see your looks when everyone has the add-on.
 
