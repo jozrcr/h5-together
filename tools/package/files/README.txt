@@ -51,6 +51,17 @@ WHAT IT DOES
 - Linux: the mouse wheel zooms out again (automatic).
 
 
+NEW IN 0.3.4
+
+- Following: click an ally's name or eye to start and stop; your camera goes to their hero at once, also when they are in a town or a battle. A short line after the eye says where they are; while they fight, a small "Watch the battle" button sits there. Nothing in the middle of the map any more.
+- Watching their battle: a right click shows a creature's card; watching works also when they were already fighting, and ends by itself when their battle was their game loss.
+- Stay and watch after a defeat (on): when you lose the game while your friends play on, closing the results keeps you on the map to follow your team and watch their battles.
+- "Resume my turn" is a round button over the hourglass.
+- The computer's weekly bonus (the host's F2 rules) also applies to a loaded game, from the next week.
+- Black map edges in the underground too (edge_sky=none). Quick resume: the "Reprise" save reaches the friend who crashed whole.
+- The computer bonus in a loaded game needs 0.3.4 on every PC; following works best with 0.3.4 everywhere. Everything else mixes with 0.3.3.
+
+
 NEW IN 0.3.3
 
 - Follow a friend's view: while you wait, click an ally's name in the player list and your camera follows theirs on the adventure map (allies only, each through their own fog). A button just over the turn banner stops it; it also stops when your turn begins.

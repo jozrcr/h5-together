@@ -5,7 +5,7 @@ This is the next big test of H5 Together (phase 3 of the project): **three or mo
 ## Before the game
 
 1. **Everyone** installs the same H5 Together version: from the zip, `install.bat` on Windows or `bash install.sh` on Linux.
-2. Everyone starts the game once and checks the first line of `h5-together.log` in the game's `bin` folder. It must say the same version for all, for example `H5 Together hook DLL 0.3.3 loaded`.
+2. Everyone starts the game once and checks the first line of `h5-together.log` in the game's `bin` folder. It must say the same version for all, for example `H5 Together hook DLL 0.3.4 loaded`.
 3. **How you connect:**
    - **GameRanger:** as usual.
    - **ZeroTier:** everyone joins the host's network. On Windows, the ZeroTier network must be **Private** (the installer tells you if it isn't). Start ZeroTier before the game.

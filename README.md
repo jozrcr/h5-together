@@ -11,7 +11,7 @@ An unofficial add-on for **Heroes of Might and Magic V: Tribes of the East** wit
 - **Faster co-op games.** The computer's turns are much quicker, and so are clicks. A rare freeze of the host during computer turns is fixed.
 - **Online play with your Steam friends** (new in 0.3.0, a test). Your friends' games show in the game's own LAN list, through Steam: no GameRanger, no VPN. The host invites friends from the waiting room. [How it works](#online-play-over-steam-new-a-test).
 - **Settings inside the game.** Main menu, **Options**, **H5 Together** (or press **F3**). No file to edit.
-- **Watch your friends while you wait** (new in 0.3.3). Click an ally's name in the player list: your camera follows theirs, and you can watch their battles live.
+- **Watch your friends while you wait** (new in 0.3.3, polished in 0.3.4). Click an ally's name or eye in the player list: your camera follows theirs, and you can watch their battles live. A player who loses the game can stay and watch (new in 0.3.4).
 - **A few extras on top:** a player list on the map, a "your turn" notification, a random map template builder, other looks for your heroes, and a game rules menu for the host.
 - **Safe to try.** It never changes the game's own files, and it is easy to remove.
 - **Made for** the Steam game with MMH5.5 RC19d or RC19k, on Windows, or on Linux with Proton.
@@ -24,7 +24,7 @@ H5 Together was called **open-homm5** until version 0.2.7. If you have an old ve
 2. Close the game. **Extract the whole zip** (Windows: right-click it, **Extract All**).
 3. **Windows:** double-click `install.bat`. **Linux:** run `bash install.sh` in the folder.
 
-The installer finds your game, shows you what it found ("Your game": the folder, Steam or GOG, the language, which MMH5.5 you have), copies the files in and tells you what to do next. Start the game as you always do. In the main menu, a line **"H5 Together 0.3.3"** now sits above MMH5.5's version line: the add-on is running.
+The installer finds your game, shows you what it found ("Your game": the folder, Steam or GOG, the language, which MMH5.5 you have), copies the files in and tells you what to do next. Start the game as you always do. In the main menu, a line **"H5 Together 0.3.4"** now sits above MMH5.5's version line: the add-on is running.
 
 ![The main menu with the H5 Together version line](docs/images/main-menu.png)
 
@@ -111,7 +111,7 @@ The defaults keep the original game: the speed-ups, fixes and panels are on, and
 - **LAN games over ZeroTier** and other virtual networks show up in the LAN list, so a friend (on Linux too) can join without GameRanger.
 - **The waiting room shows versions.** A line at the bottom says whether every player has the same H5 Together, and who has another version or none.
 - **Computers play together** (new in 0.3.2, the host's choice, off by default). The computer players take their turns at the same time instead of one after another: their part of each day about 40% shorter with two or three of them.
-- **Undo End Turn** (new in 0.3.2, the host's choice, off by default). With simultaneous turns, a player who ended the turn too early can take it back while another human still plays.
+- **Undo End Turn** (new in 0.3.2, the host's choice, off by default). With simultaneous turns, a player who ended the turn too early can take it back while another human still plays: a round button over the hourglass (since 0.3.4).
 - **Quick resume after a crash** (new in 0.3.2, on). When a player's game crashes, every PC saves the game as "Reprise" with that player still in it; the player who crashed gets the save over Steam.
 - **Each game its own autosaves** (new in 0.3.2). Autosaves are named after their game's map, so a new game no longer overwrites yesterday's.
 
@@ -134,8 +134,9 @@ The defaults keep the original game: the speed-ups, fixes and panels are on, and
 
   ![The player list during a computer turn](docs/images/player-list.png)
 
-- **Follow a friend's view** (new in 0.3.3, on). While you wait for your turn, click an ally's name in the player list: your camera follows theirs on the adventure map, and a line says what they are doing ("in a battle", "in a town"). An eye shows who follows whom. Allies only; each player still sees the map through their own fog.
-- **Watch their battle live** (new in 0.3.3, on). While you follow an ally who fights, a "Watch the battle" button opens their battle on your screen, also when it has begun. You only watch: the battle gets none of your clicks, and your PC sends nothing. Leave with "Stop watching" (or Esc) and come back whenever you like.
+- **Follow a friend's view** (new in 0.3.3, on). While you wait for your turn, click an ally's name (or eye) in the player list: your camera goes to their hero and follows their camera on the adventure map; click again to stop. A short line after the eye says where they are when not on the map ("in a town", "in a menu"). An eye shows who follows whom. Allies only; each player still sees the map through their own fog.
+- **Watch their battle live** (new in 0.3.3, on). While you follow an ally who fights, a small "Watch the battle" button after their eye opens their battle on your screen, also when it has begun. You only watch: a right click shows a creature's card, but the battle gets none of your other clicks, and your PC sends nothing. Leave with "Stop watching" (or Esc) and come back whenever you like.
+- **Stay and watch after a defeat** (new in 0.3.4, on). When you lose the game while your friends play on, closing the results keeps you on the map: follow your team and watch their battles instead of going back to the lobby.
 
 - **"Your turn" notification** when the game is in the background: the taskbar button flashes, a short sound plays, and a pop-up appears.
 - **Hero looks.** Give a hero the 3D figure of another hero of the same faction (the small button on the hero screen, or **F7**). In multiplayer, friends see your looks when everyone has the add-on.
@@ -159,7 +160,7 @@ The defaults keep the original game: the speed-ups, fixes and panels are on, and
 
 ### Game rules menu
 
-- The **host** chooses MMH5.5's rule switches for each game: governors, town conversion, the town gate, mine guards, the computer's weekly bonus, mixed neutral stacks, prank artifacts, random map extras and more. **Règles... / Rules...** in the multiplayer waiting room, or **F2**.
+- The **host** chooses MMH5.5's rule switches for each game: governors, town conversion, the town gate, mine guards, the computer's weekly bonus, mixed neutral stacks, prank artifacts, random map extras and more. **Règles... / Rules...** in the multiplayer waiting room, or **F2**. The computer's weekly bonus also applies to a loaded game, from the next week (new in 0.3.4).
 
   ![The game rules panel](docs/images/game-rules.png)
 
