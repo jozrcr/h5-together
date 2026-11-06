@@ -64,6 +64,7 @@ const DWORD kExecute = 0x008256a0;         // __thiscall(), returns al = 1
 const DWORD kDefeatVftable = 0x00e0e75c;   // NWorld::CDefeatPlayerCmd: +0x10 the player (IPlayer *)
 const DWORD kMe = 0x54;                    // the transceiver: this PC's index (the host is 0)
 const DWORD kPlayerNumber = 0x2c;          // IPlayer slot: its number (0x00720e90)
+const DWORD kPlayerInGame = 0x6c;          // IPlayer slot: 1 while the player is in the game (players.md; turn_undo.cpp)
 const DWORD kSaveName = 0x1c;              // CMPSaveWorldCmd: its name (wide string: begin, end)
 const DWORD kDropWindowMs = 60000;         // a defeat this long after a drop is the drop's
 const DWORD kBannerMs = 30000;
@@ -196,14 +197,19 @@ void __fastcall DropHook(void *transceiver, void *edx, int pc)
 	               me != 0 ? "" : g_on ? ": the host saves before the game takes its player out" : ": no save ([coop] resume_save=0)");
 }
 
-int PlayerNumber(void *player)
+int PlayerSlot(void *player, DWORD slot, int fallback)
 {
 	__try {
-		return reinterpret_cast<GetFn>(Read(reinterpret_cast<void *>(Read(player, 0)), kPlayerNumber))(player, nullptr);
+		return reinterpret_cast<GetFn>(Read(reinterpret_cast<void *>(Read(player, 0)), slot))(player, nullptr);
 	}
 	__except (EXCEPTION_EXECUTE_HANDLER) {
-		return 0;
+		return fallback;
 	}
+}
+
+int PlayerNumber(void *player)
+{
+	return PlayerSlot(player, kPlayerNumber, 0);
 }
 
 void __fastcall SendHook(void *transceiver, void *edx, void *command)
@@ -213,7 +219,13 @@ void __fastcall SendHook(void *transceiver, void *edx, void *command)
 		g_drop_at = 0;  // (one save per drop)
 		void *player = reinterpret_cast<void *>(Read(command, 0x10));
 		const int number = player ? PlayerNumber(player) : 0;
-		if (since < kDropWindowMs) {
+		// A player who had already lost the game (the owner's game, 2026-11-05: a friend's last
+		// hero fell, the day's end took him out, then his PC left): nothing to resume, and the
+		// save would replace the last useful "Reprise".
+		const bool lost = player && PlayerSlot(player, kPlayerInGame, 1) != 1;
+		if (lost)
+			hooklog::Write("quick resume: PC %d's player %d had already lost the game: no resume save", g_drop_pc, number);
+		if (since < kDropWindowMs && !lost) {
 			const WString name = {g_save_name.c_str(), g_save_name.c_str() + g_save_name.size(),
 			                      g_save_name.c_str() + g_save_name.size()};
 			void *save = reinterpret_cast<MakeSaveFn>(kMakeSave)(&name, 1);

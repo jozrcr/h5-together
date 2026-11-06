@@ -158,6 +158,7 @@ float g_back_w = 0, g_back_h = 0;
 int g_hover = 0;    // the followable player under the cursor, 0 = none
 int g_pressed = 0;  // the row the button went down on
 bool g_button = false;
+bool g_shown_now = false;  // the list is drawn this frame (its rows' places are current)
 const char *const kRowOwners[plist::kMaxPlayers] = {"player list row 1", "player list row 2", "player list row 3",
                                                     "player list row 4", "player list row 5", "player list row 6",
                                                     "player list row 7", "player list row 8"};
@@ -202,9 +203,11 @@ bool Wanted()
 	if (!g_visible || !plist::ReadSnapshot(&g_snapshot)) {
 		g_hits.count = 0;
 		g_hover = g_pressed = 0;
+		g_shown_now = false;
 		return false;
 	}
 	Spectate(&g_snapshot);
+	g_shown_now = true;
 	return true;
 }
 
@@ -257,6 +260,20 @@ void Draw(const overlay::Frame &frame)
 }
 
 }  // namespace
+
+bool PlayerListRowPlace(int player, float *right, float *top, float *bottom)
+{
+	if (!g_shown_now)
+		return false;
+	for (int i = 0; i < g_hits.count; ++i)
+		if (g_hits.id[i] == player) {
+			*right = g_hits.rect[i][2];
+			*top = g_hits.pill[i][1];
+			*bottom = g_hits.pill[i][3];
+			return true;
+		}
+	return false;
+}
 
 void InstallPlayerListEarly()
 {

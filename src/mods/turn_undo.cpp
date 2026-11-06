@@ -2,9 +2,9 @@
 // host's choice, off by default; docs/plans/turn-features.md, part 1).
 //
 // In plain words: with simultaneous turns, a player who pressed End Turn too early
-// gets a button "Resume my turn" under the game's own "Please wait for the other
-// players..." banner, for as long as another human still plays. A click undoes the
-// End Turn on every PC, at the same moment of the game.
+// gets a round button "Resume my turn" over the game's own hourglass (the End Turn
+// button), for as long as another human still plays. A click undoes the End Turn on
+// every PC, at the same moment of the game.
 //
 // 1. The game's turns (players.md, turn-features.md): End Turn sets the player's
 //    "pressed End Turn" (+0x178, IPlayer slot 0x50); with simultaneous turns the
@@ -24,9 +24,11 @@
 //    segment's commands) and decides there, on the same world, whether it is still
 //    allowed (undo::Allowed); a request that comes after the last other human ended
 //    is refused the same way everywhere.
-// 4. The button: an overlay client on the adventure screen, in the game's own button
-//    art, shown only while this PC's player could undo; the overlay holds back the
-//    game's clicks under it (overlay::BlockClicksIn), so the click does not reach the map.
+// 4. The button: an overlay client on the adventure screen, a disc over the hourglass at
+//    the centre of the game's wheel (an arrow turning back around a small hourglass; its
+//    name at the left of the wheel a few seconds, and under the mouse), shown only while
+//    this PC's player could undo; the overlay holds back the game's clicks under it
+//    (overlay::BlockClicksIn), so the click does not reach the hourglass.
 //
 // Robot steps: "panel|turn request" (as a click on the button), "panel|turn
 // force_request" (a request even when the button would not show: to test that every
@@ -57,6 +59,8 @@ namespace {
 namespace ui = builder_ui;
 
 const char kName[] = "turn_undo";
+const char kNameAcross[] = "turn_undo across";  // (more click zones: one per name)
+const char kNameDown[] = "turn_undo down";
 const char kAdventureScreen[] = ".?AVCAdventureScreen@NUI@@";
 
 // --- the game (vanilla 3.1 addresses, the same in MMH55_Utility) -----------------------------
@@ -103,10 +107,16 @@ const Code kCode[] = {
 };
 
 // --- layout: the game's 1024x768 screens, centred and scaled with the height ---------------
-// The button: under the game's "Veuillez attendre les autres joueurs..." banner
-// (robot run 20261104-082900-lan: the banner's middle at x 532, its bottom at y 575).
-const float kRefH = 768.0f, kScreenW = 1024.0f;
-const float kButtonX = 422.0f, kButtonY = 582.0f, kButtonW = 220.0f, kButtonH = 34.0f, kButtonFont = 15.0f;
+// The button: over the hourglass at the centre of the game's wheel at the bottom right (the
+// owner's idea, 2026-11-05), round like it. The wheel (the game's EoTButton, 202x220 at
+// 823,549 of its 1024x768 layout) keeps to the screen's bottom-right corner, scaled with the
+// height: the hourglass's centre 122.7 left of the right edge and 113.2 over the bottom, its
+// dark disc 28 around, the gold ring 39.5 (the robot's 1008x729 screenshot and the owner's
+// 2560x1440 one agree within a pixel). The wheel's six small buttons start 50 from the centre.
+const float kRefH = 768.0f;
+const float kDialRight = 122.7f, kDialBottom = 113.2f, kDialR = 39.5f, kBlockHalf = 33.0f, kBlockBar = 22.0f;
+const float kLabelFont = 14.0f, kLabelRight = 114.0f;  // the name: left of the wheel's horse button (108)
+const DWORD kLabelMs = 4000;
 
 typedef void(__fastcall *UpdateFn)(void *controller, void *edx, DWORD a, DWORD b, DWORD c, DWORD d, DWORD e);
 typedef void(__fastcall *StepFn)(void *transceiver, void *edx);
@@ -496,34 +506,35 @@ void RobotCommand(const char *text)
 		hooklog::Write("turn undo: robot command \"%s\" not known", text);
 }
 
-ImVec2 ScreenAt(float x, float y, float w, float h)
+// The hourglass's centre on screen, and the button's radius.
+ImVec2 DialCentre(float w, float h, float *radius)
 {
 	const float k = h / kRefH;
-	const float x0 = floorf((w - kScreenW * k) / 2 + 0.5f);
-	return ImVec2(x0 + x * k, y * k);
+	*radius = kDialR * k;
+	return ImVec2(w - kDialRight * k, h - kDialBottom * k);
 }
 
-void ButtonRect(float w, float h, ImVec2 *p0, ImVec2 *p1)
-{
-	*p0 = ScreenAt(kButtonX, kButtonY, w, h);
-	*p1 = ScreenAt(kButtonX + kButtonW, kButtonY + kButtonH, w, h);
-}
+bool g_was_shown = false;
+DWORD g_shown_since = 0;  // the label shows a few seconds after the button comes
 
 bool Wanted()
 {
 	char top[96] = "";
 	overlay::TopScreen(top, sizeof(top));
 	g_shown = strcmp(top, kAdventureScreen) == 0 && SafeCanUndoHere();
+	if (g_shown && !g_was_shown)
+		g_shown_since = GetTickCount();
+	g_was_shown = g_shown;
 	if (!g_shown) {
 		g_down = g_hovered = false;
 		return false;
 	}
-	ImVec2 p0, p1;
-	ButtonRect(g_back_w, g_back_h, &p0, &p1);
+	float r = 0;
+	const ImVec2 c = DialCentre(g_back_w, g_back_h, &r);
 	float x, y;
 	HWND window = overlay::GameWindow();
 	const bool front = window && GetAncestor(GetForegroundWindow(), GA_ROOTOWNER) == GetAncestor(window, GA_ROOTOWNER);
-	g_hovered = front && overlay::CursorInBackBuffer(g_back_w, g_back_h, &x, &y) && x >= p0.x && x < p1.x && y >= p0.y && y < p1.y;
+	g_hovered = front && overlay::CursorInBackBuffer(g_back_w, g_back_h, &x, &y) && (x - c.x) * (x - c.x) + (y - c.y) * (y - c.y) <= r * r;
 	const bool down = front && (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
 	if (down && !g_down && g_hovered)
 		g_down = true;
@@ -538,7 +549,45 @@ bool Wanted()
 void Prepare(const overlay::Frame &frame)
 {
 	ui::LoadPictures(frame.device);
-	overlay::WantFont(floorf(kButtonFont * frame.height / kRefH + 0.5f));
+	overlay::WantFont(floorf(kLabelFont * frame.height / kRefH + 0.5f));
+}
+
+ImU32 Rgba(int r, int g, int b, float a)
+{
+	return IM_COL32(r, g, b, static_cast<int>(a * 255.0f + 0.5f));
+}
+
+// A small hourglass, in the game's colours: wooden ends, the glass, the sand mostly run down.
+void Hourglass(ImDrawList *draw, ImVec2 o, float k, float a)
+{
+	const float hh = 11.0f * k, hw = 7.0f * k, neck = 1.2f * k;
+	const ImU32 glass = Rgba(196, 206, 204, 0.85f * a), sand = Rgba(226, 186, 112, a), wood = Rgba(150, 96, 52, a);
+	draw->AddTriangleFilled(ImVec2(o.x - hw * 0.8f, o.y + hh - 1.5f * k), ImVec2(o.x + hw * 0.8f, o.y + hh - 1.5f * k),
+	                        ImVec2(o.x, o.y + 2.5f * k), sand);
+	draw->AddTriangleFilled(ImVec2(o.x - hw * 0.45f, o.y - 4.5f * k), ImVec2(o.x + hw * 0.45f, o.y - 4.5f * k), ImVec2(o.x, o.y - 0.5f * k),
+	                        sand);
+	const ImVec2 left[] = {ImVec2(o.x - hw, o.y - hh), ImVec2(o.x - neck, o.y), ImVec2(o.x - hw, o.y + hh)};
+	const ImVec2 right[] = {ImVec2(o.x + hw, o.y - hh), ImVec2(o.x + neck, o.y), ImVec2(o.x + hw, o.y + hh)};
+	draw->AddPolyline(left, 3, glass, 0, 1.4f * k);
+	draw->AddPolyline(right, 3, glass, 0, 1.4f * k);
+	draw->AddLine(ImVec2(o.x - hw - 2.0f * k, o.y - hh), ImVec2(o.x + hw + 2.0f * k, o.y - hh), wood, 2.6f * k);
+	draw->AddLine(ImVec2(o.x - hw - 2.0f * k, o.y + hh), ImVec2(o.x + hw + 2.0f * k, o.y + hh), wood, 2.6f * k);
+}
+
+// An arrow turning back (counter-clockwise) around the hourglass: "back to your turn".
+void TurnBackArrow(ImDrawList *draw, ImVec2 o, float radius, float k, ImU32 ink)
+{
+	const float pi = 3.14159265f;
+	const float a0 = -pi / 2 + 0.55f, a1 = -pi / 2 + 2 * pi - 0.3f;  // open at the top; the head at the right of the gap
+	const float head_len = 8.0f * k, head_half = 6.0f * k;
+	draw->PathArcTo(o, radius, a0 + 0.1f, a1, 48);
+	draw->PathStroke(ink, 0, 3.2f * k);
+	const ImVec2 base(o.x + radius * cosf(a0), o.y + radius * sinf(a0));
+	const ImVec2 along(sinf(a0), -cosf(a0));   // counter-clockwise, along the circle
+	const ImVec2 out(cosf(a0), sinf(a0));      // away from the centre
+	draw->AddTriangleFilled(ImVec2(base.x + along.x * head_len, base.y + along.y * head_len),
+	                        ImVec2(base.x + out.x * head_half, base.y + out.y * head_half),
+	                        ImVec2(base.x - out.x * head_half, base.y - out.y * head_half), ink);
 }
 
 void Draw(const overlay::Frame &frame)
@@ -548,32 +597,46 @@ void Draw(const overlay::Frame &frame)
 	if (!g_shown)
 		return;
 	const float k = frame.height / kRefH;
-	ImVec2 p0, p1;
-	ButtonRect(frame.width, frame.height, &p0, &p1);
-	overlay::BlockClicksIn(kName, p0.x, p0.y, p1.x, p1.y, frame.width, frame.height);
+	float r = 0;
+	const ImVec2 c = DialCentre(frame.width, frame.height, &r);
+	// the game's clicks under the round button do not reach the hourglass: a square inside the
+	// circle and two bars across it (never over the wheel's six small buttons around)
+	const float s = kBlockHalf * k, bar = kBlockBar * k;
+	overlay::BlockClicksIn(kName, c.x - s, c.y - s, c.x + s, c.y + s, frame.width, frame.height);
+	overlay::BlockClicksIn(kNameAcross, c.x - r, c.y - bar, c.x + r, c.y + bar, frame.width, frame.height);
+	overlay::BlockClicksIn(kNameDown, c.x - bar, c.y - r, c.x + bar, c.y + r, frame.width, frame.height);
 	ImDrawList *draw = ImGui::GetForegroundDrawList();
 	const bool pressed = g_down && g_hovered;
-	// The game's 122x34 button, wider: its ends kept, its middle stretched (as online_ui.cpp's).
-	if (ImTextureID picture = ui::Tex(pressed ? ui::kButtonClick : ui::kButtonNormal))
-		ui::NineSlice(draw, picture, p0, p1, ImVec2(122.0f, 34.0f), 12.0f, 12.0f * k);
-	else
-		draw->AddRectFilled(p0, p1, pressed ? IM_COL32(70, 52, 30, 255) : IM_COL32(96, 72, 40, 255), 4.0f * k);
-	if (g_hovered && !pressed) {
-		if (ImTextureID highlight = ui::Tex(ui::kButtonHighlight))
-			ui::NineSlice(draw, highlight, p0, p1, ImVec2(122.0f, 34.0f), 12.0f, 12.0f * k);
-		else
-			draw->AddRect(p0, p1, ui::kGold, 4.0f * k, 0, 1.5f * k);
+	const ImVec2 o(c.x, c.y + (pressed ? k : 0.0f));
+	// the disc over the game's hourglass and its ring: the game's dark teal, a gold rim
+	draw->AddCircleFilled(c, r, IM_COL32(4, 16, 21, 240), 64);
+	draw->AddCircleFilled(c, r * 0.72f, pressed ? IM_COL32(6, 26, 33, 255) : IM_COL32(9, 34, 43, 255), 64);
+	draw->AddCircle(c, r - 1.2f * k, IM_COL32(120, 84, 40, 255), 64, 2.4f * k);
+	if (g_hovered && !pressed)
+		draw->AddCircle(c, r - 1.2f * k, IM_COL32(255, 222, 150, 150), 64, 4.0f * k);
+	Hourglass(draw, o, k, 1.0f);
+	const ImU32 ink = pressed ? IM_COL32(200, 160, 90, 255) : g_hovered ? IM_COL32(255, 232, 170, 255) : IM_COL32(236, 196, 116, 255);
+	TurnBackArrow(draw, o, r * 0.86f, k, ink);
+	// its name, at the left of the wheel: a few seconds when it comes, and under the mouse
+	const DWORD age = GetTickCount() - g_shown_since;
+	const float a = g_hovered ? 1.0f : age < kLabelMs ? 1.0f : age < kLabelMs + 600 ? 1.0f - (age - kLabelMs) / 600.0f : 0.0f;
+	if (a > 0.0f) {
+		const float px = floorf(kLabelFont * k + 0.5f);
+		ImFont *font = overlay::Font(px);
+		const char *text = texts::Get("turn.undo_button");
+		const ImVec2 size = font->CalcTextSizeA(px, 10000.0f, 0.0f, text);
+		const float right = floorf(c.x - kLabelRight * k), pad_x = 9.0f * k, pad_y = 5.0f * k;
+		const ImVec2 p0(floorf(right - size.x - 2 * pad_x), floorf(c.y - size.y / 2 - pad_y));
+		const ImVec2 p1(right, floorf(c.y + size.y / 2 + pad_y));
+		draw->AddRectFilled(p0, p1, Rgba(14, 11, 8, 0.82f * a), 4.0f * k);
+		draw->AddRect(p0, p1, Rgba(150, 112, 60, 0.9f * a), 4.0f * k, 0, 1.2f * k);
+		draw->AddText(font, px, ImVec2(p0.x + pad_x + 1, p0.y + pad_y + 1), Rgba(0, 0, 0, 0.8f * a), text);
+		draw->AddText(font, px, ImVec2(p0.x + pad_x, p0.y + pad_y), Rgba(255, 236, 190, a), text);
 	}
-	const float px = floorf(kButtonFont * k + 0.5f);
-	ImFont *font = overlay::Font(px);
-	const std::string text = ui::Fit(font, px, texts::Get("turn.undo_button"), p1.x - p0.x - 12.0f * k);
-	const ImVec2 size = font->CalcTextSizeA(px, 10000.0f, 0.0f, text.c_str());
-	ui::ShadowText(draw, font, px, ImVec2(floorf((p0.x + p1.x - size.x) / 2), floorf((p0.y + p1.y - size.y) / 2 + (pressed ? k : 0.0f))),
-	               IM_COL32(255, 236, 190, 255), text.c_str());
 	static bool told = false;
 	if (!told) {
 		told = true;
-		hooklog::Write("turn undo: the button is shown (the first time in this run)");
+		hooklog::Write("turn undo: the button is shown over the hourglass (the first time in this run)");
 	}
 }
 

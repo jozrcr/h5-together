@@ -86,7 +86,7 @@ help.extra_conversions = How many more towns and dwellings may convert (1 = MMH5
 help.town_gate = Heroes can travel between their own towns.
 help.mine_control = Mines can be guarded by armies that keep themselves.
 help.dimension_doors = On random maps, a dimension door can visit a town from afar.
-help.ai_cheat = Extra gold and creatures each week for the computer players.
+help.ai_cheat = Extra gold and creatures each week for the computer players. Also in a loaded game, from the next week.
 help.mixed_stacks = Neutral armies mix several kinds of creatures (multiplayer maps).
 help.neutral_stack_size = Multiplier for the neutral armies (the start may lag a while).
 help.bank_difficulty = Multiplier for the guards of banks and battle sites.
@@ -348,18 +348,16 @@ banner = A player left. Saved as "Resume": Multiplayer, LAN, Create, Load to pla
 # Following a friend's view (a click on an ally's name in the player list).
 # {name} is the friend's name; {n} a player's number.
 [spectate]
-stop_button = Stop following {name}
 watch_button = Watch the battle
 stop_watching = Stop watching
 back_to_map = Back to the map
 watching = Watching {name}
 battle_over = Battle over
-hint = Click the button, the name, or move the camera to stop.
-in_battle = {name} is in a battle.
-in_town = {name} is in a town.
-in_hero_screen = {name} is looking at a hero.
-elsewhere = {name} is in a menu.
-no_view = {name} does not share their view (their setting, or an older H5 Together).
+row_in_battle = in a battle
+row_in_town = in a town
+row_in_hero_screen = looking at a hero
+row_elsewhere = in a menu
+row_no_view = does not share their view
 player = Player {n}
 
 [settings]
@@ -443,7 +441,7 @@ value.menu_homm5 = Heroes V
 value.menu_random = Random
 value.no_peers = none
 ui.player_list = Player list
-ui.player_list.help = The day, and each player's hero and turn, on the left of the adventure map. In a multiplayer game, click an ally's name to follow their view.
+ui.player_list.help = The day, and each player's hero and turn, on the left of the adventure map. In a multiplayer game, click an ally's name to follow their view (an eye shows it), and click it again to stop.
 ui.player_list_key = Player list key
 ui.player_list_key.help = Hides or shows the player list on the adventure map.
 ui.player_list_top = List: from the top
@@ -458,7 +456,7 @@ notify.popup = ... with a pop-up
 notify.popup.help = A Windows notification with the flash (on Linux it may not show).
 coop.share_view = Allies may follow my view
 coop.watch_battles = Watch the followed ally's battles
-coop.watch_battles.help = While you follow an ally's view and they fight, a "Watch the battle" button shows their battle live on your screen, even when it has begun. You only watch: the battle's buttons do nothing for you, and "Stop watching" (or Esc) brings you back.
+coop.watch_battles.help = While you follow an ally's view and they fight, a "Watch the battle" button beside their name shows their battle live on your screen, even when it has begun. You only watch: the battle's buttons do nothing for you, and "Stop watching" (or Esc) brings you back.
 coop.share_view.help = An ally can click your name in the player list and watch the adventure map where you look (an eye shows who). Only your camera's place is sent; each sees the map through their own fog.
 rules.key = Game rules key
 rules.key.help = Opens the game rules panel: setup screen, waiting room, adventure map.

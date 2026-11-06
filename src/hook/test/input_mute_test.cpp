@@ -174,6 +174,39 @@ void TestEvents()
 	Check(d.Events(true, nullptr, sizeof(DIDEVICEOBJECTDATA), 3, true) == 3, "events: no buffer (a count query) untouched");
 }
 
+// A panel that lets the right button, the motion and the wheel through (watching a friend's
+// battle): the left button and the keys stay held back.
+void TestPass()
+{
+	const unsigned pass = inputmute::kPassRightButton | inputmute::kPassMouseMove | inputmute::kPassWheel;
+	inputmute::Messages m;
+	Check(m.Filter(WM_RBUTTONDOWN, 0, 0, true, pass) == kPass && m.Filter(WM_RBUTTONUP, 0, 0, true, pass) == kPass,
+	      "pass: a right click reaches the game");
+	Check(m.Filter(WM_MOUSEMOVE, 0, 0, true, pass) == kPass, "pass: the mouse's motion reaches the game");
+	Check(m.Filter(WM_MOUSEWHEEL, MAKEWPARAM(0, 120), 0, true, pass) == kPass, "pass: the wheel reaches the game");
+	Check(m.Filter(WM_LBUTTONDOWN, 0, 0, true, pass) == kSwallow && m.Filter(WM_LBUTTONUP, 0, 0, true, pass) == kSwallow,
+	      "pass: a left click is still held back");
+	Check(m.Filter(WM_KEYDOWN, 'A', 0, true, pass) == kSwallow && m.Filter(WM_KEYUP, 'A', 0, true, pass) == kSwallow,
+	      "pass: a key is still held back");
+	Check(m.Filter(WM_RBUTTONDOWN, 0, 0, true, pass) == kPass && m.Filter(WM_RBUTTONUP, 0, 0, false) == kPass,
+	      "pass: a right press let through gets its release after the panel");
+
+	inputmute::DirectInput d;
+	DIMOUSESTATE2 st = {};
+	st.lZ = 120;
+	st.rgbButtons[0] = 0x80;
+	st.rgbButtons[1] = 0x80;
+	d.MouseState(&st, sizeof(st), true, pass);
+	Check(st.lZ == 120 && st.rgbButtons[1] == 0x80 && st.rgbButtons[0] == 0, "pass: mouse state keeps the right button and the wheel, not the left");
+
+	DIDEVICEOBJECTDATA ev[4] = {Event(DIMOFS_BUTTON1, 0x80), Event(DIMOFS_BUTTON0, 0x80), Event(DIMOFS_Z, 120), Event(DIMOFS_X, 3)};
+	const DWORD kept = d.Events(false, ev, sizeof(DIDEVICEOBJECTDATA), 4, true, pass);
+	Check(kept == 3 && ev[0].dwOfs == DIMOFS_BUTTON1 && ev[1].dwOfs == DIMOFS_Z && ev[2].dwOfs == DIMOFS_X,
+	      "pass: events keep the right press, the wheel and the motion; the left press removed");
+	DIDEVICEOBJECTDATA keys[1] = {Event(DIK_A, 0x80)};
+	Check(d.Events(true, keys, sizeof(DIDEVICEOBJECTDATA), 1, true, pass) == 0, "pass: keyboard presses still removed");
+}
+
 }  // namespace
 
 int main()
@@ -182,6 +215,7 @@ int main()
 	TestKeyboardState();
 	TestMouseState();
 	TestEvents();
+	TestPass();
 	if (g_failures) {
 		printf("%d check(s) FAILED\n", g_failures);
 		return 1;

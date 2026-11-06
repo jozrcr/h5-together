@@ -98,6 +98,9 @@ void *TopScreenObject();
 // The RTTI class names of every screen in the game's list, bottom first (the
 // last one is TopScreen's); their count (at most `max`).
 int ScreenNames(char (*names)[96], int max);
+// The topmost screen object of that RTTI class in the game's list (on top or under
+// others: the adventure map under a town or a battle), or nullptr.
+void *ScreenObject(const char *class_name);
 // The panels' language as English or French: kFrench when the texts in use
 // are French (texts.h chooses the language, any language with a texts file;
 // the panels take their words from there).
@@ -128,6 +131,10 @@ void EnableModalInput();
 // (it closes when another screen is on top). One modal panel at a time: false
 // when another one is open, or modal input is not enabled.
 bool OpenModal(const char *owner);
+// What `owner`'s open panel lets through to the game (inputmute::Pass, input_mute.h: these
+// values): the right button, the mouse's motion, the wheel. Until it closes; 0 = nothing.
+const unsigned kPassRightButton = 1u << 1, kPassMouseMove = 1u << 8, kPassWheel = 1u << 9;
+void SetModalPass(const char *owner, unsigned pass);
 // Closes it (nothing if it is not open).
 void CloseModal(const char *owner);
 // Is `owner`'s panel open? The overlay may have closed it (Esc, its screen, the timeout).

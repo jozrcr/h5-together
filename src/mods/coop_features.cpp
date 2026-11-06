@@ -19,6 +19,14 @@
 // 3. The features act only inside the multiplayer segment runner (0x007c98e0, wrapped
 //    here: InMultiplayerSegment), where every PC changes its world alike, and never in
 //    single player.
+// 4. ai_bonus (0.3.4; the owner's wish, 2026-11-05: "the AI army multiplies x2 overnight"):
+//    MMH5.5's computer bonus (H55_AICheatMode, read by its script at each new week) is set
+//    from the host's [rules] ai_cheat in the game itself, at the decision (the start of
+//    segment kDecideAt, the same point of the game on every PC), with the game's own "run
+//    a line of script" (script_rhythm.cpp, RunGameScript). So it applies to a loaded game
+//    too (MMH5.5 reads its settings file only at a map's start; a save keeps the values):
+//    from the next week on. The value: what the host's F2 panel shows (its [rules] ai_cheat
+//    choice, else its own H55-Settings.lua's; host_rules.cpp, HostComputerBonus).
 #include "coop_features.h"
 
 #include <windows.h>
@@ -27,6 +35,8 @@
 #include <string>
 
 #include "coop_features_logic.h"
+#include "host_rules.h"
+#include "script_rhythm.h"
 
 #include "../hook/log.h"
 #include "../hook/patch.h"
@@ -140,12 +150,21 @@ void SendValue(const BYTE *transceiver, DWORD value)
 		reinterpret_cast<StrongReleaseFn>(kReleaseStrong)(cmd, nullptr, 0xfffff);
 }
 
-// What this PC wants, as a host (h5-together.ini, read at each game's start).
-unsigned Wants()
+// What this PC wants, as a host (h5-together.ini, read at each game's start), and the
+// computer bonus it wants set ([rules] ai_cheat, when the rules are on and it is set).
+unsigned Wants(unsigned *ai_bonus)
 {
 	wchar_t path[MAX_PATH];
 	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
 	unsigned wants = 0;
+	*ai_bonus = 0;
+	// the value the F2 panel shows: the host's choice, else its own MMH5.5 file's (0.3.4-test2
+	// read only a saved choice: a host whose file already said "Off" asked for nothing)
+	const int ai = HostComputerBonus();
+	if (ai >= 0 && ai <= 6) {
+		wants |= 1u << features::kAiBonus;
+		*ai_bonus = static_cast<unsigned>(ai);
+	}
 	if (GetPrivateProfileIntW(L"coop", L"script_rhythm", 1, path) != 0)
 		wants |= 1u << features::kScriptRhythm;
 	if (GetPrivateProfileIntW(L"ai", L"parallel_turns", 0, path) != 0)
@@ -181,13 +200,15 @@ void __fastcall MpStepHook(void *self, void *edx)
 	g_last_reports = reports;
 	if (!g_hello_sent && reports >= features::kSendAt && reports <= features::kSendBy) {
 		g_hello_sent = true;
-		const unsigned wants = me == 0 ? Wants() : 0;
-		const uint32_t value = features::EncodeHello(features::kKnown, wants);
+		unsigned ai_bonus = 0;
+		const unsigned wants = me == 0 ? Wants(&ai_bonus) : 0;
+		const uint32_t value = features::EncodeHello(features::kKnown, wants, ai_bonus);
 		g_hellos[me] = features::DecodeHello(value);
 		SendValue(t, value);
 		if (me == 0)
-			hooklog::Write("co-op features: hello sent (PC 0 of %d, the host; knows %s; wants %s)", pcs,
-			               Names(features::kKnown).c_str(), Names(wants).c_str());
+			hooklog::Write("co-op features: hello sent (PC 0 of %d, the host; knows %s; wants %s%s)", pcs,
+			               Names(features::kKnown).c_str(), Names(wants).c_str(),
+			               (wants & (1u << features::kAiBonus)) ? (" = " + std::to_string(ai_bonus)).c_str() : "");
 		else
 			hooklog::Write("co-op features: hello sent (PC %d of %d; knows %s)", me, pcs, Names(features::kKnown).c_str());
 	}
@@ -219,6 +240,8 @@ void __fastcall CheckHook(void *self, void *edx, int pc, const BYTE *cmd)
 	g_check_next(self, edx, pc, cmd);
 }
 
+void SetComputerBonus(unsigned bonus);
+
 // The start of each segment's commands (every PC runs the same segments in the same
 // order): the decision at kDecideAt.
 void __fastcall SegmentHook(void *transceiver8, void *edx, DWORD time)
@@ -239,9 +262,24 @@ void __fastcall SegmentHook(void *transceiver8, void *edx, DWORD time)
 					missing += (missing.empty() ? "" : ", ") + std::to_string(pc);
 			hooklog::Write("co-op features: this game (%d PCs): on: %s%s%s", pcs, Names(g_on).c_str(),
 			               missing.empty() ? "" : "; no hello from PC ", missing.c_str());
+			if (g_on & (1u << features::kAiBonus))
+				SetComputerBonus(g_hellos[0].ai_bonus);
 		}
 	}
 	g_segment_next(transceiver8, edx, time);
+}
+
+// ai_bonus: H55_AICheatMode in the running game, on every PC at the same point (the start
+// of segment kDecideAt). Logged with what the script says back, so that every PC's log
+// shows the same value.
+void SetComputerBonus(unsigned bonus)
+{
+	char line[160];
+	_snprintf_s(line, sizeof(line), _TRUNCATE,
+	            "H55_AICheatMode = %u; print(\"H5 Together: H55_AICheatMode = \"..tostring(H55_AICheatMode))", bonus);
+	const bool ok = RunGameScript(line);
+	hooklog::Write("co-op features: the host's computer bonus: H55_AICheatMode = %u (%s) set in the game on every PC%s", bonus,
+	               bonus == 0 ? "off" : bonus == 4 ? "100%" : "MMH5.5's 0-6 scale", ok ? "" : ": FAILED here (the script did not run)");
 }
 
 void __fastcall RunnerHook(void *transceiver, void *edx)
@@ -297,9 +335,12 @@ void ApplyCoopFeaturesFromSettings()
 		// (the runner's depth is still counted if its hook went in: InMultiplayerSegment stays right)
 		return;
 	}
-	const unsigned wants = Wants();
-	hooklog::Write("co-op features: ready (knows %s; as host, this PC wants %s: [coop] script_rhythm, [ai] parallel_turns)",
-	               Names(features::kKnown).c_str(), Names(wants).c_str());
+	unsigned ai_bonus = 0;
+	const unsigned wants = Wants(&ai_bonus);
+	hooklog::Write("co-op features: ready (knows %s; as host, this PC wants %s%s: [coop] script_rhythm, [ai] parallel_turns, "
+	               "[rules] ai_cheat)",
+	               Names(features::kKnown).c_str(), Names(wants).c_str(),
+	               (wants & (1u << features::kAiBonus)) ? (" = " + std::to_string(ai_bonus)).c_str() : "");
 }
 
 }  // namespace mods

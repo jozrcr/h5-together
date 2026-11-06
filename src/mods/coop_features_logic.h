@@ -22,7 +22,9 @@ const unsigned kVersion = 1;
 enum Feature {
 	kScriptRhythm = 0,  // MMH5.5's scripts at their own pace (script_rhythm.cpp, [coop] script_rhythm)
 	kParallelAi = 1,    // the computer players side by side (parallel_ai.cpp, [ai] parallel_turns)
-	kFeatureCount = 2,
+	kAiBonus = 2,       // the host's MMH5.5 computer bonus, set in the game itself, also a loaded one
+	                    // ([rules] ai_cheat: H55_AICheatMode; coop_features.cpp, 0.3.4)
+	kFeatureCount = 3,
 };
 const unsigned kKnown = (1u << kFeatureCount) - 1;  // what this version knows
 
@@ -34,11 +36,14 @@ const unsigned kDecideAt = 20;  // the segment at whose start every PC decides
 struct Hello {
 	bool valid = false;  // false: none came (or not one of ours)
 	unsigned version = 0;
-	unsigned knows = 0;  // bit f: the sender knows feature f
-	unsigned wants = 0;  // bit f: the sender wants feature f (only the host's counts)
+	unsigned knows = 0;     // bit f: the sender knows feature f
+	unsigned wants = 0;     // bit f: the sender wants feature f (only the host's counts)
+	unsigned ai_bonus = 0;  // with kAiBonus wanted: the computer bonus, 0..6 (H55_AICheatMode)
 };
 
-uint32_t EncodeHello(unsigned knows, unsigned wants);
+// The wants byte: the features in its low 4 bits, the computer bonus in bits 4-6 (an
+// older version reads only the features it knows, the low bits).
+uint32_t EncodeHello(unsigned knows, unsigned wants, unsigned ai_bonus = 0);
 // valid = false when the value is not one of our hellos.
 Hello DecodeHello(uint32_t value);
 

@@ -118,7 +118,7 @@ segment_ms=50     ; 50 or 100 (50 by default since 0.2.0)
 
 ## Undo End Turn (`turn_undo*.cpp`; off by default, the host's choice)
 
-**What it does:** with simultaneous turns, a player who pressed End Turn too early can take it back while another human still plays. A button **"Resume my turn"** ("Reprendre mon tour") shows under the game's own banner "Please wait for the other players..."; a click gives the turn back on every PC at the same moment. Once the last other human has ended the turn, the computer players start and the button goes.
+**What it does:** with simultaneous turns, a player who pressed End Turn too early can take it back while another human still plays. A round button **"Resume my turn"** ("Reprendre mon tour") shows over the game's hourglass (the End Turn button, at the centre of the wheel at the bottom right): an arrow turning back around a small hourglass, its name at the left of the wheel for a few seconds and whenever the mouse is over it. A click gives the turn back on every PC at the same moment. Once the last other human has ended the turn, the computer players start and the button goes.
 
 **Setting:** `[coop] undo_end_turn=1` (Options, H5 Together, the host's settings). Only the host's value counts, from the next game. Every PC needs a DLL that knows it (whatever its own setting); otherwise it stays off for that game.
 
@@ -163,6 +163,18 @@ Some of our changes act on the game world, so every PC of a multiplayer game mus
 co-op features: this game (2 PCs): on: script_rhythm parallel_ai
 ```
 
+## The computer bonus, also in a loaded game (`coop_features.cpp`, `ai_bonus`; since 0.3.4)
+
+**What it does:** MMH5.5 gives the computer players extra gold and creatures every week (`H55_AICheatMode`, the F2 panel's "Computer bonus": Off, 40% ... 140%). Its scripts read their settings file only when a map starts, and a save keeps the values, so a loaded game used to keep the bonus it started with (the owner's 3-player game, 2026-11-05: "the AI army multiplies x2 overnight"). MMH5.5 reads the variable again at each new week. So at the co-op features' decision (segment 20, the same point of the game on every PC) every PC sets it to the host's value with the game's own "run a line of script" (`DoString`, the scripts' object slot 0 `0x00cab4a0`, at world `+0x1d0` `+0x0c`; it answers 0 when the line ran). The value is what the host's F2 panel shows: its choice, else its own MMH5.5 file's. It counts from the next week; what the computers already got stays.
+
+**Travels** in the co-op features' hello (the wants byte's bits 4-6; a 0.3.3 PC reads only bits 0-1, does not know `ai_bonus`, so it stays off for everyone). The log, on every PC:
+
+```
+co-op features: the host's computer bonus: H55_AICheatMode = 0 (off) set in the game on every PC
+```
+
+and MMH5.5's console: `H5 Together: H55_AICheatMode = 0`. Robot (LAN A1M4, 2026-11-05/06): with the host's `ai_cheat=0` and with no choice (its file's 4), both consoles print the value, 449 world checks all equal.
+
 ## MMH5.5's scripts at their own pace (`script_rhythm.cpp`; on, the host's choice)
 
 **What it does:** map scripts (MMH5.5's above all) count their waits in "ticks" of the game's script clock, one per segment. MMH5.5 was made for the game's 200 ms segments; with our 50 ms co-op segments its main loop checked every hero four times as often (more work on every PC, a choppier map). With this, the script clock ticks once per 200 ms of game time, as in the original game: every script keeps its original pace.
@@ -179,19 +191,22 @@ co-op features: this game (2 PCs): on: script_rhythm parallel_ai
 
 ## Following a friend's view (`spectate*.cpp`; on, each player's choice)
 
-**What it does:** in a multiplayer game, a click on an ally's name in the player list makes your camera follow theirs on the adventure map, gliding, so you can watch what they do while you wait. Just over the game's turn banner, a button "Stop following Pierre", with a line over it, says what they are doing ("Pierre is in a battle", "in a town"...). It stops when you click the button or the name again, move the camera yourself, or your own turn begins. An eye after a name shows whom you follow; on their screen, an eye after your name shows that you follow them.
+**What it does:** in a multiplayer game, a click on an ally's name in the player list makes your camera follow theirs on the adventure map, gliding, so you can watch what they do while you wait. An eye after their name shows that you follow them, and a short line after the eye says where they are when it is not the map ("in a town", "looking at a hero"...). Your camera goes to them at once, also when they are in a town or a battle (to the place where they went in). It stops when you click the name (or the eye) again, move the camera yourself, or your own turn begins. On their screen, an eye after your name shows that you follow them. Nothing is drawn in the middle of the map.
 
 **Only allies** (the same team), and each player sees the map through their own fog: nothing of the game itself changes, so it cannot desync a game. While an ally follows you, your PC sends where your camera looks (a tile, a few times a second) as a small message next to the game's own world checks.
 
-**Watching their battle.** While you follow an ally and they fight, a second button shows beside the first: **"Watch the battle"**. It opens the game's own battle screen on their battle, live (every PC runs every battle anyway: its actions are world commands), also when the battle has begun; leave with the small **"Stop watching"** button at the bottom right (or Esc) and come back as often as you like. The battle's own buttons at the top right (auto combat, options, the white flag) show greyed out, as the game greys the others when it is not your turn. At the end, their results box shows, and **"Back to the map"** closes it. You only watch: while the battle screen is open the game gets none of your clicks or keys, and your PC sends no command at all (that battle screen would act as your ally: its own settings, auto-combat moves; all dropped). If your own battle starts meanwhile, watching stops at once.
+**Placing the army** (the battle's tactics phase): the game sends nothing of it until the player starts the battle (one command with every creature's place), so a watcher sees the creatures where they began, then at their new places when the battle starts. It is the same for every PC, also in a battle between players.
 
-**Settings:** `[coop] share_view=1` (Options, H5 Together, interface): your allies may follow your view; 0 = your view stays yours (they then read "Pierre does not share their view"). `[coop] watch_battles=1`: the "Watch the battle" button; 0 = no button. Each player chooses; both apply at once. The player list must be on (`[ui] player_list=1`): its names are where you click.
+**Watching their battle.** While you follow an ally and they fight, a small button shows right after their eye in the player list: **"Watch the battle"** (also when you start following them in the middle of their battle). It opens the game's own battle screen on their battle, live (every PC runs every battle anyway: its actions are world commands), also when the battle has begun; leave with the small **"Stop watching"** button at the bottom right (or Esc) and come back as often as you like. The battle's own buttons at the top right (auto combat, options, the white flag) show greyed out, as the game greys the others when it is not your turn. At the end, their results box shows, and **"Back to the map"** closes it. You only watch: while the battle screen is open the game gets no left click and no key (a right click, the mouse's motion and the wheel do reach it, to see a creature's information and what lies under the cursor), and your PC sends no command at all (that battle screen would act as your ally: its own settings, auto-combat moves; all dropped). If your own battle starts meanwhile, watching stops at once.
+
+**Settings:** `[coop] share_view=1` (Options, H5 Together, interface): your allies may follow your view; 0 = your view stays yours (they then read "does not share their view" after your name). `[coop] watch_battles=1`: the "Watch the battle" button; 0 = no button. Each player chooses; both apply at once. The player list must be on (`[ui] player_list=1`): its names are where you click.
 
 `h5-together.log`:
 
 ```
 spectate: following Pierre's view (a click on the player list)
 spectate: Pierre's view arrives (0.1 s after the request)
+spectate: Pierre's screen: a battle
 spectate: stopped following Pierre (this PC's turn began)
 spectate: Joz follows this PC's view
 ```
@@ -949,7 +964,7 @@ log_volume=0        ; testing: log the first N changes of an audible channel vol
 
 ## Black past the map's edge (`edge_sky.cpp`, off by default)
 
-**What it is for:** zoomed out (above), you see past the adventure map's edge. On many random maps that is a flat dark violet with a lavender corner. It is a **sky dome**, the Sylvan siege battlefield's sky: MMH5.5 gave it to `Lights/_(AmbientLight)/Arena/Dusk_light_BoatArena01(VicTest).xdb`, one of the 4 lights the random map generator picks from (`RMG/Params/Default.xdb`). The original game's copy of that light has no sky dome. With `edge_sky=none`, the game gets that light without its sky dome, so past the edge the screen stays black, like unexplored land. Off (the default, `game`), the game's sky.
+**What it is for:** zoomed out (above), you see past the adventure map's edge. On many random maps that is a flat dark violet with a lavender corner. It is a **sky dome**, the Sylvan siege battlefield's sky: MMH5.5 gave it to `Lights/_(AmbientLight)/Arena/Dusk_light_BoatArena01(VicTest).xdb`, one of the 4 lights the random map generator picks from (`RMG/Params/Default.xdb`). The original game's copy of that light has no sky dome. With `edge_sky=none`, the game gets that light without its sky dome, so past the edge the screen stays black, like unexplored land. The same goes for the **underground**: the generator gives every random map's underground `Lights/_(AmbientLight)/Tests/underground.xdb`, which has a sky dome of its own (a dungeon backdrop, `SkyDome_Dung_Virt`); since 0.3.4 it is served without it too (the owner's game, 2026-11-05). Only adventure maps' undergrounds name that light (and an old map file among the arenas, in a list of underground lights a battlefield does not have). Off (the default, `game`), the game's sky.
 
 **How:** when the game opens that light file, the mod hands it the same file with an empty `<SkyDome/>`, as the lights without one have. This uses the game's file system hook (the one the original music and the French texts use). Nothing on disk changes.
 - In the game data only the generator's list names this light, so **battles keep their sky**.
@@ -973,7 +988,7 @@ log_volume=0        ; testing: log the first N changes of an audible channel vol
 
 ```ini
 [camera]
-edge_sky=game            ; game (the game's sky), none (no sky dome on the random maps' dusk light: black)
+edge_sky=game            ; game (the game's sky), none (no sky dome on the random maps' dusk light and the undergrounds' light: black)
 edge_sky_test_light=     ; testing: one more light file to show without its sky dome
 ```
 

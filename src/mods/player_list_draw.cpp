@@ -464,6 +464,10 @@ void DrawPanel(const Snapshot &s, const Look &look, float rect[4], Hits *hits)
 			hits->rect[n][1] = y - reach;
 			hits->rect[n][2] = eye_x + kEyeHalfW * k;
 			hits->rect[n][3] = y + ph + reach;
+			hits->pill[n][0] = px;
+			hits->pill[n][1] = y;
+			hits->pill[n][2] = px + pw;
+			hits->pill[n][3] = y + ph;
 		}
 		y += ph;
 		if (teams && last) {  // the team's line, a thin pewter one, down to its last pill

@@ -595,6 +595,30 @@ Values Effective()
 	return v;
 }
 
+}  // namespace
+
+int HostComputerBonus()
+{
+	if (!g_enabled)
+		return -1;
+	const int r = rules::RuleIndex("ai_cheat");
+	if (r < 0)
+		return -1;
+	std::string value;
+	{
+		Lock lock;
+		if (!g_file_known && g_chosen[r].empty())
+			return -1;
+		value = Effective()[r];
+	}
+	if (value.empty())
+		return -1;
+	const int bonus = atoi(value.c_str());
+	return bonus >= 0 && bonus <= 6 ? bonus : -1;
+}
+
+namespace {
+
 // MMH5.5's start script, when the scripts read it (dofile from H55-Core.lua, every
 // PC): with this game's start rules (game mode, ToE start bonuses), or as it is.
 GameStream *ServeStartScript(GameStream *s)

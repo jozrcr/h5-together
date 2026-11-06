@@ -14,4 +14,9 @@ void ApplyPlayerListFromSettings();
 // From the settings menu: its key and its place, at once.
 void ReloadPlayerListSettings();
 
+// Where a player's row was drawn on the last frame (pixels of the back buffer): `right` the
+// end of the row (after its eye), `top` and `bottom` its pill's. False when the list is not
+// shown (F9, not the adventure map) or the player has no row. (spectate.cpp draws beside it.)
+bool PlayerListRowPlace(int player, float *right, float *top, float *bottom);
+
 }  // namespace mods

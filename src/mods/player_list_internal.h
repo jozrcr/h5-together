@@ -50,6 +50,7 @@ struct Hits {
 	int count;
 	int id[kMaxPlayers];         // the player number
 	float rect[kMaxPlayers][4];  // x0, y0, x1, y1 in pixels: the portrait, the pill and the eye
+	float pill[kMaxPlayers][4];  // the pill alone (what is drawn beside the eye lines up with it)
 };
 
 struct Snapshot {

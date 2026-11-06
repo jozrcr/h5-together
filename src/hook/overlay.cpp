@@ -534,6 +534,47 @@ int ScreenNames(char (*names)[96], int max)
 	return n;
 }
 
+// The whole screen object from the part the game's list holds (one of its bases): its RTTI
+// locator says where that part sits in the whole object. Inside a __try.
+static void *WholeScreen(const BYTE *part)
+{
+	if (!part)
+		return nullptr;
+	const DWORD vtable = Read(part, 0);
+	if (vtable < 0x00401000 || vtable > 0x01200000)
+		return nullptr;
+	const DWORD locator = Read(reinterpret_cast<const void *>(vtable), static_cast<DWORD>(-4));
+	if (locator < 0x00401000 || locator > 0x01200000)
+		return nullptr;
+	return const_cast<BYTE *>(part - Read(reinterpret_cast<const void *>(locator), 4));
+}
+
+void *ScreenObject(const char *class_name)
+{
+	if (g_screens_ok < 0)
+		g_screens_ok = memcmp(reinterpret_cast<const void *>(kTopScreenGetter), kTopScreenGetterBytes,
+		                      sizeof(kTopScreenGetterBytes)) == 0;
+	if (!g_screens_ok)
+		return nullptr;
+	void *found = nullptr;
+	__try {
+		const DWORD *sentinel = *reinterpret_cast<const DWORD *const *>(kScreenList);
+		if (!sentinel)
+			return nullptr;
+		int n = 0;
+		for (DWORD node = sentinel[0]; node && node != reinterpret_cast<DWORD>(sentinel) && n < 64;
+		     node = Read(reinterpret_cast<const void *>(node), 0), ++n) {
+			const BYTE *part = reinterpret_cast<const BYTE *>(Read(reinterpret_cast<const void *>(node), 8));
+			if (part && strcmp(ClassName(part), class_name) == 0)
+				found = WholeScreen(part);  // (bottom first: the last one found is the topmost)
+		}
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER) {
+		return nullptr;
+	}
+	return found;
+}
+
 void *TopScreenObject()
 {
 	if (g_screens_ok < 0)
