@@ -22,7 +22,8 @@
 // 2008 game gets "Documents\H5 Together\Original game" as its Documents folder (the game's
 // SHGetFolderPathA, CSIDL_PERSONAL). At its first start the profiles' settings are copied
 // there from the shared folder (the player's name, options and keys), never the saves.
-// Not in robot mode: the robot gives every copy its own home already.
+// In robot mode, inside the robot's home (its own hook answers first). The random map
+// generator's cache (data\index.bin) also goes there (see "the random map generator's cache").
 //
 // [video] hd_textures=1 keeps MMH5.5's HD textures (MMH55-HDTex.pak: terrain, town
 // exteriors, terrain objects, sky domes; textures only, every file it points to is in it or
@@ -32,6 +33,8 @@
 
 #include <windows.h>
 #include <shlobj.h>
+#include <ctype.h>
+#include <string.h>
 
 #include <string>
 
@@ -39,7 +42,6 @@
 
 #include "../hook/log.h"
 #include "../hook/patch.h"
-#include "../hook/robot.h"
 
 namespace mods {
 namespace {
@@ -247,18 +249,136 @@ HRESULT WINAPI FolderHook(HWND hwnd, int csidl, HANDLE token, DWORD flags, LPSTR
 	return g_folder_next(hwnd, csidl, token, flags, path);
 }
 
-// While MMH5.5's files are hidden (not in robot mode): the original game's own Documents
-// folder, from the game's first question.
-void OwnProfile(const wchar_t *ini)
+// While MMH5.5's files are hidden: the original game's own Documents folder, from the game's
+// first question (in robot mode inside the robot's home: the robot's own hook answers first).
+void OwnProfile()
 {
-	// (testing: [debug] own_profile_test=1 does it in robot mode too, inside the robot's home)
-	if (robot::Active() && GetPrivateProfileIntW(L"debug", L"own_profile_test", 0, ini) == 0)
-		return;
 	g_folder_next = reinterpret_cast<SHGetFolderPathAFn>(
 		hookpatch::PatchImport("SHELL32.dll", "SHGetFolderPathA", reinterpret_cast<void *>(&FolderHook)));
 	if (!g_folder_next)
 		hooklog::Write("mmh55 files: the game's Documents question could not be wrapped: the original game shares MMH5.5's "
 		               "profiles and saves (never load a save of the other game)");
+}
+
+// --- the random map generator's cache, data\index.bin ---------------------------------------
+// The generator keeps a cache of every map object in data\index.bin (and its log,
+// index-bin.log), built from the data the game sees, read at the game's start (CreateFileA,
+// "<game>\data\index.bin") and written back when it generates a map (0x00499b80). MMH5.5's
+// copy is built from MMH5.5's files: the 2008 game read it, and crashed while writing it back
+// from the generator, leaving it cut (the owner, 2026-11-06; MMH5.5 then simply builds it
+// again). So the 2008 game's copy lives in its own folder, "Documents\H5 Together\Original
+// game\index.bin", and MMH5.5's is never read or written by it.
+typedef HANDLE(WINAPI *CreateFileAFn)(LPCSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES, DWORD, DWORD, HANDLE);
+typedef BOOL(WINAPI *GetAttrExFn)(LPCSTR, GET_FILEEX_INFO_LEVELS, LPVOID);
+typedef BOOL(WINAPI *DeleteFileAFn)(LPCSTR);
+CreateFileAFn g_create_next = nullptr;
+GetAttrExFn g_attr_next = nullptr;
+DeleteFileAFn g_delete_next = nullptr;
+bool g_trace = false;  // research: [debug] trace_files=1 logs the game's file calls that name "index"
+char g_own_base[MAX_PATH] = "";  // "<Documents>\H5 Together\Original game", known at the first need
+
+// "...\data\index.bin" or "...\data\index-bin.log" (any case, / or \): its file name, else nullptr.
+const char *CacheName(const char *path)
+{
+	if (!path)
+		return nullptr;
+	const char *const names[] = {"data\\index.bin", "data\\index-bin.log"};
+	const size_t n = strlen(path);
+	for (const char *name : names) {
+		const size_t k = strlen(name);
+		if (n < k || (n > k && path[n - k - 1] != '\\' && path[n - k - 1] != '/'))
+			continue;
+		bool same = true;
+		for (size_t i = 0; i < k && same; ++i) {
+			const char a = path[n - k + i], b = name[i];
+			same = (a == b) || (b == '\\' && a == '/') || (tolower(static_cast<unsigned char>(a)) == b);
+		}
+		if (same)
+			return name + 5;  // past "data\"
+	}
+	return nullptr;
+}
+
+// The original game's own folder (made if needed), or false when it is not known.
+bool OwnBase()
+{
+	static LONG state = 0;  // 0 not yet, 1 being found, 2 done
+	if (InterlockedCompareExchange(&state, 1, 0) == 0) {
+		char documents[MAX_PATH] = "";
+		if (g_folder_next && SUCCEEDED(g_folder_next(nullptr, CSIDL_PERSONAL, nullptr, SHGFP_TYPE_CURRENT, documents)) &&
+		    documents[0]) {
+			const std::string base = std::string(documents) + "\\H5 Together\\Original game";
+			const int made = SHCreateDirectoryExA(nullptr, base.c_str(), nullptr);
+			if (base.size() < MAX_PATH - 32 && (made == ERROR_SUCCESS || made == ERROR_ALREADY_EXISTS || made == ERROR_FILE_EXISTS))
+				lstrcpynA(g_own_base, base.c_str(), MAX_PATH);
+		}
+		hooklog::Write(g_own_base[0] ? "mmh55 files: the original game's random map cache (index.bin) is %s\\index.bin, not "
+		                               "MMH5.5's"
+		                             : "mmh55 files: the original game's own folder is not known%s: its random map cache stays "
+		                               "data\\index.bin, MMH5.5's (making a random map may fail)",
+		               g_own_base);
+		InterlockedExchange(&state, 2);
+	}
+	while (InterlockedCompareExchange(&state, 2, 2) != 2)
+		Sleep(1);
+	return g_own_base[0] != 0;
+}
+
+// The path the game gets: its own copy for the generator's cache, else `path` itself.
+const char *Redirect(const char *path, std::string *buffer)
+{
+	const char *name = CacheName(path);
+	if (!name || !OwnBase())
+		return path;
+	*buffer = std::string(g_own_base) + "\\" + name;
+	return buffer->c_str();
+}
+
+HANDLE WINAPI CreateFileAHook(LPCSTR name, DWORD access, DWORD share, LPSECURITY_ATTRIBUTES sa, DWORD disposition, DWORD flags,
+                              HANDLE tmpl)
+{
+	std::string buffer;
+	const char *path = Redirect(name, &buffer);
+	HANDLE h = g_create_next(path, access, share, sa, disposition, flags, tmpl);
+	if (path != name || (g_trace && name && strstr(name, "ndex")))
+		hooklog::Write("mmh55 files: %s %s access %08lx disposition %lu -> %s", path != name ? "the game's" : "trace: CreateFileA",
+		               path, access, disposition, h == INVALID_HANDLE_VALUE ? "not there" : "open");
+	return h;
+}
+
+BOOL WINAPI GetAttrExHook(LPCSTR name, GET_FILEEX_INFO_LEVELS level, LPVOID info)
+{
+	std::string buffer;
+	const char *path = Redirect(name, &buffer);
+	const BOOL ok = g_attr_next(path, level, info);
+	if (g_trace && name && strstr(name, "ndex"))
+		hooklog::Write("mmh55 files: trace: GetFileAttributesExA %s -> %d", path, ok);
+	return ok;
+}
+
+BOOL WINAPI DeleteFileAHook(LPCSTR name)
+{
+	std::string buffer;
+	const char *path = Redirect(name, &buffer);
+	const BOOL ok = g_delete_next(path);
+	if (path != name || (g_trace && name && strstr(name, "ndex")))
+		hooklog::Write("mmh55 files: the game deletes %s -> %d", path, ok);
+	return ok;
+}
+
+void InstallCacheRedirect(const wchar_t *ini)
+{
+	g_trace = GetPrivateProfileIntW(L"debug", L"trace_files", 0, ini) != 0;
+	g_create_next = reinterpret_cast<CreateFileAFn>(
+		hookpatch::PatchImport("KERNEL32.dll", "CreateFileA", reinterpret_cast<void *>(&CreateFileAHook)));
+	g_attr_next = reinterpret_cast<GetAttrExFn>(
+		hookpatch::PatchImport("KERNEL32.dll", "GetFileAttributesExA", reinterpret_cast<void *>(&GetAttrExHook)));
+	g_delete_next = reinterpret_cast<DeleteFileAFn>(
+		hookpatch::PatchImport("KERNEL32.dll", "DeleteFileA", reinterpret_cast<void *>(&DeleteFileAHook)));
+	if (!g_create_next || !g_attr_next || !g_delete_next)
+		hooklog::Write("mmh55 files: the game's file calls could not all be wrapped (%d%d%d): its random map cache may be "
+		               "MMH5.5's",
+		               g_create_next != nullptr, g_attr_next != nullptr, g_delete_next != nullptr);
 }
 
 }  // namespace
@@ -292,7 +412,8 @@ void InstallMmh55FilesEarly()
 	               "original game (%s); MMH5.5's HD textures %s",
 	               names.c_str(),
 	               g_keep_hd ? "kept ([video] hd_textures=1)" : hd ? "hidden too ([video] hd_textures=0)" : "not installed");
-	OwnProfile(ini);
+	OwnProfile();
+	InstallCacheRedirect(ini);
 }
 
 bool Mmh55FilesHidden()
