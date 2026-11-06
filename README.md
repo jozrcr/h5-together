@@ -136,6 +136,7 @@ The defaults keep the original game: the speed-ups, fixes and panels are on, and
 
 - **Follow a friend's view** (new in 0.3.3, on). While you wait for your turn, click an ally's name (or eye) in the player list: your camera goes to their hero and follows their camera on the adventure map; click again to stop. A short line after the eye says where they are when not on the map ("in a town", "in a menu"). An eye shows who follows whom. Allies only; each player still sees the map through their own fog.
 - **Watch their battle live** (new in 0.3.3, on). While you follow an ally who fights, a small "Watch the battle" button after their eye opens their battle on your screen, also when it has begun. You only watch: a right click shows a creature's card, but the battle gets none of your other clicks, and your PC sends nothing. Leave with "Stop watching" (or Esc) and come back whenever you like.
+- **A sword on an ally's row while they fight** (new in 0.3.5). Click it to follow them and open their battle at once.
 - **Stay and watch after a defeat** (new in 0.3.4, on). When you lose the game while your friends play on, closing the results keeps you on the map: follow your team and watch their battles instead of going back to the lobby.
 
 - **Hero details in the waiting room** (new in 0.3.5, on). Hover a starting hero's picture (or hold the right button on it): besides its name and specialty, the tooltip gives its class, its starting skills and what its specialty does.

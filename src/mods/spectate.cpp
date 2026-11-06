@@ -26,6 +26,13 @@
 //    its eye: a short line when the ally is not on the map ("in a town"), or, while the ally
 //    fights, a small button "Watch the battle". Nothing in the middle of the map: a click on
 //    the name or the eye starts and stops following (the owner's choice, 2026-11-05).
+// 5. The sword (the owner's wish, 2026-11-06: "a small sword icon on player list to indicate
+//    when in battle (maybe clickable to directly spectate)"): every PC that shares its view
+//    also tells every PC when it is in a battle (a "status" message, again every 4 s while it
+//    fights, and once when it leaves; 0.3.4 takes a status only from the ally it follows, so
+//    it ignores these). Each PC keeps the allies' (TellBattle, CheckHook); the player list
+//    draws a sword on an ally's row while it fights, and a click on it follows that ally and
+//    opens their battle as soon as it can (SpectateWatchBattle).
 //
 // Research probe ([debug] spectate_probe=1, robot runs): the camera's position, the floor
 // and the operator's object, every 2 s.
@@ -189,6 +196,17 @@ int g_their_screen = spectate::kOnMap;
 bool g_set = false;  // we put the camera somewhere in the frame before
 float g_set_x = 0, g_set_y = 0;
 bool g_my_turn_before = false;
+
+// The sword (5.): this PC's own battle, told to every PC; the allies' battles, heard.
+const DWORD kBattleRepeat = 4000;  // "in a battle" again, this often (a PC that starts late hears it)
+const DWORD kBattleLapse = 10000;  // nothing more heard this long: no longer in a battle
+DWORD g_battle_checked_at = 0;     // this PC's screen, looked at (every 250 ms)
+int g_battle_code = spectate::kOnMap;
+bool g_battle_told = false;        // "in a battle" went out, and no "out of it" since
+DWORD g_battle_told_at = 0;
+DWORD g_battle_heard[9];           // by player: when its "in a battle" came (GetTickCount), 0 = not
+int g_auto_watch = 0;              // the sword's click: watch this ally's battle as soon as it can
+DWORD g_auto_watch_since = 0;
 LARGE_INTEGER g_last_frame = {};
 
 DWORD Read(const void *p, DWORD off)
@@ -402,6 +420,24 @@ void ShareView(DWORD now)
 		g_sent_floor = floor;
 		g_sent_view_at = now;
 	}
+}
+
+// --- every PC: "this PC is in a battle" (the sword in the allies' player lists) -----------------
+void TellBattle(DWORD now)
+{
+	if (now - g_battle_checked_at >= 250) {
+		g_battle_checked_at = now;
+		g_battle_code = g_share ? ScreenCode() : spectate::kElsewhere;
+	}
+	const bool fighting = g_battle_code == spectate::kInBattle;
+	if (fighting ? g_battle_told && now - g_battle_told_at < kBattleRepeat : !g_battle_told)
+		return;
+	Queue(spectate::EncodeStatus(g_me, g_battle_code));
+	if (fighting != g_battle_told)
+		hooklog::Write("spectate: this PC %s (told every PC: the sword in their player lists)",
+		               fighting ? "is in a battle" : "left its battle");
+	g_battle_told = fighting;
+	g_battle_told_at = now;
 }
 
 // --- as the follower -------------------------------------------------------------------------------
@@ -903,8 +939,12 @@ void Frame(DWORD now, float dt)
 		if (g_following)
 			Stop("not in a multiplayer game");
 		g_watchers.Clear();
+		memset(g_battle_heard, 0, sizeof(g_battle_heard));
+		g_battle_told = false;
+		g_auto_watch = 0;
 		return;
 	}
+	TellBattle(now);
 	ShareView(now);
 	// this PC's turn begins: stop following (the player plays again)
 	const PlayerInfo &me = g_players[g_me];
@@ -941,6 +981,20 @@ void Frame(DWORD now, float dt)
 		WatchNow(g_request_how);
 		if (g_watching_battle)
 			return;
+	}
+	if (g_auto_watch) {  // the sword's click: as soon as the ally's status says the battle goes on
+		if (g_auto_watch != g_following || now - g_auto_watch_since > 8000) {
+			if (g_auto_watch == g_following)
+				hooklog::Write("spectate: %s's battle could not be watched within 8 s (the sword's click)",
+				               NameOf(g_auto_watch).c_str());
+			g_auto_watch = 0;
+		}
+		else if (WatchableNotice()) {
+			g_auto_watch = 0;
+			WatchNow("the sword in the player list");
+			if (g_watching_battle)
+				return;
+		}
 	}
 	FollowFrame(screen, dt);
 }
@@ -1060,7 +1114,8 @@ void LookAt(int x, int y)
 
 void RobotCommand(const char *text)
 {
-	// robot steps "panel|spectate follow 2", "panel|spectate stop", "panel|spectate look 23 66"
+	// robot steps "panel|spectate follow 2", "panel|spectate stop", "panel|spectate look 23 66",
+	// "panel|spectate sword 1" (the robot's clicks do not reach the player list: GetAsyncKeyState)
 	// (the prefix is taken off)
 	int player = 0, x = 0, y = 0;
 	if (sscanf_s(text, "follow %d", &player) == 1)
@@ -1073,6 +1128,8 @@ void RobotCommand(const char *text)
 		StopWatching("robot");
 	else if (strcmp(text, "watch") == 0)
 		WatchNow("robot");
+	else if (sscanf_s(text, "sword %d", &player) == 1)  // what a click on the player list's sword does
+		SpectateWatchBattle(player, "robot: the sword");
 	else
 		hooklog::Write("spectate: robot command \"%s\" not known", text);
 }
@@ -1194,6 +1251,13 @@ void __fastcall CheckHook(void *self, void *edx, int pc, const BYTE *cmd)
 		if (value >> 24 == spectate::kMark) {
 			const spectate::Message m = spectate::Decode(value);
 			const DWORD now = GetTickCount();
+			if (m.valid && m.kind == spectate::kStatus && m.player != g_me) {  // (any PC's: the sword)
+				const bool fighting = m.screen == spectate::kInBattle;
+				if (fighting != (g_battle_heard[m.player] != 0))
+					hooklog::Write("spectate: %s %s (their PC says)", NameOf(m.player).c_str(),
+					               fighting ? "is in a battle" : "is out of their battle");
+				g_battle_heard[m.player] = fighting ? (now ? now : 1) : 0;
+			}
 			if (m.valid && m.kind == spectate::kWatch && m.target == g_me && g_me) {
 				if (m.on)
 					g_watchers.On(m.player, now);
@@ -1554,6 +1618,26 @@ void SpectateToggle(int player, const char *how)
 bool SpectateFollowsMe(int player)
 {
 	return g_ready && InMultiplayer() && g_share && g_watchers.Active(player, GetTickCount()) && MayWatchMe(player);
+}
+
+bool SpectateInBattle(int player)
+{
+	if (!g_ready || player < 1 || player > 8 || player == g_me || !g_battle_heard[player] || !InMultiplayer())
+		return false;
+	return GetTickCount() - g_battle_heard[player] < kBattleLapse && Followable(player);
+}
+
+void SpectateWatchBattle(int player, const char *how)
+{
+	if (g_watching_battle)
+		return;
+	if (g_following != player)
+		Start(player, how);
+	if (g_following != player)
+		return;
+	g_auto_watch = player;
+	g_auto_watch_since = GetTickCount();
+	hooklog::Write("spectate: watch %s's battle as soon as it can (%s)", NameOf(player).c_str(), how);
 }
 
 void SpectateNoteName(int player, const char *name)

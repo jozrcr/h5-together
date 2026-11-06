@@ -79,6 +79,15 @@ They go out after this PC's own segment report, as the other mods' messages do, 
 
 **Not tested yet:** Esc (the robot's keys do not reach the overlay's window messages), this PC's own battle starting while it watches, a real game between two PCs over Steam.
 
+### Built (2026-11-07): the sword in the player list
+
+While an ally fights, a sword (the game's attack cursor) replaces the turn mark on their row; a click follows them and opens their battle as soon as their status says it goes on (`SpectateWatchBattle`: 8 s at most). Every PC that shares its view sends its "status" to every PC when it enters a battle, every 4 s while in it, and once when it leaves (`TellBattle`); each PC keeps the allies' (`g_battle_heard`, 10 s lapse). The old way (a status only to followers, every 2 s) stays: a follower hears both.
+
+| Run | What | Result |
+|---|---|---|
+| `20261107-000337-lan` | The 2008 game; the host attacks a monster; the client follows nobody | The client: "Robot-host is in a battle (their PC says)", the sword on the host's row (screenshot); gone at the battle's end. 2293 world checks, all equal. |
+| `20261107-001130-lan` | The client's sword action (`panel|spectate sword 1`) | Followed the host and opened the battle 0.2 s later (screenshot: "Vous regardez Robot-host"); 74 commands dropped while watching; 2893 world checks, all equal. |
+
 ## Tests
 
 - `test/spectate_test.cpp`: messages both ways, the glide, the "may follow" rule.
