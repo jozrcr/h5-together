@@ -57,6 +57,20 @@ namespace {
 namespace ui = builder_ui;
 
 const char kName[] = "spectate";
+
+// --- a player who lost the game stays and watches ([coop] stay_after_defeat; the owner's idea,
+// 2026-11-05). When the game's results screen ("Echec de la mission", NUI::CMissionResultsScreen)
+// is closed, the adventure screen's frame (0x0059d5f0) sees the controller's "mission over"
+// (0x00604010) and calls 0x005923c0 (at 0x0059e0db), which queues NUI::CUnwindToMPLobby
+// (vtable 0x00e21c54) in a multiplayer game: back to the lobby, and the PC leaves the game. While
+// the world goes on (the robot: a defeated copy stays in step, 20261106-004946-lan), that call is
+// skipped: the PC stays on the map, plays no more (the world gives it no turn), and can follow
+// its team and watch their battles. Esc, Quit leaves as usual.
+const DWORD kMissionOverCall = 0x0059e0db;  // call 0x005923c0
+const DWORD kMissionOver = 0x005923c0;      // __thiscall(adventure screen part): results logging, then the unwind
+typedef void(__fastcall *MissionOverFn)(void *screen, void *edx);
+MissionOverFn g_mission_over_next = nullptr;
+bool g_stay_after_defeat = true;
 const char kAdventureScreen[] = ".?AVCAdventureScreen@NUI@@";
 
 // --- the game (vanilla 3.1 addresses, the same in MMH55_Utility) -----------------------------
@@ -274,6 +288,17 @@ bool Followable(int player)
 	return a.known && b.known && b.human && b.in_game && spectate::MayFollow(g_me, a.team, player, b.team);
 }
 
+// As the followed: may `player` follow this PC's view? An ally (the same team), human, also
+// one who has lost the game and stays to watch (stay_after_defeat): it plays no more, and
+// sees only what its team sees.
+bool MayWatchMe(int player)
+{
+	if (!g_ready || !InMultiplayer() || g_me == 0 || player < 1 || player > 8)
+		return false;
+	const PlayerInfo &a = g_players[g_me], &b = g_players[player];
+	return a.known && b.known && b.human && spectate::MayFollow(player, b.team, g_me, a.team);
+}
+
 // "Pierre", or "Player 2" when the player list has not told us the name.
 std::string NameOf(int player)
 {
@@ -344,10 +369,10 @@ void ShareView(DWORD now)
 			fresh = fresh || active;  // a new follower: what this PC shows and where it looks, at once
 			hooklog::Write("spectate: %s %s this PC's view%s", NameOf(p).c_str(), active ? "follows" : "stopped following",
 			               active && !g_share       ? " (asked; not shared: share_view=0)"
-			               : active && !Followable(p) ? " (asked; not shared: not an ally)"
+			               : active && !MayWatchMe(p) ? " (asked; not shared: not an ally)"
 			                                          : "");
 		}
-		any = any || (active && g_share && Followable(p));
+		any = any || (active && g_share && MayWatchMe(p));
 	}
 	if (!any || g_me == 0)
 		return;
@@ -859,7 +884,7 @@ void Frame(DWORD now, float dt)
 	ShareView(now);
 	// this PC's turn begins: stop following (the player plays again)
 	const PlayerInfo &me = g_players[g_me];
-	const bool my_turn = me.known && me.turn == 0 && !me.pressed;
+	const bool my_turn = me.known && me.in_game && me.turn == 0 && !me.pressed;
 	if (my_turn && !g_my_turn_before && g_following)
 		Stop("this PC's turn began");
 	g_my_turn_before = my_turn;
@@ -1427,6 +1452,33 @@ void Draw(const overlay::Frame &frame)
 	               ui::kParchment, line.c_str());
 }
 
+// This PC's player is out of the game (lost), in a multiplayer game where another human still plays.
+bool LostWhileOthersPlay()
+{
+	ReadPlayers();
+	if (!InMultiplayer() || g_me == 0 || !g_players[g_me].known || g_players[g_me].in_game)
+		return false;
+	for (int p = 1; p <= 8; ++p)
+		if (p != g_me && g_players[p].known && g_players[p].human && g_players[p].in_game)
+			return true;
+	return false;
+}
+
+void __fastcall MissionOverHook(void *screen, void *edx)
+{
+	static DWORD told_at = 0;
+	if (g_stay_after_defeat && LostWhileOthersPlay()) {
+		if (!told_at) {
+			told_at = GetTickCount();
+			hooklog::Write("spectate: this PC's player lost the game while the others play on: it stays and watches (the game's way "
+			               "back to the lobby skipped; Esc, Quit leaves)");
+		}
+		return;
+	}
+	told_at = 0;
+	g_mission_over_next(screen, edx);
+}
+
 bool CodeAsExpected()
 {
 	for (const Code &c : kCode)
@@ -1448,6 +1500,7 @@ void ReadSettings()
 	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
 	g_share = GetPrivateProfileIntW(L"coop", L"share_view", 1, path) != 0;
 	g_watch_battles = GetPrivateProfileIntW(L"coop", L"watch_battles", 1, path) != 0;
+	g_stay_after_defeat = GetPrivateProfileIntW(L"coop", L"stay_after_defeat", 1, path) != 0;
 	g_probe = static_cast<int>(GetPrivateProfileIntW(L"debug", L"spectate_probe", 0, path));
 }
 
@@ -1474,7 +1527,7 @@ void SpectateToggle(int player, const char *how)
 
 bool SpectateFollowsMe(int player)
 {
-	return g_ready && InMultiplayer() && g_share && g_watchers.Active(player, GetTickCount()) && Followable(player);
+	return g_ready && InMultiplayer() && g_share && g_watchers.Active(player, GetTickCount()) && MayWatchMe(player);
 }
 
 void SpectateNoteName(int player, const char *name)
@@ -1495,6 +1548,9 @@ void ApplySpectateFromSettings()
 	if (!CodeAsExpected())
 		return;
 	g_update_next = reinterpret_cast<UpdateFn>(hookpatch::RedirectCall(kUpdateCall, kUpdate, &UpdateHook));
+	g_mission_over_next = reinterpret_cast<MissionOverFn>(hookpatch::RedirectCall(kMissionOverCall, kMissionOver, &MissionOverHook));
+	if (!g_mission_over_next)
+		hooklog::Write("spectate: the map screen's end of a mission is not as expected: a player who lost goes back to the lobby");
 	g_mp_step_next = reinterpret_cast<StepFn>(hookpatch::PatchPointer(kMpStepCell, kMpStep, &MpStepHook));
 	g_check_next = reinterpret_cast<CheckFn>(hookpatch::RedirectCall(kCheckCall, kCheckHandler, &CheckHook));
 	if (!g_update_next || !g_mp_step_next || !g_check_next) {

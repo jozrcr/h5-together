@@ -141,6 +141,8 @@ const Setting kSettings[] = {
 	    "settings.coop.share_view", "settings.coop.share_view.help"),
 	ROW("coop", "watch_battles", "1", kBool, 0, 1, nullptr, 0, nullptr, kPlayer, kLive, kInterface, kCheck,
 	    "settings.coop.watch_battles", "settings.coop.watch_battles.help"),
+	ROW("coop", "stay_after_defeat", "1", kBool, 0, 1, nullptr, 0, nullptr, kPlayer, kLive, kInterface, kCheck,
+	    "settings.coop.stay_after_defeat", "settings.coop.stay_after_defeat.help"),
 	FILE_ONLY("notify", "trace", "0", kBool, 0, 1, kTester, kRestart),
 	// [ui]
 	ROW("ui", "player_list", "1", kBool, 0, 1, nullptr, 0, nullptr, kPlayer, kRestart, kInterface, kCheck,
