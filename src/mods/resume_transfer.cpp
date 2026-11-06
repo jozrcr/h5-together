@@ -18,6 +18,7 @@
 #include "resume_transfer.h"
 
 #include <windows.h>
+#include <shlobj.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -215,6 +216,14 @@ void WriteReceived()
 		return;
 	}
 	_snprintf_s(path, sizeof(path), _TRUNCATE, "%s%s", folder, kReceivedName);
+	{
+		// (a profile that never saved has no Saves folder yet: the original game's own profile,
+		// mmh55_files.cpp, at its first game; robot 2026-11-06: error 3, the path not found)
+		std::string dir = folder;
+		while (!dir.empty() && (dir.back() == '\\' || dir.back() == '/'))
+			dir.pop_back();
+		SHCreateDirectoryExA(nullptr, dir.c_str(), nullptr);
+	}
 	HANDLE f = CreateFileA(path, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
 	DWORD written = 0;
 	const std::vector<uint8_t> &file = g_rx.File();
@@ -232,7 +241,7 @@ void WriteReceived()
 	}
 	else {
 		g_state = 3;
-		hooklog::Write("resume transfer: writing the received save failed (error %lu)", GetLastError());
+		hooklog::Write("resume transfer: writing the received save into %s failed (error %lu)", folder, GetLastError());
 	}
 	g_rx.Finish();
 }
