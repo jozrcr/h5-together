@@ -4,7 +4,7 @@
 
 *H5 Together's own page in the game's Options screen. (The test game in this picture is in French, so the game's own buttons are too.)*
 
-An unofficial add-on for **Heroes of Might and Magic V: Tribes of the East** with the **MMH5.5** mod. Free and open source. It is made for a small group of friends who play co-op games against the computer, and anyone is welcome to use it.
+An unofficial add-on for **Heroes of Might and Magic V: Tribes of the East** with the **MMH5.5** mod, or the original 2008 game (new in 0.3.5). Free and open source. It is made for a small group of friends who play co-op games against the computer, and anyone is welcome to use it.
 
 ## What it does
 
@@ -14,7 +14,7 @@ An unofficial add-on for **Heroes of Might and Magic V: Tribes of the East** wit
 - **Watch your friends while you wait** (new in 0.3.3, polished in 0.3.4). Click an ally's name or eye in the player list: your camera follows theirs, and you can watch their battles live. A player who loses the game can stay and watch (new in 0.3.4).
 - **A few extras on top:** a player list on the map, a "your turn" notification, a random map template builder, other looks for your heroes, and a game rules menu for the host.
 - **Safe to try.** It never changes the game's own files, and it is easy to remove.
-- **Made for** the Steam game with MMH5.5 RC19d or RC19k, on Windows, or on Linux with Proton.
+- **Made for** the Steam game with MMH5.5 RC19d or RC19k, on Windows, or on Linux with Proton. **New in 0.3.5:** it also works with the original game without MMH5.5, even from a folder where MMH5.5 is installed ([how](#the-original-game-without-mmh55-new-in-035)).
 
 H5 Together was called **open-homm5** until version 0.2.7. If you have an old version, install the new one over it: your settings and hero looks are kept.
 
@@ -77,10 +77,10 @@ Good to know:
 | Game | Status |
 |---|---|
 | Steam Tribes of the East 3.1 with **MMH5.5 RC19d or RC19k**, started with the co-op exe `MMH55_Utility_64.exe` (or `MMH55_Utility.exe`), also when it is renamed `H5_Game.exe` for GameRanger | **Supported** |
-| The 2008 3.1 exe (`H5_GameOLD.exe`, or the `H5_Game.exe` that MMH5.5 RC19k leaves) | Recognised. The MMH5.5-only parts do nothing |
+| The original 2008 game (`H5_GameOLD.exe` after the GameRanger guide, or the `H5_Game.exe` that MMH5.5 RC19k leaves) | **Supported** (new in 0.3.5). In a folder with MMH5.5, H5 Together hides MMH5.5 from it ([how](#the-original-game-without-mmh55-new-in-035)) |
 | MMH5.5's single-player exe `MMH55_64.exe` / `MMH55.exe` | Not recognised: the add-on stays off and the game runs as it always did |
 | Steam's 2025 rebuild of `H5_Game.exe` (3.1.2.99) | Not recognised yet |
-| Tribes of the East **without** MMH5.5 | Not yet. The installer says so |
+| Tribes of the East **without** MMH5.5 | With the 2008 exe, yes (new in 0.3.5). Steam's 2025 rebuild alone: not yet, the installer says so |
 | GOG copy | The installer looks for it. Not tested |
 | Windows 10 and 11 | Yes |
 | Linux with Steam and Proton | Yes, with a launch option ([docs/linux.md](docs/linux.md)) |
@@ -169,6 +169,19 @@ The defaults keep the original game: the speed-ups, fixes and panels are on, and
 - **MMH5.5 scripts on random maps:** in multiplayer, MMH5.5's scripts (and so these rules) also run on random maps straight from the game's generator. Off on RC19d and on on RC19k by default, which is what each version does by itself.
 - **Skills of each class:** MMH5.5's lock (the default), or **Unlocked**: each class keeps its own skills and can also be offered the others at a small chance, as in the original game.
 - It works only when **every player** has the add-on (0.2.7 or later for the last three). Otherwise everyone uses their own MMH5.5 file, as before.
+
+### The original game, without MMH5.5 (new in 0.3.5)
+
+H5 Together also works with the original Tribes of the East 3.1, the 2008 program. In the owner's group, everyone has it already: the GameRanger guide for MMH5.5 renamed it `bin\H5_GameOLD.exe`.
+
+- **Start `H5_GameOLD.exe`** (with Steam running) instead of MMH5.5's exe. The main menu shows "H5 Together" over "Version : 3.1", without MMH5.5's line.
+- **From the same folder as MMH5.5.** The 2008 program would read MMH5.5's data files without MMH5.5's program changes, a broken mix. So H5 Together hides MMH5.5's files from it (`data\MMH55-*.pak`, `UserMODs\MMH55-*.h5u`): you get the original game. MMH5.5 still starts as before from its own exe. No file is changed or moved.
+- **Its own profile and saves:** a save of one game crashes the other, so the original game keeps its profile and saves in `Documents\H5 Together\Original game`. At its first start it copies your profile's settings there (name, options, keys), never the saves.
+- **MMH5.5's HD textures, if you like them:** Options, H5 Together, **MMH5.5's HD textures** (`[video] hd_textures=1`). Only the pictures: terrain, towns, sky. Each player chooses; it does not matter for the others.
+- **Endless simultaneous turns** (the host's choice, off by default): the original game ends simultaneous turns when heroes get close; with **Endless simultaneous turns** (`[coop] endless_turns=1`) they last the whole game, as MMH5.5's PEST does. Every PC needs H5 Together 0.3.5.
+- Everything else of H5 Together works the same: faster computer turns, online play over Steam, following and watching your friends, the player list, quick resume, Undo End Turn. The game rules menu (F2) is not there: its rules are all MMH5.5's.
+- **In one game, everybody starts the same:** all the original game, or all MMH5.5. Over Steam you only see games of your own kind.
+- Measured with the robot (same map, same settings): the computer's turns are as fast as with MMH5.5, and faster on a big map (15 turns in 92 s, against 119 s with MMH5.5's scripts).
 
 ### Camera, sound and visuals (off by default)
 

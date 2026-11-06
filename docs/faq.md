@@ -49,7 +49,9 @@ Some antivirus programs distrust a `dinput8.dll` that changes a game while it ru
 
 ### Does it work without MMH5.5?
 
-Not yet. Several parts need MMH5.5: the co-op exe `MMH55_Utility_64.exe` that the add-on hooks into, and the game rules menu, which is made of MMH5.5's own switches. On plain Tribes of the East the add-on does nothing for now. The installer says so and warns you, then copies the files anyway, so they start working once MMH5.5 is installed. Support for plain Tribes of the East may come later, after online play.
+Yes, since 0.3.5, with the original 2008 program: `H5_GameOLD.exe` if you followed the GameRanger guide for MMH5.5, or the `H5_Game.exe` that MMH5.5 RC19k leaves. Start that exe instead of MMH5.5's. In a folder where MMH5.5 is installed, H5 Together hides MMH5.5's files from it, so you play the original game, with its own profile and saves (`Documents\H5 Together\Original game`). The game rules menu (F2) is not there: its rules are all MMH5.5's. More in the [README](../README.md#the-original-game-without-mmh55-new-in-035).
+
+Steam's current `H5_Game.exe` is a 2025 rebuild of the game that the add-on does not know yet: with only that one, the add-on does nothing, and the installer says so.
 
 The add-on does not install MMH5.5. Get it from [MMH5.5's ModDB page](https://www.moddb.com/mods/might-magic-heroes-55). The installer knows **RC19d** and **RC19k**.
 
@@ -58,7 +60,7 @@ The add-on does not install MMH5.5. Get it from [MMH5.5's ModDB page](https://ww
 | What you start | Result |
 |---|---|
 | `MMH55_Utility_64.exe` (MMH5.5's co-op exe), or a copy of it named `H5_Game.exe` for GameRanger | Works |
-| The 2008 3.1 exe (`H5_GameOLD.exe`) | Recognised; only the parts that do not need MMH5.5 do something |
+| The original 2008 exe (`H5_GameOLD.exe`) | Works (new in 0.3.5): the original game, MMH5.5's files hidden from it |
 | `MMH55_64.exe` / `MMH55.exe` (MMH5.5's single-player exe) | Not recognised: nothing changes, the log says "unknown build" |
 | Steam's 2025 `H5_Game.exe` (3.1.2.99) | Not recognised yet |
 

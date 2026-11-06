@@ -365,8 +365,10 @@ void MenuDataTests(const std::string &texts_dir)
 	      "Options screen: under Wine and with the French packs, their rows too");
 	Check(out.find("<GlobalVar1>h5t_audio_original_music</GlobalVar1>") != std::string::npos &&
 	          out.find("<GlobalVar1>h5t_rules_key</GlobalVar1>") != std::string::npos &&
-	          out.find("<GlobalVar1>h5t_coop_endless_turns</GlobalVar1>") == std::string::npos,
-	      "Options screen: with MMH5.5, its rows (original music, the rules' key) and no endless turns (its PEST does that)");
+	          out.find("<GlobalVar1>h5t_coop_endless_turns</GlobalVar1>") == std::string::npos &&
+	          out.find("<GlobalVar1>h5t_video_hd_textures</GlobalVar1>") == std::string::npos,
+	      "Options screen: with MMH5.5, its rows (original music, the rules' key) and no endless turns (its PEST does that) "
+	      "nor HD textures (always there)");
 	options.mmh55 = false;
 	Check(AddCategory(game, options, &out) && out.find("<GlobalVar1>h5t_coop_endless_turns</GlobalVar1>") != std::string::npos &&
 	          out.find("<GlobalVar1>h5t_audio_original_music</GlobalVar1>") == std::string::npos &&
@@ -374,6 +376,8 @@ void MenuDataTests(const std::string &texts_dir)
 	          out.find("<GlobalVar1>h5t_coop_script_rhythm</GlobalVar1>") == std::string::npos &&
 	          out.find("<GlobalVar1>h5t_rules_key</GlobalVar1>") == std::string::npos &&
 	          out.find("<GlobalVar1>h5t_rules_button</GlobalVar1>") == std::string::npos &&
+	          out.find("<GlobalVar1>h5t_lang_texts</GlobalVar1>") == std::string::npos &&
+	          out.find("<GlobalVar1>h5t_video_hd_textures</GlobalVar1>") != std::string::npos &&
 	          out.find("<GlobalVar1>h5t_notify_sound</GlobalVar1>") != std::string::npos,
 	      "Options screen: the 2008 game without MMH5.5: endless turns shown, MMH5.5's rows hidden, the others as before");
 	printf("      (%d items in our category)\n", items);

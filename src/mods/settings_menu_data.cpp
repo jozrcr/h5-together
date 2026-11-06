@@ -68,7 +68,7 @@ bool Shown(const Setting &s, const MenuOptions &o)
 	if (Is(s, "camera", "wheel_fix"))
 		return o.wine;
 	if (Is(s, "lang", "texts"))
-		return o.packs;
+		return o.packs && o.mmh55;  // (the French pack holds MMH5.5's texts)
 	// what acts only on MMH5.5's data (its music, its violet sky, its scripts, its rules)
 	if (Is(s, "audio", "original_music") || Is(s, "camera", "edge_sky") || Is(s, "coop", "script_rhythm") ||
 	    Is(s, "rules", "key") || Is(s, "rules", "button"))
