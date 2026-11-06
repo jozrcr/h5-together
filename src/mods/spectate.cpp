@@ -44,6 +44,7 @@
 #include "spectate_logic.h"
 
 #include "../hook/d3d9_hook.h"
+#include "../hook/game_build.h"
 #include "../hook/log.h"
 #include "../hook/overlay.h"
 #include "../hook/patch.h"
@@ -1443,7 +1444,9 @@ void Draw(const overlay::Frame &frame)
 		ImVec2 p0, p1;
 		ButtonRect(0, frame.width, frame.height, &p0, &p1);
 		overlay::BlockClicksIn(kName, p0.x, p0.y, p1.x, p1.y, frame.width, frame.height);
-		if (!ResultsOnTop())
+		// (those three buttons are MMH5.5's battle screen's: the original game has none there,
+		// and greyed discs over its battlefield looked odd, the owner, 2026-11-06)
+		if (!ResultsOnTop() && GameHasMmh55())
 			GreyBattleButtons(draw, frame.width, k);
 		DrawButton(draw, g_main, 0, ButtonLabel(), k);
 		// a small caption over the small button, centred on it
