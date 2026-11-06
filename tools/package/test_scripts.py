@@ -34,6 +34,8 @@ OURS_MARK = b"H5 Together hook DLL"
 
 failures = []
 checks = 0
+# the installers never offer to fetch the original game's exe from GitHub during the tests
+os.environ["H5_TOGETHER_NO_DOWNLOAD"] = "1"
 
 
 sys.stdout.reconfigure(errors="replace")

@@ -39,6 +39,9 @@ param(
     # MMH5.5's installer file (MMH55_RC19k.exe...), to make the original game's 4 GB exe from
     # (else it is looked for in this folder, Downloads and the Desktop).
     [string]$Mmh55Installer = "",
+    # Never offer to fetch the original game's exe from MMH5.5's release on GitHub (also the
+    # environment variable H5_TOGETHER_NO_DOWNLOAD=1).
+    [switch]$NoDownload,
     # Tests only (see above).
     [string]$TestRegistry = "",
     [string]$TestPicker = "",
@@ -618,6 +621,46 @@ function Find-Exe2008In([string]$Path) {
     return $null
 }
 
+# MMH5.5's own release on GitHub holds the same 2008 exe in a zip (manual_setup_RC19k.zip,
+# 820 MB): only its piece is fetched (an HTTP range: about 5.4 MB), unpacked, and checked
+# against the 2008 exe's SHA-256 before it is used. Read from the zip's table of contents on
+# 2026-11-06 (tools/package/README.md). If MMH5.5 changes that file, the check fails and the
+# installer says so: the player then uses MMH5.5's installer file as before.
+$Mmh55ZipUrl = "https://github.com/Might-Magic-Heroes-5-5/MMH55/releases/download/RC19k/manual_setup_RC19k.zip"
+$Mmh55ZipExe = @{ Offset = [long]2988923; Packed = 5401151; Size = 13089792
+                  Sha256 = "6502a8c4cd0e03e9ce43b474bcb4a85acb8b8bf5050d56317e93c8f13fff50bd" }
+
+# The 2008 exe from MMH5.5's release on GitHub: its bytes (checked), else an exception.
+function Get-Exe2008FromGitHub {
+    try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12 } catch { }
+    $from = $Mmh55ZipExe.Offset
+    $req = [System.Net.HttpWebRequest]::Create($Mmh55ZipUrl)
+    $req.AddRange($from, $from + 30 + 1024 + $Mmh55ZipExe.Packed)
+    $req.UserAgent = "H5 Together installer"
+    $req.Timeout = 60000
+    $req.ReadWriteTimeout = 120000
+    $resp = $req.GetResponse()
+    try {
+        $buf = New-Object System.IO.MemoryStream
+        $resp.GetResponseStream().CopyTo($buf)
+        $data = $buf.ToArray()
+    } finally { $resp.Close() }
+    if ($data.Length -lt 30 -or [BitConverter]::ToUInt32($data, 0) -ne 0x04034B50) { throw "the downloaded piece is not the zip's file (MMH5.5 may have changed its release)" }
+    $n = [BitConverter]::ToUInt16($data, 26)
+    $start = 30 + $n + [BitConverter]::ToUInt16($data, 28)
+    if ($Latin1.GetString($data, 30, $n) -ne "bin/H5_Game.exe" -or [BitConverter]::ToUInt16($data, 8) -ne 8 -or
+        $start + $Mmh55ZipExe.Packed -gt $data.Length) { throw "the downloaded piece is not the 2008 exe (MMH5.5 may have changed its release)" }
+    $in = New-Object System.IO.MemoryStream ($data, $start, $Mmh55ZipExe.Packed)
+    $inflate = New-Object System.IO.Compression.DeflateStream ($in, [System.IO.Compression.CompressionMode]::Decompress)
+    $out = New-Object System.IO.MemoryStream
+    $inflate.CopyTo($out)
+    $exe = $out.ToArray()
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    $hex = -join ($sha.ComputeHash($exe) | ForEach-Object { $_.ToString("x2") })
+    if ($exe.Length -ne $Mmh55ZipExe.Size -or $hex -ne $Mmh55ZipExe.Sha256) { throw "the downloaded exe is not the expected 2008 exe (its SHA-256 differs)" }
+    return ,$exe
+}
+
 # MMH5.5's installer files (MMH55*.exe, over 100 MB) in this package's folder, Downloads, the Desktop.
 function Find-Mmh55Installers {
     $places = @($PSScriptRoot, (Split-Path -Parent $PSScriptRoot))
@@ -658,7 +701,20 @@ function Install-Original4Gb([string]$Bin, [string]$Given) {
     }
     if ($null -eq $exe) {
         if ($sources.Count -gt 0) { return @{ State = "failed"; From = ($sources -join ", "); Why = "the original game's exe is not in it" } }
-        return @{ State = "none"; From = ""; Why = "" }
+        # else, with the player's yes: MMH5.5's release on GitHub (about 5.4 MB)
+        if ($NoDownload -or $env:H5_TOGETHER_NO_DOWNLOAD) { return @{ State = "none"; From = ""; Why = "" } }
+        Write-Host ""
+        Write-Host "The original 2008 game (without MMH5.5) with 4 GB of memory: I can make bin\$Original4GbName."
+        Write-Host "Its exe comes from MMH5.5's own release on GitHub (only that file: about 5.4 MB; MMH5.5"
+        Write-Host "itself is not installed). Skip it if you only play MMH5.5."
+        $answer = $null
+        try { $answer = Read-Host "Fetch it? Y = yes, N = no" } catch { }
+        if ($null -eq $answer -or ($answer.Trim() -ne "" -and $answer.Trim().ToLowerInvariant() -notin @("y", "yes", "o", "oui"))) {
+            return @{ State = "none"; From = ""; Why = "" }
+        }
+        Write-Host "Fetching the original game's exe from MMH5.5's release on GitHub ..."
+        try { $exe = Get-Exe2008FromGitHub } catch { return @{ State = "failed"; From = "MMH5.5's release on GitHub"; Why = $_.Exception.Message } }
+        $from = "MMH5.5's release on GitHub, checked"
     }
     $pe = [BitConverter]::ToInt32($exe, 0x3C)
     $exe[$pe + 22] = $exe[$pe + 22] -bor 0x20  # IMAGE_FILE_LARGE_ADDRESS_AWARE: up to 4 GB

@@ -10,6 +10,8 @@
 #   --steam-dir <folder>  look in this Steam folder only
 #   --mmh55-installer <file>  MMH5.5's installer file, to make the original game's 4 GB exe
 #                         from (else looked for here, in Downloads and on the Desktop)
+#   --no-download         never offer to fetch that exe from MMH5.5's release on GitHub
+#                         (also H5_TOGETHER_NO_DOWNLOAD=1)
 #   --test-known-55u "<sha256>=<name>;..."   count these 55u.dll files as known versions (tests)
 #
 # It looks for Steam in ~/.steam/steam, ~/.local/share/Steam, the Flatpak and the Snap
@@ -43,12 +45,14 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 game_dir_arg=""
 steam_dir_arg=""
 mmh55_installer_arg=""
+no_download=0
 test_known_55u_arg=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --game-dir)  game_dir_arg="${2:-}"; shift ;;
         --steam-dir) steam_dir_arg="${2:-}"; shift ;;
         --mmh55-installer) mmh55_installer_arg="${2:-}"; shift ;;
+        --no-download) no_download=1 ;;
         --test-known-55u) test_known_55u_arg="${2:-}"; shift ;;
         -h|--help)   awk 'NR > 1 { if (/^#/) { sub(/^# ?/, ""); print } else exit }' "${BASH_SOURCE[0]}"; exit 0 ;;
         *) echo "Unknown option: $1 (try --help)"; exit 2 ;;
@@ -88,7 +92,8 @@ bin_of() {
 
 # SHA-256 of a file as lower case hex.
 sha256_of() {
-    if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" 2>/dev/null | awk '{print $1}'
+    # (sha256sum puts a "\" before the checksum when the file's path holds a backslash)
+    if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" 2>/dev/null | awk '{sub(/^\\/, "", $1); print $1}'
     elif command -v shasum >/dev/null 2>&1; then shasum -a 256 "$1" 2>/dev/null | awk '{print $1}'
     elif command -v openssl >/dev/null 2>&1; then openssl dgst -sha256 "$1" 2>/dev/null | awk '{print $NF}'
     fi
@@ -878,6 +883,44 @@ set_4gb() {
     printf "$(printf '\\%03o' $((b | 32)))" | dd of="$1" bs=1 seek="$at" conv=notrunc status=none
 }
 
+# MMH5.5's own release on GitHub holds the same 2008 exe in a zip (as install.ps1,
+# Get-Exe2008FromGitHub): only its piece is fetched (curl, an HTTP range: about 5.4 MB),
+# unpacked (python3) and checked against the 2008 exe's SHA-256.
+MMH55_ZIP_URL="https://github.com/Might-Magic-Heroes-5-5/MMH55/releases/download/RC19k/manual_setup_RC19k.zip"
+MMH55_ZIP_OFFSET=2988923
+MMH55_ZIP_PACKED=5401151
+MMH55_ZIP_SHA256="6502a8c4cd0e03e9ce43b474bcb4a85acb8b8bf5050d56317e93c8f13fff50bd"
+
+# fetch_exe_2008 <out>: the 2008 exe from MMH5.5's release on GitHub, checked; fails otherwise
+# (fetch_why says why).
+fetch_exe_2008() {
+    local out="$1" piece n e start
+    fetch_why=""
+    if ! command -v curl > /dev/null 2>&1 || ! command -v python3 > /dev/null 2>&1; then
+        fetch_why="it needs curl and python3"; return 1
+    fi
+    piece="$(mktemp)"
+    if ! curl -fsSL -r "$MMH55_ZIP_OFFSET-$((MMH55_ZIP_OFFSET + 30 + 1024 + MMH55_ZIP_PACKED))" -o "$piece" "$MMH55_ZIP_URL"; then
+        rm -f "$piece"; fetch_why="the download failed"; return 1
+    fi
+    n="$(u16 "$piece" 26)"
+    e="$(u16 "$piece" 28)"
+    start=$((30 + n + e))
+    if [ "$(u32 "$piece" 0)" != "67324752" ] || [ "$(dd if="$piece" bs=1 skip=30 count="$n" status=none 2>/dev/null)" != "bin/H5_Game.exe" ]; then
+        rm -f "$piece"; fetch_why="the downloaded piece is not the 2008 exe (MMH5.5 may have changed its release)"; return 1
+    fi
+    if ! python3 -I -c 'import sys, zlib
+d = open(sys.argv[1], "rb").read()
+s, n = int(sys.argv[2]), int(sys.argv[3])
+open(sys.argv[4], "wb").write(zlib.decompressobj(-15).decompress(d[s:s + n]))' "$piece" "$start" "$MMH55_ZIP_PACKED" "$out"; then
+        rm -f "$piece" "$out"; fetch_why="unpacking it failed"; return 1
+    fi
+    rm -f "$piece"
+    if [ "$(sha256_of "$out")" != "$MMH55_ZIP_SHA256" ]; then
+        rm -f "$out"; fetch_why="the downloaded exe is not the expected 2008 exe (its SHA-256 differs)"; return 1
+    fi
+}
+
 original_state="none"
 original_from=""
 dst4="$bin/H5_Original_4GB.exe"
@@ -906,6 +949,28 @@ else
             echo "Looking for the original game's exe in $(basename "$src") ..."
             if copy_exe_2008 "$src" "$dst4"; then original_from="$(basename "$src")"; break; fi
         done
+    fi
+    # else, with the player's yes: MMH5.5's release on GitHub (about 5.4 MB)
+    if [ -z "$original_from" ] && [ "$original_state" != "failed" ] && [ "${#sources[@]}" -eq 0 ] &&
+       [ "$no_download" = "0" ] && [ -z "${H5_TOGETHER_NO_DOWNLOAD:-}" ]; then
+        echo
+        echo "The original 2008 game (without MMH5.5) with 4 GB of memory: I can make bin/H5_Original_4GB.exe."
+        echo "Its exe comes from MMH5.5's own release on GitHub (only that file: about 5.4 MB; MMH5.5"
+        echo "itself is not installed). Skip it if you only play MMH5.5."
+        answer=""
+        if read -r -p "Fetch it? Y = yes, N = no: " answer; then
+            case "$(printf '%s' "$answer" | tr 'A-Z' 'a-z')" in
+                ""|y|yes|o|oui)
+                    echo "Fetching the original game's exe from MMH5.5's release on GitHub ..."
+                    if fetch_exe_2008 "$dst4"; then
+                        original_from="MMH5.5's release on GitHub, checked"
+                    else
+                        original_state="failed"
+                        original_from="MMH5.5's release on GitHub ($fetch_why)"
+                    fi
+                    ;;
+            esac
+        fi
     fi
     if [ -n "$original_from" ] && [ -f "$dst4" ] && [ "$original_state" != "failed" ]; then
         set_4gb "$dst4"
