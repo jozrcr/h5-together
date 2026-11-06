@@ -86,9 +86,9 @@ Only one file can have that name. Rename the other mod's `dinput8.dll` to `dinpu
 
 Three signs:
 
-- In the main menu, a line **"H5 Together 0.3.3"** (your version) above MMH5.5's "Version" line.
+- In the main menu, a line **"H5 Together 0.3.4"** (your version) above MMH5.5's "Version" line.
 - `h5-together.log` in the game's `bin` folder, whose first line says `H5 Together hook DLL <version> loaded`.
-- In a multiplayer waiting room, a line at the bottom: "Every player has H5 Together 0.3.3."
+- In a multiplayer waiting room, a line at the bottom: "Every player has H5 Together 0.3.4."
 
 ![The main menu with the version line](images/main-menu.png)
 
