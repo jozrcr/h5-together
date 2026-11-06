@@ -73,8 +73,9 @@ bool Shown(const Setting &s, const MenuOptions &o)
 	if (Is(s, "audio", "original_music") || Is(s, "camera", "edge_sky") || Is(s, "coop", "script_rhythm") ||
 	    Is(s, "rules", "key") || Is(s, "rules", "button"))
 		return o.mmh55;
-	// MMH5.5's PEST, for the 2008 game (with MMH5.5, its 55u.dll does it)
-	if (Is(s, "coop", "endless_turns"))
+	// MMH5.5's PEST, for the 2008 game (with MMH5.5, its 55u.dll does it); MMH5.5's HD
+	// textures kept in the 2008 game (with MMH5.5 they are always there)
+	if (Is(s, "coop", "endless_turns") || Is(s, "video", "hd_textures"))
 		return !o.mmh55;
 	return true;
 }

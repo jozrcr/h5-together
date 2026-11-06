@@ -213,6 +213,8 @@ const Setting kSettings[] = {
 	    "settings.video.fps_limit", "settings.video.fps_limit.help"),
 	ROW("video", "vsync", "game", kChoice, 0, 0, kVsync, COUNT(kVsync), nullptr, kPlayer, kRestart, kCamera, kList,
 	    "settings.video.vsync", "settings.video.vsync.help"),
+	ROW("video", "hd_textures", "0", kBool, 0, 1, nullptr, 0, nullptr, kPlayer, kRestart, kCamera, kCheck,
+	    "settings.video.hd_textures", "settings.video.hd_textures.help"),  // the 2008 game in an MMH5.5 folder (mmh55_files.cpp)
 	HIDDEN("camera", "anim_every", "1", kInt, 0, 8),  // testing: 3D models animated on one frame in N (anim_throttle.cpp)
 	FILE_ONLY("camera", "vertex_pool", "4", kInt, 1, 16, kTester, kRestart),  // the dynamic vertex pool N times as large (vertex_pool.cpp)
 	HIDDEN("camera", "vb_trace", "0", kBool, 0, 1),  // research: why the models' vertices are built again (vertex_pool.cpp)

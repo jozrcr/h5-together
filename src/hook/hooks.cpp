@@ -31,6 +31,7 @@
 #include "../mods/languages.h"
 #include "../mods/lockstep.h"
 #include "../mods/menu_scene.h"
+#include "../mods/mmh55_files.h"
 #include "../mods/net_tuning.h"
 #include "../mods/notify.h"
 #include "../mods/online_ui.h"
@@ -89,7 +90,12 @@ void InstallEarly()
 	// Only data-table hooks that must be in place before the game reads its
 	// data, and only in a build we know (an unwrapped exe: the Steam-wrapped
 	// one is still encrypted now, and gets them with InstallAll()).
-	if (NoHooks() || !IsHookable(DetectGameBuild()))
+	if (NoHooks())
+		return;
+	// The 2008 exe in a folder with MMH5.5: its files hidden before the game looks for its
+	// data. Also in the Steam-wrapped exe (it reads only the header and the import table).
+	mods::InstallMmh55FilesEarly();
+	if (!IsHookable(DetectGameBuild()))
 		return;
 	crash::Install("from the DLL's load, before the game's own crash filter");  // first: before the game's code runs
 	mods::InstallLanguagesEarly();  // [lang] texts=fr, before the game reads its first text
