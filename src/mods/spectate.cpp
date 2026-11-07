@@ -176,8 +176,9 @@ char g_names[9][64];      // by number: the player list's names ("" = not told)
 int g_me = 0;             // this PC's player number
 
 // Messages waiting for this PC's next step
-DWORD g_queue[16];
+DWORD g_queue[32];
 int g_queued = 0;
+const int kQueueSize = sizeof(g_queue) / sizeof(g_queue[0]);
 
 // As the followed: who follows, and what was last sent
 spectate::Watchers g_watchers;
@@ -221,7 +222,7 @@ BYTE ReadByte(const void *p, DWORD off)
 
 void Queue(DWORD value)
 {
-	if (g_queued < static_cast<int>(sizeof(g_queue) / sizeof(g_queue[0])))
+	if (g_queued < kQueueSize)
 		g_queue[g_queued++] = value;
 }
 
@@ -438,6 +439,218 @@ void TellBattle(DWORD now)
 		               fighting ? "is in a battle" : "left its battle");
 	g_battle_told = fighting;
 	g_battle_told_at = now;
+}
+
+// --- the army's placement before a battle (since 0.3.5) --------------------------------------------
+// During a battle's placement (tactics) phase nothing is in the world yet: each PC's battle
+// screen (NUI::CCombatArenaScreen) keeps a private list of the stacks (its CPlacementInfo at
+// +0x488), copied from the army's auto-placement, and the fighter's clicks change only that
+// list; at Enter the game sends it in one CMoveCreaturesOnBattlefield (0x00577f30, from
+// 0x00541fa0), with CEndTactic. So a watcher saw the auto-placement until the battle began.
+// Now the fighter's PC sends its list to the PCs that follow it (kPlacement messages: when it
+// changes, and every 2 s), and the watcher writes it into the watched screen's own list and
+// redraws it the game's way: Reset (0x00578290), then Refresh (0x00577420), as the game's own
+// auto-place does (0x00578510). The world is never touched; at Enter the game's own commands
+// place the real stacks where the watcher saw them. A merge or a split (another number of
+// stacks) shows only at Enter. (Research: 2026-11-07, docs/plans/spectate.md.)
+const DWORD kArenaVftable = 0x00e1da84;
+const char kArenaScreen[] = ".?AVCCombatArenaScreen@NUI@@";
+const DWORD kPlacementInfo = 0x488;      // CPtr CPlacementInfo (vftable 0x00e202dc)
+const DWORD kPlaceBegin = 0x0c;          // its list of stacks (begin, end), 0x24 bytes each:
+const DWORD kPlaceEnd = 0x10;            //   +0x04 bar slot, +0x08 count, +0x10 placed (byte),
+const DWORD kPlaceEntry = 0x24;          //   +0x14 / +0x18 hex x, y, +0x1c creature type
+const DWORD kPlaceArmy = 0x24;           // the army, not 0 only while the screen's player places
+const DWORD kPlaceReset = 0x00578290;    // __fastcall(info)
+const DWORD kPlaceRefresh = 0x00577420;  // __fastcall(info)
+const DWORD kPlaceRepeat = 2000;
+typedef void(__fastcall *PlaceFn)(void *info, void *edx);
+
+struct Placement {
+	int n;
+	int slot[7], count[7], type[7], x[7], y[7];
+	BYTE placed[7];
+};
+
+bool ReadPlacementUnsafe(const BYTE *screen, Placement *out, BYTE **info_out)
+{
+	if (!screen || Read(screen, 0) != kArenaVftable)
+		return false;
+	BYTE *info = reinterpret_cast<BYTE *>(Read(screen, kPlacementInfo));
+	if (!info || !Read(info, kPlaceArmy))
+		return false;
+	const DWORD begin = Read(info, kPlaceBegin), end = Read(info, kPlaceEnd);
+	if (!begin || end < begin || (end - begin) % kPlaceEntry)
+		return false;
+	const int n = static_cast<int>((end - begin) / kPlaceEntry);
+	if (n < 1 || n > 7)
+		return false;
+	out->n = n;
+	for (int i = 0; i < n; ++i) {
+		const BYTE *e = reinterpret_cast<const BYTE *>(begin + i * kPlaceEntry);
+		out->slot[i] = static_cast<int>(Read(e, 0x04));
+		out->count[i] = static_cast<int>(Read(e, 0x08));
+		out->placed[i] = ReadByte(e, 0x10) ? 1 : 0;
+		out->x[i] = out->placed[i] ? static_cast<int>(Read(e, 0x14)) : 0;
+		out->y[i] = out->placed[i] ? static_cast<int>(Read(e, 0x18)) : 0;
+		out->type[i] = static_cast<int>(Read(e, 0x1c));
+	}
+	if (info_out)
+		*info_out = info;
+	return true;
+}
+
+// The list of a battle screen while its player places its army; false otherwise.
+bool ReadPlacement(const BYTE *screen, Placement *out, BYTE **info_out)
+{
+	memset(out, 0, sizeof(*out));
+	__try {
+		return ReadPlacementUnsafe(screen, out, info_out);
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER) {
+		return false;
+	}
+}
+
+// As the fighter
+Placement g_place_sent;  // n = 0: nothing sent for this placement yet
+DWORD g_place_sent_at = 0;
+int g_place_said = 0;
+bool g_place_said_hex = false;
+
+void SharePlacement(DWORD now)
+{
+	if (WatchingBattle() || g_battle_code != spectate::kInBattle || !g_watchers.Any(now)) {
+		g_place_sent.n = 0;
+		return;
+	}
+	Placement p;
+	if (!ReadPlacement(static_cast<const BYTE *>(overlay::ScreenObject(kArenaScreen)), &p, nullptr)) {
+		g_place_sent.n = 0;
+		return;
+	}
+	const bool changed = memcmp(&p, &g_place_sent, sizeof(p)) != 0;
+	if (!changed && now - g_place_sent_at < kPlaceRepeat)
+		return;
+	if (g_queued + p.n + 1 > kQueueSize)
+		return;  // (the next frame)
+	for (int i = 0; i < p.n; ++i) {
+		if (p.placed[i] && !spectate::PlacementHexFits(p.x[i], p.y[i])) {
+			if (!g_place_said_hex) {
+				g_place_said_hex = true;
+				hooklog::Write("spectate: this PC's army placement has a hex %d,%d that our message cannot carry: not sent",
+				               p.x[i], p.y[i]);
+			}
+			return;
+		}
+	}
+	for (int i = 0; i < p.n; ++i)
+		Queue(spectate::EncodePlacementStack(g_me, i, p.slot[i], p.placed[i] != 0, p.x[i], p.y[i]));
+	Queue(spectate::EncodePlacementEnd(g_me, p.n, spectate::PlacementCheck(p.type, p.count, p.n)));
+	if (changed && g_place_said < 8) {
+		++g_place_said;
+		int on_field = 0;
+		for (int i = 0; i < p.n; ++i)
+			on_field += p.placed[i];
+		hooklog::Write("spectate: this PC's army placement sent to the PCs that follow it (%d stack(s), %d on the field)",
+		               p.n, on_field);
+	}
+	g_place_sent = p;
+	g_place_sent_at = now;
+}
+
+// As the watcher: the followed ally's list, as it arrives (CheckHook), then shown (Frame).
+struct PlacementIn {
+	int player;
+	int slot[7], x[7], y[7];
+	bool placed[7];
+	unsigned got;  // bit i: stack i arrived since the last end
+};
+PlacementIn g_place_in;
+PlacementIn g_place_new;  // the last whole list
+int g_place_new_count = 0, g_place_new_check = 0;
+bool g_place_ready = false;
+int g_place_shown = 0, g_place_differ = 0;
+
+void HearPlacement(const spectate::Message &m)
+{
+	if (m.player != g_place_in.player) {
+		memset(&g_place_in, 0, sizeof(g_place_in));
+		g_place_in.player = m.player;
+	}
+	if (!m.end) {
+		g_place_in.slot[m.index] = m.slot;
+		g_place_in.placed[m.index] = m.placed;
+		g_place_in.x[m.index] = m.hx;
+		g_place_in.y[m.index] = m.hy;
+		g_place_in.got |= 1u << m.index;
+		return;
+	}
+	const unsigned all = (1u << m.count) - 1;
+	if ((g_place_in.got & all) == all) {
+		g_place_new = g_place_in;
+		g_place_new_count = m.count;
+		g_place_new_check = m.check;
+		g_place_ready = true;
+	}
+	g_place_in.got = 0;
+}
+
+// The ally's list into this PC's screen's list (the same stacks: checked before), then the
+// game's redraw; the number of stacks changed, or -1 if it crashed.
+int WritePlacement(BYTE *info, const Placement &mine, const PlacementIn &p)
+{
+	int changed = 0;
+	__try {
+		const DWORD begin = Read(info, kPlaceBegin);
+		for (int i = 0; i < mine.n; ++i) {
+			BYTE *e = reinterpret_cast<BYTE *>(begin + i * kPlaceEntry);
+			const bool same = mine.slot[i] == p.slot[i] && (mine.placed[i] != 0) == p.placed[i] &&
+			                  (!p.placed[i] || (mine.x[i] == p.x[i] && mine.y[i] == p.y[i]));
+			if (same)
+				continue;
+			*reinterpret_cast<DWORD *>(e + 0x04) = static_cast<DWORD>(p.slot[i]);
+			*(e + 0x10) = p.placed[i] ? 1 : 0;
+			if (p.placed[i]) {
+				*reinterpret_cast<DWORD *>(e + 0x14) = static_cast<DWORD>(p.x[i]);
+				*reinterpret_cast<DWORD *>(e + 0x18) = static_cast<DWORD>(p.y[i]);
+			}
+			++changed;
+		}
+		if (changed) {
+			reinterpret_cast<PlaceFn>(kPlaceReset)(info, nullptr);
+			reinterpret_cast<PlaceFn>(kPlaceRefresh)(info, nullptr);
+		}
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER) {
+		return -1;
+	}
+	return changed;
+}
+
+void ShowPlacement()
+{
+	if (!g_place_ready || g_place_new.player != g_following)
+		return;
+	g_place_ready = false;
+	Placement mine;
+	BYTE *info = nullptr;
+	if (!ReadPlacement(static_cast<const BYTE *>(overlay::ScreenObject(kArenaScreen)), &mine, &info))
+		return;  // (not placing here: before the screen opened, or after Enter)
+	if (mine.n != g_place_new_count || spectate::PlacementCheck(mine.type, mine.count, mine.n) != g_place_new_check) {
+		if (g_place_differ++ < 3)
+			hooklog::Write("spectate: %s's army placement names other stacks than this PC's screen (%d here, %d there: "
+			               "a merge or a split?): shown when the battle starts",
+			               NameOf(g_following).c_str(), mine.n, g_place_new_count);
+		return;
+	}
+	const int changed = WritePlacement(info, mine, g_place_new);
+	if (changed < 0) {
+		hooklog::Write("spectate: showing %s's army placement crashed (caught)", NameOf(g_following).c_str());
+		return;
+	}
+	if (changed && g_place_shown++ < 8)
+		hooklog::Write("spectate: %s's army placement shown here (%d stack(s) moved)", NameOf(g_following).c_str(),
+		               changed);
 }
 
 // --- as the follower -------------------------------------------------------------------------------
@@ -946,6 +1159,7 @@ void Frame(DWORD now, float dt)
 	}
 	TellBattle(now);
 	ShareView(now);
+	SharePlacement(now);
 	// this PC's turn begins: stop following (the player plays again)
 	const PlayerInfo &me = g_players[g_me];
 	const bool my_turn = me.known && me.in_game && me.turn == 0 && !me.pressed;
@@ -967,6 +1181,8 @@ void Frame(DWORD now, float dt)
 			g_request_stop_watching = false;
 			StopWatching(g_request_how);
 		}
+		if (!g_closing)
+			ShowPlacement();
 		WatchFrame(now);
 		return;
 	}
@@ -1273,6 +1489,9 @@ void __fastcall CheckHook(void *self, void *edx, int pc, const BYTE *cmd)
 				g_view_x = m.x;
 				g_view_y = m.y;
 				g_view_floor = m.floor;
+			}
+			else if (m.valid && m.kind == spectate::kPlacement && g_following && m.player == g_following) {
+				HearPlacement(m);
 			}
 			else if (m.valid && m.kind == spectate::kStatus && g_following && m.player == g_following) {
 				if (!g_heard || m.screen != g_their_screen)
