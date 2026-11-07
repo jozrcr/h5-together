@@ -565,8 +565,8 @@ def settings_tests(who, pkg, game_bin, install, uninstall):
     ini.write_bytes(old)
     code, out = install()
     want = replaced(tpl, [
-        ("\n;view_delay_ms=100\n", "\nview_delay_ms=50\n"),
-        ("\n;net_sleep_ms=2\n", f"\nnet_sleep_ms=1\n\n{KEPT}\nfast_turns=1\n"),
+        ("\n;view_delay_ms=50\n", "\nview_delay_ms=50\n"),
+        ("\n;net_sleep_ms=1\n", f"\nnet_sleep_ms=1\n\n{KEPT}\nfast_turns=1\n"),
         ("\n;language=auto\n", "\nlanguage=fr\n"),
         ("\n;builder_last=\n", "\nbuilder_last=OH-X1-321110nnxxxxxxxa\n"),
         ("\n;original_music=0\n", "\noriginal_music=1\n"),
@@ -599,7 +599,7 @@ def settings_tests(who, pkg, game_bin, install, uninstall):
     want = replaced(tpl, [
         ("same settings.\n\n[net]\n", f"same settings.\n\n{KEPT}\ntop=1\n\n[net]\n"),
         ("\n;tuning=1\n", "\ntuning=0\n"),
-        ("\n;net_sleep_ms=2\n", f"\n;net_sleep_ms=2\n\n{KEPT}\ntuning=1\nlonely line\n"),
+        ("\n;net_sleep_ms=1\n", f"\n;net_sleep_ms=1\n\n{KEPT}\ntuning=1\nlonely line\n"),
         ("\n;fast_paths=1\n", "\nfast_paths=0\n"),
     ])
     got = ini.read_bytes()
