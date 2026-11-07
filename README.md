@@ -158,7 +158,7 @@ The defaults keep the original game: the speed-ups, fixes and panels are on, and
 
 - **Recipe maps.** A template's name carries its whole setup, so every friend with the add-on rebuilds the same template when joining; there is nothing to share. A friend who lacks a template gets the game's error message instead of a crash.
 - **24 ready templates** in the game's list (names start with `OH-`).
-- **Teams.** Maps made from a team template get their teams in the lobby, and the team arrows still change them. The host can also set teams on other random maps (`[rmg] teams=`, `lobby_teams=1`).
+- **Teams.** Maps made from a team template get their teams in the lobby. On them, the team arrows move you to **another start of your own team** (new in 0.3.5: an open one; your team stays the same), so teammates can pick their places. The host can also set teams on other random maps (`[rmg] teams=`, `lobby_teams=1`).
 - **Start terrain that matches your faction** (off by default, the host's choice). With `[rmg] faction_terrain=1`, each start zone gets the ground of the faction picked in the lobby; the map is rebuilt for a few seconds at the start. Terrain changes movement costs, which is why it is off.
 
 ### Game rules menu
