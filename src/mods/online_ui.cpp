@@ -629,7 +629,7 @@ vlan::Mode ModeSetting()
 {
 	wchar_t path[MAX_PATH], mode[32];
 	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
-	GetPrivateProfileStringW(L"online", L"mode", L"off", mode, 32, path);
+	GetPrivateProfileStringW(L"online", L"mode", L"steam", mode, 32, path);
 	return vlan::ParseMode(mode);
 }
 

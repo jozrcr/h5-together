@@ -78,21 +78,21 @@ const Setting kSettings[] = {
 	FILE_ONLY("net", "keepalive_ms", "10", kInt, 1, 1000, kTester, kRestart),
 	FILE_ONLY("net", "send_interval_ms", "2", kInt, 0, 50, kTester, kRestart),
 	FILE_ONLY("net", "batched_segments", "0", kInt, 0, 3, kTester, kRestart),
-	FILE_ONLY("net", "join_timeout_s", "90", kInt, 0, 600, kPlayer, kRestart),  // join_time.cpp
+	FILE_ONLY("net", "join_timeout_s", "300", kInt, 0, 600, kPlayer, kRestart),  // join_time.cpp
 	ROW("net", "lan_all_adapters", "1", kBool, 0, 1, nullptr, 0, nullptr, kPlayer, kLive, kAdvanced, kCheck,
 	    "settings.net.lan_all_adapters", "settings.net.lan_all_adapters.help"),
 	// a text box the game's Options screen does not have: shown as a line of the Advanced group, set in the file
 	{"net", "lan_peers", "", kText, 0, 0, nullptr, 0, nullptr, kPlayer, kLive, kAdvanced, kNone, "settings.net.lan_peers",
 	 "settings.net.lan_peers.help", true},
 	FILE_ONLY("net", "drain_reports", "1", kBool, 0, 1, kTester, kRestart),
-	ROW("net", "view_delay_ms", "100", kInt, 50, 400, kViewDelay, COUNT(kViewDelay), "settings.unit.ms", kGroup, kRestart,
+	ROW("net", "view_delay_ms", "50", kInt, 50, 400, kViewDelay, COUNT(kViewDelay), "settings.unit.ms", kGroup, kRestart,
 	    kAdvanced, kList,
 	    "settings.net.view_delay_ms", "settings.net.view_delay_ms.help"),
 	FILE_ONLY("net", "trace_lockstep", "1", kBool, 0, 1, kTester, kRestart),
 	FILE_ONLY("net", "catch_up_ms", "600", kInt, 150, 5000, kTester, kRestart),
 	FILE_ONLY("net", "scale_pacing", "1", kBool, 0, 1, kTester, kRestart),
 	FILE_ONLY("net", "catch_up_behind", "1", kBool, 0, 1, kTester, kRestart),
-	FILE_ONLY("net", "net_sleep_ms", "2", kInt, 1, 10, kTester, kRestart),
+	FILE_ONLY("net", "net_sleep_ms", "1", kInt, 1, 10, kTester, kRestart),
 	// [coop]
 	ROW("coop", "guard", "1", kBool, 0, 1, nullptr, 0, nullptr, kGroup, kRestart, kAdvanced, kCheck,
 	    "settings.coop.guard", "settings.coop.guard.help"),
@@ -100,9 +100,9 @@ const Setting kSettings[] = {
 	{"coop", "fast_segments", "1", kBool, 0, 1, nullptr, 0, nullptr, kGroup, kRestart, kAdvanced, kNone, nullptr, nullptr, true},
 	ROW("coop", "resume_save", "1", kBool, 0, 1, nullptr, 0, nullptr, kHost, kRestart, kHostGroup, kCheck,
 	    "settings.coop.resume_save", "settings.coop.resume_save.help"),
-	ROW("coop", "undo_end_turn", "0", kBool, 0, 1, nullptr, 0, nullptr, kHost, kNextGame, kHostGroup, kCheck,
+	ROW("coop", "undo_end_turn", "1", kBool, 0, 1, nullptr, 0, nullptr, kHost, kNextGame, kHostGroup, kCheck,
 	    "settings.coop.undo_end_turn", "settings.coop.undo_end_turn.help"),
-	ROW("coop", "endless_turns", "0", kBool, 0, 1, nullptr, 0, nullptr, kHost, kNextGame, kHostGroup, kCheck,
+	ROW("coop", "endless_turns", "1", kBool, 0, 1, nullptr, 0, nullptr, kHost, kNextGame, kHostGroup, kCheck,
 	    "settings.coop.endless_turns", "settings.coop.endless_turns.help"),  // the 2008 game only (endless_turns.cpp)
 	ROW("coop", "script_rhythm", "1", kBool, 0, 1, nullptr, 0, nullptr, kHost, kNextGame, kHostGroup, kCheck,
 	    "settings.coop.script_rhythm", "settings.coop.script_rhythm.help"),
@@ -118,7 +118,7 @@ const Setting kSettings[] = {
 	FILE_ONLY("ai", "port_expand", "1", kBool, 0, 1, kTester, kRestart),
 	FILE_ONLY("ai", "fast_ashore", "1", kBool, 0, 1, kTester, kRestart),
 	FILE_ONLY("ai", "ashore_check", "0", kBool, 0, 1, kTester, kRestart),
-	ROW("ai", "parallel_turns", "0", kBool, 0, 1, nullptr, 0, nullptr, kHost, kNextGame, kHostGroup, kCheck,
+	ROW("ai", "parallel_turns", "1", kBool, 0, 1, nullptr, 0, nullptr, kHost, kNextGame, kHostGroup, kCheck,
 	    "settings.ai.parallel_turns", "settings.ai.parallel_turns.help"),
 	FILE_ONLY("ai", "one_decision_per_frame", "1", kBool, 0, 1, kTester, kRestart),
 	FILE_ONLY("ai", "max_expansions", "0", kInt, 0, 1000000, kTester, kRestart),
@@ -186,14 +186,14 @@ const Setting kSettings[] = {
 	ROW("rmg", "builder_key", "F11", kKey, 0, 0, nullptr, 0, nullptr, kPlayer, kLive, kRandomMaps, kList,
 	    "settings.rmg.builder_key", "settings.rmg.builder_key.help"),
 	FILE_ONLY("rmg", "builder_last", "", kText, 0, 0, kPanel, kWritten),
-	ROW("rmg", "faction_terrain", "0", kBool, 0, 1, nullptr, 0, nullptr, kHost, kRestart, kHostGroup, kCheck,
+	ROW("rmg", "faction_terrain", "1", kBool, 0, 1, nullptr, 0, nullptr, kHost, kRestart, kHostGroup, kCheck,
 	    "settings.rmg.faction_terrain", "settings.rmg.faction_terrain.help"),
 	FILE_ONLY("rmg", "trace_factions", "0", kBool, 0, 1, kTester, kRestart),
 	// [audio]
 	ROW("audio", "original_music", "0", kBool, 0, 1, nullptr, 0, nullptr, kPlayer, kRestart, kSound, kCheck,
 	    "settings.audio.original_music", "settings.audio.original_music.help"),
 	FILE_ONLY("audio", "log_music", "0", kBool, 0, 1, kTester, kRestart),
-	ROW("audio", "volume_curve", "game", kChoice, 0, 0, kVolumeCurve, COUNT(kVolumeCurve), nullptr, kPlayer, kRestart, kSound,
+	ROW("audio", "volume_curve", "wide", kChoice, 0, 0, kVolumeCurve, COUNT(kVolumeCurve), nullptr, kPlayer, kRestart, kSound,
 	    kCheck,
 	    "settings.audio.volume_curve", "settings.audio.volume_curve.help"),
 	FILE_ONLY("audio", "log_volume", "0", kInt, 0, 1000000, kTester, kRestart),
@@ -216,7 +216,7 @@ const Setting kSettings[] = {
 	    "settings.camera.edge_sky", "settings.camera.edge_sky.help"),
 	ROW("camera", "anim_saver", "1", kBool, 0, 1, nullptr, 0, nullptr, kPlayer, kRestart, kCamera, kCheck,
 	    "settings.camera.anim_saver", "settings.camera.anim_saver.help"),
-	ROW("video", "fps_limit", "0", kInt, 0, 500, kFpsLimit, COUNT(kFpsLimit), "settings.unit.fps", kPlayer, kLive, kCamera, kList,
+	ROW("video", "fps_limit", "180", kInt, 0, 500, kFpsLimit, COUNT(kFpsLimit), "settings.unit.fps", kPlayer, kLive, kCamera, kList,
 	    "settings.video.fps_limit", "settings.video.fps_limit.help"),
 	ROW("video", "vsync", "game", kChoice, 0, 0, kVsync, COUNT(kVsync), nullptr, kPlayer, kRestart, kCamera, kList,
 	    "settings.video.vsync", "settings.video.vsync.help"),
@@ -282,7 +282,7 @@ const Setting kSettings[] = {
 	    "settings.chain.dll", "settings.chain.dll.help"),
 	// [online]: the virtual LAN (off | steam | loopback, the robot's). Steam starts at the game's first DirectInput
 	// call and the Winsock hooks go in when the DLL loads, so a change waits for a restart.
-	ROW("online", "mode", "off", kChoice, 0, 0, kOnlineMode, COUNT(kOnlineMode), nullptr, kGroup, kRestart, kOnline, kList,
+	ROW("online", "mode", "steam", kChoice, 0, 0, kOnlineMode, COUNT(kOnlineMode), nullptr, kGroup, kRestart, kOnline, kList,
 	    "settings.online.mode", "settings.online.mode.help"),
 
 	// read by the code, not in the shipped file (appendix B): for testing

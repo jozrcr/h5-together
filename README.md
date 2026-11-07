@@ -39,7 +39,7 @@ The installer finds your game, shows you what it found ("Your game": the folder,
 - **Built on GitHub's machines.** The zip on the releases page is built and tested by GitHub from the code you see here (the recipe is in [.github/workflows/package.yml](.github/workflows/package.yml)), not on a private PC.
 - **It never changes the game's own files.** It adds one file, `dinput8.dll`, a settings file and some folders of its own to the game's `bin` folder. The game loads `dinput8.dll` when it starts. MMH5.5's settings are changed only in the PC's memory, never on disk.
 - **It sends nothing about you.** It sends nothing to us or to anyone else. In a multiplayer game, the players' PCs exchange a few small messages (versions, game rules, hero looks) over the game's own connection. Apart from online play over Steam (below), the only thing that can contact a server is the optional update check, which is off unless you say yes: once a day it asks GitHub for the number of the latest version. Nothing is downloaded or installed by the add-on.
-- **Online play over Steam is off unless you turn it on.** When it is on, the game talks to your friends' games through Steam, as any Steam game does: Steam sees the friends-only game you host and the invites you send. The add-on also shows its version number to your Steam friends' add-ons (a small Steam "rich presence" value), so they know you have it.
+- **Online play over Steam is on by default** (since 0.3.5; Options, H5 Together, Online play: Off turns it off). When it is on, the game talks to your friends' games through Steam, as any Steam game does: Steam sees the friends-only game you host and the invites you send. The add-on also shows its version number to your Steam friends' add-ons (a small Steam "rich presence" value), so they know you have it.
 - **Antivirus scan of this release:** (link to the VirusTotal result: to be added at release.)
 - **How to remove it:** run `uninstall.bat` (Windows) or `bash uninstall.sh` (Linux). It removes only the add-on's own files. Or delete `dinput8.dll` from the game's `bin` folder: the game is then as before.
 
@@ -59,7 +59,7 @@ Over the internet, use what your group uses today (GameRanger, or ZeroTier for a
 
 New in 0.3.0: play over the internet with your **Steam friends**, without GameRanger or a VPN. The add-on carries the game's own LAN play through Steam's network, so your friends' games show in the game's LAN list as if you were in the same house.
 
-1. **Every player:** main menu, **Options, H5 Together, Online play: Steam**, then restart the game. Steam must be running, and the game must be the Steam version.
+1. **Every player:** nothing to do since 0.3.5 (online play is on by default; before: **Options, H5 Together, Online play: Steam**, then restart). Steam must be running, and the game must be the Steam version; without Steam (a GOG copy, Steam closed) the game uses its own LAN play.
 2. **The host:** **Multiplayer, LAN, Create**, as usual. In the waiting room, **Invite friends...** opens Steam's invite window (or the add-on's own list of your Steam friends).
 3. **The friends:** accept the invite in Steam. The game starts if it is not running, opens the LAN screen and joins the host's game by itself. Or open **Multiplayer, LAN** and join the host's game in the list, like a LAN game.
 
@@ -110,8 +110,8 @@ The defaults keep the original game: the speed-ups, fixes and panels are on, and
 - **No long autosave freeze** at the start of each round (7 to 10 s down to a fraction of a second when the `Saves` folder holds many multiplayer saves).
 - **LAN games over ZeroTier** and other virtual networks show up in the LAN list, so a friend (on Linux too) can join without GameRanger.
 - **The waiting room shows versions.** A line at the bottom says whether every player has the same H5 Together, and who has another version or none.
-- **Computers play together** (new in 0.3.2, the host's choice, off by default). The computer players take their turns at the same time instead of one after another: their part of each day about 40% shorter with two or three of them.
-- **Undo End Turn** (new in 0.3.2, the host's choice, off by default). With simultaneous turns, a player who ended the turn too early can take it back while another human still plays: a round button over the hourglass (since 0.3.4).
+- **Computers play together** (new in 0.3.2, the host's choice, on by default since 0.3.5). The computer players take their turns at the same time instead of one after another: their part of each day about 40% shorter with two or three of them.
+- **Undo End Turn** (new in 0.3.2, the host's choice, on by default since 0.3.5). With simultaneous turns, a player who ended the turn too early can take it back while another human still plays: a round button over the hourglass (since 0.3.4).
 - **Quick resume after a crash** (new in 0.3.2, on). When a player's game crashes, every PC saves the game as "Reprise" with that player still in it; the player who crashed gets the save over Steam.
 - **Each game its own autosaves** (new in 0.3.2). Autosaves are named after their game's map, so a new game no longer overwrites yesterday's.
 
@@ -119,7 +119,7 @@ The defaults keep the original game: the speed-ups, fixes and panels are on, and
 
 - **Big maps zoomed out run about twice as fast** (new in 0.3.2): the add-on gives the game more room for its 3D models, and far-away animations get lighter when the map runs slow (robot, a 6-player map at 2560x1440 zoomed out to 250%: 33 to 70 frames a second).
 - **MMH5.5's scripts at their own pace** (new in 0.3.2): with the faster co-op steps, MMH5.5's script loop ran four times as often as intended; it runs at its original pace again.
-- **A frame rate limit and the vertical sync** (new in 0.3.2, off by default), in Options, H5 Together.
+- **A frame rate limit and the vertical sync** (new in 0.3.2; since 0.3.5 the limit is 180 frames a second by default), in Options, H5 Together.
 
 ### Stability
 
@@ -159,7 +159,7 @@ The defaults keep the original game: the speed-ups, fixes and panels are on, and
 - **Recipe maps.** A template's name carries its whole setup, so every friend with the add-on rebuilds the same template when joining; there is nothing to share. A friend who lacks a template gets the game's error message instead of a crash.
 - **24 ready templates** in the game's list (names start with `OH-`).
 - **Teams.** Maps made from a team template get their teams in the lobby. On them, the team arrows move you to **another start of your own team** (new in 0.3.5: an open one; your team stays the same), so teammates can pick their places. The host can also set teams on other random maps (`[rmg] teams=`, `lobby_teams=1`).
-- **Start terrain that matches your faction** (off by default, the host's choice). With `[rmg] faction_terrain=1`, each start zone gets the ground of the faction picked in the lobby; the map is rebuilt for a few seconds at the start. Terrain changes movement costs, which is why it is off.
+- **Start terrain that matches your faction** (on by default since 0.3.5, the host's choice). With `[rmg] faction_terrain=1`, each start zone gets the ground of the faction picked in the lobby; the map is rebuilt for a few seconds at the start. Terrain changes movement costs, which is why it is off.
 
 ### Game rules menu
 
@@ -183,11 +183,11 @@ H5 Together also works with the original Tribes of the East 3.1, the 2008 progra
 - **From the same folder as MMH5.5.** The 2008 program would read MMH5.5's data files without MMH5.5's program changes, a broken mix. So H5 Together hides MMH5.5's files from it (`data\MMH55-*.pak`, `UserMODs\MMH55-*.h5u`): you get the original game. MMH5.5 still starts as before from its own exe. No file is changed or moved.
 - **Its own profile and saves:** a save of one game crashes the other, so the original game keeps its profile and saves in `Documents\H5 Together\Original game`. At its first start it copies your profile's settings there (name, options, keys), never the saves.
 - **MMH5.5's HD textures, if you like them:** Options, H5 Together, **MMH5.5's HD textures** (`[video] hd_textures=1`). Only the pictures: terrain, towns, sky. Each player chooses; it does not matter for the others.
-- **Endless simultaneous turns** (the host's choice, off by default): the original game ends simultaneous turns when heroes get close; with **Endless simultaneous turns** (`[coop] endless_turns=1`) they last the whole game, as MMH5.5's PEST does. Every PC needs H5 Together 0.3.5.
+- **Endless simultaneous turns** (the host's choice, on by default since 0.3.5): the original game ends simultaneous turns when heroes get close; with **Endless simultaneous turns** (`[coop] endless_turns=1`) they last the whole game, as MMH5.5's PEST does. Every PC needs H5 Together 0.3.5.
 - Everything else of H5 Together works the same: faster computer turns, online play over Steam, following and watching your friends, the player list, quick resume, Undo End Turn. The game rules menu (F2) is not there: its rules are all MMH5.5's.
 - **In one game, everybody starts the same:** all the original game, or all MMH5.5. Over Steam you only see games of your own kind.
 - **Maps:** the original game cannot load maps made for MMH5.5 (with its editor or its random map generator): it crashes on their MMH5.5 objects. Use the game's own maps, or random maps made in the original game.
-- **Joining a big random map** takes a while (every PC builds the map itself): H5 Together gives a joining PC up to 90 s (`[net] join_timeout_s`) instead of the game's 20, and the game's 20 s again once the game runs.
+- **Joining a big random map** takes a while (every PC builds the map itself): H5 Together gives a joining PC up to 300 s (`[net] join_timeout_s`) instead of the game's limits (its join stages' 10 + 20 s, its 20 s silence limit), and the game's values again once the game runs. This is what let a Linux PC (Proton builds big maps more slowly) join a Windows host's builder map.
 - Measured with the robot (same map, same settings): the computer's turns are as fast as with MMH5.5, and faster on a big map (15 turns in 92 s, against 119 s with MMH5.5's scripts).
 
 ### Camera, sound and visuals (off by default)
@@ -196,7 +196,7 @@ All of these are rows on the Options page, under **Camera and visuals** and **So
 
 - **Zoom out farther:** `[camera] zoom_out=150` (adventure map) and `combat_zoom_out=150` (battles); `start_zoom` sets where the camera starts.
 - **Black map edges:** `[camera] edge_sky=none` replaces the violet sky MMH5.5 put past some random maps' edges.
-- **Quieter volume range:** `[audio] volume_curve=wide` makes the sliders' lowest step about 10 times quieter.
+- **Quieter volume range** (on by default since 0.3.5): `[audio] volume_curve=wide` makes the sliders' lowest step about 10 times quieter; `game` is the game's own range.
 - **Original Heroes V music** instead of MMH5.5's: `[audio] original_music=1`.
 - **Another picture behind the main menu**, with its own music: `[menu] scene=toe` (Tribes of the East), `homm5` (the Heroes V one, with MMH5.5) or `random` (drawn at each start).
 - **Mouse wheel on Linux:** under Wine / Proton the wheel could zoom in but never out. This one is automatic, on Linux only.

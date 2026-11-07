@@ -110,7 +110,7 @@ We have not tried the H5 Lobby app. If you do, please tell us.
 
 Yes, with your **Steam friends**, from 0.3.0 (a test for now). Every player sets **Options, H5 Together, Online play: Steam** and restarts the game. The host creates a LAN game as usual and clicks **Invite friends...** in the waiting room; the friends accept the invite in Steam, and their game joins by itself (or they pick the host's game in **Multiplayer, LAN**). Everything else is the game's own LAN play. Details: [the README](../README.md#online-play-over-steam-new-a-test).
 
-It needs the game bought on Steam (not GOG), Steam running, and the same H5 Together (0.3.0 or newer) with online play on, for every player. While it is on, the LAN list shows only games through Steam: for GameRanger or a real LAN game, set it back to **Off**.
+It needs the game bought on Steam (not GOG), Steam running, and the same H5 Together (0.3.0 or newer) with online play on, for every player (on by default since 0.3.5; without Steam the game uses its own LAN play). While it is on, the LAN list shows only games through Steam: for GameRanger or a real LAN game, set it back to **Off**.
 
 ### Online play: my friend's game is not in the LAN list
 
@@ -200,4 +200,4 @@ MMH5.5's scripts, balance, installer and translations are made by the MMH5.5 tea
 
 No. It sends nothing to us or to anyone else. In a multiplayer game the PCs of the players exchange a few small messages (versions, game rules, hero looks) over the game's own connection. Apart from online play over Steam (below), the only thing that can contact a server is the update check, which is **off** unless you say yes: once a day it asks GitHub for the number of the latest version, and GitHub sees the address it comes from, as any website does. The bug report zip is made on your PC and goes nowhere until you attach it yourself.
 
-**Online play over Steam** is off unless you turn it on. When it is on, the game talks to your friends' games through Steam, as any Steam game does: Steam sees the friends-only game you host and the invites you send, and the add-on shows its version number to your Steam friends' add-ons (a small Steam "rich presence" value).
+**Online play over Steam** is on by default since 0.3.5 (Options, H5 Together, Online play: Off turns it off). When it is on, the game talks to your friends' games through Steam, as any Steam game does: Steam sees the friends-only game you host and the invites you send, and the add-on shows its version number to your Steam friends' add-ons (a small Steam "rich presence" value).
