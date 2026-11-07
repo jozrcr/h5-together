@@ -123,12 +123,12 @@ The defaults keep the original game: the speed-ups, fixes and panels are on, and
 
 ### Faster co-op multiplayer
 
-- **Quicker AI turns and clicks.** The game's network timings were made for 2006 modems; the add-on uses modern ones. When every player has the add-on, the PCs also agree on shorter game steps (50 ms instead of 200 ms). In robot tests (two copies of the game on one PC), an AI move went from 2.5 s to about 0.3 s. Over the internet, the ping between the PCs comes on top.
+- **Quicker AI turns and clicks.** The game's network timings were made for 2006 modems; the add-on uses modern ones. When every player has the add-on, the PCs also agree on shorter game steps (50 ms instead of 200 ms). In robot tests (two copies of the game on one PC, two players and four computers on a big 6-player map, 0.3.5), the computers' part of each day went from about 61 s with the game's own timings to 16 s: **about 4 times shorter**. Over the internet, the ping between the PCs comes on top.
 - **Less AI thinking on big maps.** The AI finds exactly the same paths, faster: on a day-50 huge map, 93 s of AI thinking over 4 turns became 17 s.
 - **No long autosave freeze** at the start of each round (7 to 10 s down to a fraction of a second when the `Saves` folder holds many multiplayer saves).
 - **LAN games over ZeroTier** and other virtual networks show up in the LAN list, so a friend (on Linux too) can join without GameRanger.
 - **The waiting room shows versions.** A line at the bottom says whether every player has the same H5 Together, and who has another version or none.
-- **Computers play together** (new in 0.3.2, the host's choice, on by default since 0.3.5). The computer players take their turns at the same time instead of one after another: their part of each day about 40% shorter with two or three of them.
+- **Computers play together** (new in 0.3.2, the host's choice, on by default since 0.3.5). The computer players take their turns at the same time instead of one after another: their part of each day about 40% shorter with two or three of them on a small map, about 20% with four on a big one (on top of the other speed-ups).
 - **Undo End Turn** (new in 0.3.2, the host's choice, on by default since 0.3.5). With simultaneous turns, a player who ended the turn too early can take it back while another human still plays: a round button over the hourglass (since 0.3.4).
 - **Quick resume after a crash** (new in 0.3.2, on). When a player's game crashes, every PC saves the game as "Reprise" with that player still in it; the player who crashed gets the save over Steam.
 - **Each game its own autosaves** (new in 0.3.2). Autosaves are named after their game's map, so a new game no longer overwrites yesterday's.

@@ -61,6 +61,22 @@ The fix (`src/mods/script_rhythm.cpp`, `[coop] script_rhythm`): during a multipl
 
 Parallel turns ([turn-features.md](turn-features.md) part 3, now the host's setting `[ai] parallel_turns`, multiplayer only): the computer players' part of a day 39% shorter with two (LAN, PCs in step), 46% with three (single player, the owner's MAP_JoacJoz with its scripts: 18.8 s to 10.2 s). The AI's own decisions can take 0.3 s inside one frame on huge maps (earlier logs, the 80th percentile): to profile on a late-game save.
 
+### End to end, 0.3.5 against the game's own behaviour (2026-11-07)
+
+What a player waits for: from the computers' first move of a day to the humans' next turn. Robot, two copies of the original game on one PC (`H5_2008_4GB.exe`, the 2008 exe with the 4 GB mark), over Steam's virtual LAN (0.3.5's default), the 6-player Impossible builder map (`OH-X1-23321gnnpnrxssxa`, 320x320): the two humans and one computer against three computers, so four computers; the humans end their turns at once (`--end-turn-every 3`); 5 days; no world checksums (`--no-crc`, as players). Measured with the host's log (`notify: your turn (day N)`, `robot: AI turn N started`, `parallel ai: phase N`).
+
+| Run | Settings | Computers' part of a day, days 1-5 (s) | Average | Days 2-5 |
+|---|---|---|---:|---:|
+| `20261107-192048-lan` | The game's own: `[net] tuning=0 view_delay_ms=400 drain_reports=0 catch_up_ms=150 scale_pacing=0 catch_up_behind=0 net_sleep_ms=10`, `[coop] segment_ms=200 guard=0`, `[ai] fast_paths=0 parallel_turns=0 one_decision_per_frame=0` (and the pathfinding's parts), `[save] fast_save_list=0`, `[camera] anim_saver=0 vertex_pool=1` | 75.9, 60.4, 55.9, 57.9, 53.2 | 60.6 | 56.9 |
+| `20261107-192850-lan` | 0.3.5's defaults, but `[ai] parallel_turns=0` (computers one after another) | 28.0, 22.3, 18.2, 15.0, 16.8 | 20.1 | 18.1 |
+| `20261107-191636-lan` | 0.3.5's defaults (computers play together) | 24.8, 15.1, 14.1, 13.4, 13.5 | 16.2 | 14.0 |
+
+- **About 4 times shorter** (3.7 on average, 4.1 from day 2). The timings, steps and pathfinding make 3.0 times; computers playing together cut the rest by 19% (23% from day 2), less than the 39-46% measured with two or three computers on smaller maps.
+- An AI step: 1.46 s on average in the game's own run (lockstep waits of 0.26-0.75 s per segment), a median wait of 0.15 s before each step with 0.3.5's timings.
+- All three runs: world checks equal where they ran (1450, 2544, 1989 checks in the runs with them), no desync.
+- Cautious: one run each; early days (few heroes); one thing stays on in the "game's own" run (the 1 ms system clock, `timeBeginPeriod`, which only helps it). Later days with many heroes add the AI's thinking, where the pathfinding work counts most (a day-50 huge map: 93 s of thinking over 4 turns became 17 s). Over the internet the ping comes on top in both.
+- **Found on the way:** with the 2 GB exe (`H5_2008.exe`, as Steam's protected `H5_GameOLD.exe`), two copies on this 320x320 map crashed at the first day on both PCs (an access violation while the world was written into a growing memory stream, `CStructureSaver` at `0x00cb64b0`, called from `0x004faaf0`); with the 4 GB mark the same game ran. So huge maps need `H5_Original_4GB.exe`, as the README says.
+
 ## Next
 
 1. ~~The script rhythm~~: done (`[coop] script_rhythm`, the script clock above). ~~Parallel turns as a host setting~~: done (`[ai] parallel_turns`, agreed between the PCs).
