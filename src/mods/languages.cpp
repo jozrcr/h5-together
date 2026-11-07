@@ -42,6 +42,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "../hook/game_build.h"
 #include "../hook/log.h"
 #include "../hook/old_names.h"
 #include "../hook/patch.h"
@@ -85,6 +86,7 @@ OpenFn g_open_next = nullptr;
 
 Texts g_choice = Texts::Game;
 bool g_read = false;
+bool g_original_game = false;  // texts=fr asked for, but this is the 2008 game without MMH5.5
 LONG g_log_texts = 0;
 
 void ReadSettings()
@@ -106,6 +108,12 @@ void ReadSettings()
 			hooklog::Write("languages: texts=%ls is not game, fr or en: the game's own texts", text);
 	}
 	g_log_texts = static_cast<LONG>(GetPrivateProfileIntW(L"lang", L"log_texts", 0, ini));
+	// The 2008 game without MMH5.5: its texts are the Steam language's already, and the French
+	// pack holds MMH5.5's texts (they would describe MMH5.5's rules): the game's own texts.
+	if (g_choice == Texts::French && DetectGameBuild() == GameBuild::Vanilla31) {
+		g_choice = Texts::Game;
+		g_original_game = true;
+	}
 }
 
 // ---- zlib (the game's zlib1.dll, cdecl) ----
@@ -493,7 +501,9 @@ void ApplyLanguagesFromSettings()
 	ReadSettings();
 	switch (g_choice) {
 	case Texts::Game:
-		hooklog::Write("languages: texts=game (the texts as installed)");
+		hooklog::Write(g_original_game ? "languages: texts=fr, but this is the original game without MMH5.5: its own texts (the "
+		                                 "French pack holds MMH5.5's)"
+		                               : "languages: texts=game (the texts as installed)");
 		return;
 	case Texts::English:
 		hooklog::Write("languages: texts=en is not available yet: the texts as installed");

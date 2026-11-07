@@ -545,7 +545,7 @@ void InstallVirtualLan()
 	wchar_t path[MAX_PATH];
 	hooklog::PathNextToExe(L"h5-together", L".ini", path, MAX_PATH);
 	wchar_t text[64];
-	GetPrivateProfileStringW(L"online", L"mode", L"off", text, 64, path);
+	GetPrivateProfileStringW(L"online", L"mode", L"steam", text, 64, path);
 	const vlan::Mode mode = vlan::ParseMode(text);
 	if (mode == vlan::Mode::kOff)
 		return;
