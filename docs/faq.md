@@ -49,7 +49,9 @@ Some antivirus programs distrust a `dinput8.dll` that changes a game while it ru
 
 ### Does it work without MMH5.5?
 
-Not yet. Several parts need MMH5.5: the co-op exe `MMH55_Utility_64.exe` that the add-on hooks into, and the game rules menu, which is made of MMH5.5's own switches. On plain Tribes of the East the add-on does nothing for now. The installer says so and warns you, then copies the files anyway, so they start working once MMH5.5 is installed. Support for plain Tribes of the East may come later, after online play.
+Yes: since 0.3.5 the original game comes first, and MMH5.5 is supported too. It works with the original 2008 program. The installer makes `bin\H5_Original_4GB.exe` (the original game with 4 GB of memory, started with a double-click): with your yes it fetches only the 2008 exe (about 5.4 MB) from MMH5.5's official release on GitHub and checks it, without installing MMH5.5. Without that file, Steam's protected `H5_GameOLD.exe` (after the GameRanger guide) works too, with 2 GB, started through Steam's launch options. In a folder where MMH5.5 is installed, H5 Together hides MMH5.5's files from it, so you play the original game, with its own profile and saves (`Documents\H5 Together\Original game`). The game rules menu (F2) is not there: its rules are all MMH5.5's. More in the [README](../README.md#the-original-game-first-mmh55-too).
+
+Steam's current `H5_Game.exe` is a 2025 rebuild of the game that the add-on does not know yet: with only that one, the add-on does nothing, and the installer says so.
 
 The add-on does not install MMH5.5. Get it from [MMH5.5's ModDB page](https://www.moddb.com/mods/might-magic-heroes-55). The installer knows **RC19d** and **RC19k**.
 
@@ -57,8 +59,8 @@ The add-on does not install MMH5.5. Get it from [MMH5.5's ModDB page](https://ww
 
 | What you start | Result |
 |---|---|
+| The original 2008 exe: `H5_Original_4GB.exe` (the installer makes it), or `H5_GameOLD.exe` | Works (new in 0.3.5, and first since then): the original game, MMH5.5's files hidden from it if they are there |
 | `MMH55_Utility_64.exe` (MMH5.5's co-op exe), or a copy of it named `H5_Game.exe` for GameRanger | Works |
-| The 2008 3.1 exe (`H5_GameOLD.exe`) | Recognised; only the parts that do not need MMH5.5 do something |
 | `MMH55_64.exe` / `MMH55.exe` (MMH5.5's single-player exe) | Not recognised: nothing changes, the log says "unknown build" |
 | Steam's 2025 `H5_Game.exe` (3.1.2.99) | Not recognised yet |
 
@@ -86,9 +88,9 @@ Only one file can have that name. Rename the other mod's `dinput8.dll` to `dinpu
 
 Three signs:
 
-- In the main menu, a line **"H5 Together 0.3.4"** (your version) above MMH5.5's "Version" line.
+- In the main menu, a line **"H5 Together 0.3.5"** (your version) above the game's "Version" line.
 - `h5-together.log` in the game's `bin` folder, whose first line says `H5 Together hook DLL <version> loaded`.
-- In a multiplayer waiting room, a line at the bottom: "Every player has H5 Together 0.3.4."
+- In a multiplayer waiting room, a line at the bottom: "Every player has H5 Together 0.3.5."
 
 ![The main menu with the version line](images/main-menu.png)
 
@@ -106,9 +108,9 @@ We have not tried the H5 Lobby app. If you do, please tell us.
 
 ### Can we play over the internet without GameRanger?
 
-Yes, with your **Steam friends**, from 0.3.0 (a test for now). Every player sets **Options, H5 Together, Online play: Steam** and restarts the game. The host creates a LAN game as usual and clicks **Invite friends...** in the waiting room; the friends accept the invite in Steam, and their game joins by itself (or they pick the host's game in **Multiplayer, LAN**). Everything else is the game's own LAN play. Details: [the README](../README.md#online-play-over-steam-new-a-test).
+Yes, with your **Steam friends**, from 0.3.0 (on by default since 0.3.5: nothing to set; Steam must be running). The host creates a LAN game as usual and clicks **Invite friends...** in the waiting room; the friends accept the invite in Steam, and their game joins by itself (or they pick the host's game in **Multiplayer, LAN**). Everything else is the game's own LAN play. Details: [the README](../README.md#online-play-over-steam).
 
-It needs the game bought on Steam (not GOG), Steam running, and the same H5 Together (0.3.0 or newer) with online play on, for every player. While it is on, the LAN list shows only games through Steam: for GameRanger or a real LAN game, set it back to **Off**.
+It needs the game bought on Steam (not GOG), Steam running, and the same H5 Together (0.3.0 or newer) with online play on, for every player (on by default since 0.3.5; without Steam the game uses its own LAN play). While it is on, the LAN list shows only games through Steam: for GameRanger or a real LAN game, set it back to **Off**.
 
 ### Online play: my friend's game is not in the LAN list
 
@@ -147,7 +149,7 @@ Wait **30 seconds** before closing it. If the game stops answering for 20 second
 
 ### Does it work in single player?
 
-Yes, if you start the game with MMH5.5's co-op exe, `MMH55_Utility_64.exe`. The template builder, hero looks, the camera, sound and menu options, the player list and the "your turn" notification then work in single player too, and the AI thinks faster. The parts for co-op (the waiting room line, the host's game rules, the shorter steps) only matter in multiplayer.
+Yes, with the original game's exe (`H5_Original_4GB.exe`), or with MMH5.5's co-op exe, `MMH55_Utility_64.exe`. The template builder, hero looks, the camera, sound and menu options, the player list and the "your turn" notification then work in single player too, and the AI thinks faster. The parts for co-op (the waiting room line, the host's game rules, the shorter steps) only matter in multiplayer.
 
 MMH5.5's own single-player exe, `MMH55_64.exe`, is not recognised: the add-on stays off there and the game runs as it always did. Note that the co-op exe plays with the original 3.1 AI, not the "3.1j enhanced AI" that `MMH55_64.exe` brings.
 
@@ -180,7 +182,7 @@ The log lists player names and LAN addresses, so look at it before you post it i
 
 ### The log says "unknown build"
 
-The add-on does not know the exe you started, so it does nothing, on purpose. Start MMH5.5's co-op exe, `MMH55_Utility_64.exe`, or a copy of it named `H5_Game.exe` (see the [table above](#which-game-files-does-it-work-with)). On Linux, the launch option must start that exe ([linux.md](linux.md)).
+The add-on does not know the exe you started, so it does nothing, on purpose. Start the original game's `H5_Original_4GB.exe` (the installer makes it), or MMH5.5's co-op exe, `MMH55_Utility_64.exe`, or a copy of it named `H5_Game.exe` (see the [table above](#which-game-files-does-it-work-with)). On Linux, the launch option must start that exe ([linux.md](linux.md)).
 
 ### The game crashed: where is the report?
 
@@ -198,4 +200,4 @@ MMH5.5's scripts, balance, installer and translations are made by the MMH5.5 tea
 
 No. It sends nothing to us or to anyone else. In a multiplayer game the PCs of the players exchange a few small messages (versions, game rules, hero looks) over the game's own connection. Apart from online play over Steam (below), the only thing that can contact a server is the update check, which is **off** unless you say yes: once a day it asks GitHub for the number of the latest version, and GitHub sees the address it comes from, as any website does. The bug report zip is made on your PC and goes nowhere until you attach it yourself.
 
-**Online play over Steam** is off unless you turn it on. When it is on, the game talks to your friends' games through Steam, as any Steam game does: Steam sees the friends-only game you host and the invites you send, and the add-on shows its version number to your Steam friends' add-ons (a small Steam "rich presence" value).
+**Online play over Steam** is on by default since 0.3.5 (Options, H5 Together, Online play: Off turns it off). When it is on, the game talks to your friends' games through Steam, as any Steam game does: Steam sees the friends-only game you host and the invites you send, and the add-on shows its version number to your Steam friends' add-ons (a small Steam "rich presence" value).

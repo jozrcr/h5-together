@@ -36,30 +36,81 @@ namespace {
 // --- the clients -----------------------------------------------------------------------
 struct Slot {
 	Client client;
-	bool on;      // false once it crashed
+	bool on;      // false once it crashed (for kRestartMs, at most kRestarts times)
 	bool wanted;  // this frame
+	int crashes;
+	DWORD off_at;
 };
+const DWORD kRestartMs = 5000;
+const int kRestarts = 3;
 const int kMaxClients = 8;
 Slot g_clients[kMaxClients];
 int g_client_count = 0;
 bool g_early = false;      // the Direct3D import went in at DLL load
 bool g_installed = false;  // the frame and reset callbacks are in
 
+// The last exception a client's call met: its code and where (for the log).
+DWORD g_ex_code = 0;
+void *g_ex_at = nullptr;
+
+int NoteException(const EXCEPTION_POINTERS *e)
+{
+	g_ex_code = e && e->ExceptionRecord ? e->ExceptionRecord->ExceptionCode : 0;
+	g_ex_at = e && e->ExceptionRecord ? e->ExceptionRecord->ExceptionAddress : nullptr;
+	return EXCEPTION_EXECUTE_HANDLER;
+}
+
 void Crashed(Slot &s, const char *where)
 {
 	s.on = false;
 	s.wanted = false;
-	hooklog::Write("overlay: %s crashed in %s (caught): it is turned off", s.client.name, where);
+	++s.crashes;
+	s.off_at = GetTickCount();
+	// where: module + offset (our DLL's offsets are in its build's dinput8.map)
+	char module[MAX_PATH] = "?";
+	HMODULE m = nullptr;
+	DWORD offset = reinterpret_cast<DWORD>(g_ex_at);
+	if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+	                       static_cast<const char *>(g_ex_at), &m) &&
+	    m) {
+		char path[MAX_PATH];
+		if (GetModuleFileNameA(m, path, MAX_PATH)) {
+			const char *name = strrchr(path, '\\');
+			lstrcpynA(module, name ? name + 1 : path, MAX_PATH);
+		}
+		offset -= reinterpret_cast<DWORD>(m);
+	}
+	hooklog::Write("overlay: %s crashed in %s (caught; exception %08lx at %s+0x%lx): it is turned off%s", s.client.name, where,
+	               g_ex_code, module, offset, s.crashes <= kRestarts ? " for 5 s" : " until the game restarts");
 	internal::CloseModalOf(s.client.name, "its panel crashed");
+}
+
+// [debug] overlay_crash_test=<client name>: that client "crashes" once in its wanted (an access
+// violation, caught as a real one), 20 s after its first call: the log line and the restart.
+char g_crash_test[32] = "";
+DWORD g_crash_test_at = 0;
+
+void CrashTestStep(const Slot *s)
+{
+	if (!g_crash_test[0] || strcmp(g_crash_test, s->client.name) != 0)
+		return;
+	const DWORD now = GetTickCount();
+	if (!g_crash_test_at)
+		g_crash_test_at = now ? now : 1;
+	if (now - g_crash_test_at < 20000)
+		return;
+	g_crash_test[0] = 0;
+	*static_cast<volatile int *>(nullptr) = 0;
 }
 
 // (Separate functions: __try cannot sit with C++ objects that need unwinding.)
 bool CallWanted(Slot *s)
 {
 	__try {
+		CrashTestStep(s);
 		return s->client.wanted();
 	}
-	__except (EXCEPTION_EXECUTE_HANDLER) {
+	__except (NoteException(GetExceptionInformation())) {
 		Crashed(*s, "wanted");
 		return false;
 	}
@@ -72,7 +123,7 @@ void CallPrepare(Slot *s, const Frame *f)
 	__try {
 		s->client.prepare(*f);
 	}
-	__except (EXCEPTION_EXECUTE_HANDLER) {
+	__except (NoteException(GetExceptionInformation())) {
 		Crashed(*s, "prepare");
 	}
 }
@@ -82,7 +133,7 @@ void CallDraw(Slot *s, const Frame *f)
 	__try {
 		s->client.draw(*f);
 	}
-	__except (EXCEPTION_EXECUTE_HANDLER) {
+	__except (NoteException(GetExceptionInformation())) {
 		Crashed(*s, "draw");
 	}
 }
@@ -352,6 +403,11 @@ void AskClients()
 	bool any = false;
 	for (int i = 0; i < g_client_count; ++i) {
 		Slot &s = g_clients[i];
+		if (!s.on && s.crashes && s.crashes <= kRestarts && GetTickCount() - s.off_at >= kRestartMs) {
+			s.on = true;
+			hooklog::Write("overlay: %s is turned on again (after its crash %d of %d allowed)", s.client.name, s.crashes,
+			               kRestarts);
+		}
 		s.wanted = s.on && CallWanted(&s);
 		any = any || s.wanted;
 	}
@@ -469,10 +525,17 @@ bool AddClient(const Client &client)
 		d3dhook::AddPresentCallback(&OnPresent, 0);  // the robot's screenshots come after (they show the overlay)
 		d3dhook::AddResetCallback(&OnReset);
 		g_installed = true;
+		wchar_t ini[MAX_PATH], test[32];
+		hooklog::PathNextToExe(L"h5-together", L".ini", ini, MAX_PATH);
+		GetPrivateProfileStringW(L"debug", L"overlay_crash_test", L"", test, 32, ini);
+		WideCharToMultiByte(CP_ACP, 0, test, -1, g_crash_test, sizeof(g_crash_test), nullptr, nullptr);
+		if (g_crash_test[0])
+			hooklog::Write("overlay: test: %s crashes once in its wanted, 20 s after its first call ([debug] overlay_crash_test)",
+			               g_crash_test);
 	}
 	if (g_client_count >= kMaxClients)
 		return false;
-	g_clients[g_client_count++] = {client, true, false};
+	g_clients[g_client_count++] = {client, true, false, 0, 0};
 	return true;
 }
 

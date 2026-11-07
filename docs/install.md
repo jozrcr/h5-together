@@ -4,7 +4,7 @@ How to install the add-on on a player's PC. What it does: [the main README](../R
 
 ## What you need
 
-- Heroes of Might and Magic V: Tribes of the East (Steam) with **MMH5.5 RC19d or RC19k already installed**. The add-on does not install MMH5.5. Without MMH5.5 it does nothing for now.
+- Heroes of Might and Magic V: Tribes of the East (Steam). **The original game** (3.1, the 2008 program) is the first target since 0.3.5: the installer can make `bin\H5_Original_4GB.exe` for it, with your yes. **With MMH5.5** (RC19d or RC19k, already installed), the add-on works too; it does not install MMH5.5.
 - Windows 10 or 11, or Linux with Steam and Proton.
 - The same add-on version as the friends you play with: **everyone in the same co-op game should install the same version.**
 
@@ -38,8 +38,8 @@ Your game
 ```
 
 - **Found in** says Steam or GOG when it can tell. **Language** is Steam's language setting for the game (not shown for other copies); the add-on's own panels use it when we have that language (English and French today). For another language it says "H5 Together has no texts in <language> yet: its panels will be in English", and translations are welcome ([src/mods/texts/TRANSLATING.md](../src/mods/texts/TRANSLATING.md)).
-- **MMH5.5** is named from the `55u.dll` file (RC19d and RC19k are the ones we tested). Any other `55u.dll` gives "a version we have not tested" with a yellow warning: the add-on may switch itself off (the game then runs as it always did, and `h5-together.log` says why). With no MMH5.5 at all the warning says that H5 Together needs it for now; the files are still copied, and start working when MMH5.5 is installed.
-- **Game exes:** the add-on works with MMH5.5's co-op exe, `MMH55_Utility_64.exe`. GameRanger starts `H5_Game.exe`, so the GameRanger guide has you put a copy of the co-op exe under that name: the installer recognises that copy. An `H5_Game.exe` that is the game's own exe does nothing with the add-on; start `MMH55_Utility_64.exe` then.
+- **MMH5.5** is named from the `55u.dll` file (RC19d and RC19k are the ones we tested). Any other `55u.dll` gives "a version we have not tested" with a yellow warning: the add-on may switch itself off (the game then runs as it always did, and `h5-together.log` says why). With no MMH5.5 at all that is fine: the add-on works with the original game (see Game exes); the files are copied the same way, and they also work with MMH5.5 is installed.
+- **Game exes:** the add-on works with MMH5.5's co-op exe, `MMH55_Utility_64.exe`. GameRanger starts `H5_Game.exe`, so the GameRanger guide has you put a copy of the co-op exe under that name: the installer recognises that copy. The guide keeps the original 2008 exe as `H5_GameOLD.exe`: since 0.3.5 the add-on works with it too, as the original game without MMH5.5 ([README](../README.md#the-original-game-first-mmh55-too)). An `H5_Game.exe` that is Steam's 2025 rebuild does nothing with the add-on; start `MMH55_Utility_64.exe` (or `H5_GameOLD.exe`) then.
 - **No game found, or several:** with none it asks where the game is. Type **B** to choose the folder in a window (Windows), or paste the folder (the one that holds `bin`, or `bin` itself). With several it lists them (each with where it comes from and its MMH5.5) and you type a number. A folder is accepted only if its `bin` has `H5_Game.exe` or `MMH55_Utility_64.exe`; otherwise it explains and asks again. Press Enter alone to cancel (nothing is installed). GOG copies are looked for in GOG's list in the registry, and any copy through the entry that MMH5.5's own installer leaves; we have not tried a GOG copy of Heroes V yet, so tell us if yours is not found.
 - **The game is running:** the add-on's file cannot be replaced while the game runs, so the installer says so and waits: close the game, then press Enter. Type `S` to go on anyway, `Q` to stop (exit code 8, nothing changed).
 - **At the end** it says "All done" and what to do next: start the game, then look for `h5-together.log` in the `bin` folder. The first line says `H5 Together hook DLL <version> loaded` when the add-on runs. It also says where to change settings: in the game, **Options, H5 Together** (or **F3**), or in `h5-together.ini`.
@@ -97,9 +97,9 @@ Keep the extracted folder: `uninstall.bat` and `bug-report.bat` (or the `.sh` fi
 
 ## Check that it works
 
-Start the game as you do for co-op games (GameRanger, or `MMH55_Utility_64.exe`).
+Start the game: the original game with `bin\H5_Original_4GB.exe` (a double-click, Steam running), or MMH5.5 as you do for co-op games (GameRanger, or `MMH55_Utility_64.exe`). The installer's last screen says which.
 
-- **In the main menu**, a line **"H5 Together 0.3.4"** (your version) sits above MMH5.5's "Version" line, at the bottom left.
+- **In the main menu**, a line **"H5 Together 0.3.5"** (your version) sits above the game's "Version" line, at the bottom left.
 - **The log:** a file **`h5-together.log`** appears in the same `bin` folder. Its first line says `H5 Together hook DLL <version> loaded`.
 - **The first time**, a small box asks "Check for new versions of H5 Together once a day? Yes / No". It is your choice; the default is off. See [Updating](#updating).
 - **In the waiting room** of a multiplayer game, a line at the bottom says whether every player has the same H5 Together version (and who has another one, or none).
@@ -119,7 +119,7 @@ In the game: main menu, **Options**, then **H5 Together** (or press **F3**, in t
 
 The defaults keep the original game: the speed-ups, fixes and panels are on, and whatever changes how the game plays, looks or sounds is off until you turn it on.
 
-**Online play over Steam** (new in 0.3.0, a test) is one of these settings: **Online play: Steam**, then restart the game. Every player of the game does the same. How to host, invite and join: [the README](../README.md#online-play-over-steam-new-a-test).
+**Online play over Steam** (new in 0.3.0, on by default since 0.3.5) is one of these settings: **Online play: Off** turns it off (then restart the game). How to host, invite and join: [the README](../README.md#online-play-over-steam).
 
 ## Updating
 
