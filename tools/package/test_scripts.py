@@ -1164,11 +1164,13 @@ def run_until_it_waits(cmd, marker, answer="\n", wait=4.0):
 
 
 def start_fake_game_windows(bin_folder):
-    """Makes H5_Game.exe in the folder a copy of cmd.exe and starts it (it waits a minute for
-    nothing), so that Windows lists a program called H5_Game that runs from that folder."""
+    """Makes H5_Game.exe in the folder a copy of cmd.exe and starts it (it waits ten minutes for
+    nothing, until stop() ends it), so that Windows lists a program called H5_Game that runs from
+    that folder. (One minute was too short on GitHub's runners: the installs before the last two
+    checks took longer, the fake game was gone, and those checks failed.)"""
     exe = Path(bin_folder) / "H5_Game.exe"
     shutil.copyfile(Path(os.environ["SystemRoot"]) / "System32" / "cmd.exe", exe)
-    proc = subprocess.Popen([str(exe), "/c", "ping -n 60 127.0.0.1 >nul"],
+    proc = subprocess.Popen([str(exe), "/c", "ping -n 600 127.0.0.1 >nul"],
                             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     time.sleep(1.5)
 
