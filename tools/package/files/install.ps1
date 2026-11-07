@@ -1251,7 +1251,12 @@ try {
     Write-Host "All done: $addon is installed." -ForegroundColor Green
     Write-Host ""
     Write-Host "What to do next:"
-    Write-Host "  1. Start the game as you do for co-op games (GameRanger, or MMH55_Utility_64.exe)."
+    if (Test-Path -LiteralPath (Join-Path $bin $Original4GbName)) {
+        Write-Host "  1. Start the original game: bin\$Original4GbName (a double-click, with Steam running; it has"
+        Write-Host "     4 GB of memory). For MMH5.5, start MMH55_Utility_64.exe (or GameRanger) as usual."
+    } else {
+        Write-Host "  1. Start the game as you do for co-op games (GameRanger, or MMH55_Utility_64.exe)."
+    }
     Write-Host "  2. Then look in the game's bin folder for the file h5-together.log:"
     Write-Host "       $bin"
     Write-Host "     If its first line says ""H5 Together hook DLL $version loaded"", the add-on is running."

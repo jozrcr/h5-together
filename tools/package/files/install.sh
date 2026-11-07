@@ -1070,20 +1070,38 @@ cat <<'EOF'
 
      It tells Wine (Proton) to load our dinput8.dll instead of its own.
 
-  2. Which exe starts? Steam starts H5_Game.exe, the plain game, and the add-on only
-     works with MMH5.5's exe, MMH55_Utility_64.exe (the co-op one). To make Steam start
-     that exe, paste this line instead of the one above:
+EOF
+if [ -f "$bin/H5_Original_4GB.exe" ]; then
+cat <<'EOF'
+  2. Which exe starts? Steam starts H5_Game.exe. For the original game with 4 GB of
+     memory (H5_Original_4GB.exe, which the installer made), paste this line instead:
+
+         WINEDLLOVERRIDES="dinput8=n,b" bash -c 'exec "${@/H5_Game.exe/H5_Original_4GB.exe}"' -- %command%
+
+     For MMH5.5 instead, the same line with its co-op exe:
+
+         WINEDLLOVERRIDES="dinput8=n,b" bash -c 'exec "${@/H5_Game.exe/MMH55_Utility_64.exe}"' -- %command%
+
+EOF
+elif [ "$gi_mmh55" != "missing" ]; then
+cat <<'EOF'
+  2. Which exe starts? Steam starts H5_Game.exe, and with MMH5.5 the add-on works with
+     its co-op exe, MMH55_Utility_64.exe. To make Steam start that exe, paste this line
+     instead of the one above:
 
          WINEDLLOVERRIDES="dinput8=n,b" bash -c 'exec "${@/H5_Game.exe/MMH55_Utility_64.exe}"' -- %command%
 
      If it does not work, docs/linux.md (step 3) has another way: swap the two exe
      files. https://github.com/jozrcr/h5-together/blob/main/docs/linux.md
 
-     For the original game without MMH5.5 (H5_Original_4GB.exe, when the installer made it),
-     the same line with that exe's name:
+EOF
+else
+cat <<'EOF'
+  2. Which exe starts? Steam starts H5_Game.exe, the original game: the line above is enough.
 
-         WINEDLLOVERRIDES="dinput8=n,b" bash -c 'exec "${@/H5_Game.exe/H5_Original_4GB.exe}"' -- %command%
-
+EOF
+fi
+cat <<'EOF'
   3. Start the game from Steam. Then look in the game's bin folder for the file
      h5-together.log:
 EOF
