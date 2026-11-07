@@ -1,8 +1,8 @@
-H5 Together @VERSION@ - a small add-on for Heroes of Might and Magic V (Tribes of the East + MMH5.5)
+H5 Together @VERSION@ - a small add-on for Heroes of Might and Magic V: Tribes of the East (the original game first, MMH5.5 too)
 
 What it is: one file, dinput8.dll, that the game loads at start-up, plus a settings file and 24 random map templates. It makes co-op games against the computer faster and more stable, and adds a few panels and options. It adds files to the game's bin folder and never changes the game's own files.
 
-You need: the Steam game with MMH5.5 RC19d or RC19k already installed (MMH55_Utility_64.exe in the game's bin folder). This add-on does not install MMH5.5.
+You need: the Steam game. Since 0.3.5 the original 2008 game comes first: the installer can make bin\H5_Original_4GB.exe for it, with your yes. MMH5.5 RC19d or RC19k works too, when it is already installed (MMH55_Utility_64.exe in the game's bin folder); this add-on does not install MMH5.5.
 Everyone who plays the same co-op game should install the same version.
 
 
@@ -10,7 +10,7 @@ INSTALL
 
 Windows: extract this zip (right-click it, "Extract All"), then double-click install.bat. It looks for the game (Steam, GOG), shows you what it found (the folder, the language, which MMH5.5 you have), and tells you what it did and what to do next. If it cannot find the game, or finds several, it asks: type a number, or B to choose the folder in a window. If the game is running it asks you to close it first.
 Linux (Steam / Proton): extract the zip, open a terminal in the folder, and run: bash install.sh. The same screens, without the B window (paste the folder instead). At the end it gives you one line to paste into the game's Steam launch options.
-It warns you in plain words if MMH5.5 is missing or is a version we have not tested (we tested RC19d and RC19k).
+It says which exe to start (the original game's, or MMH5.5's when you have it), and warns you in plain words if your MMH5.5 is a version we have not tested (we tested RC19d and RC19k).
 Updating: install the new version over the old one. Your settings are kept, and the new ones are added to h5-together.ini (commented out, with what they do); the installer says how many. Your old file is saved as h5-together.ini.bak.
 H5 Together was called open-homm5 until version 0.2.7. Installing over an old version gives your files the new name: open-homm5.ini becomes h5-together.ini, open-homm5-skins.ini becomes h5-together-skins.ini, and the folder open-homm5 becomes h5-together (with everything in it). Nothing you set is lost.
 
@@ -25,7 +25,7 @@ Double-click uninstall.bat (Windows) or run: bash uninstall.sh (Linux). Only our
 SETTINGS (you can skip this)
 
 In the game: main menu, Options, then "H5 Together" (or press F3). The page is part of the game's own Options screen: change a setting, then Apply (Default puts all of them back). A name that ends in * applies after a restart of the game, ** from the next game; the others apply at once. During a multiplayer game the host's and the advanced settings are read only.
-The settings are saved in h5-together.ini in the game's bin folder; you can also edit it with Notepad (then restart the game). Every line that starts with ";" is not changed and shows the default. The defaults keep the original game: the speed-ups, fixes and panels are on, and anything that changes how the game plays, looks or sounds is off until you turn it on.
+The settings are saved in h5-together.ini in the game's bin folder; you can also edit it with Notepad (then restart the game). Every line that starts with ";" is not changed and shows the default. The speed-ups, fixes and panels are on. Since 0.3.5 a few co-op choices are on by default too (endless simultaneous turns, computers playing together, Undo End Turn, start terrain of your faction, online play over Steam: see NEW IN 0.3.5); the rest of what changes how the game plays, looks or sounds is off until you turn it on.
 The main menu shows your H5 Together version under the game's own version.
 Your hero look choices are kept in h5-together-skins.ini, next to it.
 
@@ -39,7 +39,7 @@ Translations are welcome: copy en.txt to the code of your language (de.txt, ru.t
 WHAT IT DOES
 
 - Faster co-op: quicker AI turns and clicks, less AI thinking on big maps, no long autosave freeze, LAN games over ZeroTier.
-- Online play over Steam (off until you turn it on): your Steam friends' games in the game's LAN list, invites from the waiting room.
+- Online play over Steam (on by default since 0.3.5): your Steam friends' games in the game's LAN list, invites from the waiting room.
 - Stability: a fix for a rare host freeze during computer turns, a freeze detector, and a short report when the game crashes (see below).
 - Multiplayer waiting room: a line at the bottom says whether every player has the same H5 Together version, and who does not.
 - Player list on the adventure map: who is playing, who has ended the turn. F9 hides it.
@@ -47,8 +47,22 @@ WHAT IT DOES
 - Template builder: the "Template..." button ("Modeles..." in French) on the random map screen, or F11. Friends rebuild the same map from its name: nothing to share.
 - Hero looks: the small button on the hero screen, or F7. Another hero's 3D figure, same faction.
 - Game rules (host): the "Rules..." button ("Regles..." in French) in the multiplayer waiting room, or F2. Used only when every player has this version.
-- Off by default (Options, H5 Together, or h5-together.ini): a "new version available" notice in the main menu (the first start asks; at most once a day it asks GitHub for the latest version number; nothing is downloaded), farther camera zoom, black map edges, a quieter volume range, the original Heroes V music, French texts, start terrain that matches each faction on random maps.
+- Off by default (Options, H5 Together, or h5-together.ini): a "new version available" notice in the main menu (the first start asks; at most once a day it asks GitHub for the latest version number; nothing is downloaded), farther camera zoom, black map edges, the original Heroes V music, French texts.
 - Linux: the mouse wheel zooms out again (automatic).
+
+
+NEW IN 0.3.5
+
+- The original 2008 game, without MMH5.5: supported, also from a folder where MMH5.5 is installed (H5 Together hides MMH5.5's files from it; MMH5.5 still starts as before). The installer can make bin\H5_Original_4GB.exe (the original game with 4 GB of memory): with your yes it fetches only the 2008 exe from MMH5.5's official GitHub release and checks it. Its own profile and saves (Documents\H5 Together\Original game). Endless simultaneous turns for it (the host's choice).
+- A Linux PC can join a Windows host's big random map over Steam (it timed out: "timeout 0.18.0").
+- Watching a friend's battle: you also see their army's placement before the battle, as they move it.
+- A sword on an ally's row in the player list while they fight: click it to follow them and open their battle.
+- Hero details in the waiting room: the starting hero's tooltip gives its class, starting skills and what its specialty does.
+- Skill wheel (the original game): a small wheel button on the hero screen shows what the hero's class can learn.
+- Builder maps: the team arrows move you to another start of your own team.
+- New defaults, the group's usual co-op setup: endless simultaneous turns, computers playing together, Undo End Turn, start terrain of your faction (the host's choices), the wider volume range, online play over Steam, a 180 frames a second limit.
+- The installer's last screen names the exe to start (the original game's when it made it).
+- Mixing versions: endless turns, the army placement and the sword need 0.3.5 on every PC; everything else mixes with 0.3.4.
 
 
 NEW IN 0.3.4

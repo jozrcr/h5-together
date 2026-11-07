@@ -1,5 +1,7 @@
 # Playing co-op from Linux
 
+**The short way (0.3.5 and later):** extract the H5 Together zip and run `bash install.sh` in its folder. For the original game (the first target since 0.3.5) it makes `bin/H5_Original_4GB.exe` with your yes, and at the end it prints the one line to paste into the game's Steam launch options; with MMH5.5 it prints the line for MMH5.5's co-op exe instead. Online play over Steam is on by default, so no ZeroTier is needed: accept your friend's Steam invite. The rest of this page is the older, manual MMH5.5 + ZeroTier way, kept for reference.
+
 A step-by-step guide for a player on Linux who joins a co-op game hosted on Windows. You end up with Heroes V: Tribes of the East + MMH5.5 running under Steam's Proton, our DLL with the faster co-op AI mod, and a ZeroTier network that makes the two PCs look like they are on the same LAN. GameRanger is not needed.
 
 **Fixed in the DLL (2026-10-24), and it works: the owner (Windows) and a Linux friend played over ZeroTier the same day, using the install package.** History of the problem:
