@@ -79,6 +79,7 @@ const Setting kSettings[] = {
 	FILE_ONLY("net", "send_interval_ms", "2", kInt, 0, 50, kTester, kRestart),
 	FILE_ONLY("net", "batched_segments", "0", kInt, 0, 3, kTester, kRestart),
 	FILE_ONLY("net", "join_timeout_s", "300", kInt, 0, 600, kPlayer, kRestart),  // join_time.cpp
+	FILE_ONLY("video", "background", "2", kInt, 0, 2, kPlayer, kRestart),  // join_time.cpp: 2 = under Linux/Wine only
 	ROW("net", "lan_all_adapters", "1", kBool, 0, 1, nullptr, 0, nullptr, kPlayer, kLive, kAdvanced, kCheck,
 	    "settings.net.lan_all_adapters", "settings.net.lan_all_adapters.help"),
 	// a text box the game's Options screen does not have: shown as a line of the Advanced group, set in the file

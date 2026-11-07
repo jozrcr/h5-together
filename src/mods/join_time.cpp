@@ -35,6 +35,18 @@
 // three at 120 in the laptop's profile the hand join worked (29.2 s). So the three reads are
 // pointed at our own value, join_timeout_s (not the variables: the game saves its variables into
 // the player's profile when it exits).
+//
+// Kept active under Wine (the second half of the Linux join, 2026-11-07): the game's activation
+// handler (0x00c3b3c0, from the main loop's WM_ACTIVATEAPP) marks the game inactive when it
+// loses the focus and, in fullscreen, minimizes it, unless the console variable
+// app_always_active (0x010d85c3; 0 in every profile) is set; its one read is
+// "cmp byte ptr [0x010d85c3], 0" at 0x00c3b3dc. During the 25-28 s map build GNOME's "not
+// responding" box takes the focus, and after the build the joining game barely ran its
+// handshake. The laptop's tries: kept active with the game's 30 s, failed at 33 s (time); not
+// kept active with 300 s, failed (the handshake never answered); kept active with 120 s,
+// joined; the robot (always kept active) joined at 29.1 s with 30 s. So under Wine
+// ([video] background=2, the default) that read points at our own 1; 1 = on Windows too,
+// 0 = the game's own. The variable and the player's profile stay as they are.
 #include "join_time.h"
 
 #include <windows.h>
@@ -76,6 +88,15 @@ const StageRead kStageReads[] = {
 	{0x0071e3ab, 0x00f3bee4, "net_ubicom_init_timeout"},
 	{0x0075386d, 0x00f3d484, "net_load_timeout"},
 };
+
+const StageRead kAlwaysActiveRead = {0x00c3b3de, 0x010d85c3, "app_always_active"};
+BYTE g_always_active = 1;
+
+bool UnderWine()
+{
+	HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
+	return ntdll && GetProcAddress(ntdll, "wine_get_version") != nullptr;
+}
 
 bool PointRead(const StageRead &r, DWORD value)
 {
@@ -184,6 +205,18 @@ void ApplyJoinTimeFromSettings()
 		               "10 s, net_load_timeout 20 s) are %lu s: %d of 3 reads pointed at our value",
 		               g_stage_s, pointed);
 	}
+	const int background = static_cast<int>(GetPrivateProfileIntW(L"video", L"background", 2, ini));
+	const bool wine = UnderWine();
+	if (background == 1 || (background == 2 && wine)) {
+		const bool ok = PointRead(kAlwaysActiveRead, reinterpret_cast<DWORD>(&g_always_active));
+		hooklog::Write(ok ? "background: the game keeps running when another window has the focus (%s; app_always_active "
+		                    "read as 1, the profile untouched): a long map build no longer stalls a join"
+		                  : "background: the game's code is not as expected (%s): the game's own behaviour",
+		               wine ? "Linux/Wine" : "[video] background=1");
+	}
+	else
+		hooklog::Write("background: the game's own (it pauses and, in fullscreen, minimizes itself without the focus; %s)",
+		               wine ? "[video] background=0" : "Windows: only needed under Linux/Wine");
 	hooklog::Write(g_ctor_next ? (g_join_s ? "join time: on: %lu s for a PC that joins (the game's 20 s again once the game runs)"
 	                                       : "join time: off: the game's own time limit (join_timeout_s=0)%.0lu")
 	                           : "join time: the game's code is not as expected: off%.0lu",
