@@ -216,7 +216,7 @@ struct Name {
 const Name kOrder[] = {
 	{"ui", "player_list"}, {"ui", "player_list_key"}, {"ui", "player_list_top"}, {"ui", "player_list_left"},
 	{"notify", "turn"}, {"notify", "sound"}, {"notify", "popup"}, {"coop", "share_view"}, {"coop", "watch_battles"}, {"coop", "stay_after_defeat"}, {"rules", "key"}, {"rules", "button"},
-	{"ui", "hero_tips"},
+	{"ui", "hero_tips"}, {"ui", "portal_colors"},
 	{"skins", "skins"}, {"skins", "key"}, {"skins", "hero_screen_button"}, {"ui", "skill_wheel"}, {"ui", "skill_wheel_key"}, {"skins", "show_others"},
 	{"camera", "zoom_out"}, {"camera", "combat_zoom_out"}, {"camera", "start_zoom"}, {"camera", "edge_sky"}, {"camera", "anim_saver"}, {"video", "fps_limit"}, {"video", "vsync"}, {"menu", "scene"},
 	{"camera", "wheel_fix"}, {"audio", "original_music"}, {"audio", "volume_curve"}, {"ui", "language"},

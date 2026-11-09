@@ -18,6 +18,7 @@
 #include "../mods/edge_sky.h"
 #include "../mods/endless_turns.h"
 #include "../mods/keep_without_towns.h"
+#include "../mods/portal_colors.h"
 #include "../mods/frame_limit.h"
 #include "../mods/spectate.h"
 #include "../mods/fast_paths.h"
@@ -211,6 +212,7 @@ void InstallAll()
 	mods::ApplyTurnUndoFromSettings();  // [coop] undo_end_turn (host's); after hero looks: it stacks on their hooks
 	mods::InstallEndlessTurns();  // the 2008 game: endless simultaneous turns, one of the co-op features
 	mods::InstallKeepWithoutTowns();  // [coop] keep_without_towns (host's, off): carried by the host rules' start message
+	mods::ApplyPortalColorsFromSettings();  // [ui] portal_colors (each player's, off): a coloured light per pair of portals
 	mods::ApplyCoopFeaturesFromSettings();  // the host's script_rhythm and parallel_turns, agreed at each game's start
 	mods::ApplyScriptRhythmFromSettings();  // [coop] script_rhythm (host's, on by default); after the co-op features
 	mods::ApplyQuickResumeFromSettings();  // [coop] resume_save (host's); after the autosave mod: it stacks on its save hook
