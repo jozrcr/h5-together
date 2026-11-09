@@ -54,6 +54,7 @@ WHAT IT DOES
 NEW IN 0.3.7
 
 - Keep playing without towns (Options, H5 Together, the host's choice, off by default): in the original game a player who has lost every town is out 7 days later, even with an army left. With this, that player plays on while a hero lives (out only with no town and no hero). Humans and computers alike. Every PC needs 0.3.7.
+- Coloured portals (Options, H5 Together, off by default): the light inside each pair of two-way portals gets a colour of its own, so you can see which portal leads where. Each player's choice, on their screen only.
 
 
 NEW IN 0.3.6
@@ -101,6 +102,7 @@ NEW IN 0.3.2
 - A smoother map: big maps zoomed far out run about twice as fast (the game gets more room for its 3D models; far-away animations get lighter when the map runs slow), and MMH5.5's scripts run at their own pace again with the faster co-op steps.
 - Undo End Turn (the host's choice, off by default): with simultaneous turns, take back an End Turn while another human still plays.
 - Keep playing without towns (the host's choice, off by default): a player without towns is out only when no hero is left, not after 7 days.
+- Coloured portals (each player's choice, off by default): each pair of two-way portals shines in its own colour.
 - Quick resume after a crash (on): every PC saves "Reprise" with the player who crashed; they get the save over Steam.
 - Each game its own autosaves: named after their map, so a new game no longer overwrites yesterday's.
 - A frame rate limit and the vertical sync (off by default), in Options, H5 Together.
