@@ -129,6 +129,7 @@ The defaults keep the original game: the speed-ups, fixes and panels are on, and
 - **LAN games over ZeroTier** and other virtual networks show up in the LAN list, so a friend (on Linux too) can join without GameRanger.
 - **The waiting room shows versions.** A line at the bottom says whether every player has the same H5 Together, and who has another version or none.
 - **Undo End Turn** (new in 0.3.2, the host's choice, on by default since 0.3.5). With simultaneous turns, a player who ended the turn too early can take it back while another human still plays: a round button over the hourglass (since 0.3.4).
+- **Keep playing without towns** (new in 0.3.7, the host's choice, off by default). In the original game a player who has lost every town is out 7 days later, even with an army left. With this option, that player plays on while a hero lives: out only with no town and no hero. For humans and computers alike; every PC needs 0.3.7.
 - **Quick resume after a crash** (new in 0.3.2, on). When a player's game crashes, every PC saves the game as "Reprise" with that player still in it; the player who crashed gets the save over Steam.
 - **Each game its own autosaves** (new in 0.3.2). Autosaves are named after their game's map, so a new game no longer overwrites yesterday's.
 

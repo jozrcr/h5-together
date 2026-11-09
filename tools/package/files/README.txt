@@ -51,6 +51,11 @@ WHAT IT DOES
 - Linux: the mouse wheel zooms out again (automatic).
 
 
+NEW IN 0.3.7
+
+- Keep playing without towns (Options, H5 Together, the host's choice, off by default): in the original game a player who has lost every town is out 7 days later, even with an army left. With this, that player plays on while a hero lives (out only with no town and no hero). Humans and computers alike. Every PC needs 0.3.7.
+
+
 NEW IN 0.3.6
 
 - Weak computer players: fixed. With 0.3.5's default settings ("computers play together"), only the first computer player of each day moved its heroes; the others stayed home after the first day, so they were much weaker. Now the computers play one after another again, as in the original game, and every one moves its heroes every day.
@@ -95,6 +100,7 @@ NEW IN 0.3.2
 
 - A smoother map: big maps zoomed far out run about twice as fast (the game gets more room for its 3D models; far-away animations get lighter when the map runs slow), and MMH5.5's scripts run at their own pace again with the faster co-op steps.
 - Undo End Turn (the host's choice, off by default): with simultaneous turns, take back an End Turn while another human still plays.
+- Keep playing without towns (the host's choice, off by default): a player without towns is out only when no hero is left, not after 7 days.
 - Quick resume after a crash (on): every PC saves "Reprise" with the player who crashed; they get the save over Steam.
 - Each game its own autosaves: named after their map, so a new game no longer overwrites yesterday's.
 - A frame rate limit and the vertical sync (off by default), in Options, H5 Together.
