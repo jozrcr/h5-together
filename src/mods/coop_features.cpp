@@ -182,7 +182,7 @@ unsigned Wants(unsigned *ai_bonus)
 	}
 	if (GetPrivateProfileIntW(L"coop", L"script_rhythm", 1, path) != 0)
 		wants |= 1u << features::kScriptRhythm;
-	if (GetPrivateProfileIntW(L"ai", L"parallel_turns", 1, path) != 0)
+	if (GetPrivateProfileIntW(L"ai", L"parallel_turns", 0, path) != 0)
 		wants |= 1u << features::kParallelAi;
 	if (EndlessTurnsAvailable() && GetPrivateProfileIntW(L"coop", L"endless_turns", 1, path) != 0)
 		wants |= 1u << features::kEndlessTurns;

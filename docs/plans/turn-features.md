@@ -147,8 +147,19 @@ The same game with world checksums (`20261109-005945-lan`, 3 days): **1302 world
 
 **MMH5.5** (`MMH55_Utility_64.exe`, its scripts on, random map `EDD31DF8`, two humans and two computer players, 12 days, world checksums on): together (`20261109-010315-lan`) 4.7 s a day, hero moves 80 and 84, every hero ready at each phase's start, 2195 checks all equal; one after another (`20261109-010652-lan`) 5.4 s a day, hero moves 80 and 114, 2318 checks all equal. So together is about 13% shorter here, not the 39% measured with the bug. The second computer moved less in this run (84 against 114): one run each, perhaps only other choices (it sees the first one's moves as they happen); to watch in real games.
 
+**Long games and a crash: off by default in 0.3.6.** Four 15-day robot games on the 320x320 map (original game, four computers, no checksums):
+
+| Run | Mode | Days | Hero moves per computer | Computers' part of a day |
+|---|---|---|---|---|
+| `20261109-011551-lan` | together | **crashed on day 9** | 56, 47, 71, 53 (8 days) | 18.5 s |
+| `20261109-013257-lan` | together | 15 | 120, 99, 100, 103 | 20.6 s |
+| `20261109-014116-lan` | together, `fast_paths` off | 15 | 89, 98, 102, 108 | 19.0 s |
+| `20261109-012102-lan` | one after another | 15 | 115, 116, 115, 58 | 23.4 s |
+
+The crash (host, `h5-together-host-crash-20261109-012042.txt`): an access violation reading `0x3000` in a buffer copy (`0x008c7650`, from `0x008c7e70`) inside `0x0050c7c0`, slot 8 of the world's change log (world slot `0x98`, vftable `0x00e1a540`): the log's "back to position N", which copies saved entries back. The AI uses that log to try things in its head and undo them (the turn driver keeps the position at `+0xdc`; `0x00bc5480`, under a hero estimate `0x00bc5740` called from the pathfinder's tile check `0x009d15e0`/`0x009d1700`, rolls back to a position it holds at `+0x14`). The saved entry it copied from was garbage. A guess, not proven: a position kept by one computer's AI no longer matches the log after another computer's moves ran in between. Until 0.3.6 this never showed, because the computers after the first did not move. Not seen in the run without our ported pathfinder, nor one after another, but that is two runs. So **0.3.6 ships with `[ai] parallel_turns=0` by default**: the gain is only 12-19%, and the game's own order is safe. Next: reproduce it (a save from the crashed run's day 8, or many long runs), then find who keeps the stale position.
+
 ## Order
 
 1. Undo End Turn: built (2026-11-04). Next: the owner's hand test (a real click on the button), then a release.
 2. Quick resume: find when the world removes a dropped player; then the host's save at the drop, the banner, the robot test (kill a copy, reload, rejoin).
-3. Parallel AI turns: built (0.3.2, the host's setting; on by default in 0.3.5). Its first measures (~40% shorter) were taken with the bug above; fixed in 0.3.6. Next: measure again with two or three computer players on a smaller map, and the owner's hand test (the computer players should be as strong as one after another).
+3. Parallel AI turns: built (0.3.2, the host's setting; on by default in 0.3.5, off again in 0.3.6). Its first measures (~40% shorter) were taken with the bug above; fixed in 0.3.6, 12-19% shorter. Next: the crash above (reproduce, then find the stale rollback position), then the owner's hand test.
