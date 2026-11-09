@@ -233,7 +233,7 @@ and MMH5.5's console: `H5 Together: H55_AICheatMode = 0`. Robot (LAN A1M4, 2026-
 
 ## Computer players side by side (`parallel_ai.cpp`; on since 0.3.5, the host's choice)
 
-**What it does:** the computer players take their turns at the same time instead of one after another (robot, four computer players on a 320x320 map: their part of a day about 12% shorter). They may decide differently than in the original game (each sees the others' moves as they happen). Multiplayer only.
+**What it does:** the computer players take their turns at the same time instead of one after another (robot: their part of a day about 12-13% shorter, two computer players on a small map or four on a 320x320 one). They may decide differently than in the original game (each sees the others' moves as they happen). Multiplayer only.
 
 **Fixed in 0.3.6:** until 0.3.5 only the first computer player of the phase got the game's start of a turn (`0x00994920`: its heroes' movement back), so the others never moved a hero after the first day. Now the phase's start runs it for each computer player it brings in. Every PC must do the same: the co-op features' hello has a new bit (`parallel_ai_starts`), and a 0.3.5 PC in the game keeps the phase off for everyone.
 

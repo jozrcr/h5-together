@@ -145,6 +145,8 @@ At each phase's start every computer player's heroes can move (day 2: 2/2, 2/2, 
 
 The same game with world checksums (`20261109-005945-lan`, 3 days): **1302 world checks, all equal** on both PCs; hero moves 18, 14, 25 and 12.
 
+**MMH5.5** (`MMH55_Utility_64.exe`, its scripts on, random map `EDD31DF8`, two humans and two computer players, 12 days, world checksums on): together (`20261109-010315-lan`) 4.7 s a day, hero moves 80 and 84, every hero ready at each phase's start, 2195 checks all equal; one after another (`20261109-010652-lan`) 5.4 s a day, hero moves 80 and 114, 2318 checks all equal. So together is about 13% shorter here, not the 39% measured with the bug. The second computer moved less in this run (84 against 114): one run each, perhaps only other choices (it sees the first one's moves as they happen); to watch in real games.
+
 ## Order
 
 1. Undo End Turn: built (2026-11-04). Next: the owner's hand test (a real click on the button), then a release.
