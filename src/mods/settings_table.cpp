@@ -105,6 +105,8 @@ const Setting kSettings[] = {
 	    "settings.coop.undo_end_turn", "settings.coop.undo_end_turn.help"),
 	ROW("coop", "endless_turns", "1", kBool, 0, 1, nullptr, 0, nullptr, kHost, kNextGame, kHostGroup, kCheck,
 	    "settings.coop.endless_turns", "settings.coop.endless_turns.help"),  // the 2008 game only (endless_turns.cpp)
+	ROW("coop", "keep_without_towns", "0", kBool, 0, 1, nullptr, 0, nullptr, kHost, kNextGame, kHostGroup, kCheck,
+	    "settings.coop.keep_without_towns", "settings.coop.keep_without_towns.help"),  // keep_without_towns.cpp, 0.3.7
 	ROW("coop", "script_rhythm", "1", kBool, 0, 1, nullptr, 0, nullptr, kHost, kNextGame, kHostGroup, kCheck,
 	    "settings.coop.script_rhythm", "settings.coop.script_rhythm.help"),
 	ROW("coop", "segment_ms", "50", kChoice, 0, 0, kSteps, COUNT(kSteps), "settings.unit.ms", kGroup, kRestart, kAdvanced, kList,

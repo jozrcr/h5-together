@@ -96,6 +96,7 @@
 //                  ("0.2.9"), or "old" = it says none, as a PC before 0.3.0
 #include "host_rules.h"
 #include "host_rules_internal.h"
+#include "keep_without_towns.h"
 
 #include <windows.h>
 #include <stdio.h>
@@ -173,6 +174,13 @@ const DWORD kStartInfoVftable = 0x00e92744;
 const DWORD kSlotSize = 0x8c;
 const BYTE kChunk = 0x4f;          // our chunk in the start message (the game's are 2..7 inside 3)
 const int kChunkSize = 512;        // fixed: a reader copies this many bytes (a new size needs a new chunk number)
+// [coop] keep_without_towns (0.3.7, keep_without_towns.cpp): a chunk of its own, not a rule of
+// the table: a 0.3.6 PC refuses a rules' text with a key it does not know (all of it), and
+// counts the lobby text's values. The host sends it only when every PC has 0.3.7 or later.
+const BYTE kKeepChunk = 0x50;
+const int kKeepChunkSize = 32;
+const char kKeepText[] = "OKT1;keep_without_towns=1";
+const char kKeepVersion[] = "0.3.7";  // the first H5 Together that knows it
 
 const char kSettingsPath[] = "scripts/h55-settings.lua";
 const char kStartScriptPath[] = "scripts/h55-advmap.lua";
@@ -315,6 +323,8 @@ std::string g_start_text;  // host: the chunk of its start message ("" = none)
 bool g_armed = false;      // this PC's next multiplayer game gets these rules
 Values g_armed_values = rules::NoValues();
 bool g_serving = false;  // this game's rules (served when the scripts read the file)
+bool g_keep_send = false;   // host: its start message says keep_without_towns
+bool g_keep_armed = false;  // this PC's next multiplayer game: keep_without_towns
 Values g_serving_values = rules::NoValues();
 bool g_in_game = false;  // a game started since the last lobby
 LONG g_served = 0;
@@ -797,6 +807,22 @@ bool StartRulesChanged(const Values &v)
 bool ClassRuleChanged(const Values &v)
 {
 	return !v[rules::kClassSkills].empty() && v[rules::kClassSkills] != rules::kClassLocked;
+}
+
+// Host, under the lock: the human players whose H5 Together cannot take keep_without_towns
+// (older than kKeepVersion, or not said yet), "" when every one can.
+std::string KeepBlockers(const void *logic, const BYTE *info)
+{
+	const uint32_t needed = rules::PackVersion(kKeepVersion);
+	std::string names;
+	for (int pc : HumanClients(logic, info)) {
+		const Pc *p = FindPc(pc);
+		if (p && p->has_addon_version && p->addon_version >= needed)
+			continue;
+		const std::string version = p && p->has_addon_version ? rules::UnpackVersion(p->addon_version) : std::string("?");
+		names += (names.empty() ? "" : ", ") + PcName(info, pc) + " (" + version + ")";
+	}
+	return names;
 }
 
 // Host, under the lock: who lacks the mod, whose files differ, can every PC take
@@ -1290,6 +1316,18 @@ void __fastcall HostStartHook(void *logic, void *edx)
 			hooklog::Write("rules: START: the class skills stay MMH5.5's lock: %s", g_class_why.c_str());
 			values[rules::kClassSkills] = rules::kClassLocked;
 		}
+		const bool keep_wanted = KeepWithoutTownsWanted();
+		g_keep_send = false;
+		if (keep_wanted && !g_will_apply)
+			hooklog::Write("rules: START: keep playing without towns stays off: a player has no H5 Together's rules");
+		else if (keep_wanted) {
+			const std::string older = KeepBlockers(logic, info);
+			g_keep_send = older.empty();
+			hooklog::Write(older.empty() ? "rules: START: keep playing without towns: on for every PC%s"
+			                             : "rules: START: keep playing without towns stays off: needs H5 Together %s on every PC: %s",
+			               older.empty() ? "" : kKeepVersion, older.c_str());
+		}
+		g_keep_armed = g_keep_send;
 		if (!g_will_apply) {
 			std::string names;
 			for (const std::string &n : g_missing)
@@ -1335,15 +1373,35 @@ int __fastcall StartSerializeHook(BYTE *message, void *edx, void *saver)
 			return r;
 		memcpy(buf, text.c_str(), text.size());
 		chunk(saver, nullptr, kChunk, buf, kChunkSize, 1);
+		bool keep;
+		{
+			Lock lock;
+			keep = g_keep_send;
+		}
+		if (keep) {
+			char keep_buf[kKeepChunkSize];
+			memset(keep_buf, 0, sizeof(keep_buf));
+			memcpy(keep_buf, kKeepText, sizeof(kKeepText));
+			chunk(saver, nullptr, kKeepChunk, keep_buf, kKeepChunkSize, 1);
+		}
 		static LONG logged = 0;
 		if (InterlockedIncrement(&logged) <= 10)
-			hooklog::Write("rules: the start message carries the host's rules (%s)", text.c_str());
+			hooklog::Write("rules: the start message carries the host's rules (%s)%s", text.c_str(),
+			               keep ? " and keep_without_towns" : "");
 		return r;
 	}
 	chunk(saver, nullptr, kChunk, buf, kChunkSize, 1);  // all zeros when the host sent none
 	buf[kChunkSize - 1] = 0;
+	char keep_buf[kKeepChunkSize];
+	memset(keep_buf, 0, sizeof(keep_buf));
+	chunk(saver, nullptr, kKeepChunk, keep_buf, kKeepChunkSize, 1);  // all zeros from a host before 0.3.7, or without it
+	keep_buf[kKeepChunkSize - 1] = 0;
 	Values values;
 	Lock lock;
+	g_keep_armed = strcmp(keep_buf, kKeepText) == 0;
+	if (g_keep_armed || keep_buf[0])
+		hooklog::Write("rules: the host's start message: keep_without_towns %s (\"%s\")", g_keep_armed ? "on" : "not understood: off",
+		               keep_buf);
 	if (buf[0] && rules::Decode(buf, &values)) {
 		g_armed = true;
 		g_armed_values = values;
@@ -1362,8 +1420,11 @@ int __fastcall StartSerializeHook(BYTE *message, void *edx, void *saver)
 void __fastcall RunMpHook(void *self, void *edx)
 {
 	std::string classes, chance;
+	bool keep;
 	{
 		Lock lock;
+		keep = g_keep_armed;
+		g_keep_armed = false;
 		g_serving = g_armed;
 		g_serving_values = g_armed ? g_armed_values : rules::NoValues();
 		g_armed = false;
@@ -1383,6 +1444,7 @@ void __fastcall RunMpHook(void *self, void *edx)
 		rules::SetClassSkills(classes, chance, false, "a multiplayer game starts");
 		rules::ForgetWorldRead();
 	}
+	SetKeepWithoutTowns(keep, keep ? "a multiplayer game starts: the host's start message" : "a multiplayer game starts");
 	InterlockedExchange(&g_mp_world, 1);  // the world is made inside (0x00820830 -> 0x00c9fa80)
 	g_run_mp_next(self, edx);
 	InterlockedExchange(&g_mp_world, 0);
@@ -1463,6 +1525,7 @@ void __fastcall RunSingleHook(void *self, void *edx)
 			hooklog::Write("rules: a single-player game starts: the file's rules");
 		g_serving = false;
 		g_armed = false;
+		g_keep_armed = false;
 		g_start_text.clear();
 		g_in_game = true;
 		if (g_class_single) {  // testing: this PC's choices for the class rules
@@ -1470,6 +1533,7 @@ void __fastcall RunSingleHook(void *self, void *edx)
 			chance = g_chosen[rules::kClassChance];
 		}
 	}
+	SetKeepWithoutTowns(false, "a single-player game starts");
 	// a new game (a single-player load does not come here: robot run 20261102-011559)
 	if (g_enabled) {
 		rules::SetClassSkills(classes, chance, false,
