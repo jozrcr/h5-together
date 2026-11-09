@@ -237,7 +237,7 @@ and MMH5.5's console: `H5 Together: H55_AICheatMode = 0`. Robot (LAN A1M4, 2026-
 
 **Fixed in 0.3.6:** until 0.3.5 only the first computer player of the phase got the game's start of a turn (`0x00994920`: its heroes' movement back), so the others never moved a hero after the first day. Now the phase's start runs it for each computer player it brings in. Every PC must do the same: the co-op features' hello has a new bit (`parallel_ai_starts`), and a 0.3.5 PC in the game keeps the phase off for everyone. With every computer really playing, three long robot games of nine crashed (days 6, 9 and 10, in the AI's world rollback `0x0050c7c0` during a hero estimate, with our pathfinder or the game's own): off by default until that is understood ([turn-features.md](../../docs/plans/turn-features.md), part 3).
 
-**Setting:** `[ai] parallel_turns=1` (Options, H5 Together, the host's settings). Only the host's value counts, from the next game; every PC needs 0.3.6 or later. How, and the bug: [docs/plans/turn-features.md](../../docs/plans/turn-features.md), part 3.
+**Setting:** `[ai] parallel_turns=1`, a hidden test setting since 0.3.6 (not in the Options nor in the shipped h5-together.ini: three long robot games of nine crashed with it). Only the host's value counts, from the next game; every PC needs 0.3.6 or later. How, and the bug: [docs/plans/turn-features.md](../../docs/plans/turn-features.md), part 3.
 
 ## Following a friend's view (`spectate*.cpp`; on, each player's choice)
 
