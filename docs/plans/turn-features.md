@@ -123,8 +123,30 @@ With the agreement (2026-11-04, `20261104-133921-lan`, the same random map, 2 hu
 
 **Not looked at yet:** big maps with long AI turns, MMH5.5's scripts (events per player turn), battles between two computer players moving at the same time, how the game's own screens show two players "thinking".
 
+### The bug of 0.3.2 to 0.3.5: only the first computer player moved its heroes (found 2026-11-09)
+
+**What the owner saw** (a long 3-human game against three computer players, 0.3.4 then 0.3.5, the 6-player builder map): one computer player strong, the two others "barely an inconvenience": small armies, no mines taken.
+
+**What the logs said.** The phase's research counters (the host's `parallel ai: ... ended its turn, the last of phase N (... picks/busy/free/reached ...)`) gave, per day: the first computer player of the phase 50 to 190 AI steps, its heroes often "busy" (walking); the others 10 to 20 steps, **never busy after day 2**. When the first one was beaten (day 73), the next one in player order became the first and moved at once; the last stayed still. The robot benchmark of 2026-11-07 showed the same with four computer players: hero moves per day (a step whose commands include `CStartMoveHeroCmd`) 7 on day 1, then **0** for all but the first. The earlier robot measures (39% and 46% shorter, above) were taken with this bug: the computer players after the first did almost nothing.
+
+**Why.** The AI's MOVE_HERO stage picks its next hero with `0x00869770`: only a hero whose world actor (world slot `0x100`, `0x0098dae0`, the list at world `+0x5c`) says yes at its second base's slot `0x44` (`0x008db210`: movement points over 999). A player's heroes get their movement back in **the start of its turn**, `0x00994920` (`__thiscall(world, player)`, only for a player at state 0): the new week's message (`0x009946e0`, once a week), every hero's and both tavern heroes' slot `0x220`, then world slot `0x1fc` (`0x0098e8a0`) for its heroes. The next turn (`0x00998060`) runs it at its end (`0x00995ef0`, for every player, so only for the ones it just gave the turn to). The phase's other computer players got state 0 from our tick hook, one tick later, through their state setter only: they kept the day before's empty movement. On day 1 every hero starts with full movement, so the bug showed from day 2.
+
+**The fix (0.3.6).** At the phase's start, after the state setter, our tick hook runs `0x00994920` for each computer player it brings in, as the next turn does for the first. It changes the world, so every PC must do it: the co-op features' hello has a new "knows" bit, `parallel_ai_starts` (bit 4), and this version no longer says it knows the old `parallel_ai` bit. The host still asks with the old bit; the phase runs only if every PC knows the new one, and a 0.3.5 PC (which would run the phase without the fix) sees the feature off too (`coop_features_logic.h`, tested in `coop_features_test.cpp`).
+
+**Robot, after the fix** (the same benchmark: two copies of the original game, the 320x320 builder map `OH-X1-23321gnnpnrxssxa`, two humans and four computer players, 5 days; `parallel ai research: heroes able to move ...`, robot only, logs each computer player's heroes that can move when it changes):
+
+| Run | Hero moves per computer player over 5 days | Computers' part of a day |
+|---|---|---|
+| one after another (`20261107-192850-lan`) | 48, 22, 48, 14 | 20.1 s (days 2-5: 18.1) |
+| 0.3.5 together (`20261107-191636-lan`) | 33, 7, 10, 9 (the last three: all on day 1) | 16.2 s (14.0) |
+| **0.3.6 together** (`20261109-005537-lan`) | **36, 32, 36, 33** | **17.6 s (15.7)** |
+
+At each phase's start every computer player's heroes can move (day 2: 2/2, 2/2, 3/3, 2/2; before: 2/2, 0/2, 0/3, 0/2). The last one to end its turn changes from day to day. Together is about 12% shorter than one after another on this map: the first computer player, an ally of the humans whose walks are shown (and so take time), sets the pace.
+
+The same game with world checksums (`20261109-005945-lan`, 3 days): **1302 world checks, all equal** on both PCs; hero moves 18, 14, 25 and 12.
+
 ## Order
 
 1. Undo End Turn: built (2026-11-04). Next: the owner's hand test (a real click on the button), then a release.
 2. Quick resume: find when the world removes a dropped player; then the host's save at the drop, the banner, the robot test (kill a copy, reload, rejoin).
-3. Parallel AI turns: the experiment works (2026-11-04, ~40% shorter computer phases with two computer players, PCs in step). Three computer players on a script map: 46% shorter. Next: a multiplayer game with three computer players and the owner's hand test, then the agreement between PCs and a host setting (off by default).
+3. Parallel AI turns: built (0.3.2, the host's setting; on by default in 0.3.5). Its first measures (~40% shorter) were taken with the bug above; fixed in 0.3.6. Next: measure again with two or three computer players on a smaller map, and the owner's hand test (the computer players should be as strong as one after another).

@@ -51,6 +51,11 @@ WHAT IT DOES
 - Linux: the mouse wheel zooms out again (automatic).
 
 
+NEW IN 0.3.6
+
+- Computers playing together: fixed. In 0.3.5 (and since 0.3.2 when it was turned on), only the first computer player of each day moved its heroes; the others stayed home after the first day, so they were much weaker. Now every one moves its heroes every day. Every PC needs 0.3.6 for it: with an older PC in the game, the computers play one after another.
+
+
 NEW IN 0.3.5
 
 - The original 2008 game, without MMH5.5: supported, also from a folder where MMH5.5 is installed (H5 Together hides MMH5.5's files from it; MMH5.5 still starts as before). The installer can make bin\H5_Original_4GB.exe (the original game with 4 GB of memory): with your yes it fetches only the 2008 exe from MMH5.5's official GitHub release and checks it. Its own profile and saves (Documents\H5 Together\Original game). Endless simultaneous turns for it (the host's choice).

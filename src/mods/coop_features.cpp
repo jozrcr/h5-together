@@ -192,7 +192,7 @@ unsigned Wants(unsigned *ai_bonus)
 std::string Names(unsigned bits)
 {
 	std::string out;
-	for (int f = 0; f < features::kFeatureCount; ++f)
+	for (int f = 0; f < features::kKnowsCount; ++f)
 		if (bits & (1u << f)) {
 			if (!out.empty())
 				out += " ";

@@ -231,11 +231,13 @@ and MMH5.5's console: `H5 Together: H55_AICheatMode = 0`. Robot (LAN A1M4, 2026-
 
 **How:** the world's update ends with the script clock's tick; during a multiplayer world update, the tick goes through only when the update's game time is in a new 200 ms step. Every PC runs the same updates with the same times, so every PC ticks the same. Measures and the addresses: [docs/plans/performance.md](../../docs/plans/performance.md), "The script clock".
 
-## Computer players side by side (`parallel_ai.cpp`; off, the host's choice)
+## Computer players side by side (`parallel_ai.cpp`; on since 0.3.5, the host's choice)
 
-**What it does:** the computer players take their turns at the same time instead of one after another (robot: their part of a day about 40% shorter with two or three). They may decide differently than in the original game, so it is off by default. Multiplayer only.
+**What it does:** the computer players take their turns at the same time instead of one after another (robot, four computer players on a 320x320 map: their part of a day about 12% shorter). They may decide differently than in the original game (each sees the others' moves as they happen). Multiplayer only.
 
-**Setting:** `[ai] parallel_turns=1` (Options, H5 Together, the host's settings). Only the host's value counts, from the next game; every PC needs a DLL that knows it. How: [docs/plans/turn-features.md](../../docs/plans/turn-features.md), part 3.
+**Fixed in 0.3.6:** until 0.3.5 only the first computer player of the phase got the game's start of a turn (`0x00994920`: its heroes' movement back), so the others never moved a hero after the first day. Now the phase's start runs it for each computer player it brings in. Every PC must do the same: the co-op features' hello has a new bit (`parallel_ai_starts`), and a 0.3.5 PC in the game keeps the phase off for everyone.
+
+**Setting:** `[ai] parallel_turns=1` (Options, H5 Together, the host's settings). Only the host's value counts, from the next game; every PC needs 0.3.6 or later. How, and the bug: [docs/plans/turn-features.md](../../docs/plans/turn-features.md), part 3.
 
 ## Following a friend's view (`spectate*.cpp`; on, each player's choice)
 
