@@ -53,7 +53,7 @@ WHAT IT DOES
 
 NEW IN 0.3.6
 
-- Computers playing together: fixed. In 0.3.5 (and since 0.3.2 when it was turned on), only the first computer player of each day moved its heroes; the others stayed home after the first day, so they were much weaker. Now every one moves its heroes every day. It is OFF by default again (an experiment: about 12-19% shorter waits, and one long robot game of three crashed with it). Every PC needs 0.3.6 for it: with an older PC in the game, the computers play one after another.
+- Computers playing together: fixed. In 0.3.5 (and since 0.3.2 when it was turned on), only the first computer player of each day moved its heroes; the others stayed home after the first day, so they were much weaker. Now every one moves its heroes every day. It is OFF by default again (an experiment: about 12-19% shorter waits, and two long robot games of four crashed with it). Every PC needs 0.3.6 for it: with an older PC in the game, the computers play one after another.
 
 
 NEW IN 0.3.5
