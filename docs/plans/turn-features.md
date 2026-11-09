@@ -147,7 +147,7 @@ The same game with world checksums (`20261109-005945-lan`, 3 days): **1302 world
 
 **MMH5.5** (`MMH55_Utility_64.exe`, its scripts on, random map `EDD31DF8`, two humans and two computer players, 12 days, world checksums on): together (`20261109-010315-lan`) 4.7 s a day, hero moves 80 and 84, every hero ready at each phase's start, 2195 checks all equal; one after another (`20261109-010652-lan`) 5.4 s a day, hero moves 80 and 114, 2318 checks all equal. So together is about 13% shorter here, not the 39% measured with the bug. The second computer moved less in this run (84 against 114): one run each, perhaps only other choices (it sees the first one's moves as they happen); to watch in real games.
 
-**Long games and a crash: off by default in 0.3.6.** Four 15-day robot games on the 320x320 map (original game, four computers, no checksums):
+**Long games and a crash: off by default in 0.3.6.** 15-day robot games on the 320x320 map (original game, four computers, no checksums):
 
 | Run | Mode | Days | Hero moves per computer | Computers' part of a day |
 |---|---|---|---|---|
@@ -157,10 +157,18 @@ The same game with world checksums (`20261109-005945-lan`, 3 days): **1302 world
 | `20261109-012102-lan` | one after another | 15 | 115, 116, 115, 58 | 23.4 s |
 | `20261109-015443-lan` | one after another (0.3.6's default) | 15 | 114, 104, 119, 32 | 22.3 s |
 | `20261109-020347-lan` | together | **crashed on day 6** | 48, 35, 38, 29 (6 days) | 18.3 s |
+| `20261109-020901-lan` | together, `fast_paths` off | 15 | 116, 88, 122, 96 | |
+| `20261109-021703-lan` | together, `fast_paths` off | 15 | 103, 109, 106, 85 | |
+| `20261109-022741-lan` | together, the game's own pathfinding during the phase (an experiment, dropped) | 15 | 138, 93, 97, 84 | 20.3 s |
+| `20261109-023558-lan` | the same | **crashed on day 10** | 70, 55, 79, 77 (10 days) | 18.1 s |
+| `20261109-024145-lan` | the same | 15 | 93, 105, 96, 80 | 20.2 s |
+| `20261109-025132-lan` | one after another (0.3.6's default) | 15 | 115, 118, 120, 47 | 22.6 s |
+| `20261109-030034-lan` | one after another (0.3.6's default) | 15 | 126, 96, 126, 82 | 21.0 s |
+| `20261109-030911-lan` | one after another (0.3.6's default) | 15 | 102, 98, 119, 73 | 22.2 s |
 
-The second crash is the same path: the pathfinder's tile check (`0x009d1700` → `0x009d15e0`), the hero estimate (`0x00bc5740` → `0x00bc5480`), the change log's "back to position" (`0x00bc567c` calls slot 8, `0x0050c7c0`), here reading `0x4` at `0x0050c8bd` (a saved entry whose fields are text: `edi=31332f47`, "G/31"). So **2 crashes in 4 long "together" games, none in 3 "one after another"**. Both crashes had our ported pathfinder on (the one run without it ran 15 days, a single run).
+The second crash is the same path: the pathfinder's tile check (`0x009d1700` → `0x009d15e0`), the hero estimate (`0x00bc5740` → `0x00bc5480`), the change log's "back to position" (`0x00bc567c` calls slot 8, `0x0050c7c0`), here reading `0x4` at `0x0050c8bd` (a saved entry whose fields are text: `edi=31332f47`, "G/31"). The third crash (`20261109-023558-lan`, day 10) came with the game's own search loop and expansion on the stack (`0x00c08b32`, `0x00c084f9`): our ported pathfinder was paused for the phase, so it is not the cause (the three runs without it that ran 15 days were luck). **3 crashes in 9 long "together" games, all at the same place; none in 5 one after another.**
 
-The crash (host, `h5-together-host-crash-20261109-012042.txt`): an access violation reading `0x3000` in a buffer copy (`0x008c7650`, from `0x008c7e70`) inside `0x0050c7c0`, slot 8 of the world's change log (world slot `0x98`, vftable `0x00e1a540`): the log's "back to position N", which copies saved entries back. The AI uses that log to try things in its head and undo them (the turn driver keeps the position at `+0xdc`; `0x00bc5480`, under a hero estimate `0x00bc5740` called from the pathfinder's tile check `0x009d15e0`/`0x009d1700`, rolls back to a position it holds at `+0x14`). The saved entry it copied from was garbage. A guess, not proven: a position kept by one computer's AI no longer matches the log after another computer's moves ran in between. Until 0.3.6 this never showed, because the computers after the first did not move. Not seen in the run without our ported pathfinder, nor one after another, but that is two runs. So **0.3.6 ships with `[ai] parallel_turns=0` by default**: the gain is only 12-19%, and the game's own order is safe. Next: reproduce it (a save from the crashed run's day 8, or many long runs), then find who keeps the stale position.
+The crash (host, `h5-together-host-crash-20261109-012042.txt`): an access violation reading `0x3000` in a buffer copy (`0x008c7650`, from `0x008c7e70`) inside `0x0050c7c0`, slot 8 of the world's change log (world slot `0x98`, vftable `0x00e1a540`): the log's "back to position N", which copies saved entries back. The AI uses that log to try things in its head and undo them (the turn driver keeps the position at `+0xdc`; `0x00bc5480`, under a hero estimate `0x00bc5740` called from the pathfinder's tile check `0x009d15e0`/`0x009d1700`, rolls back to a position it holds at `+0x14`). The saved entry it copied from was garbage. A guess, not proven: a position kept by one computer's AI no longer matches the log after another computer's moves ran in between. Until 0.3.6 this never showed, because the computers after the first did not move. So **0.3.6 ships with `[ai] parallel_turns=0` by default**: the gain is only 12-19%, and the game's own order is safe. Next: reproduce it (a save from the crashed run's day 8, or many long runs), then find who keeps the stale position.
 
 ## Order
 
