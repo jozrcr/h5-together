@@ -53,7 +53,9 @@ WHAT IT DOES
 
 NEW IN 0.3.6
 
-- Computers playing together: fixed. In 0.3.5 (and since 0.3.2 when it was turned on), only the first computer player of each day moved its heroes; the others stayed home after the first day, so they were much weaker. Now every one moves its heroes every day. It is OFF by default again (an experiment: about 12-19% shorter waits, and three long robot games of nine crashed with it). Every PC needs 0.3.6 for it: with an older PC in the game, the computers play one after another.
+- Weak computer players: fixed. With 0.3.5's default settings ("computers play together"), only the first computer player of each day moved its heroes; the others stayed home after the first day, so they were much weaker. Now the computers play one after another again, as in the original game, and every one moves its heroes every day.
+- "Computers play together" is no longer in the Options: it saved only 12-19% of the wait, and long robot games crashed with it.
+- The speed, measured again: with four computer players on a big map, the computers' part of each day is about 3 times shorter than with the game's own timings (61 s down to 20 s). 0.3.5 said "about 4 times": that counted computers that did nothing.
 
 
 NEW IN 0.3.5
@@ -92,7 +94,6 @@ NEW IN 0.3.3
 NEW IN 0.3.2
 
 - A smoother map: big maps zoomed far out run about twice as fast (the game gets more room for its 3D models; far-away animations get lighter when the map runs slow), and MMH5.5's scripts run at their own pace again with the faster co-op steps.
-- Computers play together (the host's choice, off by default): the computer players take their turns at the same time.
 - Undo End Turn (the host's choice, off by default): with simultaneous turns, take back an End Turn while another human still plays.
 - Quick resume after a crash (on): every PC saves "Reprise" with the player who crashed; they get the save over Steam.
 - Each game its own autosaves: named after their map, so a new game no longer overwrites yesterday's.

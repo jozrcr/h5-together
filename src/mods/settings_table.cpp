@@ -119,8 +119,7 @@ const Setting kSettings[] = {
 	FILE_ONLY("ai", "port_expand", "1", kBool, 0, 1, kTester, kRestart),
 	FILE_ONLY("ai", "fast_ashore", "1", kBool, 0, 1, kTester, kRestart),
 	FILE_ONLY("ai", "ashore_check", "0", kBool, 0, 1, kTester, kRestart),
-	ROW("ai", "parallel_turns", "0", kBool, 0, 1, nullptr, 0, nullptr, kHost, kNextGame, kHostGroup, kCheck,
-	    "settings.ai.parallel_turns", "settings.ai.parallel_turns.help"),
+	HIDDEN("ai", "parallel_turns", "0", kBool, 0, 1),  // experiment: the computers play together; crashes in long games (parallel_ai.cpp)
 	FILE_ONLY("ai", "one_decision_per_frame", "1", kBool, 0, 1, kTester, kRestart),
 	FILE_ONLY("ai", "max_expansions", "0", kInt, 0, 1000000, kTester, kRestart),
 	// [save]
