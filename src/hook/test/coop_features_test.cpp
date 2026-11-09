@@ -18,7 +18,18 @@ void Check(bool ok, const char *what)
 }
 
 const unsigned kRhythm = 1u << kScriptRhythm, kParallel = 1u << kParallelAi, kBonus = 1u << kAiBonus,
-               kEndless = 1u << kEndlessTurns;
+               kEndless = 1u << kEndlessTurns, kStarts = 1u << kParallelAiStarts;
+
+// What a 0.3.5 PC decides (its Decide: the host's wants, known by every PC, bits 0-3).
+unsigned OldDecide(const Hello *hellos, int pcs)
+{
+	if (pcs < 1 || !hellos[0].valid)
+		return 0;
+	unsigned on = hellos[0].wants & 0x0f;
+	for (int pc = 0; pc < pcs; ++pc)
+		on &= hellos[pc].valid ? hellos[pc].knows : 0;
+	return on;
+}
 
 }  // namespace
 
@@ -34,7 +45,8 @@ int main()
 	Check(!DecodeHello(0x55110001).valid, "Undo End Turn's hello ('U') is not ours");
 	Check(!DecodeHello(0x46000301).valid, "version 0: not a hello");
 	Check(!DecodeHello(0).valid, "nothing: not a hello");
-	Check(kKnown == (kRhythm | kParallel | kBonus | kEndless), "this version knows script_rhythm, parallel_ai, ai_bonus and endless_turns");
+	Check(kKnown == (kRhythm | kBonus | kEndless | kStarts),
+	      "this version knows script_rhythm, ai_bonus, endless_turns and parallel_ai_starts (not the old parallel_ai)");
 	h = DecodeHello(EncodeHello(kKnown, kEndless | kBonus, 4));
 	Check(h.valid && h.wants == (kEndless | kBonus) && h.ai_bonus == 4, "hello: endless_turns (bit 3) and the computer bonus travel together");
 	Hello endless[2];
@@ -72,7 +84,7 @@ int main()
 	Check(Decide(two, 2) == 0, "no hello from the host: everything off");
 	two[0] = DecodeHello(EncodeHello(0xff, 0xff));
 	two[1] = DecodeHello(EncodeHello(0xff, 0xff));
-	Check(Decide(two, 2) == kKnown, "a newer version's features: off (this version does not know them)");
+	Check(Decide(two, 2) == kWantable, "a newer version's other bits: off (only the four a host can want)");
 	Hello one[1];
 	one[0] = DecodeHello(EncodeHello(kKnown, kParallel));
 	Check(Decide(one, 1) == kParallel, "a game of one PC (the host and computer players): the host's wish");
@@ -85,7 +97,25 @@ int main()
 	four[3] = Hello();
 	Check(Decide(four, 4) == 0, "four PCs, the last sent none: off");
 
-	Check(Name(kScriptRhythm)[0] == 's' && Name(kParallelAi)[0] == 'p' && Name(kAiBonus)[0] == 'a' && Name(kEndlessTurns)[0] == 'e',
+	// --- parallel_ai, fixed in 0.3.6: never with a 0.3.5 PC, whoever hosts ---
+	Hello fixed[3];
+	for (Hello &x : fixed)
+		x = DecodeHello(EncodeHello(kKnown, 0));
+	fixed[0] = DecodeHello(EncodeHello(kKnown, kRhythm | kParallel));
+	Check(Decide(fixed, 3) == (kRhythm | kParallel), "three PCs of this version, the host wants parallel_ai: on");
+	const unsigned old_knows = kRhythm | kParallel | kBonus | kEndless;  // 0.3.5
+	fixed[2] = DecodeHello(EncodeHello(old_knows, 0));
+	Check(Decide(fixed, 3) == kRhythm, "a 0.3.5 client: parallel_ai off here (it does not know the fixed one)");
+	Check(OldDecide(fixed, 3) == kRhythm, "...and off on the 0.3.5 PC too (this version no longer knows the old bit)");
+	fixed[0] = DecodeHello(EncodeHello(old_knows, kRhythm | kParallel));
+	fixed[2] = DecodeHello(EncodeHello(kKnown, 0));
+	Check(Decide(fixed, 3) == kRhythm, "a 0.3.5 host that wants parallel_ai, a client of this version: off here");
+	Check(OldDecide(fixed, 3) == kRhythm, "...and off on the 0.3.5 host");
+	h = DecodeHello(EncodeHello(kKnown, kParallel));
+	Check(h.knows == kKnown && h.wants == kParallel, "hello: parallel_ai_starts (bit 4) travels in the knows byte");
+
+	Check(Name(kScriptRhythm)[0] == 's' && Name(kParallelAi)[0] == 'p' && Name(kAiBonus)[0] == 'a' && Name(kEndlessTurns)[0] == 'e' &&
+	          Name(kParallelAiStarts)[0] == 'p',
 	      "names");
 
 	if (g_failures)

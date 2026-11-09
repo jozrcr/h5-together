@@ -19,7 +19,9 @@
 // What this does (every hook acts only while the setting is on):
 //   1. the world's tick, before it runs: when one computer player has just got the turn
 //      and no human plays (the computer players' part of the day begins), every other
-//      computer player in the game gets state 0 too. They make up this "phase";
+//      computer player in the game gets state 0 too, and the game's start of a turn
+//      (0x00994920: its heroes' movement back; 0.3.5 missed it, so only the first one
+//      moved its heroes). They make up this "phase";
 //   2. the AI manager's "which computer player plays?": during a phase, the next one in
 //      the phase (in turn, one per frame) that has not ended its turn;
 //   3. a computer player's End Turn during a phase: it is only marked done, unless it is
@@ -45,6 +47,7 @@
 
 #include "../hook/log.h"
 #include "../hook/patch.h"
+#include "../hook/robot.h"
 
 namespace mods {
 namespace {
@@ -56,6 +59,12 @@ const DWORD kTick = 0x00998520;            // the world's turn manager, __thisca
 const DWORD kTickCall = 0x0099892e;        // in the world's update 0x009987b0
 const DWORD kEndTurnSlot = 0x00e6260c + 0xd0;  // NWorld::CWorld slot 0xd0
 const DWORD kEndTurn = 0x00998760;         // __thiscall(world, IPlayer *), ret 4
+// The start of a player's turn, __thiscall(world, IPlayer *), ret 4: for a player at state
+// 0 only, the new week's message (once a week), every hero's and both tavern heroes' slot
+// 0x220 (movement back), then the world's slot 0x1fc for its heroes (their turn flags). The
+// next turn (0x00998060) runs it for every player at its end (0x00995ef0): so only for the
+// players it has just given the turn to.
+const DWORD kTurnStart = 0x00994920;
 const DWORD kPlayers = 0x24, kPlayersEnd = 0x28;
 // IPlayer slots (byte offsets in its vtable 0x00e1a09c)
 const DWORD kNumber = 0x2c, kState = 0x44, kSetState = 0x48, kInGame = 0x6c, kHuman = 0x184;
@@ -69,6 +78,7 @@ const Code kCode[] = {
 	{kFindPlaying, {0x51, 0x53, 0x55, 0x8b, 0xe9, 0x8b, 0x45, 0x00}, 8},
 	{kTick, {0x51, 0x56, 0x8b, 0xf1, 0x8b, 0x06, 0xff, 0x50}, 8},
 	{kEndTurn, {0x56, 0x8b, 0x74, 0x24, 0x08, 0x85, 0xf6, 0x57}, 8},
+	{kTurnStart, {0x53, 0x8b, 0x5c, 0x24, 0x08, 0x85, 0xdb, 0x55}, 8},
 	{0x00720e90, {0x8b, 0x41, 0x78, 0xc3}, 4},   // slot 0x2c: the number at +0x78
 	{0x00500c10, {0x8b, 0x81, 0x34, 0x06, 0x00, 0x00}, 6},  // slot 0x44: the state
 	{0x00500d60, {0x33, 0xc0, 0x39, 0x41, 0x74, 0x0f}, 6},  // slot 0x184: human
@@ -77,6 +87,7 @@ const Code kCode[] = {
 typedef void *(__fastcall *FindFn)(void *players, int want_human, int in_game_only);
 typedef void(__fastcall *TickFn)(void *world, void *edx);
 typedef void(__fastcall *EndTurnFn)(void *world, void *edx, void *player);
+typedef void(__fastcall *TurnStartFn)(void *world, void *edx, void *player);
 typedef int(__fastcall *GetFn)(void *self, void *edx);
 typedef void(__fastcall *SetFn)(void *self, void *edx, int value);
 
@@ -183,9 +194,71 @@ std::string Members()
 	return out;
 }
 
+// RESEARCH (robot only, 2026-11-09): per computer player, its heroes that can still move
+// (the AI's hero pick 0x00869770: the world's actor for the hero, world slot 0x100, and
+// its second base's slot 0x44 = 0x008db210: movement points over 999).
+typedef void *(__fastcall *ActorOfFn)(void *world, void *edx, void *hero);
+typedef char(__fastcall *ByteFn)(void *self, void *edx);
+typedef void *(__fastcall *PtrFn)(void *self, void *edx);
+
+void ReadySignatureUnsafe(void *world, char *out, size_t size)
+{
+	size_t used = 0;
+	out[0] = 0;
+	{
+		P players[8];
+		const int n = ReadPlayers(static_cast<const BYTE *>(world) + kPlayers, players, 8);
+		ActorOfFn actor_of = reinterpret_cast<ActorOfFn>(Read(reinterpret_cast<void *>(Read(world, 0)), 0x100));
+		for (int i = 0; i < n; ++i) {
+			if (players[i].human || !players[i].in_game)
+				continue;
+			void *player = players[i].player;
+			const DWORD *vec = static_cast<const DWORD *>(reinterpret_cast<PtrFn>(Read(reinterpret_cast<void *>(Read(player, 0)), 0xc0))(player, nullptr));
+			int heroes = 0, ready = 0;
+			for (DWORD h = vec[0]; h < vec[1]; h += 4, ++heroes) {
+				char *actor = static_cast<char *>(actor_of(world, nullptr, reinterpret_cast<void *>(*reinterpret_cast<DWORD *>(h))));
+				if (!actor)
+					continue;
+				char *second = actor + 4 + *reinterpret_cast<const LONG *>(Read(actor, 4) + 0xc);
+				if (reinterpret_cast<ByteFn>(Read(reinterpret_cast<void *>(Read(second, 0)), 0x44))(second, nullptr))
+					++ready;
+			}
+			const int w = _snprintf_s(out + used, size - used, _TRUNCATE, "%sP%d(s%d):%d/%d", used ? " " : "", players[i].number,
+			                          players[i].state, ready, heroes);
+			if (w > 0)
+				used += static_cast<size_t>(w);
+		}
+	}
+}
+
+void ReadySignature(void *world, char *out, size_t size)
+{
+	__try {
+		ReadySignatureUnsafe(world, out, size);
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER) {
+		strcpy_s(out, size, "(read failed)");
+	}
+}
+
+char g_ready_last[256];
+
+void NoteReady(void *world, const char *where)
+{
+	if (!robot::Active())
+		return;
+	char now[256];
+	ReadySignature(world, now, sizeof(now));
+	if (strcmp(now, g_ready_last) != 0) {
+		hooklog::Write("parallel ai research: heroes able to move %s: %s", where, now);
+		strcpy_s(g_ready_last, now);
+	}
+}
+
 // 1. Before the world's tick: the computer players' part of the day begins.
 void __fastcall TickHook(void *world, void *edx)
 {
+	NoteReady(world, "before the world's tick");
 	if (g_phase && world != g_phase_world) {
 		g_phase = false;
 		hooklog::Write("parallel ai: phase %d ends with its game", g_phase_count);
@@ -209,9 +282,14 @@ void __fastcall TickHook(void *world, void *edx)
 				if (!players[i].in_game || players[i].human || players[i].number < 1 || players[i].number > 8)
 					continue;
 				g_member[players[i].number] = true;
-				if (players[i].state != 0)
+				if (players[i].state != 0) {
 					reinterpret_cast<SetFn>(Read(reinterpret_cast<void *>(Read(players[i].player, 0)), kSetState))(players[i].player,
 					                                                                                              nullptr, 0);
+					// ...and the start of its turn, as the game's next turn gives it to the
+					// player it starts: its heroes' movement back, their turn flags reset
+					// (without it, 0.3.5: only the first computer player moved its heroes)
+					reinterpret_cast<TurnStartFn>(kTurnStart)(world, nullptr, players[i].player);
+				}
 			}
 			g_phase = true;
 			g_phase_world = world;
@@ -222,9 +300,11 @@ void __fastcall TickHook(void *world, void *edx)
 			g_phase_started = GetTickCount();
 			++g_phase_count;
 			hooklog::Write("parallel ai: phase %d: computer players %s play at the same time", g_phase_count, Members().c_str());
+			NoteReady(world, "after the phase's start");
 		}
 	}
 	g_tick_next(world, edx);
+	NoteReady(world, "after the world's tick");
 }
 
 // 2. The AI manager: the next computer player of the phase not done yet.
@@ -273,12 +353,16 @@ void __fastcall EndTurnHook(void *world, void *edx, void *player)
 			hooklog::Write("parallel ai: computer player %d ended its turn, the last of phase %d (%lu ms): the day moves on (the "
 			               "AI manager's picks/busy/free/reached: %s)",
 			               number, g_phase_count, GetTickCount() - g_phase_started, picks.c_str());
+			NoteReady(world, "before the last End Turn");
 			g_end_turn_next(world, edx, player);  // the game's End Turn, and its next turn (hook 4 inside)
+			NoteReady(world, "after the last End Turn");
 			g_phase = false;
 			return;
 		}
 	}
+	NoteReady(world, "before an End Turn");
 	g_end_turn_next(world, edx, player);
+	NoteReady(world, "after an End Turn");
 }
 
 // 4. Inside the next turn: "the computer player playing now".

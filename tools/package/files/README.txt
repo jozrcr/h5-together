@@ -25,7 +25,7 @@ Double-click uninstall.bat (Windows) or run: bash uninstall.sh (Linux). Only our
 SETTINGS (you can skip this)
 
 In the game: main menu, Options, then "H5 Together" (or press F3). The page is part of the game's own Options screen: change a setting, then Apply (Default puts all of them back). A name that ends in * applies after a restart of the game, ** from the next game; the others apply at once. During a multiplayer game the host's and the advanced settings are read only.
-The settings are saved in h5-together.ini in the game's bin folder; you can also edit it with Notepad (then restart the game). Every line that starts with ";" is not changed and shows the default. The speed-ups, fixes and panels are on. Since 0.3.5 a few co-op choices are on by default too (endless simultaneous turns, computers playing together, Undo End Turn, start terrain of your faction, online play over Steam: see NEW IN 0.3.5); the rest of what changes how the game plays, looks or sounds is off until you turn it on.
+The settings are saved in h5-together.ini in the game's bin folder; you can also edit it with Notepad (then restart the game). Every line that starts with ";" is not changed and shows the default. The speed-ups, fixes and panels are on. Since 0.3.5 a few co-op choices are on by default too (endless simultaneous turns, Undo End Turn, start terrain of your faction, online play over Steam: see NEW IN 0.3.5); the rest of what changes how the game plays, looks or sounds is off until you turn it on.
 The main menu shows your H5 Together version under the game's own version.
 Your hero look choices are kept in h5-together-skins.ini, next to it.
 
@@ -49,6 +49,11 @@ WHAT IT DOES
 - Game rules (host): the "Rules..." button ("Regles..." in French) in the multiplayer waiting room, or F2. Used only when every player has this version.
 - Off by default (Options, H5 Together, or h5-together.ini): a "new version available" notice in the main menu (the first start asks; at most once a day it asks GitHub for the latest version number; nothing is downloaded), farther camera zoom, black map edges, the original Heroes V music, French texts.
 - Linux: the mouse wheel zooms out again (automatic).
+
+
+NEW IN 0.3.6
+
+- Computers playing together: fixed. In 0.3.5 (and since 0.3.2 when it was turned on), only the first computer player of each day moved its heroes; the others stayed home after the first day, so they were much weaker. Now every one moves its heroes every day. It is OFF by default again (an experiment: about 12-19% shorter waits, and three long robot games of nine crashed with it). Every PC needs 0.3.6 for it: with an older PC in the game, the computers play one after another.
 
 
 NEW IN 0.3.5

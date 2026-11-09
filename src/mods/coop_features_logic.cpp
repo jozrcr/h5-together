@@ -27,10 +27,15 @@ unsigned Decide(const Hello *hellos, int pcs)
 {
 	if (pcs < 1 || !hellos[0].valid)
 		return 0;
-	unsigned on = hellos[0].wants & kKnown;
+	const unsigned wants = hellos[0].wants & kWantable;
+	unsigned all_know = 0xff;
 	for (int pc = 0; pc < pcs; ++pc)
-		on &= hellos[pc].valid ? hellos[pc].knows : 0;
-	return on;
+		all_know &= hellos[pc].valid ? hellos[pc].knows : 0;
+	const unsigned parallel = 1u << kParallelAi;
+	unsigned on = wants & all_know & kKnown;
+	if ((wants & parallel) && (all_know & (1u << kParallelAiStarts)))
+		on |= parallel;  // asked with its old bit, known as the fixed version's
+	return on & kWantable;
 }
 
 const char *Name(int feature)
@@ -44,6 +49,8 @@ const char *Name(int feature)
 		return "ai_bonus";
 	case kEndlessTurns:
 		return "endless_turns";
+	case kParallelAiStarts:
+		return "parallel_ai_starts";
 	default:
 		return "?";
 	}
