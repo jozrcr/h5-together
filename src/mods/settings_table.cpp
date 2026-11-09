@@ -164,6 +164,8 @@ const Setting kSettings[] = {
 	    "settings.ui.language", "settings.ui.language.help"),
 	ROW("ui", "hero_tips", "1", kBool, 0, 1, nullptr, 0, nullptr, kPlayer, kRestart, kInterface, kCheck,
 	    "settings.ui.hero_tips", "settings.ui.hero_tips.help"),
+	ROW("ui", "portal_colors", "0", kBool, 0, 1, nullptr, 0, nullptr, kPlayer, kRestart, kInterface, kCheck,
+	    "settings.ui.portal_colors", "settings.ui.portal_colors.help"),  // portal_colors.cpp, 0.3.7
 	ROW("ui", "skill_wheel", "1", kBool, 0, 1, nullptr, 0, nullptr, kPlayer, kLive, kInterface, kCheck,
 	    "settings.ui.skill_wheel", "settings.ui.skill_wheel.help"),  // the button: the 2008 game only (skill_wheel.cpp)
 	ROW("ui", "skill_wheel_key", "none", kKey, 0, 0, nullptr, 0, nullptr, kPlayer, kLive, kInterface, kList,
